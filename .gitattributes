@@ -1,0 +1,6 @@
+# Normalize line endings on commit; check out CRLF on Windows.
+* text=auto
+
+# Husky hooks are executed by sh: CRLF there breaks the hook.
+.husky/* text eol=lf
+*.sh text eol=lf

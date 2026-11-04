@@ -1,0 +1,8 @@
+# Fast, staged-only: Prettier via lint-staged.
+pnpm exec lint-staged
+
+# typecheck / test 尚未接入：package.json 里没有 typecheck 脚本，
+# 且 test 脚本仍是 npm init 的占位（echo + exit 1）。
+# 等有了真实脚本后在此追加，例如：
+#   pnpm exec tsc --noEmit
+#   pnpm test

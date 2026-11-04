@@ -1,0 +1,9 @@
+# Lockfiles are generated — Prettier must not rewrite them.
+pnpm-lock.yaml
+package-lock.json
+npm-shrinkwrap.json
+
+# Dependencies / build output
+node_modules/
+dist/
+coverage/
