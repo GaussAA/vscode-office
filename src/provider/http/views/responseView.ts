@@ -77,8 +77,8 @@ export class HttpResponseView {
 
     public constructor() {
         workspace.registerTextDocumentContentProvider(this.scheme, this.contentProvider);
-        commands.registerCommand('vscode-office.copy-response-body', () => this.copyBody());
-        commands.registerCommand('vscode-office.save-response-body', () => this.saveBody());
+        commands.registerCommand('chaowu21.vscode-office.copy-response-body', () => this.copyBody());
+        commands.registerCommand('chaowu21.vscode-office.save-response-body', () => this.saveBody());
     }
 
     public async render(response: HttpResponse, column?: ViewColumn) {

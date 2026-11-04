@@ -54,6 +54,6 @@ export class RequestBodyDocumentLinkProvider implements DocumentLinkProvider {
             }
         }
 
-        return Uri.parse(`command:vscode-office._openDocumentLink?${encodeURIComponent(JSON.stringify({ path: resourcePath }))}`);
+        return Uri.parse(`command:chaowu21.vscode-office._openDocumentLink?${encodeURIComponent(JSON.stringify({ path: resourcePath }))}`);
     }
 }

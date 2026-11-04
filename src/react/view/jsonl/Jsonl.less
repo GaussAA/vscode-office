@@ -1,0 +1,207 @@
+body:has(.jsonl-viewer) {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.jsonl-viewer {
+    --jl-bg: var(--vscode-editor-background, #1e1e1e);
+    --jl-header-bg: var(--vscode-editorGroupHeader-tabsBackground, #2d2d2d);
+    --jl-border: var(--vscode-panel-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
+    --jl-fg: var(--vscode-foreground, #cccccc);
+    --jl-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+    --jl-hover: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.31));
+    --jl-active-bg: var(--vscode-list-activeSelectionBackground, #094771);
+    --jl-active-fg: var(--vscode-list-activeSelectionForeground, #ffffff);
+    --jl-error: var(--vscode-errorForeground, #f48771);
+    --jl-warn: var(--vscode-editorWarning-foreground, #e8d48b);
+    --jl-num: var(--vscode-charts-blue, #3794ff);
+    --jl-str: var(--vscode-charts-green, #89d185);
+    --jl-bool: var(--vscode-charts-red, #f14c4c);
+    --jl-null: var(--vscode-charts-orange, #d18616);
+    --jl-key: var(--vscode-symbolIcon-propertyForeground, var(--vscode-charts-purple, #b180d7));
+    --jl-line-id: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.55));
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-height: 100vh;
+    background: var(--jl-bg);
+    color: var(--jl-fg);
+    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+    font-size: var(--vscode-font-size, 13px);
+    overflow: hidden;
+}
+
+.jsonl-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 12px;
+    background: var(--jl-header-bg);
+    border-bottom: 1px solid var(--jl-border);
+    flex: 0 0 auto;
+}
+
+.jsonl-file-name {
+    max-width: 320px;
+    font-size: 12px;
+}
+
+.jsonl-meta {
+    color: var(--jl-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.jsonl-selection {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 12px;
+    border-bottom: 1px solid var(--jl-border);
+    background: color-mix(in srgb, var(--jl-header-bg) 70%, transparent);
+    font-size: 12px;
+    flex: 0 0 auto;
+}
+
+.jsonl-selection__path {
+    font-family: var(--vscode-editor-font-family, monospace);
+    color: var(--jl-key);
+}
+
+.jsonl-selection__value {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--jl-muted);
+}
+
+.jsonl-tree {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 2px 4px;
+
+    .ant-tree {
+        background: transparent;
+        color: var(--jl-fg);
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: var(--vscode-editor-font-size, 12px);
+    }
+
+    .ant-tree-treenode {
+        padding: 0;
+    }
+
+    .ant-tree-node-content-wrapper {
+        border-radius: 4px;
+        line-height: 22px;
+
+        &:hover {
+            background: var(--jl-hover);
+        }
+    }
+
+    .ant-tree-node-selected {
+        background: var(--jl-active-bg) !important;
+
+        .ant-tree-node-content-wrapper,
+        .jsonl-key,
+        .jsonl-val {
+            color: var(--jl-active-fg) !important;
+        }
+    }
+
+    .ant-tree-switcher {
+        color: var(--jl-muted);
+    }
+}
+
+.jsonl-line {
+    white-space: pre;
+}
+
+.jsonl-line--pending,
+.jsonl-line--empty {
+    color: var(--jl-muted);
+}
+
+.jsonl-line--error {
+    color: var(--jl-error);
+}
+
+.jsonl-line--warn {
+    color: var(--jl-warn);
+}
+
+.jsonl-badge {
+    display: inline-block;
+    margin: 0 4px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 16px;
+}
+
+.jsonl-badge--error {
+    background: color-mix(in srgb, var(--jl-error) 22%, transparent);
+}
+
+.jsonl-badge--warn {
+    background: color-mix(in srgb, var(--jl-warn) 22%, transparent);
+}
+
+.jsonl-kv {
+    white-space: pre;
+}
+
+.jsonl-key {
+    color: var(--jl-key);
+}
+
+.jsonl-colon {
+    color: var(--jl-muted);
+}
+
+.jsonl-val--number {
+    color: var(--jl-num);
+}
+
+.jsonl-val--string {
+    color: var(--jl-str);
+}
+
+.jsonl-val--boolean {
+    color: var(--jl-bool);
+}
+
+.jsonl-val--null {
+    color: var(--jl-null);
+    font-style: italic;
+}
+
+.jsonl-val--object,
+.jsonl-val--array {
+    color: var(--jl-muted);
+}
+
+.jsonl-muted {
+    color: var(--jl-muted);
+}
+
+.jsonl-more {
+    color: var(--jl-muted);
+    font-style: italic;
+}
+
+.jsonl-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    color: var(--jl-muted);
+}

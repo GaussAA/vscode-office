@@ -69,8 +69,23 @@ function resolveColumnIcon(type: string): { icon: string; kind: ColumnIconKind }
 
 type TableRow = Record<string, unknown> & { key: string };
 
+/** Codecs actually used by this file's column chunks. */
+function collectCodecs(metadata: unknown): string[] {
+    const codecs = new Set<string>();
+    const groups = (metadata as {
+        row_groups?: Array<{ columns?: Array<{ meta_data?: { codec?: string } }> }>;
+    })?.row_groups ?? [];
+    for (const group of groups) {
+        for (const column of group.columns ?? []) {
+            const codec = column.meta_data?.codec;
+            if (codec) codecs.add(codec);
+        }
+    }
+    return [...codecs];
+}
+
 function ParquetViewer() {
-    const { message } = App.useApp();
+    const { message, modal } = App.useApp();
     const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
     const [allRows, setAllRows] = useState<Record<string, unknown>[]>([]);
     const [page, setPage] = useState(0);
@@ -127,19 +142,37 @@ function ParquetViewer() {
     const handleSave = useCallback(() => {
         const info = fileInfoRef.current;
         if (!info || !dirtyRef.current || savingRef.current || readOnlyRef.current) return;
-        savingRef.current = true;
-        setSaving(true);
-        try {
-            const buffer = writeParquetBuffer(info.columns, allRowsRef.current);
-            handler.emit('save', [...new Uint8Array(buffer)]);
-        } catch (e) {
-            savingRef.current = false;
-            setSaving(false);
-            const errMessage = e instanceof Error ? e.message : 'Failed to serialize parquet file';
-            setError(errMessage);
-            message.error(errMessage);
+
+        const write = () => {
+            savingRef.current = true;
+            setSaving(true);
+            try {
+                const buffer = writeParquetBuffer(info.columns, allRowsRef.current);
+                handler.emit('save', [...new Uint8Array(buffer)]);
+            } catch (e) {
+                savingRef.current = false;
+                setSaving(false);
+                const errMessage = e instanceof Error ? e.message : 'Failed to serialize parquet file';
+                setError(errMessage);
+                message.error(errMessage);
+            }
+        };
+
+        // Fork addition: hyparquet-compressors can READ zstd/gzip/brotli/lz4 but the
+        // writer only encodes SNAPPY. Saving would silently re-encode the file, so warn.
+        const reencoded = collectCodecs(info.metadata).filter(codec => codec !== 'SNAPPY');
+        if (reencoded.length === 0) {
+            write();
+            return;
         }
-    }, [message]);
+        modal.confirm({
+            title: 'Saving will change the compression codec',
+            content: `This file stores its columns as ${reencoded.join(', ')}. Saving writes every column back as SNAPPY, so the file's encoding changes even though the data does not.`,
+            okText: 'Save anyway',
+            cancelText: 'Cancel',
+            onOk: write,
+        });
+    }, [message, modal]);
 
     const startEdit = useCallback((rowIndex: number, column: ParquetColumnInfo, value: unknown) => {
         if (readOnlyRef.current || !isColumnEditable(column.type)) return;

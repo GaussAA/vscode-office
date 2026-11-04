@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { Global } from './common/global';
-import { TelemetryService } from './service/telemetryService';
 import { JavaDecompilerProvider } from './provider/javaDecompilerProvider';
 import { MarkdownEditorProvider } from './provider/markdownEditorProvider';
 import { OfficeViewerProvider } from './provider/officeViewerProvider';
 import { ArchiveViewerProvider } from './provider/archiveViewerProvider';
 import { ClassViewerProvider } from './provider/classViewerProvider';
+import { JsonlViewerProvider } from './provider/jsonlViewerProvider';
 import { HtmlService } from './service/htmlService';
 import { MarkdownService } from './service/markdownService';
 import { switchCsvEditor } from './service/csvService';
@@ -21,7 +21,6 @@ import { autoClearCacheStorage } from './service/autoClearCacheStorage';
 export async function activate(context: vscode.ExtensionContext) {
 	await Global.init(context);
 	autoClearCacheStorage(context);
-	TelemetryService.init(context);
 	await IconService.getInstance().init(context);
 	activateHttp(context);
 	activateYaml(context);
@@ -34,17 +33,19 @@ export async function activate(context: vscode.ExtensionContext) {
 	const viewerInstance = new OfficeViewerProvider(context);
 	const archiveViewerInstance = new ArchiveViewerProvider(context);
 	const classViewerInstance = new ClassViewerProvider(context);
+	const jsonlViewerInstance = new JsonlViewerProvider(context);
 	const markdownEditorProvider = new MarkdownEditorProvider(context)
 	context.subscriptions.push(
-		vscode.commands.registerCommand('office.markdown.switch', (uri) => { markdownService.switchEditor(uri) }),
-		vscode.commands.registerCommand('office.csv.switch', (uri) => { switchCsvEditor(uri) }),
-		vscode.commands.registerCommand('office.markdown.paste', () => { markdownService.loadClipboardImage() }),
-		vscode.commands.registerCommand('office.html.preview', uri => HtmlService.previewHtml(uri, context)),
+		vscode.commands.registerCommand('chaowu21.office.markdown.switch', (uri) => { markdownService.switchEditor(uri) }),
+		vscode.commands.registerCommand('chaowu21.office.csv.switch', (uri) => { switchCsvEditor(uri) }),
+		vscode.commands.registerCommand('chaowu21.office.markdown.paste', () => { markdownService.loadClipboardImage() }),
+		vscode.commands.registerCommand('chaowu21.office.html.preview', uri => HtmlService.previewHtml(uri, context)),
 		vscode.workspace.registerTextDocumentContentProvider('decompile_java', new JavaDecompilerProvider(context)),
-		vscode.window.registerCustomEditorProvider("cweijan.markdownViewer", markdownEditorProvider, viewOption),
-		vscode.window.registerCustomEditorProvider("cweijan.markdownPreview", markdownEditorProvider, viewOption),
+		vscode.window.registerCustomEditorProvider("chaowu21.markdownViewer", markdownEditorProvider, viewOption),
+		vscode.window.registerCustomEditorProvider("chaowu21.markdownPreview", markdownEditorProvider, viewOption),
 		archiveViewerInstance.bindCustomEditor(viewOption),
 		classViewerInstance.bindCustomEditor(viewOption),
+		jsonlViewerInstance.bindCustomEditor(viewOption),
 		...viewerInstance.bindCustomEditors(viewOption)
 	);
 }

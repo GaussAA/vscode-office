@@ -97,7 +97,7 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
             fileSaveTimes[target.toString()] = Date.now();
             setDirty(handler, uri, false);
             handler.emit("saveDone");
-            await vscode.commands.executeCommand('vscode.openWith', target, 'cweijan.officeViewer');
+            await vscode.commands.executeCommand('vscode.openWith', target, 'chaowu21.officeViewer');
         })
         .on('developerTool', () => vscode.commands.executeCommand('workbench.action.toggleDevTools'))
         .on('sponsorClick', () => { })

@@ -1,3 +1,7 @@
 {
-  "*": "prettier --ignore-unknown --write"
+  "AGENTS.md": "prettier --write",
+  "CLAUDE.md": "prettier --write",
+  "GLOSSARY.md": "prettier --write",
+  "docs/agents/**/*.md": "prettier --write",
+  "docs/adr/**/*.md": "prettier --write"
 }

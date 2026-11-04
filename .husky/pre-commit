@@ -1,11 +1,11 @@
-# Fast, staged-only: Prettier via lint-staged.
+# Fast, staged-only: Prettier over OUR docs only.
+#
+# Upstream files (src/, vite/, template/, …) are deliberately NOT auto-formatted:
+# upstream uses a different style (4 spaces, single quotes) and we must stay
+# mergeable with it. Write fork code in upstream style instead.
 pnpm exec lint-staged
 
-# Deep-module boundaries: a package is reachable only through its entry points.
-pnpm lint:boundaries
-
-# typecheck / test 尚未接入：package.json 里没有 typecheck 脚本，
-# 且 test 脚本仍是 npm init 的占位（echo + exit 1）。
-# 等有了真实脚本后在此追加，例如：
+# typecheck / test 尚未接入：上游没有 typecheck 脚本，也没有测试脚本。
+# 等接上后在此追加，例如：
 #   pnpm exec tsc --noEmit
 #   pnpm test

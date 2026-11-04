@@ -20,6 +20,7 @@ const IcnsViewer = lazy(() => import('./view/icns/IcnsViewer.tsx'))
 const PsdViewer = lazy(() => import('./view/psd/PsdViewer.tsx'))
 const XmindViewer = lazy(() => import('./view/xmind/XmindViewer.tsx'))
 const Parquet = lazy(() => import('./view/parquet/Parquet.tsx'))
+const Jsonl = lazy(() => import('./view/jsonl/Jsonl.tsx'))
 const WebUnsupported = lazy(() => import('./view/WebUnsupported.tsx'))
 
 document.getElementById('_defaultStyles')?.parentNode?.removeChild(document.getElementById('_defaultStyles'))
@@ -53,6 +54,8 @@ export default function App() {
       return <XmindViewer />
     case 'parquet':
       return <Parquet />
+    case 'jsonl':
+      return <Jsonl />
     case 'gitHistory':
       return <GitHistory />
     case 'webUnsupported':

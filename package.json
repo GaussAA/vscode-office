@@ -201,50 +201,50 @@
 		],
 		"commands": [
 			{
-				"command": "vscode-office.save-response-body",
+				"command": "chaowu21.vscode-office.save-response-body",
 				"title": "Save Response",
 				"icon": "$(save)",
 				"enablement": "!office.extensionHost.web"
 			},
 			{
-				"command": "vscode-office.copy-response-body",
+				"command": "chaowu21.vscode-office.copy-response-body",
 				"title": "Copy Response",
 				"icon": "$(copy)",
 				"enablement": "!office.extensionHost.web"
 			},
 			{
-				"command": "office.markdown.switch",
+				"command": "chaowu21.office.markdown.switch",
 				"title": "Switch markdown editor",
 				"icon": "$(edit)"
 			},
 			{
-				"command": "office.csv.switch",
+				"command": "chaowu21.office.csv.switch",
 				"title": "Switch CSV editor",
 				"icon": "$(edit)"
 			},
 			{
-				"command": "office.markdown.paste",
+				"command": "chaowu21.office.markdown.paste",
 				"title": "Enhance paste in markdown",
 				"enablement": "!office.extensionHost.web"
 			},
 			{
-				"command": "office.html.preview",
+				"command": "chaowu21.office.html.preview",
 				"title": "Preview HTML"
 			},
 			{
-				"command": "office.gitHistory.view",
+				"command": "chaowu21.office.gitHistory.view",
 				"title": "View Git History",
 				"icon": "$(history)",
 				"enablement": "!office.extensionHost.web"
 			},
 			{
-				"command": "office.gitHistory.viewFileHistory",
+				"command": "chaowu21.office.gitHistory.viewFileHistory",
 				"title": "Git: View File History",
 				"icon": "$(git-commit)",
 				"enablement": "!office.extensionHost.web"
 			},
 			{
-				"command": "office.gitHistory.quickSync",
+				"command": "chaowu21.office.gitHistory.quickSync",
 				"title": "Git: Quick Sync",
 				"icon": "$(sync)",
 				"enablement": "!office.extensionHost.web"
@@ -252,24 +252,24 @@
 		],
 		"keybindings": [
 			{
-				"command": "office.markdown.paste",
+				"command": "chaowu21.office.markdown.paste",
 				"key": "ctrl+v",
 				"mac": "cmd+v",
 				"when": "editorTextFocus && resourceLangId == markdown && !office.extensionHost.web"
 			},
 			{
-				"command": "office.html.preview",
+				"command": "chaowu21.office.html.preview",
 				"key": "ctrl+shift+v",
 				"when": "editorTextFocus && editorLangId == html"
 			},
 			{
-				"command": "office.markdown.switch",
+				"command": "chaowu21.office.markdown.switch",
 				"key": "ctrl+alt+e",
 				"mac": "ctrl+cmd+e",
 				"when": "editorTextFocus && editorLangId == markdown"
 			},
 			{
-				"command": "vscode-office.request",
+				"command": "chaowu21.vscode-office.request",
 				"key": "ctrl+enter",
 				"mac": "cmd+enter",
 				"when": "editorTextFocus && editorLangId == 'http' && !office.extensionHost.web"
@@ -278,81 +278,81 @@
 		"menus": {
 			"scm/title": [
 				{
-					"command": "office.gitHistory.view",
+					"command": "chaowu21.office.gitHistory.view",
 					"group": "navigation",
 					"when": "scmProvider == git && !office.extensionHost.web"
 				},
 				{
-					"command": "office.gitHistory.quickSync",
+					"command": "chaowu21.office.gitHistory.quickSync",
 					"group": "navigation",
 					"when": "scmProvider == git && config.vscode-office.gitHistory.quickSyncButton && !office.extensionHost.web"
 				}
 			],
 			"scm/repository": [
 				{
-					"command": "office.gitHistory.view",
+					"command": "chaowu21.office.gitHistory.view",
 					"group": "navigation",
 					"when": "scmProvider == git && !office.extensionHost.web"
 				}
 			],
 			"scm/resourceState/context": [
 				{
-					"command": "office.gitHistory.viewFileHistory",
+					"command": "chaowu21.office.gitHistory.viewFileHistory",
 					"when": "config.git.enabled && gitOpenRepositoryCount != 0 && !office.extensionHost.web"
 				}
 			],
 			"editor/title": [
 				{
-					"command": "office.gitHistory.viewFileHistory",
+					"command": "chaowu21.office.gitHistory.viewFileHistory",
 					"group": "navigation@4",
 					"when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file && !office.extensionHost.web"
 				},
 				{
-					"command": "office.markdown.switch",
+					"command": "chaowu21.office.markdown.switch",
 					"when": "resourceExtname == '.md'",
 					"group": "navigation@-2"
 				},
 				{
-					"command": "office.csv.switch",
+					"command": "chaowu21.office.csv.switch",
 					"when": "resourceExtname == '.csv' || resourceExtname == '.tsv'",
 					"group": "navigation@-2"
 				},
 				{
 					"when": "editorTextFocus && resourceScheme == rest-client-response",
-					"command": "vscode-office.copy-response-body",
+					"command": "chaowu21.vscode-office.copy-response-body",
 					"group": "navigation@0"
 				},
 				{
 					"when": "editorTextFocus && resourceScheme == rest-client-response",
-					"command": "vscode-office.save-response-body",
+					"command": "chaowu21.vscode-office.save-response-body",
 					"group": "navigation@2"
 				}
 			],
 			"editor/context": [
 				{
-					"command": "office.gitHistory.viewFileHistory",
+					"command": "chaowu21.office.gitHistory.viewFileHistory",
 					"group": "git",
 					"when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file && !office.extensionHost.web"
 				},
 				{
-					"command": "office.html.preview",
+					"command": "chaowu21.office.html.preview",
 					"group": "navigation@1",
 					"when": "editorTextFocus && editorLangId == html"
 				},
 				{
-					"command": "vscode-office.save-response-body",
+					"command": "chaowu21.vscode-office.save-response-body",
 					"group": "http@2",
 					"when": "editorTextFocus && resourceScheme == rest-client-response && !office.extensionHost.web"
 				},
 				{
-					"command": "vscode-office.copy-response-body",
+					"command": "chaowu21.vscode-office.copy-response-body",
 					"group": "http@4",
 					"when": "editorTextFocus && resourceScheme == rest-client-response && !office.extensionHost.web"
 				}
 			],
 			"explorer/context": [
 				{
-					"command": "office.gitHistory.viewFileHistory",
+					"command": "chaowu21.office.gitHistory.viewFileHistory",
 					"group": "git",
 					"when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file && !office.extensionHost.web"
 				}
@@ -861,7 +861,8 @@
 		"vite": "^8.0.16",
 		"vite-plugin-static-copy": "^4.1.1",
 		"husky": "^9.1.7",
-		"prettier": "^3.9.10"
+		"prettier": "^3.9.10",
+		"lint-staged": "^17.6.0"
 	},
 	"dependencies": {
 		"@ant-design/icons": "^5.3.5",

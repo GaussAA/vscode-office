@@ -9,6 +9,8 @@ import {
 } from 'hyparquet';
 import { getPhysicalColumns } from 'hyparquet/src/schema.js';
 import { parquetWriteBuffer, type BasicType, type ColumnSource } from 'hyparquet-writer';
+// Fork addition: decode ZSTD/GZIP/BROTLI/LZ4 columns (upstream shipped SNAPPY only).
+import { compressors } from 'hyparquet-compressors';
 
 export interface ParquetColumnInfo {
     name: string;
@@ -94,6 +96,7 @@ export async function readAllParquetRows(file: AsyncBuffer, metadata: FileMetaDa
         rowStart: 0,
         rowEnd: rowCount,
         rowFormat: 'object',
+        compressors,
     });
 }
 

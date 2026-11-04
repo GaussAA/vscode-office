@@ -7,7 +7,6 @@ import { handleImage, isImage } from './handlers/imageHanlder';
 import { handleSvg } from './handlers/svgHandler';
 import { isVirtualUri, readUriText } from './handlers/officeContent';
 import { handleCommonEvent } from './compress/commonHandler';
-import { TelemetryService } from '@/service/telemetryService';
 import { extensionResource, getExtensionResourceRoots, readExtensionText } from '@/common/extensionResource';
 
 /**
@@ -19,10 +18,10 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
 
 	bindCustomEditors(viewOption: { webviewOptions: vscode.WebviewPanelOptions }) {
 		return [
-			vscode.window.registerCustomEditorProvider('cweijan.officeViewer', this, viewOption),
-			vscode.window.registerCustomEditorProvider('cweijan.htmlViewer', this, viewOption),
-			vscode.window.registerCustomEditorProvider('cweijan.imageViewer', this, viewOption),
-			vscode.window.registerCustomEditorProvider('cweijan.parquetViewer', this, viewOption),
+			vscode.window.registerCustomEditorProvider('chaowu21.officeViewer', this, viewOption),
+			vscode.window.registerCustomEditorProvider('chaowu21.htmlViewer', this, viewOption),
+			vscode.window.registerCustomEditorProvider('chaowu21.imageViewer', this, viewOption),
+			vscode.window.registerCustomEditorProvider('chaowu21.parquetViewer', this, viewOption),
 		];
 	}
 
@@ -105,8 +104,6 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
 				if (route) break;
 				vscode.commands.executeCommand('vscode.openWith', uri, 'default');
 		}
-		const fileType = suffix.startsWith('.') ? suffix.slice(1) : suffix;
-		TelemetryService.get()?.trackOfficeViewOpen(uri.fsPath, route, fileType);
 		if (route) return ReactApp.view(webview, { route });
 	}
 

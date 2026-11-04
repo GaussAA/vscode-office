@@ -1,17 +1,16 @@
 import { getExtensionResourceRoots } from '@/common/extensionResource';
 import { handleClass } from '@/provider/handlers/classHandler';
-import { TelemetryService } from '@/service/telemetryService';
 import * as vscode from 'vscode';
 
 /**
- * Desktop-only Java decompiler custom editor (`cweijan.classViewer`).
+ * Desktop-only Java decompiler custom editor (`chaowu21.classViewer`).
  */
 export class ClassViewerProvider implements vscode.CustomReadonlyEditorProvider {
 
 	constructor(private context: vscode.ExtensionContext) { }
 
 	bindCustomEditor(viewOption: { webviewOptions: vscode.WebviewPanelOptions }) {
-		return vscode.window.registerCustomEditorProvider('cweijan.classViewer', this, viewOption);
+		return vscode.window.registerCustomEditorProvider('chaowu21.classViewer', this, viewOption);
 	}
 
 	openCustomDocument(uri: vscode.Uri): vscode.CustomDocument {
@@ -25,6 +24,5 @@ export class ClassViewerProvider implements vscode.CustomReadonlyEditorProvider 
 			localResourceRoots: [...getExtensionResourceRoots(this.context), folderPath],
 		};
 		handleClass(document.uri, webviewPanel);
-		TelemetryService.get()?.trackViewOpen('class');
 	}
 }
