@@ -1,5 +1,5 @@
 import { CopyOutlined, LeftOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons';
-import { Button, InputNumber, Space, Tree, Typography } from 'antd';
+import { Button, ConfigProvider, InputNumber, Tree, Typography, theme as antdTheme } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -10,12 +10,18 @@ import {
     type JsonlLinesPayload,
 } from '../../../common/jsonlTypes.ts';
 import { handler } from '../../util/vscode.ts';
+import {
+    getVscodeThemeColor,
+    isVscodeDarkTheme,
+    observeVscodeThemeChange,
+} from '../../util/vscodeTheme.ts';
 import './Jsonl.less';
 
 type PathSeg = string | number;
 
 const MAX_CHILDREN = 100;
 const MAX_DEPTH = 8;
+const ROW_HEIGHT = 24;
 
 const makeKey = (parts: PathSeg[]): string => JSON.stringify(parts);
 const readKey = (key: React.Key | string): PathSeg[] => JSON.parse(String(key)) as PathSeg[];
@@ -24,19 +30,26 @@ function isComposite(value: unknown): value is Record<PathSeg, unknown> | unknow
     return typeof value === 'object' && value !== null;
 }
 
-function kindOf(value: unknown): string {
+/** Short type label shown as a chip on each line / value. */
+function typeLabel(value: unknown): string {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return `array[${value.length}]`;
+    const kind = typeof value;
+    if (kind === 'object') return `object{${Object.keys(value as object).length}}`;
+    return kind;
+}
+
+function typeClass(value: unknown): string {
     if (value === null) return 'null';
     if (Array.isArray(value)) return 'array';
+    if (typeof value === 'object') return 'object';
     return typeof value;
 }
 
 function preview(value: unknown): string {
     if (value === null) return 'null';
-    if (Array.isArray(value)) return `[…] ${value.length} item${value.length === 1 ? '' : 's'}`;
-    if (typeof value === 'object') {
-        const size = Object.keys(value as object).length;
-        return `{…} ${size} key${size === 1 ? '' : 's'}`;
-    }
+    if (Array.isArray(value)) return '[…]';
+    if (typeof value === 'object') return '{…}';
     if (typeof value === 'string') {
         const text = JSON.stringify(value);
         return text.length > 120 ? `${text.slice(0, 120)}…` : text;
@@ -45,9 +58,11 @@ function preview(value: unknown): string {
     return String(value);
 }
 
-function previewLine(value: unknown): string {
-    if (isComposite(value)) return preview(value);
-    return preview(value);
+/** One-line raw preview used for the line node: the collapsed JSON itself. */
+function rawPreview(line: JsonlLinePayload): string {
+    const text = line.raw.replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    return text.length > 160 ? `${text.slice(0, 160)}…` : text;
 }
 
 function resolvePath(root: unknown, path: PathSeg[]): unknown {
@@ -73,8 +88,9 @@ function buildChildren(parentKey: PathSeg[], value: unknown, depth: number): Dat
             title: (
                 <span className="jsonl-kv">
                     <span className="jsonl-key">{Array.isArray(value) ? `[${seg}]` : String(seg)}</span>
-                    <span className="jsonl-colon">: </span>
-                    <span className={`jsonl-val jsonl-val--${kindOf(child)}`}>{preview(child)}</span>
+                    <span className="jsonl-colon">:</span>
+                    <span className={`jsonl-val jsonl-val--${typeClass(child)}`}>{preview(child)}</span>
+                    {composite && <span className="jsonl-type">{typeLabel(child)}</span>}
                 </span>
             ),
         });
@@ -84,7 +100,7 @@ function buildChildren(parentKey: PathSeg[], value: unknown, depth: number): Dat
             key: makeKey([...parentKey, '__more__']),
             isLeaf: true,
             selectable: false,
-            title: <span className="jsonl-more">… {entries.length - MAX_CHILDREN} more</span>,
+            title: <span className="jsonl-more">… {entries.length - MAX_CHILDREN} more keys</span>,
         });
     }
     return nodes;
@@ -114,6 +130,7 @@ export default function JsonlViewer() {
     const [loading, setLoading] = useState(true);
     const [version, setVersion] = useState(0);
     const [viewportHeight, setViewportHeight] = useState(480);
+    const [dark, setDark] = useState(isVscodeDarkTheme);
 
     const linesRef = useRef(lines);
     const childrenRef = useRef(new Map<string, DataNode[]>());
@@ -122,8 +139,10 @@ export default function JsonlViewer() {
         linesRef.current = lines;
     }, [lines]);
 
+    useEffect(() => observeVscodeThemeChange(() => setDark(isVscodeDarkTheme())), []);
+
     useEffect(() => {
-        const measure = () => setViewportHeight(Math.max(240, window.innerHeight - 120));
+        const measure = () => setViewportHeight(Math.max(200, window.innerHeight - 84));
         measure();
         window.addEventListener('resize', measure);
         return () => window.removeEventListener('resize', measure);
@@ -182,31 +201,37 @@ export default function JsonlViewer() {
         for (let index = windowStart; index < end; index++) {
             const line = lines.get(index);
             const lineKey = makeKey([index]);
+            const lineno = <span className="jsonl-lineno">{index + 1}</span>;
             let title: ReactNode;
             let isLeaf = true;
             if (!line) {
-                title = <span className="jsonl-line jsonl-line--pending">L{index + 1} <span className="jsonl-muted">loading…</span></span>;
+                title = <span className="jsonl-row jsonl-row--pending"><span className="jsonl-muted">loading…</span>{lineno}</span>;
             } else if (line.empty) {
-                title = <span className="jsonl-line jsonl-line--empty">L{index + 1} <span className="jsonl-muted">(empty line)</span></span>;
+                title = <span className="jsonl-row jsonl-row--empty"><span className="jsonl-type">empty</span>{lineno}</span>;
             } else if (line.error) {
                 title = (
-                    <span className="jsonl-line jsonl-line--error">
-                        L{index + 1} <span className="jsonl-badge jsonl-badge--error">invalid JSON</span>{' '}
-                        <span className="jsonl-muted">{line.raw}</span>
+                    <span className="jsonl-row jsonl-row--error">
+                        <span className="jsonl-chip jsonl-chip--error">invalid JSON</span>
+                        <span className="jsonl-raw">{rawPreview(line)}</span>
+                        {lineno}
                     </span>
                 );
             } else if (line.tooLarge) {
                 title = (
-                    <span className="jsonl-line jsonl-line--warn">
-                        L{index + 1} <span className="jsonl-badge jsonl-badge--warn">too large to parse</span>{' '}
-                        <span className="jsonl-muted">{formatBytes(line.size)} · {line.raw}</span>
+                    <span className="jsonl-row jsonl-row--warn">
+                        <span className="jsonl-chip jsonl-chip--warn">too large</span>
+                        <span className="jsonl-muted">{formatBytes(line.size)}</span>
+                        <span className="jsonl-raw">{rawPreview(line)}</span>
+                        {lineno}
                     </span>
                 );
             } else {
                 isLeaf = !isComposite(line.value);
                 title = (
-                    <span className="jsonl-line">
-                        L{index + 1} <span className={`jsonl-val jsonl-val--${kindOf(line.value)}`}>{previewLine(line.value)}</span>
+                    <span className="jsonl-row">
+                        <span className={`jsonl-chip jsonl-chip--${typeClass(line.value)}`}>{typeLabel(line.value)}</span>
+                        <span className="jsonl-raw">{rawPreview(line)}</span>
+                        {lineno}
                     </span>
                 );
             }
@@ -248,7 +273,7 @@ export default function JsonlViewer() {
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1200);
         } catch {
-            // clipboard is unavailable outside a user gesture in some hosts; ignore.
+            // clipboard may be unavailable; ignore.
         }
     }, [selection]);
 
@@ -259,84 +284,108 @@ export default function JsonlViewer() {
         requestWindow(jumpValue - 1);
     };
 
+    const selectionPath = selection
+        ? selection.parts.length === 1
+            ? `L${(selection.parts[0] as number) + 1}`
+            : `L${(selection.parts[0] as number) + 1} › ${selection.parts.slice(1).join(' › ')}`
+        : '';
+
     return (
-        <div className="jsonl-viewer">
-            <div className="jsonl-toolbar">
-                <Space size={8} wrap>
-                    <Typography.Text strong ellipsis className="jsonl-file-name">
-                        {info?.fileName ?? 'JSONL'}
-                    </Typography.Text>
-                    <span className="jsonl-meta">
-                        {total.toLocaleString()} lines · {formatBytes(info?.byteSize ?? 0)}
-                    </span>
-                </Space>
-                <Space size={8}>
-                    <Button
-                        icon={<LeftOutlined />}
-                        size="small"
-                        disabled={windowStart === 0 || loading}
-                        onClick={() => requestWindow(Math.max(0, windowStart - JSONL_WINDOW_SIZE))}
-                    />
-                    <span className="jsonl-meta">L{windowStart + 1}–L{windowEnd}</span>
-                    <Button
-                        icon={<RightOutlined />}
-                        size="small"
-                        disabled={windowEnd >= total || loading}
-                        onClick={() => requestWindow(windowStart + JSONL_WINDOW_SIZE)}
-                    />
-                    <InputNumber
-                        size="small"
-                        min={1}
-                        max={Math.max(1, total)}
-                        value={jumpValue}
-                        placeholder="line #"
-                        style={{ width: 92 }}
-                        onChange={value => setJumpValue(typeof value === 'number' ? value : null)}
-                        onPressEnter={jump}
-                    />
-                    <Button size="small" onClick={jump}>Go</Button>
-                    <Button
-                        size="small"
-                        icon={<ReloadOutlined />}
-                        onClick={() => {
-                            childrenRef.current.clear();
-                            setLoading(true);
-                            handler.emit('jsonlReload');
-                        }}
-                    />
-                </Space>
-            </div>
-
-            {selection && (
-                <div className="jsonl-selection">
-                    <span className="jsonl-selection__path">
-                        {selection.parts.length === 1
-                            ? `L${(selection.parts[0] as number) + 1}`
-                            : `L${(selection.parts[0] as number) + 1} › ${selection.parts.slice(1).join(' › ')}`}
-                    </span>
-                    <span className="jsonl-selection__value">{preview(selection.value)}</span>
-                    <Button size="small" type="text" icon={<CopyOutlined />} onClick={() => { void copySelection(); }}>
-                        {copied ? 'Copied' : 'Copy value'}
-                    </Button>
+        <ConfigProvider
+            theme={{
+                algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+                token: {
+                    colorBgContainer: 'transparent',
+                    colorBgElevated: getVscodeThemeColor('--vscode-editorWidget-background', dark ? '#202020' : '#ffffff'),
+                    colorBorder: getVscodeThemeColor('--vscode-panel-border', dark ? '#2b2b2b' : '#e5e5e5'),
+                    colorText: getVscodeThemeColor('--vscode-foreground', dark ? '#cccccc' : '#3b3b3b'),
+                    colorTextSecondary: getVscodeThemeColor('--vscode-descriptionForeground', dark ? '#9d9d9d' : '#717171'),
+                    colorPrimary: getVscodeThemeColor('--vscode-button-background', '#0078d4'),
+                    colorError: getVscodeThemeColor('--vscode-errorForeground', '#f14c4c'),
+                    colorWarning: getVscodeThemeColor('--vscode-editorWarning-foreground', '#cca700'),
+                    fontFamily: getVscodeThemeColor('--vscode-font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'),
+                    fontSize: Number.parseInt(getVscodeThemeColor('--vscode-font-size', '13px'), 10) || 13,
+                    controlHeightSM: 22,
+                    borderRadius: 4,
+                },
+            }}
+        >
+            <div className={`jsonl-viewer${dark ? '' : ' jsonl-viewer--light'}`}>
+                <div className="jsonl-toolbar">
+                    <div className="jsonl-toolbar__left">
+                        <span className="jsonl-file-name" title={info?.fileName}>{info?.fileName ?? 'JSONL'}</span>
+                        <span className="jsonl-meta">{total.toLocaleString()} lines</span>
+                        <span className="jsonl-dot">·</span>
+                        <span className="jsonl-meta">{formatBytes(info?.byteSize ?? 0)}</span>
+                    </div>
+                    <div className="jsonl-toolbar__right">
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<LeftOutlined />}
+                            disabled={windowStart === 0 || loading}
+                            onClick={() => requestWindow(Math.max(0, windowStart - JSONL_WINDOW_SIZE))}
+                        />
+                        <span className="jsonl-meta jsonl-range">L{windowStart + 1}–{windowEnd}</span>
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<RightOutlined />}
+                            disabled={windowEnd >= total || loading}
+                            onClick={() => requestWindow(windowStart + JSONL_WINDOW_SIZE)}
+                        />
+                        <InputNumber
+                            size="small"
+                            min={1}
+                            max={Math.max(1, total)}
+                            value={jumpValue}
+                            placeholder="line #"
+                            className="jsonl-jump"
+                            onChange={value => setJumpValue(typeof value === 'number' ? value : null)}
+                            onPressEnter={jump}
+                        />
+                        <Button size="small" onClick={jump}>Go</Button>
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<ReloadOutlined />}
+                            onClick={() => {
+                                childrenRef.current.clear();
+                                setLoading(true);
+                                handler.emit('jsonlReload');
+                            }}
+                        />
+                    </div>
                 </div>
-            )}
 
-            {!info ? (
-                <div className="jsonl-empty">Loading…</div>
-            ) : total === 0 ? (
-                <div className="jsonl-empty">Empty file</div>
-            ) : (
-                <Tree
-                    className="jsonl-tree"
-                    treeData={treeData}
-                    loadData={loadData}
-                    onSelect={onSelect}
-                    height={viewportHeight}
-                    itemHeight={22}
-                    virtual
-                    showIcon={false}
-                />
-            )}
-        </div>
+                {selection && (
+                    <div className="jsonl-selection">
+                        <span className="jsonl-selection__path">{selectionPath}</span>
+                        <span className="jsonl-selection__value">{preview(selection.value)}</span>
+                        <Button size="small" type="text" icon={<CopyOutlined />} onClick={() => { void copySelection(); }}>
+                            {copied ? 'Copied' : 'Copy'}
+                        </Button>
+                    </div>
+                )}
+
+                {!info ? (
+                    <div className="jsonl-empty">Loading…</div>
+                ) : total === 0 ? (
+                    <div className="jsonl-empty">Empty file</div>
+                ) : (
+                    <Tree
+                        className="jsonl-tree"
+                        treeData={treeData}
+                        loadData={loadData}
+                        onSelect={onSelect}
+                        height={viewportHeight}
+                        itemHeight={ROW_HEIGHT}
+                        virtual
+                        showIcon={false}
+                    />
+                )}
+            </div>
+        </ConfigProvider>
     );
 }
+

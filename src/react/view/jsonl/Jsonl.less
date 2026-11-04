@@ -2,25 +2,29 @@ body:has(.jsonl-viewer) {
     width: 100vw;
     height: 100vh;
     overflow: hidden;
+    background: var(--vscode-editor-background, #1f1f1f);
 }
 
 .jsonl-viewer {
-    --jl-bg: var(--vscode-editor-background, #1e1e1e);
-    --jl-header-bg: var(--vscode-editorGroupHeader-tabsBackground, #2d2d2d);
-    --jl-border: var(--vscode-panel-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
+    --jl-bg: var(--vscode-editor-background, #1f1f1f);
+    --jl-toolbar-bg: var(--vscode-editorGroupHeader-tabsBackground, #181818);
+    --jl-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
     --jl-fg: var(--vscode-foreground, #cccccc);
-    --jl-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
-    --jl-hover: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.31));
-    --jl-active-bg: var(--vscode-list-activeSelectionBackground, #094771);
+    --jl-muted: var(--vscode-descriptionForeground, #9d9d9d);
+    --jl-gutter: var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground, #6e7681));
+    --jl-hover: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.28));
+    --jl-active-bg: var(--vscode-list-activeSelectionBackground, #04395e);
     --jl-active-fg: var(--vscode-list-activeSelectionForeground, #ffffff);
-    --jl-error: var(--vscode-errorForeground, #f48771);
-    --jl-warn: var(--vscode-editorWarning-foreground, #e8d48b);
-    --jl-num: var(--vscode-charts-blue, #3794ff);
-    --jl-str: var(--vscode-charts-green, #89d185);
-    --jl-bool: var(--vscode-charts-red, #f14c4c);
-    --jl-null: var(--vscode-charts-orange, #d18616);
+    --jl-error: var(--vscode-errorForeground, #f85149);
+    --jl-warn: var(--vscode-editorWarning-foreground, #cca700);
     --jl-key: var(--vscode-symbolIcon-propertyForeground, var(--vscode-charts-purple, #b180d7));
-    --jl-line-id: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.55));
+    --jl-string: var(--vscode-charts-green, #89d185);
+    --jl-number: var(--vscode-charts-blue, #3794ff);
+    --jl-boolean: var(--vscode-charts-red, #f14c4c);
+    --jl-null: var(--vscode-charts-orange, #d18616);
+    --jl-chip-bg: color-mix(in srgb, var(--jl-fg) 10%, transparent);
+    --jl-mono: var(--vscode-editor-font-family, Consolas, 'Cascadia Mono', monospace);
+    --jl-row-height: 24px;
 
     position: relative;
     display: flex;
@@ -34,42 +38,114 @@ body:has(.jsonl-viewer) {
     overflow: hidden;
 }
 
+/* ---------- toolbar ---------- */
+
 .jsonl-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 6px 12px;
-    background: var(--jl-header-bg);
-    border-bottom: 1px solid var(--jl-border);
+    height: 34px;
+    padding: 0 8px 0 12px;
     flex: 0 0 auto;
+    background: var(--jl-toolbar-bg);
+    border-bottom: 1px solid var(--jl-border);
+}
+
+.jsonl-toolbar__left,
+.jsonl-toolbar__right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.jsonl-toolbar__left {
+    overflow: hidden;
 }
 
 .jsonl-file-name {
-    max-width: 320px;
     font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40vw;
 }
 
 .jsonl-meta {
+    font-size: 11px;
     color: var(--jl-muted);
-    font-size: 12px;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
+
+.jsonl-dot {
+    color: var(--jl-muted);
+    font-size: 11px;
+}
+
+.jsonl-range {
+    min-width: 64px;
+    text-align: center;
+}
+
+.jsonl-jump {
+    width: 88px;
+}
+
+/* antd controls inside a VS Code webview: keep them flat and theme-correct */
+
+.jsonl-viewer .ant-btn {
+    background: transparent;
+    border-color: transparent;
+    color: var(--jl-fg);
+    box-shadow: none;
+}
+
+.jsonl-viewer .ant-btn:not(:disabled):hover {
+    background: var(--jl-hover);
+    color: var(--jl-fg);
+}
+
+.jsonl-viewer .ant-btn:disabled {
+    color: var(--jl-muted);
+    opacity: 0.5;
+}
+
+.jsonl-viewer .ant-btn-default {
+    background: var(--vscode-button-secondaryBackground, transparent);
+    border-color: var(--jl-border);
+}
+
+.jsonl-viewer .ant-input-number {
+    background: var(--vscode-input-background, rgba(128, 128, 128, 0.15));
+    border-color: var(--vscode-input-border, var(--jl-border));
+}
+
+.jsonl-viewer .ant-input-number-input {
+    color: var(--vscode-input-foreground, var(--jl-fg));
+    font-size: 11px;
+}
+
+/* ---------- selection bar ---------- */
 
 .jsonl-selection {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 4px 12px;
-    border-bottom: 1px solid var(--jl-border);
-    background: color-mix(in srgb, var(--jl-header-bg) 70%, transparent);
-    font-size: 12px;
+    height: 26px;
+    padding: 0 8px 0 12px;
     flex: 0 0 auto;
+    border-bottom: 1px solid var(--jl-border);
+    background: color-mix(in srgb, var(--jl-toolbar-bg) 60%, transparent);
+    font-size: 11px;
 }
 
 .jsonl-selection__path {
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--jl-mono);
     color: var(--jl-key);
+    white-space: nowrap;
 }
 
 .jsonl-selection__value {
@@ -78,85 +154,161 @@ body:has(.jsonl-viewer) {
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--jl-muted);
+    font-family: var(--jl-mono);
 }
+
+/* ---------- tree ---------- */
 
 .jsonl-tree {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
-    padding: 2px 4px;
+    padding: 2px 0;
 
-    .ant-tree {
-        background: transparent;
+    .ant-tree,
+    .ant-tree-list,
+    .ant-tree-list-holder,
+    .ant-tree-list-holder-inner {
+        background: transparent !important;
         color: var(--jl-fg);
-        font-family: var(--vscode-editor-font-family, monospace);
-        font-size: var(--vscode-editor-font-size, 12px);
+    }
+
+    .ant-tree-list-holder {
+        scrollbar-color: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4)) transparent;
     }
 
     .ant-tree-treenode {
+        display: flex;
+        align-items: center;
+        width: 100%;
         padding: 0;
+        padding-right: 8px;
+    }
+
+    .ant-tree-indent,
+    .ant-tree-switcher {
+        flex: 0 0 auto;
     }
 
     .ant-tree-node-content-wrapper {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: var(--jl-row-height);
+        line-height: var(--jl-row-height);
+        padding: 0 6px 0 2px;
         border-radius: 4px;
-        line-height: 22px;
+        transition: none;
+        overflow: hidden;
+    }
 
-        &:hover {
-            background: var(--jl-hover);
-        }
+    .ant-tree-node-content-wrapper:hover {
+        background: var(--jl-hover);
     }
 
     .ant-tree-node-selected {
         background: var(--jl-active-bg) !important;
+    }
 
-        .ant-tree-node-content-wrapper,
-        .jsonl-key,
-        .jsonl-val {
-            color: var(--jl-active-fg) !important;
-        }
+    .ant-tree-node-selected .jsonl-row,
+    .ant-tree-node-selected .jsonl-key,
+    .ant-tree-node-selected .jsonl-val,
+    .ant-tree-node-selected .jsonl-gutter,
+    .ant-tree-node-selected .jsonl-raw,
+    .ant-tree-node-selected .jsonl-colon {
+        color: var(--jl-active-fg) !important;
     }
 
     .ant-tree-switcher {
+        width: 18px;
+        line-height: var(--jl-row-height);
         color: var(--jl-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .ant-tree-switcher .ant-tree-switcher-icon {
+        font-size: 10px;
+    }
+
+    .ant-tree-indent {
+        align-self: stretch;
+    }
+
+    .ant-tree-indent-unit {
+        width: 18px;
     }
 }
 
-.jsonl-line {
-    white-space: pre;
+/* ---------- rows ---------- */
+
+.jsonl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--jl-row-height);
+    min-width: 0;
+    font-family: var(--jl-mono);
+    font-size: var(--vscode-editor-font-size, 12.5px);
+    white-space: nowrap;
 }
 
-.jsonl-line--pending,
-.jsonl-line--empty {
+.jsonl-lineno {
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 12px;
+    color: var(--jl-gutter);
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+    opacity: 0.75;
+}
+
+.jsonl-chip {
+    flex: 0 0 auto;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    line-height: 15px;
+    text-transform: lowercase;
+    background: var(--jl-chip-bg);
     color: var(--jl-muted);
 }
 
-.jsonl-line--error {
+.jsonl-chip--error {
+    background: color-mix(in srgb, var(--jl-error) 20%, transparent);
     color: var(--jl-error);
 }
 
-.jsonl-line--warn {
+.jsonl-chip--warn {
+    background: color-mix(in srgb, var(--jl-warn) 20%, transparent);
     color: var(--jl-warn);
 }
 
-.jsonl-badge {
-    display: inline-block;
-    margin: 0 4px;
-    padding: 0 6px;
-    border-radius: 999px;
-    font-size: 11px;
-    line-height: 16px;
+.jsonl-row--error .jsonl-raw {
+    color: var(--jl-error);
+    opacity: 0.85;
 }
 
-.jsonl-badge--error {
-    background: color-mix(in srgb, var(--jl-error) 22%, transparent);
+.jsonl-row--empty .jsonl-chip,
+.jsonl-row--pending .jsonl-chip {
+    color: var(--jl-muted);
 }
 
-.jsonl-badge--warn {
-    background: color-mix(in srgb, var(--jl-warn) 22%, transparent);
+.jsonl-raw {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--jl-muted);
 }
 
 .jsonl-kv {
-    white-space: pre;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    font-family: var(--jl-mono);
+    font-size: var(--vscode-editor-font-size, 12.5px);
+    white-space: nowrap;
 }
 
 .jsonl-key {
@@ -167,16 +319,31 @@ body:has(.jsonl-viewer) {
     color: var(--jl-muted);
 }
 
-.jsonl-val--number {
-    color: var(--jl-num);
+.jsonl-type {
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 10px;
+    line-height: 14px;
+    background: var(--jl-chip-bg);
+    color: var(--jl-muted);
+}
+
+.jsonl-val {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .jsonl-val--string {
-    color: var(--jl-str);
+    color: var(--jl-string);
+}
+
+.jsonl-val--number,
+.jsonl-val--bigint {
+    color: var(--jl-number);
 }
 
 .jsonl-val--boolean {
-    color: var(--jl-bool);
+    color: var(--jl-boolean);
 }
 
 .jsonl-val--null {
@@ -196,6 +363,8 @@ body:has(.jsonl-viewer) {
 .jsonl-more {
     color: var(--jl-muted);
     font-style: italic;
+    font-family: var(--jl-mono);
+    font-size: 11px;
 }
 
 .jsonl-empty {
@@ -204,4 +373,6 @@ body:has(.jsonl-viewer) {
     justify-content: center;
     flex: 1 1 auto;
     color: var(--jl-muted);
+    font-size: 12px;
 }
+
