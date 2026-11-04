@@ -2,8 +2,11 @@
 node_modules/
 
 # build output
+out/
 dist/
 coverage/
+test/output
+.vscode-test/
 
 # local env
 .env
@@ -14,3 +17,11 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
+.idea/
+*.vsix
+
+# other package managers' lockfiles — this repo uses pnpm (pnpm-lock.yaml IS tracked)
+package-lock.json
+bun.lock
+yarn.lock
+pnpm-workspace.yaml
