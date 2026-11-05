@@ -23,9 +23,12 @@ jobs:
         echo ">>> Start compile office-viewer-plus."
         pnpm build
         echo ">>> Compile ok."
+    - name: Unit tests
+      run: pnpm test
     - name: UI verification (headless DOM assertions)
       run: xvfb-run -a pnpm verify:ui
     - name: Package vsix
       run: pnpm dlx @vscode/vsce package --no-dependencies
+
 
 
