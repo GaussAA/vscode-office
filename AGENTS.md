@@ -10,7 +10,7 @@
 
 ### Issue tracker
 
-issue 与 spec 以本地 markdown 记在 `.scratch/<feature-slug>/` 下，无远程 tracker。见 `docs/agents/issue-tracker.md`。
+issue 与 spec 用 GitHub Issues，目标仓库是 fork `GaussAA/vscode-office`（`gh` 可能默认解析到上游，动手前先 `gh repo view --json nameWithOwner` 确认）。见 `docs/agents/issue-tracker.md`。
 
 ### Triage labels
 
