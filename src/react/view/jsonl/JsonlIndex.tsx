@@ -147,7 +147,7 @@ export default function JsonlIndex({
     }, [items, positionOf, selected, onSelect]);
 
     return (
-        <div className="jsonl-index" ref={containerRef}>
+        <div className="jsonl-index" ref={containerRef} tabIndex={0} onKeyDown={onKeyDown}>
             {header}
             {items.length === 0 ? (
                 <div className="jsonl-empty">{emptyText}</div>

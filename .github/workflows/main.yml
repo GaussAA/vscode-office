@@ -18,27 +18,19 @@ jobs:
         node-version: 22.x
         cache: pnpm
     - run: pnpm install --frozen-lockfile
+    # Cheap and most likely to fail first: lint + typecheck + unit tests (~15s).
+    - name: Check (lint, typecheck, unit tests)
+      run: pnpm check
     - name: Build
-      run: |
-        echo ">>> Start compile office-viewer-plus."
-        pnpm build
-        echo ">>> Compile ok."
-    - name: Typecheck (fork-owned files)
-      run: pnpm typecheck
-    - name: Unit tests
-      run: pnpm test
+      run: pnpm build
     - name: UI verification (headless DOM assertions)
       run: xvfb-run -a pnpm verify:ui
+    # Same command a developer runs locally — one packaging path, pinned tool version.
     - name: Package vsix
-      run: pnpm dlx @vscode/vsce package --no-dependencies
+      run: pnpm run package
     - name: Upload vsix
       uses: actions/upload-artifact@v4
       with:
         name: office-viewer-plus-vsix
         path: '*.vsix'
         if-no-files-found: error
-
-
-
-
-

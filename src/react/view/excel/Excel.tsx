@@ -448,6 +448,10 @@ function ExcelViewer() {
             themeObserver.disconnect();
             clearTimeout(themeTimer);
         };
+    // `handleAutoFitColumns` is deliberately omitted: this effect boots the spreadsheet
+    // and calls emit('init'), so re-running it when that callback's identity changes would
+    // re-initialise the whole sheet. It is stable enough that the stale closure is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [message, handleSave, handleSaveAs])
 
     return (

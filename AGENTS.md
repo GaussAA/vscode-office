@@ -24,7 +24,18 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 
 单 context：根目录 `GLOSSARY.md` + `docs/adr/`。见 `docs/agents/domain.md`。
 
-## 代码结构（上游布局，勿重排）
+## 与上游的关系
+
+我们**独立演进**：`upstream` 只是一个只读参考资料，不是合并来源。见 [docs/adr/0002-independent-evolution.md](./docs/adr/0002-independent-evolution.md)。
+
+1. **需要上游的修复就读它的 diff，自己重写一遍**，不要 `git merge upstream/main`，也不要 rebase 到上游。`upstream` remote 保留，仅用于对照和可选的单点 `cherry-pick`。
+2. **上游文件可以改写**。「能新增就不改写」不再是规则，取而代之的是：**一次改动只做一件事，且这个提交能单独回退**；不要把重构和功能混进同一个提交。
+3. **继承来的债是我们的债**：上游代码的类型错误、死代码、残留配置都可以修。`pnpm typecheck` 的目标是零错误，不是给历史错误建永久白名单。
+4. **风格**：上游的 4 空格 / 单引号不再有保护价值。统一到 prettier 要单独提交，不与功能改动混在一起。
+
+## 代码结构（沿用上游布局）
+
+重排本身不划算，不是因为对上游有承诺；要偏离布局先写 ADR。
 
 - `src/extension.ts` / `src/extension.web.ts` —— 入口，注册全部 custom editors
 - `src/provider/` —— 每个 viewer 一个 `CustomReadonlyEditorProvider`
@@ -33,19 +44,19 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 - `vite.config.ts` + `build.ts` —— 构建，产出 `out/`；webview 每个视图一个 Vite 入口
 - `package.json` 的 `contributes.customEditors` —— viewer 与文件模式的唯一登记处
 
-## 与上游共存的铁律
-
-1. **不改上游文件的风格**（4 空格缩进、单引号）。`.prettierrc` 只作用于我们自己的根级文档，`src/` 不参与自动格式化。
-2. **能新增就不改写**：改动集中在新文件或上游的少数接缝（`parquetParser.ts`、`extension.ts`、`package.json`），以便 `git merge upstream/main`。
-3. **不要 rebase 到上游**，方向永远是 upstream → 我们。
-
 ## 常用命令
 
 ```bash
-pnpm install     # 依赖（pnpm，不是 npm）
-pnpm build       # vite 构建到 out/
-pnpm run package # vsce 打包 vsix（需先 build）
-pnpm test        # node:test 单测（先 esbuild 打包纯逻辑模块）
-pnpm typecheck   # tsc 只检查 fork 自有文件（上游 57 个历史错误忽略）
-pnpm verify:ui   # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
+pnpm install          # 依赖（pnpm，不是 npm）
+pnpm build            # 构建到 out/（vite + esbuild 多步）
+pnpm run package      # 打 vsix（@vscode/vsce 已是 devDependency；需先 build）
+pnpm lint             # eslint 整个 src；0 problem 才通过
+pnpm typecheck        # tsc 覆盖整个 src（含 webview）；对基线上限，只许减不许增
+pnpm typecheck:update # 重写基线 —— 审 diff，它只应变小
+pnpm test             # node:test 单测（先 esbuild 打包纯逻辑模块）
+pnpm check            # lint + typecheck + test（pre-commit 跑这个）
+pnpm check:full       # check + build + verify:ui（CI 跑这个）
+pnpm verify:ui        # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
 ```
+
+**闸门是 fail-closed 的**：`scripts/typecheck.mjs` 把每个类型错误按「文件 + 错误码 + 消息」与 `scripts/typecheck-baseline.json` 比对，出现基线外的错误就红；基线里的错误消失了只提示你收缩基线。不要用 `typecheck:update` 把新错误塞进基线 —— 那是这个闸门唯一能欺骗自己的方式。

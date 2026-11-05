@@ -41,7 +41,12 @@ function jsonText(value: unknown): string {
 export default function JsonlDetail({ index, entry, loading, mode, onModeChange }: Props) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [height, setHeight] = useState(320);
-    const [expanded, setExpanded] = useState<React.Key[]>([]);
+    /**
+     * null means "follow the default expansion for this entry"; the first toggle pins an
+     * explicit set. The pane is keyed by entry index, so switching entries remounts it and
+     * both this and `activeKey` fall back to their defaults.
+     */
+    const [expanded, setExpanded] = useState<React.Key[] | null>(null);
     const [activeKey, setActiveKey] = useState<string | null>(null);
     const [copied, setCopied] = useState<'value' | 'path' | null>(null);
 
@@ -57,6 +62,12 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
         return buildTree(entry.value, wrap);
     }, [entry, wrap]);
 
+    const defaultExpanded = useMemo<React.Key[]>(() => {
+        if (!built) return [];
+        return built.count <= AUTO_EXPAND_LIMIT ? built.allKeys : built.shallowKeys;
+    }, [built]);
+    const expandedKeys = expanded ?? defaultExpanded;
+
     useEffect(() => {
         const element = containerRef.current;
         if (!element) return;
@@ -65,15 +76,6 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
         setHeight(Math.max(120, element.clientHeight));
         return () => observer.disconnect();
     }, []);
-
-    useEffect(() => {
-        setActiveKey(null);
-        if (!built) {
-            setExpanded([]);
-            return;
-        }
-        setExpanded(built.count <= AUTO_EXPAND_LIMIT ? built.allKeys : built.shallowKeys);
-    }, [built, index]);
 
     const flash = useCallback((kind: 'value' | 'path') => {
         setCopied(kind);
@@ -126,21 +128,25 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
 
     const collapseAll = useCallback(() => setExpanded([]), []);
 
+    const mutateExpansion = useCallback((update: (keys: React.Key[]) => React.Key[]) => {
+        setExpanded(update(expandedKeys));
+    }, [expandedKeys]);
+
     const onKeyDown = useCallback((event: React.KeyboardEvent) => {
         if (activeKey) {
             if (event.key === 'ArrowRight') {
                 event.preventDefault();
-                setExpanded(prev => (prev.includes(activeKey) ? prev : [...prev, activeKey]));
+                mutateExpansion(keys => (keys.includes(activeKey) ? keys : [...keys, activeKey]));
                 return;
             }
             if (event.key === 'ArrowLeft') {
                 event.preventDefault();
-                setExpanded(prev => prev.filter(key => key !== activeKey));
+                mutateExpansion(keys => keys.filter(key => key !== activeKey));
                 return;
             }
             if (event.key === ' ' || event.key === 'Spacebar') {
                 event.preventDefault();
-                setExpanded(prev => (prev.includes(activeKey) ? prev.filter(key => key !== activeKey) : [...prev, activeKey]));
+                mutateExpansion(keys => (keys.includes(activeKey) ? keys.filter(key => key !== activeKey) : [...keys, activeKey]));
                 return;
             }
         }
@@ -154,7 +160,7 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
             if (event.shiftKey) copyPath();
             else copyValue();
         }
-    }, [activeKey, copyPath, copyValue]);
+    }, [activeKey, copyPath, copyValue, mutateExpansion]);
 
     const header = (
         <div className="jsonl-detail__header">
@@ -222,7 +228,7 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
             <Tree
                 className={`jsonl-detail__tree${wrap ? ' jsonl-detail__tree--wrap' : ''}`}
                 treeData={built.nodes}
-                expandedKeys={expanded}
+                expandedKeys={expandedKeys}
                 onExpand={keys => setExpanded(keys)}
                 selectedKeys={activeKey ? [activeKey] : []}
                 onSelect={keys => setActiveKey(keys.length ? String(keys[0]) : null)}

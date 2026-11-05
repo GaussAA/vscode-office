@@ -1,67 +1,111 @@
 /**
- * Typecheck gate for the fork.
+ * Typecheck gate.
  *
- * Upstream's tsconfig pairs `resolveJsonModule` with `moduleResolution: "classic"`, which
- * TypeScript rejects outright (TS5070), and the upstream sources still carry ~57 real type
- * errors in gitHistory / vditor / zip code. Rewriting all of that is not this fork's job,
- * so the gate runs tsc with a working configuration and fails only on errors in **files
- * this fork owns**. That way our own code cannot regress while upstream debt stays visible
- * in the output instead of blocking every commit.
+ * Runs tsc over the whole `src` tree (extension host + every webview) with
+ * `tsconfig.check.json`, then compares the errors against a checked-in baseline.
+ *
+ * The baseline is a ratchet, not an allowlist of paths:
+ *  - every error is identified by file + code + message (line numbers excluded, so
+ *    moving code does not invalidate it);
+ *  - an error that is not in the baseline fails the build;
+ *  - an error that disappears only produces a reminder to regenerate the baseline.
+ *
+ * `pnpm typecheck:update` rewrites the baseline. Review the diff: it must only ever
+ * shrink.
  */
 import { spawnSync } from 'node:child_process'
-import { dirname, join, relative } from 'node:path'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..')
+const baselinePath = join(here, 'typecheck-baseline.json')
+const update = process.argv.includes('--update')
+const verbose = process.argv.includes('--verbose')
 
-/** Paths whose type errors are ours to fix. Everything else is inherited debt. */
-const OWNED = [
-    'src/react/view/jsonl/',
-    'src/react/view/parquet/',
-    'src/react/util/',
-    'src/service/jsonlDocument.ts',
-    'src/provider/jsonlViewerProvider.ts',
-    'src/common/jsonlTypes.ts',
-    'scripts/',
-    'test/unit/',
-]
-
-// Run tsc directly: `pnpm exec` needs a shell on Windows, which Node's spawn warns about.
 const tsc = join(root, 'node_modules', 'typescript', 'bin', 'tsc')
 const result = spawnSync(
     process.execPath,
-    [
-        tsc,
-        '--noEmit',
-        '--moduleResolution', 'bundler',
-        '--module', 'preserve',
-        '--skipLibCheck',
-        '--lib', 'es2019,dom,dom.iterable',
-    ],
+    [tsc, '-p', join(root, 'tsconfig.check.json'), '--pretty', 'false'],
     { cwd: root, encoding: 'utf8' },
 )
 
+if (result.error) {
+    console.error(`typecheck: failed to start tsc — ${result.error.message}`)
+    process.exit(1)
+}
+
 const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
-const errors = output
-    .split(/\r?\n/)
-    .filter(line => /error TS\d+/.test(line))
+const ERROR_LINE = /^(.+?)\((\d+),(\d+)\): error (TS\d+): (.*)$/
+const errors = []
+for (const line of output.split(/\r?\n/)) {
+    const match = ERROR_LINE.exec(line)
+    if (!match) continue
+    const [, file, , , code, message] = match
+    errors.push({ file: file.replace(/\\/g, '/'), code, message: message.trim() })
+}
 
-const ownedErrors = errors.filter(line => OWNED.some(prefix => line.includes(prefix)))
-const ignored = errors.length - ownedErrors.length
-
-if (ownedErrors.length > 0) {
-    console.error(`typecheck: ${ownedErrors.length} error(s) in fork-owned files`)
-    for (const line of ownedErrors) console.error(`  ${line}`)
-    if (ignored > 0) console.error(`(${ignored} upstream error(s) ignored)`)
+if (errors.length === 0 && result.status !== 0) {
+    // tsc failed without emitting a single parseable error: configuration problem.
+    console.error('typecheck: tsc exited non-zero without a recognisable diagnostic')
+    console.error(output.trim() || '(no output)')
     process.exit(1)
 }
 
-if (result.status !== 0 && errors.length === 0) {
-    // tsc failed for a reason that did not produce a TS error line (bad flag, crash).
-    console.error(output.trim() || `typecheck: tsc exited with ${result.status}`)
+const keyOf = error => `${error.file}|${error.code}|${error.message}`
+
+if (update) {
+    const sorted = errors
+        .slice()
+        .sort((a, b) => keyOf(a).localeCompare(keyOf(b)))
+        .map(({ file, code, message }) => ({ file, code, message }))
+    writeFileSync(baselinePath, `${JSON.stringify(sorted, null, 2)}\n`, 'utf8')
+    console.log(`typecheck: baseline rewritten with ${sorted.length} known error(s)`)
+    process.exit(0)
+}
+
+let baseline = []
+try {
+    baseline = JSON.parse(readFileSync(baselinePath, 'utf8'))
+} catch (error) {
+    if (error.code !== 'ENOENT') throw error
+    console.error(`typecheck: ${baselinePath} is missing — run 'pnpm typecheck:update' once`)
     process.exit(1)
 }
 
-console.log(`typecheck: 0 errors in fork-owned files (${ignored} upstream error(s) ignored)`)
+// Multiset comparison: the same file may legitimately repeat an identical message.
+const remaining = new Map()
+for (const entry of baseline) {
+    const key = keyOf(entry)
+    remaining.set(key, (remaining.get(key) ?? 0) + 1)
+}
 
+const introduced = []
+for (const error of errors) {
+    const key = keyOf(error)
+    const count = remaining.get(key) ?? 0
+    if (count > 0) {
+        remaining.set(key, count - 1)
+    } else {
+        introduced.push(error)
+    }
+}
+
+const fixed = [...remaining.values()].reduce((sum, count) => sum + count, 0)
+
+if (introduced.length > 0) {
+    console.error(`\ntypecheck: ${introduced.length} new error(s) — not in the baseline\n`)
+    for (const error of introduced) {
+        console.error(`  ${error.file}  ${error.code}  ${error.message}`)
+    }
+    console.error('\nFix them, or (only if genuinely inherited debt) run `pnpm typecheck:update` and review the diff.')
+    process.exit(1)
+}
+
+if (verbose) {
+    for (const error of errors) console.log(`  ${error.file}  ${error.code}  ${error.message}`)
+}
+
+const hint = fixed > 0 ? " — run 'pnpm typecheck:update' to shrink the baseline" : ''
+console.log(`typecheck: 0 new error(s) · baseline ${baseline.length} known · ${fixed} fixed${hint}`)

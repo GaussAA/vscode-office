@@ -204,24 +204,31 @@ export default function JsonlViewer() {
         handler.emit('init');
     }, [recenter, requestEntry, selectEntry, startSearch]);
 
-    // search: debounce typing, and restore the directory when cleared
+    const clearSearch = useCallback(() => {
+        setSearching(false);
+        setSearchEntries([]);
+        setSearchMeta(null);
+        if (info) {
+            const target = pendingJump.current ?? selectedRef.current;
+            pendingJump.current = null;
+            recenter(Math.max(0, Math.min(info.lineCount - 1, target)), info.lineCount);
+        }
+    }, [info, recenter]);
+
+    const handleQueryChange = useCallback((next: string) => {
+        window.clearTimeout(searchTimer.current);
+        setQuery(next);
+        if (!next.trim()) clearSearch();
+    }, [clearSearch]);
+
+    // search: debounce typing (the reset itself happens in the change handler, not here)
     useEffect(() => {
         window.clearTimeout(searchTimer.current);
         const trimmed = query.trim();
-        if (!trimmed) {
-            setSearching(false);
-            setSearchEntries([]);
-            setSearchMeta(null);
-            if (info) {
-                const target = pendingJump.current ?? selectedRef.current;
-                pendingJump.current = null;
-                recenter(Math.max(0, Math.min(info.lineCount - 1, target)), info.lineCount);
-            }
-            return;
-        }
+        if (!trimmed) return;
         searchTimer.current = window.setTimeout(() => startSearch(trimmed), SEARCH_DEBOUNCE_MS);
         return () => window.clearTimeout(searchTimer.current);
-    }, [query, info, recenter, startSearch]);
+    }, [query, startSearch]);
 
     useEffect(() => {
         if (!info) return;
@@ -320,7 +327,7 @@ export default function JsonlViewer() {
                             placeholder="Search entries"
                             className="jsonl-search"
                             value={query}
-                            onChange={event => setQuery(event.target.value)}
+                            onChange={event => handleQueryChange(event.target.value)}
                         />
                         <InputNumber
                             size="small"
@@ -362,6 +369,7 @@ export default function JsonlViewer() {
                     </Splitter.Panel>
                     <Splitter.Panel className="jsonl-splitter__panel">
                         <JsonlDetail
+                            key={selected}
                             index={selected}
                             entry={detail}
                             loading={detailLoading}

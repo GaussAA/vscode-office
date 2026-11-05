@@ -1,0 +1,382 @@
+[
+  {
+    "file": "src/gitHistory/provider/gitHistoryPanel.ts",
+    "code": "TS2353",
+    "message": "Object literal may only specify known properties, and 'gitHistorySettings' does not exist in type 'ViewOption'."
+  },
+  {
+    "file": "src/gitHistory/provider/gitHistoryPanel.ts",
+    "code": "TS2353",
+    "message": "Object literal may only specify known properties, and 'retainContextWhenHidden' does not exist in type 'WebviewOptions'."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2339",
+    "message": "Property 'push' does not exist on type 'readonly GitCommitRemote[]'."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2339",
+    "message": "Property 'push' does not exist on type 'readonly GitCommitTag[]'."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2339",
+    "message": "Property 'push' does not exist on type 'readonly GitRefHead[]'."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2339",
+    "message": "Property 'push' does not exist on type 'readonly GitRefRemote[]'."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2339",
+    "message": "Property 'push' does not exist on type 'readonly GitRefTag[]'."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2352",
+    "message": "Conversion of type 'GitCommit' to type '{ heads: string[]; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2540",
+    "message": "Cannot assign to 'fileChanges' because it is a read-only property."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2540",
+    "message": "Cannot assign to 'fileChanges' because it is a read-only property."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2540",
+    "message": "Cannot assign to 'head' because it is a read-only property."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2540",
+    "message": "Cannot assign to 'onCurrentBranch' because it is a read-only property."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2540",
+    "message": "Cannot assign to 'onCurrentBranch' because it is a read-only property."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2540",
+    "message": "Cannot assign to 'onCurrentBranch' because it is a read-only property."
+  },
+  {
+    "file": "src/gitHistory/service/commitService.ts",
+    "code": "TS2540",
+    "message": "Cannot assign to 'stash' because it is a read-only property."
+  },
+  {
+    "file": "src/gitHistory/service/findGit.ts",
+    "code": "TS2367",
+    "message": "This comparison appears to be unintentional because the types 'string' and 'number' have no overlap."
+  },
+  {
+    "file": "src/gitHistory/service/findGit.ts",
+    "code": "TS2769",
+    "message": "No overload matches this call."
+  },
+  {
+    "file": "src/provider/http/providers/customVariableDiagnosticsProvider.ts",
+    "code": "TS2769",
+    "message": "No overload matches this call."
+  },
+  {
+    "file": "src/provider/http/providers/environmentOrFileVariableHoverProvider.ts",
+    "code": "TS2322",
+    "message": "Type 'MarkdownString' is not assignable to type 'MarkedString'."
+  },
+  {
+    "file": "src/provider/http/providers/environmentOrFileVariableHoverProvider.ts",
+    "code": "TS2322",
+    "message": "Type 'MarkdownString' is not assignable to type 'MarkedString'."
+  },
+  {
+    "file": "src/provider/http/providers/requestVariableHoverProvider.ts",
+    "code": "TS2345",
+    "message": "Argument of type 'MarkdownString' is not assignable to parameter of type 'MarkedString'."
+  },
+  {
+    "file": "src/provider/http/utils/curlRequestParser.ts",
+    "code": "TS2322",
+    "message": "Type 'unknown' is not assignable to type 'string'."
+  },
+  {
+    "file": "src/provider/http/utils/curlRequestParser.ts",
+    "code": "TS2345",
+    "message": "Argument of type 'unknown' is not assignable to parameter of type 'string | Buffer<ArrayBufferLike>'."
+  },
+  {
+    "file": "src/provider/http/utils/curlRequestParser.ts",
+    "code": "TS2345",
+    "message": "Argument of type 'unknown' is not assignable to parameter of type 'string | Stream'."
+  },
+  {
+    "file": "src/provider/http/utils/curlRequestParser.ts",
+    "code": "TS2345",
+    "message": "Argument of type 'unknown' is not assignable to parameter of type 'string[]'."
+  },
+  {
+    "file": "src/provider/http/utils/httpRequestParser.ts",
+    "code": "TS1016",
+    "message": "A required parameter cannot follow an optional parameter."
+  },
+  {
+    "file": "src/provider/http/utils/httpRequestParser.ts",
+    "code": "TS2345",
+    "message": "Argument of type 'string | Stream' is not assignable to parameter of type 'string'."
+  },
+  {
+    "file": "src/provider/http/utils/httpRequestParser.ts",
+    "code": "TS2345",
+    "message": "Argument of type 'string' is not assignable to parameter of type 'BufferEncoding'."
+  },
+  {
+    "file": "src/provider/http/utils/mimeUtility.ts",
+    "code": "TS2820",
+    "message": "Type '\"utf16be\"' is not assignable to type 'BufferEncoding'. Did you mean '\"utf16le\"'?"
+  },
+  {
+    "file": "src/provider/http/utils/streamUtility.ts",
+    "code": "TS2345",
+    "message": "Argument of type 'string' is not assignable to parameter of type 'BufferEncoding'."
+  },
+  {
+    "file": "src/react/view/epub/Epub.tsx",
+    "code": "TS2339",
+    "message": "Property 'manager' does not exist on type 'Rendition'."
+  },
+  {
+    "file": "src/react/view/epub/Epub.tsx",
+    "code": "TS2352",
+    "message": "Conversion of type 'PackagingMetadataObject' to type 'Record<string, string>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+  },
+  {
+    "file": "src/react/view/epub/Epub.tsx",
+    "code": "TS2367",
+    "message": "This comparison appears to be unintentional because the types 'string' and 'number' have no overlap."
+  },
+  {
+    "file": "src/react/view/epub/Epub.tsx",
+    "code": "TS2367",
+    "message": "This comparison appears to be unintentional because the types 'string' and 'number' have no overlap."
+  },
+  {
+    "file": "src/react/view/epub/epubConfig.ts",
+    "code": "TS2322",
+    "message": "Type 'Location' is not assignable to type 'number'."
+  },
+  {
+    "file": "src/react/view/epub/epubConfig.ts",
+    "code": "TS2339",
+    "message": "Property 'spineItems' does not exist on type 'Spine'."
+  },
+  {
+    "file": "src/react/view/epub/epubConfig.ts",
+    "code": "TS2339",
+    "message": "Property 'spineItems' does not exist on type 'Spine'."
+  },
+  {
+    "file": "src/react/view/epub/epubConfig.ts",
+    "code": "TS2351",
+    "message": "This expression is not constructable."
+  },
+  {
+    "file": "src/react/view/epub/epubConfig.ts",
+    "code": "TS2365",
+    "message": "Operator '>=' cannot be applied to types 'Location' and 'number'."
+  },
+  {
+    "file": "src/react/view/epub/epubConfig.ts",
+    "code": "TS2488",
+    "message": "Type 'Contents' must have a '[Symbol.iterator]()' method that returns an iterator."
+  },
+  {
+    "file": "src/react/view/excel/csvEncoding.ts",
+    "code": "TS2345",
+    "message": "Argument of type 'Uint8Array<ArrayBufferLike>' is not assignable to parameter of type 'Buffer<ArrayBufferLike>'."
+  },
+  {
+    "file": "src/react/view/excel/excel_find.ts",
+    "code": "TS2538",
+    "message": "Type 'SheetData' cannot be used as an index type."
+  },
+  {
+    "file": "src/react/view/excel/excel_images.ts",
+    "code": "TS2322",
+    "message": "Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'Buffer'."
+  },
+  {
+    "file": "src/react/view/excel/excel_images.ts",
+    "code": "TS2322",
+    "message": "Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'Buffer'."
+  },
+  {
+    "file": "src/react/view/excel/excel_images.ts",
+    "code": "TS2345",
+    "message": "Argument of type '{ editAs?: string; tl: { col: number; row: number; }; ext: { width: number; height: number; }; } | { editAs?: string; tl: { col: number; row: number; }; br: { col: number; row: number; }; }' is not assignable to parameter of type 'string | ({ editAs?: string; } & ImageRange & { hyperlinks?: ImageHyperlinkValue; }) | ({ editAs?: string; } & ImagePosition & { hyperlinks?: ImageHyperlinkValue; })'."
+  },
+  {
+    "file": "src/react/view/excel/excel_protection.ts",
+    "code": "TS2339",
+    "message": "Property 'sheetProtection' does not exist on type 'WorksheetModel'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_reader.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_styles.ts",
+    "code": "TS2367",
+    "message": "This comparison appears to be unintentional because the types 'true | \"double\" | \"single\" | \"singleAccounting\" | \"doubleAccounting\"' and 'false' have no overlap."
+  },
+  {
+    "file": "src/react/view/excel/excel_writer.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_writer.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_writer.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_writer.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/excel_writer.ts",
+    "code": "TS2503",
+    "message": "Cannot find namespace 'ExcelJS'."
+  },
+  {
+    "file": "src/react/view/excel/Excel.tsx",
+    "code": "TS2339",
+    "message": "Property 'cols' does not exist on type 'SpreadsheetData'."
+  },
+  {
+    "file": "src/react/view/excel/Excel.tsx",
+    "code": "TS2339",
+    "message": "Property 'rows' does not exist on type 'SpreadsheetData'."
+  },
+  {
+    "file": "src/react/view/gitHistory/components/ToolbarTooltip.tsx",
+    "code": "TS2769",
+    "message": "No overload matches this call."
+  },
+  {
+    "file": "src/react/view/xmind/xmindParser.ts",
+    "code": "TS2322",
+    "message": "Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'BlobPart'."
+  },
+  {
+    "file": "src/react/view/xmind/xmindParser.ts",
+    "code": "TS2741",
+    "message": "Property ''<ID>'' is missing in type '{}' but required in type 'Markers'."
+  },
+  {
+    "file": "src/react/view/xmind/xmindParser.ts",
+    "code": "TS2741",
+    "message": "Property ''<ID>'' is missing in type '{}' but required in type 'Markers'."
+  },
+  {
+    "file": "src/service/compress/tarUtils.ts",
+    "code": "TS2367",
+    "message": "This comparison appears to be unintentional because the types '\"File\" | \"OldFile\" | \"Link\" | \"SymbolicLink\" | \"CharacterDevice\" | \"BlockDevice\" | \"FIFO\" | \"ContiguousFile\" | \"GlobalExtendedHeader\" | \"ExtendedHeader\" | \"SolarisACL\" | \"GNUDumpDir\" | ... 8 more ... | \"Unsupported\"' and '\"5\"' have no overlap."
+  },
+  {
+    "file": "src/service/markdownService.ts",
+    "code": "TS2724",
+    "message": "'\"file-type\"' has no exported member named 'fileTypeFromFile'. Did you mean 'fileTypeFromBlob'?"
+  },
+  {
+    "file": "src/service/parquet/parquetUtil.ts",
+    "code": "TS2322",
+    "message": "Type '(start: number, end?: number) => ArrayBuffer | SharedArrayBuffer' is not assignable to type '(start: number, end?: number) => Awaitable<ArrayBuffer>'."
+  },
+  {
+    "file": "src/service/zip/zipArchive.ts",
+    "code": "TS2322",
+    "message": "Type 'Buffer<ArrayBufferLike>' is not assignable to type 'BlobPart'."
+  },
+  {
+    "file": "src/service/zip/zipArchive.ts",
+    "code": "TS2322",
+    "message": "Type 'Buffer<ArrayBufferLike>' is not assignable to type 'BlobPart'."
+  },
+  {
+    "file": "src/service/zip/zipArchive.ts",
+    "code": "TS2345",
+    "message": "Argument of type 'string' is not assignable to parameter of type 'AllowSharedBufferSource'."
+  }
+]

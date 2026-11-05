@@ -132,6 +132,8 @@ function ParquetViewer() {
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [readOnly, setReadOnly] = useState(false);
+    /** `${absoluteRow}:${column}` for every patched cell, so render never reads a ref. */
+    const [editedCells, setEditedCells] = useState<Set<string>>(() => new Set());
     const [vscodeTheme, setVscodeTheme] = useState(loadParquetVscodeTheme);
     const readOnlyRef = useRef(false);
     const fileInfoRef = useRef<ParquetFileInfo | null>(null);
@@ -255,6 +257,7 @@ function ParquetViewer() {
         const patch = editsRef.current.get(rowIndex) ?? {};
         patch[column.name] = nextValue;
         editsRef.current.set(rowIndex, patch);
+        setEditedCells((prev) => new Set(prev).add(`${rowIndex}:${column.name}`));
 
         const rows = [...pageRowsRef.current];
         rows[offset] = { ...row, [column.name]: nextValue };
@@ -273,6 +276,7 @@ function ParquetViewer() {
         pageRowsRef.current = [];
         editsRef.current.clear();
         pageCache.current.clear();
+        setEditedCells(new Set());
         setInspected(null);
         searchSeq.current++;
         setSearching(false);
@@ -368,7 +372,11 @@ function ParquetViewer() {
         }
     }, [fileInfo, page]);
 
-    useEffect(() => { setInspected(null); }, [page, fileInfo]);
+    /** Every page change drops the inspector: it points at a row on the old page. */
+    const goToPage = useCallback((next: number | ((current: number) => number)) => {
+        setInspected(null);
+        setPage(next);
+    }, []);
 
     const jumpToRow = useCallback(() => {
         const info = fileInfoRef.current;
@@ -377,8 +385,8 @@ function ParquetViewer() {
         if (!Number.isFinite(target)) return;
         const row = Math.max(1, Math.min(info.rowCount, target));
         cancelEdit();
-        setPage(Math.floor((row - 1) / PAGE_SIZE));
-    }, [rowJump, cancelEdit]);
+        goToPage(Math.floor((row - 1) / PAGE_SIZE));
+    }, [rowJump, cancelEdit, goToPage]);
 
     const rowRange = useMemo(() => {
         if (!fileInfo) return '';
@@ -422,14 +430,14 @@ function ParquetViewer() {
             if (found.size > 0) {
                 const first = found.values().next().value as number;
                 const target = Math.floor(first / PAGE_SIZE);
-                setPage(current => (current === target ? current : target));
+                goToPage(current => (current === target ? current : target));
             }
         } catch (e) {
             if (seq === searchSeq.current) setError(e instanceof Error ? e.message : 'Search failed');
         } finally {
             if (seq === searchSeq.current) setSearching(false);
         }
-    }, [query]);
+    }, [query, goToPage]);
 
     const jumpMatch = useCallback((direction: 1 | -1) => {
         if (matchRows.size === 0) return;
@@ -439,17 +447,21 @@ function ParquetViewer() {
         const target = direction > 0
             ? sorted.find(row => row >= pageEnd) ?? sorted[0]
             : [...sorted].reverse().find(row => row < pageStart) ?? sorted[sorted.length - 1];
-        setPage(Math.floor(target / PAGE_SIZE));
-    }, [matchRows, page]);
+        goToPage(Math.floor(target / PAGE_SIZE));
+    }, [matchRows, page, goToPage]);
 
     // clearing the box drops the previous results
-    useEffect(() => {
-        if (query.trim()) return;
+    const resetSearch = useCallback(() => {
         searchSeq.current++;
         setSearching(false);
         setSearchProgress(null);
         setMatchRows(new Set());
-    }, [query]);
+    }, []);
+
+    const handleQueryChange = useCallback((next: string) => {
+        setQuery(next);
+        if (!next.trim()) resetSearch();
+    }, [resetSearch]);
     const tableColumns = useMemo<ColumnsType<TableRow>>(() => {
         if (!fileInfo) return [];
         const cols: ColumnsType<TableRow> = [
@@ -492,7 +504,7 @@ function ParquetViewer() {
                     }
                     const cellKind = resolveColumnIcon(column.type).kind;
                     const isNull = value === null || value === undefined;
-                    const edited = editsRef.current.get(rowIndex)?.[column.name] !== undefined;
+                    const edited = editedCells.has(`${rowIndex}:${column.name}`);
                     const classes = [
                         'parquet-viewer__cell',
                         `parquet-viewer__cell--${cellKind}`,
@@ -514,7 +526,7 @@ function ParquetViewer() {
             });
         }
         return cols;
-    }, [cancelEdit, commitEdit, editValue, editingColumn, editingRow, fileInfo, page, query, readOnly, startEdit]);
+    }, [cancelEdit, commitEdit, editValue, editedCells, editingColumn, editingRow, fileInfo, page, query, readOnly, startEdit]);
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -634,7 +646,7 @@ function ParquetViewer() {
                                             className="parquet-viewer__find-input"
                                             placeholder="Find in file"
                                             value={query}
-                                            onChange={event => setQuery(event.target.value)}
+                                            onChange={event => handleQueryChange(event.target.value)}
                                             onKeyDown={event => {
                                                 if (event.key === 'Enter') void runSearch();
                                             }}
@@ -757,7 +769,7 @@ function ParquetViewer() {
                                         type="button"
                                         className="parquet-viewer__pager-btn"
                                         disabled={page <= 0}
-                                        onClick={() => { cancelEdit(); setPage((p) => Math.max(0, p - 1)); }}
+                                        onClick={() => { cancelEdit(); goToPage((p) => Math.max(0, p - 1)); }}
                                         aria-label="Previous page"
                                     >
                                         <span className="codicon codicon-chevron-left" />
@@ -783,7 +795,7 @@ function ParquetViewer() {
                                         type="button"
                                         className="parquet-viewer__pager-btn"
                                         disabled={page >= totalPages - 1}
-                                        onClick={() => { cancelEdit(); setPage((p) => Math.min(totalPages - 1, p + 1)); }}
+                                        onClick={() => { cancelEdit(); goToPage((p) => Math.min(totalPages - 1, p + 1)); }}
                                         aria-label="Next page"
                                     >
                                         <span className="codicon codicon-chevron-right" />

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { normalizeRepoPath, repoPathKey } from '../util/repoPath';
+import { repoPathKey } from '../util/repoPath';
 import type { GitExecutor } from './gitExecutor';
 
 const DEFAULT_MAX_DEPTH = 2;

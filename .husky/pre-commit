@@ -1,15 +1,12 @@
-# Fast, staged-only: Prettier over OUR docs only.
+#!/bin/sh
+# Pre-commit: everything that must never regress, in cheap-to-expensive order.
 #
-# Upstream files (src/, vite/, template/, …) are deliberately NOT auto-formatted:
-# upstream uses a different style (4 spaces, single quotes) and we must stay
-# mergeable with it. Write fork code in upstream style instead.
+# 1. Prettier over OUR docs only (~1.5s). `src/` is not auto-formatted yet: upstream
+#    style (4 spaces, single quotes) still dominates it, and mixing a format pass into
+#    a feature commit makes both unreviewable. Adopting prettier repo-wide is its own
+#    commit (see AGENTS.md).
+# 2. `pnpm check` = lint + typecheck + test (~15s warm). Each gate fails closed:
+#    eslint reports zero problems, tsc must not introduce an error outside the
+#    checked-in baseline, and node:test guards the parser edge cases.
 pnpm exec lint-staged
-
-# Unit tests: ~2s (esbuild bundles three modules, then node --test). They guard the
-# parser edge cases that DOM assertions cannot see, e.g. the countNodes 500/501
-# off-by-one that shipped once.
-pnpm test
-
-# Typecheck: ~4s. Upstream's tsconfig is broken (TS5070) and still carries ~57 type
-# errors of its own, so this gate fails only on errors in files this fork owns.
-pnpm typecheck
+pnpm check

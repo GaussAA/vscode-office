@@ -3,7 +3,6 @@ import { Uri, ViewColumn, window, type ExtensionContext } from "vscode";
 import { Util } from "../common/util";
 import { extensionResource, getExtensionResourceRoots } from "../common/extensionResource";
 import { readUriText } from "../common/workspaceFs";
-import { fileTypeFromPath } from "@/service/officeViewType";
 import { i18n } from "@/common/global";
 
 export class HtmlService {
