@@ -7,14 +7,23 @@ import {
     buildJsonlEntry,
     buildJsonlIndex,
     buildJsonlSummaries,
+    readJsonlLineText,
+    summarizeDecodedLine,
     type JsonlIndex,
 } from '@/service/jsonlDocument';
 import {
     JSONL_CHUNK_SIZE,
+    JSONL_SEARCH_LIMIT,
     type JsonlEntryPayload,
     type JsonlInfoPayload,
     type JsonlRangeRequest,
+    type JsonlSearchProgress,
+    type JsonlSearchRequest,
+    type JsonlSearchResult,
 } from '@/common/jsonlTypes';
+
+/** Lines scanned per event-loop turn while searching. */
+const SEARCH_STEP = 20_000;
 
 /**
  * The document's bytes live here, in the extension host, for its whole lifetime.
@@ -62,6 +71,8 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
         };
 
         const handler = Handler.bind(webviewPanel, document.uri);
+        // Only the newest search may emit results; older scans die on their next tick.
+        let latestSearchId = 0;
 
         const emitInfo = async () => {
             const payload: JsonlInfoPayload = {
@@ -78,7 +89,62 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
             const bytes = await vscode.workspace.fs.readFile(document.uri);
             document.bytes = bytes;
             document.index = buildJsonlIndex(bytes);
+            latestSearchId++;
             await emitInfo();
+        };
+
+        const runSearch = (request: JsonlSearchRequest) => {
+            const requestId = request?.requestId ?? 0;
+            latestSearchId = requestId;
+            const query = (request?.query ?? '').trim();
+            const total = document.index.lineCount;
+
+            if (!query) {
+                handler.emit('jsonlSearchResult', {
+                    requestId, query, entries: [], truncated: false, scanned: 0, matches: 0,
+                } satisfies JsonlSearchResult);
+                return;
+            }
+
+            const needle = query.toLowerCase();
+            const entries: JsonlEntrySummary[] = [];
+            let matches = 0;
+            let scanned = 0;
+
+            const step = () => {
+                if (requestId !== latestSearchId) return;
+                const end = Math.min(total, scanned + SEARCH_STEP);
+                for (let line = scanned; line < end; line++) {
+                    const decoded = readJsonlLineText(document.bytes, document.index, line);
+                    if (!decoded.text.toLowerCase().includes(needle)) continue;
+                    matches++;
+                    if (entries.length < JSONL_SEARCH_LIMIT) {
+                        entries.push(summarizeDecodedLine(line, decoded));
+                    }
+                }
+                scanned = end;
+
+                if (scanned < total && entries.length < JSONL_SEARCH_LIMIT) {
+                    const progress: JsonlSearchProgress = {
+                        requestId, scanned, total, matches,
+                    };
+                    handler.emit('jsonlSearchProgress', progress);
+                    setTimeout(step, 0);
+                    return;
+                }
+
+                const result: JsonlSearchResult = {
+                    requestId,
+                    query,
+                    entries,
+                    truncated: matches > entries.length,
+                    scanned,
+                    matches,
+                };
+                handler.emit('jsonlSearchResult', result);
+            };
+
+            setTimeout(step, 0);
         };
 
         handler
@@ -105,7 +171,8 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
                     entry: buildJsonlEntry(document.bytes, document.index, index),
                 };
                 handler.emit('jsonlEntryData', payload);
-            });
+            })
+            .on('jsonlSearch', (request: JsonlSearchRequest) => runSearch(request));
 
         await ReactApp.view(webview, { route: 'jsonl' });
     }

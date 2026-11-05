@@ -88,6 +88,10 @@ body:has(.jsonl-viewer) {
     width: 92px;
 }
 
+.jsonl-search {
+    width: 210px;
+}
+
 /* antd controls inside a VS Code webview: flat and theme-correct */
 
 .jsonl-viewer .ant-btn {
@@ -224,6 +228,19 @@ body:has(.jsonl-viewer) {
     position: relative;
     height: 100%;
     overflow: hidden;
+}
+
+.jsonl-index__banner {
+    display: flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 12px;
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--jl-muted);
+    background: color-mix(in srgb, var(--jl-toolbar-bg) 55%, transparent);
+    border-bottom: 1px solid var(--jl-border);
+    font-variant-numeric: tabular-nums;
 }
 
 .jsonl-index__tree {

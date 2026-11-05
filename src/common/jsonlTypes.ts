@@ -75,3 +75,30 @@ export interface JsonlEntryPayload {
     index: number;
     entry: JsonlEntryDetail;
 }
+
+/* ---------- search ---------- */
+
+/** Matches returned to the directory pane; more than this and the result is truncated. */
+export const JSONL_SEARCH_LIMIT = 500;
+
+export interface JsonlSearchRequest {
+    requestId: number;
+    query: string;
+}
+
+export interface JsonlSearchProgress {
+    requestId: number;
+    scanned: number;
+    total: number;
+    matches: number;
+}
+
+export interface JsonlSearchResult {
+    requestId: number;
+    query: string;
+    entries: JsonlEntrySummary[];
+    /** True when the scan stopped early (limit reached) or more matches exist than returned. */
+    truncated: boolean;
+    scanned: number;
+    matches: number;
+}

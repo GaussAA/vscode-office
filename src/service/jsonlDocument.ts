@@ -75,12 +75,20 @@ interface DecodedLine {
     size: number;
 }
 
-function decodeLine(bytes: Uint8Array, index: JsonlIndex, line: number): DecodedLine {
+/** Decode one line to text. Exported so the searcher can scan without re-parsing. */
+export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: number): DecodedLine {
     const slice = lineBytes(bytes, index, line);
     const text = decoder.decode(slice).replace(/[\r\n]+$/, '');
     // size excludes the line terminator
     const size = Math.max(0, text.length === 0 ? 0 : slice.length - (slice[slice.length - 1] === 0x0a ? 1 : 0));
     return { text, size };
+}
+
+const decodeLine = readJsonlLineText;
+
+/** Build a summary for a line whose text has already been decoded. */
+export function summarizeDecodedLine(line: number, decoded: DecodedLine): JsonlEntrySummary {
+    return classify(line, decoded, true);
 }
 
 function classify(line: number, decoded: DecodedLine, parse: boolean): JsonlEntrySummary {
