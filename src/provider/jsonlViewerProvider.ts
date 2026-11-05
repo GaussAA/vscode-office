@@ -3,31 +3,14 @@ import { Handler } from '@/common/handler';
 import { ReactApp } from '@/common/reactApp';
 import { getExtensionResourceRoots } from '@/common/extensionResource';
 import { buildDocumentCacheId } from '@/provider/handlers/officeContent';
-import { JsonlFile, fileByteSource, memoryByteSource, type ByteSource } from '@/service/jsonlFile';
+import { JsonlFile } from '@/service/jsonlFile';
 import { JsonlSession } from '@/service/jsonlSession';
-import {
-    JSONL_CHUNK_SIZE,
-    type JsonlEntriesPayload,
-    type JsonlEntryPayload,
-    type JsonlEntryRequest,
-    type JsonlInfoPayload,
-    type JsonlRangeRequest,
-    type JsonlSearchBatch,
-    type JsonlSearchCancel,
-    type JsonlSearchRequest,
-} from '@/common/jsonlTypes';
+import { openByteSource } from '@/service/jsonlSource';
+import { createJsonlHandlers } from './jsonlHandlers';
 
-/**
- * Random access to the document's bytes.
- *
- * A real file is opened once and read in chunks, so a 500 MB log costs one chunk of memory
- * plus the line index. Anything else (virtual documents, remote workspaces) is read whole —
- * the bytes are already the only way to reach them.
- */
-async function openByteSource(uri: vscode.Uri): Promise<ByteSource> {
-    if (uri.scheme === 'file') return fileByteSource(uri.fsPath);
-    return memoryByteSource(await vscode.workspace.fs.readFile(uri));
-}
+/** Non-file documents (virtual, remote) can only be read whole. */
+const readAll = async (uri: { scheme: string; fsPath: string }) =>
+    vscode.workspace.fs.readFile(uri as vscode.Uri);
 
 class JsonlDocument implements vscode.CustomDocument {
 
@@ -56,7 +39,7 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
     }
 
     async openCustomDocument(uri: vscode.Uri): Promise<JsonlDocument> {
-        const file = await JsonlFile.open(await openByteSource(uri));
+        const file = await JsonlFile.open(await openByteSource(uri, readAll));
         return new JsonlDocument(uri, new JsonlSession(file));
     }
 
@@ -72,60 +55,30 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
         // Always the current session: a reload replaces it.
         const current = () => document.session;
 
-        const emitInfo = () => {
-            const session = current();
-            const payload: JsonlInfoPayload = {
+        const handlers = createJsonlHandlers({
+            session: current,
+            reopen: async () => {
+                const previous = current();
+                document.session = new JsonlSession(await JsonlFile.open(await openByteSource(document.uri, readAll)));
+                previous.dispose();
+            },
+            emit: (type, payload) => handler.emit(type, payload),
+            info: () => ({
                 fileName: document.uri.path.split('/').pop() ?? document.uri.fsPath,
                 cacheId: buildDocumentCacheId(document.uri),
-                lineCount: session.lineCount,
-                byteSize: session.byteSize,
-            };
-            handler.emit('jsonlInfo', payload);
-        };
-
-        /** The file changed on disk: index the new bytes, then close the old view. */
-        const reload = async () => {
-            const previous = current();
-            document.session = new JsonlSession(await JsonlFile.open(await openByteSource(document.uri)));
-            previous.dispose();
-            emitInfo();
-        };
+                lineCount: current().lineCount,
+                byteSize: current().byteSize,
+            }),
+        });
 
         handler
-            .on('init', () => { emitInfo() })
-            .on('jsonlReload', () => reload())
-            .on('fileChange', () => reload())
-            .on('jsonlIndex', async (request: JsonlRangeRequest) => {
-                if (typeof request?.requestId !== 'number') return;
-                const start = Math.max(0, request.start ?? 0);
-                const end = request.end ?? start + JSONL_CHUNK_SIZE;
-                let payload: JsonlEntriesPayload;
-                try {
-                    payload = await current().readRange(request.requestId, start, end);
-                } catch {
-                    return; // the file was swapped underneath us; the webview will ask again
-                }
-                handler.emit('jsonlEntries', payload);
-            })
-            .on('jsonlEntry', async (request: JsonlEntryRequest) => {
-                if (typeof request?.requestId !== 'number') return;
-                let payload: JsonlEntryPayload | null = null;
-                try {
-                    payload = await current().readEntry(request.requestId, request.index);
-                } catch {
-                    return;
-                }
-                if (payload) handler.emit('jsonlEntryData', payload);
-            })
-            .on('jsonlSearch', (request: JsonlSearchRequest) => {
-                if (typeof request?.requestId !== 'number') return;
-                // A newer search supersedes the running one; the session stops it on its next turn.
-                document.session.cancelSearch();
-                document.session.search(request.requestId, request.query, {
-                    onBatch: (batch: JsonlSearchBatch) => { handler.emit('jsonlSearchBatch', batch); },
-                });
-            })
-            .on('jsonlSearchCancel', (_request: JsonlSearchCancel) => { document.session.cancelSearch(); });
+            .on('init', () => handlers.init())
+            .on('jsonlReload', () => handlers.reload())
+            .on('fileChange', () => handlers.reload())
+            .on('jsonlIndex', request => handlers.index(request))
+            .on('jsonlEntry', request => handlers.entry(request))
+            .on('jsonlSearch', request => handlers.search(request))
+            .on('jsonlSearchCancel', request => handlers.cancelSearch(request));
 
         await ReactApp.view(webview, { route: 'jsonl' });
     }
