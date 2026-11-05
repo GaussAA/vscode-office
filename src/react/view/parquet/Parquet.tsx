@@ -329,12 +329,14 @@ function ParquetViewer() {
             },
         ];
         for (const column of fileInfo.columns) {
+            const kind = resolveColumnIcon(column.type).kind;
             cols.push({
                 title: column.name,
                 dataIndex: column.name,
                 key: column.name,
                 ellipsis: true,
                 minWidth: 120,
+                align: kind === 'numeric' ? 'right' : 'left',
                 render: (value: unknown, _row, index) => {
                     const rowIndex = page * PAGE_SIZE + index;
                     const editing = editingRow === rowIndex && editingColumn === column.name;
@@ -354,13 +356,23 @@ function ParquetViewer() {
                             />
                         );
                     }
+                    const cellKind = resolveColumnIcon(column.type).kind;
+                    const isNull = value === null || value === undefined;
+                    const edited = editsRef.current.get(rowIndex)?.[column.name] !== undefined;
+                    const classes = [
+                        'parquet-viewer__cell',
+                        `parquet-viewer__cell--${cellKind}`,
+                        isNull ? 'parquet-viewer__cell--null' : '',
+                        edited ? 'parquet-viewer__cell--edited' : '',
+                        !readOnly && isColumnEditable(column.type) ? 'parquet-viewer__cell--editable' : '',
+                    ].filter(Boolean).join(' ');
                     return (
                         <span
-                            className={`parquet-viewer__cell${!readOnly && isColumnEditable(column.type) ? ' parquet-viewer__cell--editable' : ''}`}
-                            title={formatCellValue(value)}
+                            className={classes}
+                            title={isNull ? 'null' : formatCellValue(value)}
                             onDoubleClick={() => startEdit(rowIndex, column, value)}
                         >
-                            {formatCellValue(value)}
+                            {isNull ? 'NULL' : formatCellValue(value)}
                         </span>
                     );
                 },
@@ -568,6 +580,7 @@ export default function Parquet() {
         </App>
     );
 }
+
 
 
 

@@ -6,7 +6,9 @@ import {
     AUTO_EXPAND_LIMIT,
     EXPAND_ALL_CONFIRM,
     ROW_HEIGHT,
+    WRAP_NODE_LIMIT,
     buildTree,
+    countNodes,
     formatBytes,
     isComposite,
     pathToText,
@@ -43,10 +45,17 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
     const [activeKey, setActiveKey] = useState<string | null>(null);
     const [copied, setCopied] = useState<'value' | 'path' | null>(null);
 
+    // Small entries get wrapping (variable row height => no virtual scrolling);
+    // big ones stay single-line so the tree keeps its fixed-height virtual list.
+    const wrap = useMemo(() => {
+        if (!entry || entry.value === undefined) return false;
+        return countNodes(entry.value) <= WRAP_NODE_LIMIT;
+    }, [entry]);
+
     const built = useMemo(() => {
         if (!entry || entry.value === undefined) return null;
-        return buildTree(entry.value);
-    }, [entry]);
+        return buildTree(entry.value, wrap);
+    }, [entry, wrap]);
 
     useEffect(() => {
         const element = containerRef.current;
@@ -118,9 +127,26 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
     const collapseAll = useCallback(() => setExpanded([]), []);
 
     const onKeyDown = useCallback((event: React.KeyboardEvent) => {
-        if (event.key === 'Enter' && activeKey) {
+        if (activeKey) {
+            if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                setExpanded(prev => (prev.includes(activeKey) ? prev : [...prev, activeKey]));
+                return;
+            }
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                setExpanded(prev => prev.filter(key => key !== activeKey));
+                return;
+            }
+            if (event.key === ' ' || event.key === 'Spacebar') {
+                event.preventDefault();
+                setExpanded(prev => (prev.includes(activeKey) ? prev.filter(key => key !== activeKey) : [...prev, activeKey]));
+                return;
+            }
+        }
+        if (event.key === 'Enter') {
             event.preventDefault();
-            setExpanded(prev => (prev.includes(activeKey) ? prev.filter(key => key !== activeKey) : [...prev, activeKey]));
+            copyValue();
             return;
         }
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
@@ -192,20 +218,19 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
             </div>
         );
     } else if (built) {
-        body = (
+        const tree = (
             <Tree
-                className="jsonl-detail__tree"
+                className={`jsonl-detail__tree${wrap ? ' jsonl-detail__tree--wrap' : ''}`}
                 treeData={built.nodes}
                 expandedKeys={expanded}
                 onExpand={keys => setExpanded(keys)}
                 selectedKeys={activeKey ? [activeKey] : []}
                 onSelect={keys => setActiveKey(keys.length ? String(keys[0]) : null)}
-                height={height}
-                itemHeight={ROW_HEIGHT}
-                virtual
+                {...(wrap ? {} : { height, itemHeight: ROW_HEIGHT, virtual: true })}
                 showIcon={false}
             />
         );
+        body = wrap ? <div className="jsonl-detail__scroll">{tree}</div> : tree;
     } else {
         body = <div className="jsonl-empty">No tree</div>;
     }
@@ -217,3 +242,4 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
         </div>
     );
 }
+

@@ -13,6 +13,10 @@ export const EXPAND_ALL_CONFIRM = 5000;
 export const AUTO_EXPAND_LIMIT = 300;
 /** Default expansion depth for larger entries. */
 export const DEFAULT_EXPAND_DEPTH = 2;
+/** Entries at or below this node count render with wrapping (virtual scrolling off). */
+export const WRAP_NODE_LIMIT = 500;
+/** Strings longer than this are cut even in wrap mode. */
+export const WRAP_TEXT_LIMIT = 2000;
 
 export const makePathKey = (path: PathSeg[]): string => JSON.stringify(path);
 export const readPathKey = (key: React.Key | string): PathSeg[] => JSON.parse(String(key)) as PathSeg[];
@@ -67,16 +71,38 @@ function segmentLabel(seg: PathSeg): string {
     return typeof seg === 'number' ? `[${seg}]` : String(seg);
 }
 
-export function valueRow(seg: PathSeg, value: unknown): ReactNode {
+function wrappedText(text: string): string {
+    return text.length <= WRAP_TEXT_LIMIT ? text : `${text.slice(0, WRAP_TEXT_LIMIT)}… (${text.length.toLocaleString()} chars)`;
+}
+
+export function valueRow(seg: PathSeg, value: unknown, wrap = false): ReactNode {
     const composite = isComposite(value);
+    const longString = wrap && typeof value === 'string';
+    const text = longString ? wrappedText(value as string) : preview(value);
     return (
-        <span className="jsonl-kv">
+        <span className={`jsonl-kv${wrap ? ' jsonl-kv--wrap' : ''}`}>
             <span className="jsonl-key">{segmentLabel(seg)}</span>
             <span className="jsonl-colon">:</span>
-            <span className={`jsonl-val jsonl-val--${typeClass(value)}`}>{preview(value)}</span>
+            <span className={`jsonl-val jsonl-val--${typeClass(value)}${longString ? ' jsonl-val--wrap' : ''}`}>{text}</span>
             {composite && <span className="jsonl-type">{typeLabel(value)}</span>}
         </span>
     );
+}
+
+/** Cheap node count used to decide whether wrapping is affordable. */
+export function countNodes(value: unknown, limit = WRAP_NODE_LIMIT): number {
+    let count = 0;
+    const walk = (current: unknown, depth: number) => {
+        if (!isComposite(current) || depth >= MAX_DEPTH) return;
+        const entries = Array.isArray(current) ? current : Object.values(current);
+        for (const child of entries) {
+            if (count >= limit) return;
+            count++;
+            walk(child, depth + 1);
+        }
+    };
+    walk(value, 0);
+    return count;
 }
 
 export interface BuiltTree {
@@ -93,7 +119,7 @@ export interface BuiltTree {
  * Build the full antd tree for one entry. Bounded on purpose: a single JSONL
  * line can be tens of MB, and an unbounded tree freezes the webview.
  */
-export function buildTree(value: unknown): BuiltTree {
+export function buildTree(value: unknown, wrap = false): BuiltTree {
     const allKeys: string[] = [];
     const shallowKeys: string[] = [];
     let count = 0;
@@ -120,7 +146,7 @@ export function buildTree(value: unknown): BuiltTree {
             nodes.push({
                 key,
                 isLeaf: !composite,
-                title: valueRow(seg, child),
+                title: valueRow(seg, child, wrap),
                 children: composite ? walk(child, childPath) : undefined,
             });
         }
@@ -166,3 +192,4 @@ export function highlightParts(text: string, needle?: string): Array<{ text: str
     if (cursor < text.length) parts.push({ text: text.slice(cursor), hit: false });
     return parts.length ? parts : [{ text, hit: false }];
 }
+

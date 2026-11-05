@@ -103,7 +103,7 @@ export default function JsonlIndex({
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
                         <span className="jsonl-chip jsonl-chip--error">invalid</span>
-                        <span className="jsonl-entry__raw jsonl-entry__raw--error">{renderText(entry)}</span>
+                        <span className="jsonl-entry__raw jsonl-entry__raw--error" title={entry.raw}>{renderText(entry)}</span>
                     </span>
                 );
             } else if (entry.tooLarge) {
@@ -119,7 +119,7 @@ export default function JsonlIndex({
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
                         {entry.label !== undefined && <span className="jsonl-entry__label">{entry.label}</span>}
-                        <span className="jsonl-entry__raw">{renderText(entry)}</span>
+                        <span className="jsonl-entry__raw" title={entry.snippet ?? entry.raw}>{renderText(entry)}</span>
                     </span>
                 );
             }
@@ -169,4 +169,5 @@ export default function JsonlIndex({
         </div>
     );
 }
+
 

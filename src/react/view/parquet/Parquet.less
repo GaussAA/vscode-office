@@ -586,3 +586,32 @@ body:has(.parquet-app) {
 .parquet-viewer__row-jump {
     width: 84px;
 }
+
+/* fork: type-aware cell rendering */
+.parquet-viewer__cell--numeric {
+    font-variant-numeric: tabular-nums;
+    color: var(--vscode-charts-blue, #4ea1ff);
+}
+
+.parquet-viewer__cell--string {
+    color: var(--vscode-charts-green, #89d185);
+}
+
+.parquet-viewer__cell--bool {
+    color: var(--vscode-charts-orange, #f0a45e);
+}
+
+.parquet-viewer__cell--datetime {
+    color: var(--vscode-charts-purple, #c586c0);
+}
+
+.parquet-viewer__cell--null {
+    color: var(--vscode-disabledForeground, #8a8a8a);
+    font-style: italic;
+}
+
+.parquet-viewer__cell--edited {
+    background: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d) 18%, transparent);
+    box-shadow: inset 2px 0 0 var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+    border-radius: 2px;
+}

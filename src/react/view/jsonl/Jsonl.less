@@ -503,3 +503,39 @@ body:has(.jsonl-viewer) {
     border-radius: 2px;
     padding: 0;
 }
+
+/* wrapping mode: variable row height, so the virtual list is off */
+.jsonl-detail__scroll {
+    height: 100%;
+    overflow: auto;
+}
+
+.jsonl-detail__tree--wrap {
+    .ant-tree-treenode {
+        align-items: flex-start;
+    }
+
+    .ant-tree-node-content-wrapper {
+        display: block;
+        height: auto;
+        max-width: calc(100% - 28px);
+        line-height: 1.5;
+        padding: 2px 8px 2px 2px;
+    }
+
+    .ant-tree-switcher {
+        line-height: 1.5;
+        padding-top: 3px;
+    }
+}
+
+.jsonl-kv--wrap {
+    display: inline;
+    white-space: normal;
+}
+
+.jsonl-val--wrap {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
