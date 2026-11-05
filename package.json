@@ -502,9 +502,6 @@
             "filenamePattern": "*.apng"
           },
           {
-            "filenamePattern": "*.apng"
-          },
-          {
             "filenamePattern": "*.bmp"
           },
           {

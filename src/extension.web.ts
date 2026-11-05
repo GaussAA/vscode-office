@@ -37,7 +37,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand('chaowu21.office.csv.switch', (uri) => { switchCsvEditor(uri); }),
 		vscode.commands.registerCommand('chaowu21.office.html.preview', (uri) => HtmlService.previewHtml(uri, context)),
 		vscode.window.registerCustomEditorProvider('chaowu21.markdownViewer', markdownEditorProvider, viewOption),
-		vscode.window.registerCustomEditorProvider('chaowu21.markdownPreview', markdownEditorProvider, viewOption),
 		...webUnsupportedViewer.bindCustomEditors(viewOption),
 		...viewerInstance.bindCustomEditors(viewOption),
 	);

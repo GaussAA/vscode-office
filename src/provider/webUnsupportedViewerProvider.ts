@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 const WEB_UNSUPPORTED_VIEW_TYPES = [
 	'chaowu21.archiveViewer',
 	'chaowu21.classViewer',
+	'chaowu21.jsonlViewer',
 ] as const;
 
 /**

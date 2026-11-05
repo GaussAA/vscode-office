@@ -62,9 +62,19 @@ Rules that keep this suite useful:
 ## Route smoke vs. real scenarios
 
 `upstream-viewers-smoke` walks every **React** route (`image`, `svg`, `excel`, `zip`,
-`word`, `ppt`, `font`, `epub`, `icns`, `psd`, `xmind`, `webUnsupported`) with a minimal
-`open` payload and asserts that something mounted and nothing threw. Its job is to catch
-fork-wide breakage (entry, provider, shared utilities), **not** rendering correctness.
+`word`, `ppt`, `font`, `epub`, `icns`, `psd`, `xmind`, `gitHistory`, `webUnsupported`)
+with a minimal `open` payload and asserts that something mounted and nothing threw. Its job
+is to catch fork-wide breakage (entry, provider, shared utilities), **not** rendering
+correctness.
+
+It waits for the mount (`page.waitFor`) rather than sleeping a fixed delay: the excel and
+epub chunks are ~1 MB, and a fixed 900 ms per route both flaked under load and wasted
+~8 s per run.
+
+Two routes are not in the smoke list because they have their own scenarios:
+`parquet` (`parquet-*`) and `jsonl` (`jsonl-*`). `test/unit/viewer-registry.test.mjs`
+asserts that every route in `main.tsx` is covered one way or the other, so adding a route
+without coverage fails the build instead of silently shrinking the suite.
 
 Three viewers are not React routes and are therefore not in the smoke list:
 

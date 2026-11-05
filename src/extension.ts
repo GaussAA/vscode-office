@@ -42,7 +42,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand('chaowu21.office.html.preview', uri => HtmlService.previewHtml(uri, context)),
 		vscode.workspace.registerTextDocumentContentProvider('decompile_java', new JavaDecompilerProvider(context)),
 		vscode.window.registerCustomEditorProvider("chaowu21.markdownViewer", markdownEditorProvider, viewOption),
-		vscode.window.registerCustomEditorProvider("chaowu21.markdownPreview", markdownEditorProvider, viewOption),
 		archiveViewerInstance.bindCustomEditor(viewOption),
 		classViewerInstance.bindCustomEditor(viewOption),
 		jsonlViewerInstance.bindCustomEditor(viewOption),

@@ -239,7 +239,7 @@ const scenarios = [
         name: 'upstream-viewers-smoke',
         async run({ page, base }) {
             // React routes only: html/pdf are provider-served static pages and markdown has its own editor bundle.
-            const routes = ['image', 'svg', 'excel', 'zip', 'word', 'ppt', 'font', 'epub', 'icns', 'psd', 'xmind', 'webUnsupported']
+            const routes = ['image', 'svg', 'excel', 'zip', 'word', 'ppt', 'font', 'epub', 'icns', 'psd', 'xmind', 'gitHistory', 'webUnsupported']
             const failures = []
             for (const route of routes) {
                 page.clearExceptions()
