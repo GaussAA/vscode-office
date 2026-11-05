@@ -23,6 +23,7 @@ const entries = {
     jsonlFormat: 'src/react/view/jsonl/jsonlFormat.tsx',
     parquetParser: 'src/react/view/parquet/parquetParser.ts',
     parquetSession: 'src/react/view/parquet/parquetSession.ts',
+    excelFind: 'src/react/view/excel/excel_find.ts',
 }
 
 for (const [name, entry] of Object.entries(entries)) {

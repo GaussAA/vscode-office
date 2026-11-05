@@ -112,7 +112,9 @@ export function replaceCellText(
     replaceText: string,
     options: FindOptions,
 ): boolean {
-    const sheet = sheets[sheetIndexSafe(sheets, match.sheetIndex)];
+    // sheetIndexSafe returns the sheet itself, not an index: indexing the array with it
+    // produced `sheets[undefined]` and made replace silently do nothing.
+    const sheet = sheetIndexSafe(sheets, match.sheetIndex);
     const row = sheet?.rows?.[match.ri];
     if (!row || typeof row !== 'object' || !('cells' in row)) return false;
     const cell = row.cells?.[match.ci];

@@ -1,5 +1,13 @@
 import type * as ExcelJS from '@cweijan/exceljs';
 
+/**
+ * exceljs's bundled types alias its media input to `Buffer`, which in that declaration is
+ * `ArrayBuffer`-shaped. The browser build accepts the `Uint8Array` the webview has, so the
+ * two call sites cast through these aliases instead of widening the whole module.
+ */
+type ImageMediaInput = Parameters<ExcelJS.Workbook['addImage']>[0];
+type ImageRangeInput = Parameters<ExcelJS.Worksheet['addImage']>[1];
+
 export interface SheetImageAnchor {
     /** 0-based，可为小数（表示在单元格内的偏移） */
     col: number;
@@ -181,7 +189,7 @@ export function writeWorksheetImages(
         const bgId = workbook.addImage({
             buffer: bgBuffer,
             extension: backgroundImage.extension,
-        });
+        } as unknown as ImageMediaInput);
         worksheet.addBackgroundImage(bgId);
     }
     if (!images?.length) return;
@@ -191,8 +199,8 @@ export function writeWorksheetImages(
         const imageId = workbook.addImage({
             buffer,
             extension: img.extension,
-        });
-        worksheet.addImage(imageId, buildExcelJsImageRange(img.anchor));
+        } as unknown as ImageMediaInput);
+        worksheet.addImage(imageId, buildExcelJsImageRange(img.anchor) as unknown as ImageRangeInput);
     }
 }
 

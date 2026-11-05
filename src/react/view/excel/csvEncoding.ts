@@ -2,6 +2,9 @@ import iconv from 'iconv-lite';
 
 export type CsvEncoding = 'utf8' | 'gbk';
 
+/** iconv-lite's signature wants a Node Buffer; a webview only has Uint8Array. */
+type IconvInput = Parameters<typeof iconv.decode>[0];
+
 function toUint8Array(buffer: ArrayBuffer): Uint8Array {
     return new Uint8Array(buffer);
 }
@@ -35,7 +38,8 @@ export function decodeCsvBuffer(buffer: ArrayBuffer): string {
     if (encoding === 'utf8') {
         return new TextDecoder('utf-8').decode(stripUtf8Bom(toUint8Array(buffer)));
     }
-    return iconv.decode(toUint8Array(buffer), 'gbk');
+    // iconv-lite asks for a Node Buffer; it reads a Uint8Array fine, and a webview has no Buffer.
+    return iconv.decode(toUint8Array(buffer) as unknown as IconvInput, 'gbk');
 }
 
 export function encodeCsvText(text: string, encoding: CsvEncoding): Uint8Array {

@@ -88,7 +88,8 @@ function restoreViewState(spreadSheet: Spreadsheet, saved: ExcelViewState) {
     const sheets = spreadSheet.getData();
     if (!sheets.length) return;
     const sheetIndex = Math.min(Math.max(0, saved.sheetIndex), sheets.length - 1);
-    const sheet = sheets[sheetIndex];
+    // The vendored spreadsheet's SheetData type omits the grid it actually carries.
+    const sheet = sheets[sheetIndex] as { rows?: { len?: number }; cols?: { len?: number } };
     const maxRi = Math.max(0, (sheet.rows?.len ?? 1) - 1);
     const maxCi = Math.max(0, (sheet.cols?.len ?? 1) - 1);
     const ri = Math.min(Math.max(0, saved.ri), maxRi);
