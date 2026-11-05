@@ -45,7 +45,13 @@ async function jumpJsonl(page, entry) {
         const go = [...document.querySelectorAll('.jsonl-toolbar button')].find(b => b.textContent.trim() === 'Go');
         go.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     })()`)
-    await page.sleep(600)
+    // The header flips to the new line as soon as the request is issued; the body is what the
+    // scenarios assert on, so wait for it too.
+    const loaded = await page.waitFor(`(() => {
+        if (document.querySelector('.jsonl-detail__index')?.innerText.trim() !== ${JSON.stringify(`L${entry}`)}) return false;
+        return !!document.querySelector('.jsonl-detail__tree, .jsonl-detail__scalar, .jsonl-detail__raw');
+    })()`)
+    expect(loaded, `entry L${entry} never finished rendering`)
 }
 
 async function openParquet(page, base, query = '') {
@@ -62,10 +68,14 @@ const pagerState = page => page.evaluate(`JSON.stringify({
 })`).then(json)
 
 async function clickNextPage(page) {
+    const before = (await pagerState(page)).range
     await page.evaluate(`[...document.querySelectorAll('.parquet-viewer__pager-btn')]
         .filter(b => b.getAttribute('aria-label') === 'Next page')[0]
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`)
-    await page.sleep(500)
+    const moved = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') !== ${JSON.stringify(before)}`,
+    )
+    expect(moved, `pager stayed on ${before}`)
 }
 
 const scenarios = [
@@ -136,7 +146,14 @@ const scenarios = [
             })()`)
             const sawBanner = await page.waitFor(`!!document.querySelector('.jsonl-index__banner')`)
             expect(sawBanner, 'search banner never appeared')
-            await page.sleep(500)
+            const sawHits = await page.waitFor(`document.querySelectorAll('.jsonl-hit').length > 0`)
+            expect(sawHits, 'no match highlighting rendered')
+            // Settled means: a match count, and no longer "Searching…".
+            const settled = await page.waitFor(`(() => {
+                const text = document.querySelector('.jsonl-index__banner')?.innerText ?? '';
+                return /\\d+ match/.test(text) && !text.includes('Searching');
+            })()`)
+            expect(settled, 'search banner never settled on a match count')
             const state = json(await page.evaluate(`JSON.stringify({
                 banner: document.querySelector('.jsonl-index__banner')?.innerText ?? null,
                 hits: document.querySelectorAll('.jsonl-hit').length,
@@ -178,7 +195,10 @@ const scenarios = [
                     .find(b => b.textContent.trim() === 'Go')
                     ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`)
-            await page.sleep(900)
+            const arrived = await page.waitFor(
+                `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '').includes('239,951')`,
+            )
+            expect(arrived, 'jump never reached row 239,951')
             const jumped = await pagerState(page)
             expect(jumped.range === '239,951–240,000 of 250,000', `jump range: ${jumped.range}`)
             expect(jumped.first === '239951', `jump first row: ${jumped.first}`)
@@ -194,7 +214,10 @@ const scenarios = [
                 const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
                 cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`)
-            await page.sleep(300)
+            const inspected = await page.waitFor(
+                `/name · row 1/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,
+            )
+            expect(inspected, 'inspector never showed name · row 1')
             const state = json(await page.evaluate(`JSON.stringify({
                 label: document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? null,
                 value: document.querySelector('.parquet-viewer__inspector-value')?.innerText ?? null,
