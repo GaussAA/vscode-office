@@ -92,17 +92,22 @@ export function valueRow(seg: PathSeg, value: unknown, wrap = false): ReactNode 
 /** Cheap node count used to decide whether wrapping is affordable. */
 export function countNodes(value: unknown, limit = WRAP_NODE_LIMIT): number {
     let count = 0;
+    let capped = false;
     const walk = (current: unknown, depth: number) => {
-        if (!isComposite(current) || depth >= MAX_DEPTH) return;
+        if (capped || !isComposite(current) || depth >= MAX_DEPTH) return;
         const entries = Array.isArray(current) ? current : Object.values(current);
         for (const child of entries) {
-            if (count >= limit) return;
+            if (count >= limit) {
+                capped = true;
+                return;
+            }
             count++;
             walk(child, depth + 1);
         }
     };
     walk(value, 0);
-    return count;
+    // limit + 1 marks "too many"; returning exactly limit would read as "just fits"
+    return capped ? limit + 1 : count;
 }
 
 export interface BuiltTree {
@@ -192,4 +197,5 @@ export function highlightParts(text: string, needle?: string): Array<{ text: str
     if (cursor < text.length) parts.push({ text: text.slice(cursor), hit: false });
     return parts.length ? parts : [{ text, hit: false }];
 }
+
 
