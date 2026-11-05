@@ -22,6 +22,13 @@ Custom editors:
 - The same file can be opened in two editor groups at once. Previously the second open was
   refused and left you with a single viewer.
 
+Word viewer:
+
+- Moved to `@docx-editor.dev/react` (`@eigenpal/docx-editor-react` is deprecated on npm and
+  no longer receives fixes). The editor now brings its own title bar, menu bar and toolbar,
+  so the Word view gains the full editing chrome instead of the single hand-built button.
+- Read-only documents open in the editor's view mode.
+
 # 4.4.1 2026-11-05
 
 Parquet viewer:

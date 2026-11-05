@@ -1,7 +1,7 @@
 import { MoonOutlined, SunOutlined } from "@ant-design/icons";
 import { Alert, Spin } from "antd";
-import { DocxEditor, type DocxEditorRef } from "@eigenpal/docx-editor-react";
-import "@eigenpal/docx-editor-react/styles.css";
+import { DocxEditor, type DocxEditorRef } from "@docx-editor.dev/react";
+import "@docx-editor.dev/react/styles.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { handler, vscodeApi } from "../../util/vscode";
 import { loadOfficeBuffer } from "../../util/loadOfficeContent";
@@ -56,8 +56,6 @@ export default function Word() {
     const [documentBuffer, setDocumentBuffer] = useState<ArrayBuffer | undefined>(undefined);
     const [documentKey, setDocumentKey] = useState("");
     const [fileName, setFileName] = useState("");
-    const [commentsSidebarOpen, setCommentsSidebarOpen] = useState(false);
-    const skipCommentsAutoOpenRef = useRef(true);
 
     const adaptiveColorMode = colorMode === "adaptive";
 
@@ -97,8 +95,6 @@ export default function Word() {
             setReadOnly(fileReadOnly);
             setFileName(payload.fileName ?? "");
             setDocumentKey(`${payload.documentCacheId ?? ""}-${payload.nonce ?? Date.now()}`);
-            skipCommentsAutoOpenRef.current = true;
-            setCommentsSidebarOpen(false);
             const buffer = await loadOfficeBuffer(payload);
             setDocumentBuffer(buffer);
         } catch (e) {
@@ -149,28 +145,22 @@ export default function Word() {
                         key={documentKey}
                         ref={editorRef}
                         className="word-editor"
-                        documentBuffer={documentBuffer}
-                        documentName={fileName}
-                        documentNameEditable={false}
-                        readOnly={readOnly}
-                        {...(readOnly ? { mode: "viewing" as const } : {})}
-                        commentsSidebarOpen={commentsSidebarOpen}
-                        onCommentsSidebarOpenChange={(open) => {
-                            if (open && skipCommentsAutoOpenRef.current) {
-                                skipCommentsAutoOpenRef.current = false;
-                                return;
-                            }
-                            setCommentsSidebarOpen(open);
-                        }}
+                        // The package owns the title bar, menu bar and toolbar. We used to
+                        // hand-build a chrome of one button; reusing theirs is the whole
+                        // point of the swap, and it is the part that stays maintained.
+                        chrome
+                        document={documentBuffer}
+                        title={fileName}
+                        mode={readOnly ? "view" : "edit"}
                         colorMode="light"
-                        showFileOpen={false}
-                        showHelpMenu={false}
                         onChange={() => {
                             if (!readOnlyRef.current) {
                                 handler.emit("change");
                             }
                         }}
-                        onSave={emitSave}
+                        onSave={() => {
+                            void handleSave();
+                        }}
                     />
                     <footer className="word-sponsor-footer">
                         <SponsorBar placement="right" />
