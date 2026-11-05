@@ -19,7 +19,7 @@ import {
 } from '../../util/vscodeTheme.ts';
 import JsonlDetail, { type DetailMode } from './JsonlDetail.tsx';
 import JsonlIndex from './JsonlIndex.tsx';
-import { formatBytes } from './jsonlFormat.tsx';
+import { formatBytes } from './jsonlFormat.ts';
 import './Jsonl.less';
 
 const DEFAULT_LEFT_WIDTH = 340;

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+    buildJsonlEntry,
     buildJsonlIndex,
+    buildJsonlSummary,
     deriveLabel,
     matchSnippet,
     readJsonlLineText,
@@ -72,5 +74,52 @@ test('snippet: matching is case-insensitive against the text', () => {
     const snippet = matchSnippet(text, 'needle', 3)
     assert.ok(snippet.includes('NEEDLE'))
     assert.ok(snippet.startsWith('…'))
+})
+
+test('classify: a line is exactly one of four kinds', () => {
+    const { bytes, index } = open([
+        '{"id":1,"name":"alpha"}',
+        '',
+        'not json',
+        `{"big":"${'x'.repeat(1024 * 1024 + 1)}"}`,
+    ].join('\n'))
+
+    const kinds = [0, 1, 2, 3].map(line => buildJsonlSummary(bytes, index, line).kind)
+    assert.deepEqual(kinds, ['value', 'empty', 'invalid', 'too-large'])
+})
+
+test('classify: the summary carries the identity label, not the value', () => {
+    const { bytes, index } = open('{"id":42,"nested":{"id":1}}')
+    const summary = buildJsonlSummary(bytes, index, 0)
+    assert.equal(summary.kind, 'value')
+    assert.equal(summary.label, '42')
+    assert.equal(summary.value, undefined, 'the directory must not keep parsed values')
+})
+
+test('detail: every kind carries the text the raw view needs', () => {
+    const { bytes, index } = open('{"id":7}\n\n[1,2]')
+
+    const value = buildJsonlEntry(bytes, index, 0)
+    assert.equal(value.kind, 'value')
+    assert.equal(value.label, '7')
+    assert.deepEqual(value.value, { id: 7 })
+    assert.equal(value.text, '{"id":7}')
+
+    const empty = buildJsonlEntry(bytes, index, 1)
+    assert.equal(empty.kind, 'empty')
+    assert.equal(empty.text, '')
+
+    const arrayLine = buildJsonlEntry(bytes, index, 2)
+    assert.equal(arrayLine.kind, 'value')
+    assert.deepEqual(arrayLine.value, [1, 2])
+    assert.equal(arrayLine.label, undefined)
+})
+
+test('detail: an invalid line keeps its parse error and its text', () => {
+    const { bytes, index } = open('{"id":1,}')
+    const entry = buildJsonlEntry(bytes, index, 0)
+    assert.equal(entry.kind, 'invalid')
+    assert.ok(entry.error.length > 0)
+    assert.equal(entry.text, '{"id":1,}')
 })
 

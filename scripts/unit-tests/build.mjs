@@ -20,7 +20,7 @@ const entries = {
     jsonlDocument: 'src/service/jsonlDocument.ts',
     jsonlFile: 'src/service/jsonlFile.ts',
     jsonlSession: 'src/service/jsonlSession.ts',
-    jsonlFormat: 'src/react/view/jsonl/jsonlFormat.tsx',
+    jsonlFormat: 'src/react/view/jsonl/jsonlFormat.ts',
     parquetParser: 'src/react/view/parquet/parquetParser.ts',
     parquetSession: 'src/react/view/parquet/parquetSession.ts',
     excelFind: 'src/react/view/excel/excel_find.ts',

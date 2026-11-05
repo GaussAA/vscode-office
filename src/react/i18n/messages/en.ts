@@ -249,6 +249,7 @@ export default {
         tooLargeToParse: 'too large to parse',
         emptyLine: 'Empty line',
         noTree: 'No tree',
+        moreKeys: '… {count} more keys',
         selectEntry: 'Select an entry on the left',
         expandAll: 'Expand all',
         collapseAll: 'Collapse all',

@@ -3,7 +3,7 @@ import type { DataNode } from 'antd/es/tree';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { JsonlEntrySummary } from '../../../common/jsonlTypes.ts';
-import { ROW_HEIGHT, formatBytes, highlightParts } from './jsonlFormat.tsx';
+import { ROW_HEIGHT, formatBytes, highlightParts } from './jsonlFormat.ts';
 import { $t } from '../../i18n/i18nConfig.ts';
 
 interface Props {
@@ -92,14 +92,14 @@ export default function JsonlIndex({
         return items.map(entry => {
             const index = entry.index;
             let title: ReactNode;
-            if (entry.empty) {
+            if (entry.kind === 'empty') {
                 title = (
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
                         <span className="jsonl-type">{$t('jsonl.chipEmpty')}</span>
                     </span>
                 );
-            } else if (entry.error) {
+            } else if (entry.kind === 'invalid') {
                 title = (
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
@@ -107,7 +107,7 @@ export default function JsonlIndex({
                         <span className="jsonl-entry__raw jsonl-entry__raw--error" title={entry.raw}>{renderText(entry)}</span>
                     </span>
                 );
-            } else if (entry.tooLarge) {
+            } else if (entry.kind === 'too-large') {
                 title = (
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
@@ -119,7 +119,8 @@ export default function JsonlIndex({
                 title = (
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
-                        {entry.label !== undefined && <span className="jsonl-entry__label">{entry.label}</span>}
+                        {entry.kind === 'value' && entry.label !== undefined
+                            && <span className="jsonl-entry__label">{entry.label}</span>}
                         <span className="jsonl-entry__raw" title={entry.snippet ?? entry.raw}>{renderText(entry)}</span>
                     </span>
                 );

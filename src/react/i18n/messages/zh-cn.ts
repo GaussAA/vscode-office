@@ -248,6 +248,7 @@ export default {
         tooLargeToParse: '过大，未解析',
         emptyLine: '空行',
         noTree: '无树结构',
+        moreKeys: '… 还有 {count} 个键',
         selectEntry: '在左侧选择一个条目',
         expandAll: '全部展开',
         collapseAll: '全部折叠',

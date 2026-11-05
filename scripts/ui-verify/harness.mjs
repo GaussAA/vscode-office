@@ -87,23 +87,23 @@ function jsonlFixtures() {
 
     return sample.map((value, index) => {
         if (index === 2) {
-            return { index, raw: '{"id":3, broken', text: '{"id":3, broken', size: 15, error: 'Unexpected token b in JSON at position 9' }
+            return { index, kind: 'invalid', raw: '{"id":3, broken', text: '{"id":3, broken', size: 15, error: 'Unexpected token b in JSON at position 9' }
         }
         if (index === 3) {
-            return { index, raw: '', text: '', size: 0, empty: true }
+            return { index, kind: 'empty', raw: '', text: '', size: 0 }
         }
         if (index === 10) {
-            return { index, raw: '{"blob":"AAAA…', text: `{"blob":"${'A'.repeat(400)}"}`, size: 900 * 1024, tooLarge: true }
+            return { index, kind: 'too-large', raw: '{"blob":"AAAA…', text: `{"blob":"${'A'.repeat(400)}"}`, size: 900 * 1024 }
         }
         const text = JSON.stringify(value)
         const label = value && typeof value === 'object' ? (value.id ?? value._id ?? value.name ?? value.ts) : undefined
-        return { index, raw: text, text, size: text.length, label: label === undefined ? undefined : String(label), value }
+        return { index, kind: 'value', raw: text, text, size: text.length, label: label === undefined ? undefined : String(label), value }
     })
 }
 
 function jsonlStub(fixtures) {
-    const summaries = fixtures.map(({ index, raw, size, label, empty, error, tooLarge }) => ({
-        index, raw, size, label, empty, error, tooLarge,
+    const summaries = fixtures.map(({ index, kind, raw, size, label, error }) => ({
+        index, kind, raw, size, label, error,
     }))
     return `<script>
 (function () {

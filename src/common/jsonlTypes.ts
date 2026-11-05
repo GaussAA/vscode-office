@@ -42,24 +42,30 @@ export interface JsonlRangeRequest {
     end: number;
 }
 
-/** One directory row: cheap to produce, cheap to keep in memory. */
-export interface JsonlEntrySummary {
+/**
+ * One directory row.
+ *
+ * A line is exactly one of four things, and both renderers used to re-derive that from five
+ * optional booleans, in an order that only existed inside their JSX. It is a discriminated
+ * union now: adding a fifth kind is a compile error at every switch instead of a silent
+ * fall-through to the `else` branch.
+ */
+interface JsonlEntryBase {
     /** Zero-based line index. */
     index: number;
     /** Byte length of the line, excluding the newline. */
     size: number;
     /** Truncated raw text, for the directory preview. */
     raw: string;
-    /** Derived identity, e.g. the value of the top-level `id` key. */
-    label?: string;
     /** Search-only: a window of text around the match, instead of the line's head. */
     snippet?: string;
-    empty?: boolean;
-    /** Parse error message, when the line is not valid JSON. */
-    error?: string;
-    /** True when the line exceeded JSONL_MAX_LINE_BYTES and was not parsed. */
-    tooLarge?: boolean;
 }
+
+export type JsonlEntrySummary =
+    | (JsonlEntryBase & { kind: 'empty' })
+    | (JsonlEntryBase & { kind: 'invalid'; /** Parse error message. */ error: string })
+    | (JsonlEntryBase & { kind: 'too-large' })
+    | (JsonlEntryBase & { kind: 'value'; /** Derived identity, e.g. the top-level `id`. */ label?: string });
 
 export interface JsonlEntriesPayload {
     requestId: number;
@@ -73,13 +79,19 @@ export interface JsonlEntryRequest {
     index: number;
 }
 
-/** Everything the detail pane needs for one entry. */
-export interface JsonlEntryDetail extends JsonlEntrySummary {
-    /** Parsed JSON, when the line parsed and was under the size cap. */
-    value?: unknown;
-    /** Full line text (capped), for the raw view. */
-    text?: string;
-}
+/** Everything the detail pane needs for one entry: the summary plus its full text/value. */
+export type JsonlEntryDetail =
+    | (JsonlEntryBase & { kind: 'empty'; text: string })
+    | (JsonlEntryBase & { kind: 'invalid'; error: string; text: string })
+    | (JsonlEntryBase & { kind: 'too-large'; text: string })
+    | (JsonlEntryBase & {
+        kind: 'value'
+        label?: string
+        /** Parsed JSON, under the size cap. */
+        value: unknown
+        /** Full line text (capped), for the raw view. */
+        text: string
+    });
 
 export interface JsonlEntryPayload {
     requestId: number;

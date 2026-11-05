@@ -86,7 +86,7 @@ export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: nu
 
 /** Build a summary for a line whose text has already been decoded. */
 export function summarizeDecodedLine(line: number, decoded: DecodedLine): JsonlEntrySummary {
-    return classify(line, decoded, true);
+    return classify(line, decoded);
 }
 
 /**
@@ -102,23 +102,27 @@ export function matchSnippet(text: string, needle: string, radius = 48): string 
     return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
 }
 
-function classify(line: number, decoded: DecodedLine, parse: boolean): JsonlEntrySummary {
+/** One line of JSONL is exactly one of four things; this is where that is decided. */
+function classify(line: number, decoded: DecodedLine): JsonlEntrySummary {
     const { text, size } = decoded;
     const raw = truncate(text, JSONL_RAW_PREVIEW_CHARS);
     if (text.trim() === '') {
-        return { index: line, size, raw: '', empty: true };
+        return { index: line, size, raw: '', kind: 'empty' };
     }
     if (size > JSONL_MAX_LINE_BYTES) {
-        return { index: line, size, raw, tooLarge: true };
-    }
-    if (!parse) {
-        return { index: line, size, raw };
+        return { index: line, size, raw, kind: 'too-large' };
     }
     try {
         const value = JSON.parse(text);
-        return { index: line, size, raw, label: deriveLabel(value) };
+        return { index: line, size, raw, kind: 'value', label: deriveLabel(value) };
     } catch (error) {
-        return { index: line, size, raw, error: error instanceof Error ? error.message : 'Invalid JSON' };
+        return {
+            index: line,
+            size,
+            raw,
+            kind: 'invalid',
+            error: error instanceof Error ? error.message : 'Invalid JSON',
+        };
     }
 }
 
@@ -134,7 +138,7 @@ export function buildJsonlSummary(
     line: number,
     baseLine = 0,
 ): JsonlEntrySummary {
-    return classify(baseLine + line, readJsonlLineText(bytes, index, line), true);
+    return classify(baseLine + line, readJsonlLineText(bytes, index, line));
 }
 
 export function buildJsonlSummaries(
@@ -161,18 +165,28 @@ export function buildJsonlEntry(
     baseLine = 0,
 ): JsonlEntryDetail {
     const decoded = readJsonlLineText(bytes, index, line);
-    const detail: JsonlEntryDetail = {
-        ...classify(baseLine + line, decoded, false),
-        text: truncate(decoded.text, JSONL_MAX_TEXT_CHARS),
-    };
-    const empty = decoded.text.trim() === '';
-    if (!empty && detail.size <= JSONL_MAX_LINE_BYTES) {
-        try {
-            detail.value = JSON.parse(decoded.text);
-            detail.label = deriveLabel(detail.value);
-        } catch (error) {
-            detail.error = error instanceof Error ? error.message : 'Invalid JSON';
-        }
+    const at = baseLine + line;
+    const { size } = decoded;
+    const raw = truncate(decoded.text, JSONL_RAW_PREVIEW_CHARS);
+    const text = truncate(decoded.text, JSONL_MAX_TEXT_CHARS);
+
+    if (decoded.text.trim() === '') {
+        return { index: at, size, raw: '', kind: 'empty', text };
     }
-    return detail;
+    if (size > JSONL_MAX_LINE_BYTES) {
+        return { index: at, size, raw, kind: 'too-large', text };
+    }
+    try {
+        const value = JSON.parse(decoded.text);
+        return { index: at, size, raw, kind: 'value', label: deriveLabel(value), value, text };
+    } catch (error) {
+        return {
+            index: at,
+            size,
+            raw,
+            kind: 'invalid',
+            error: error instanceof Error ? error.message : 'Invalid JSON',
+            text,
+        };
+    }
 }

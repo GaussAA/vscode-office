@@ -3,7 +3,7 @@ import test from 'node:test'
 import {
     MAX_CHILDREN,
     MAX_DEPTH,
-    buildTree,
+    buildEntryModel,
     countNodes,
     highlightParts,
     makePathKey,
@@ -35,39 +35,80 @@ test('countNodes: stops descending at MAX_DEPTH', () => {
     assert.ok(countNodes(chain) <= MAX_DEPTH)
 })
 
-test('buildTree: caps children and appends a non-selectable "more keys" row', () => {
-    const built = buildTree(objectOfSize(MAX_CHILDREN + 20))
-    assert.equal(built.count, MAX_CHILDREN)
-    assert.equal(built.nodes.length, MAX_CHILDREN + 1)
-    const more = built.nodes[built.nodes.length - 1]
-    assert.equal(more.selectable, false)
-    assert.equal(more.isLeaf, true)
+test('buildEntryModel: caps children and appends a non-selectable "more keys" row', () => {
+    const model = buildEntryModel(objectOfSize(MAX_CHILDREN + 20))
+    assert.equal(model.count, MAX_CHILDREN)
+    assert.equal(model.nodes.length, MAX_CHILDREN + 1)
+    const more = model.nodes[model.nodes.length - 1]
+    assert.equal(more.overflow, 20)
+    assert.equal(more.composite, false)
+    assert.equal(more.children.length, 0)
 })
 
-test('buildTree: keeps the tree inside MAX_DEPTH', () => {
+test('buildEntryModel: keeps the tree inside MAX_DEPTH', () => {
     let chain = { leaf: 1 }
     for (let depth = 0; depth < MAX_DEPTH + 5; depth++) chain = { child: chain }
-    const built = buildTree(chain)
-    assert.ok(built.count > 0)
+    const model = buildEntryModel(chain)
+    assert.ok(model.count > 0)
     // walk() stops once the path reaches MAX_DEPTH, so the deepest node sits AT that depth.
-    assert.equal(maxDepth(built.nodes), MAX_DEPTH)
-    assert.ok(built.count <= MAX_DEPTH)
-    assert.equal(built.allKeys.length, built.count)
+    assert.equal(maxDepth(model.nodes), MAX_DEPTH)
+    assert.ok(model.count <= MAX_DEPTH)
+    assert.equal(model.keys.length, model.count)
 })
 
-test('buildTree: a scalar entry produces no rows', () => {
-    const built = buildTree('just a string')
-    assert.equal(built.nodes.length, 0)
-    assert.equal(built.count, 0)
-    assert.equal(built.truncated, false)
+test('buildEntryModel: a scalar entry produces no rows', () => {
+    const model = buildEntryModel('just a string')
+    assert.equal(model.nodes.length, 0)
+    assert.equal(model.count, 0)
+    assert.equal(model.truncated, false)
+    assert.equal(model.wrap, false, 'a scalar has nothing to wrap')
 })
 
-test('buildTree: shallowKeys stop at the default expand depth', () => {
-    const built = buildTree({ a: { b: { c: { d: { e: 1 } } } } })
+test('buildEntryModel: shallowKeys stop at the default expand depth', () => {
+    const model = buildEntryModel({ a: { b: { c: { d: { e: 1 } } } } })
     // Keys are JSON arrays (makePathKey), not dotted paths.
-    assert.equal(built.shallowKeys.length, 2)
-    assert.ok(built.shallowKeys.includes(makePathKey(['a'])))
-    assert.ok(!built.shallowKeys.includes(makePathKey(['a', 'b', 'c'])))
+    assert.equal(model.shallowKeys.length, 2)
+    assert.ok(model.shallowKeys.includes(makePathKey(['a'])))
+    assert.ok(!model.shallowKeys.includes(makePathKey(['a', 'b', 'c'])))
+})
+
+test('buildEntryModel: decides wrapping itself, in the same walk that builds the tree', () => {
+    // Small entries wrap (variable row height); big ones would freeze a virtual list.
+    const small = buildEntryModel({ a: 1, b: 'two' })
+    assert.equal(small.wrap, true)
+
+    const big = buildEntryModel(objectOfSize(600))
+    assert.equal(big.wrap, false)
+
+    // The boundary is inclusive: exactly `wrapNodeLimit` nodes still wrap.
+    const atLimit = buildEntryModel(objectOfSize(500))
+    assert.equal(atLimit.wrap, true)
+    assert.equal(buildEntryModel(objectOfSize(501)).wrap, false)
+})
+
+test('buildEntryModel: wrap mode cuts very long strings, single-line mode does not', () => {
+    const long = 'x'.repeat(5000)
+    const wrapped = buildEntryModel({ text: long })
+    assert.ok(wrapped.nodes[0].preview.endsWith('chars)'), 'wrap mode appends the original length')
+    assert.ok(wrapped.nodes[0].preview.length < long.length)
+
+    const nodes = buildEntryModel({ text: long }, { maxChildren: 10, wrapNodeLimit: 0 })
+    assert.equal(nodes.wrap, false)
+})
+
+test('buildEntryModel: array indices are labelled in brackets and stay addressable', () => {
+    const model = buildEntryModel(['a', 'b'])
+    assert.deepEqual(model.nodes.map(node => node.label), ['[0]', '[1]'])
+    assert.deepEqual(model.nodes[1].path, [1])
+    // In wrap mode a string preview is the raw text, not a JSON-quoted literal.
+    assert.equal(model.nodes[1].preview, 'b')
+})
+
+test('buildEntryModel: honours a node budget and reports truncation', () => {
+    const model = buildEntryModel(objectOfSize(50), { maxNodes: 10 })
+    assert.equal(model.count, 10)
+    assert.equal(model.truncated, true)
+    assert.equal(model.nodes.length, 10)
 })
 
 test('highlightParts: splits only the matched runs and is case-insensitive', () => {
@@ -82,4 +123,3 @@ test('highlightParts: caps the number of runs on pathological input', () => {
     assert.ok(parts.length <= 41, `produced ${parts.length} runs`)
     assert.equal(parts.map(part => part.text).join('').length, 500)
 })
-
