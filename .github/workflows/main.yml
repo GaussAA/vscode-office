@@ -23,6 +23,10 @@ jobs:
       run: pnpm check
     - name: Build
       run: pnpm build
+    # Runs inside a real VS Code Extension Development Host. This is the only layer that
+    # can see activation and custom-editor routing; verify:ui covers the webview DOM.
+    - name: Integration smoke (real VS Code host)
+      run: xvfb-run -a pnpm test:smoke
     - name: UI verification (headless DOM assertions)
       run: xvfb-run -a pnpm verify:ui
     # Same command a developer runs locally — one packaging path, pinned tool version.
