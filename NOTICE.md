@@ -21,7 +21,11 @@ Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus")
   are cached, so paging forward needs no extra reads.
 - **JSONL long values wrap.** Entries with up to 500 nodes render with wrapping (the virtual
   list is switched off, since rows are no longer fixed height); bigger entries stay on one
-  line with an ellipsis and remain copyable.- **Parquet rows are read one page at a time.** Upstream reads every row into memory and
+  line with an ellipsis and remain copyable.- **Parquet has whole-file search.** The box in the toolbar scans the file in 5 000-row
+  batches (cancelled by a newer query), shows progress, marks matching rows, highlights the
+  matching text inside cells, and jumps to the first match. It reads every row group it
+  visits, so on a very large file the scan is I/O bound — that is the stated trade-off:
+  display stays lazy, an explicit search is allowed to be expensive.- **Parquet rows are read one page at a time.** Upstream reads every row into memory and
   slices 50 per page; this fork reads only the visible page with `rowStart`/`rowEnd` and
   keeps edits in an absolute-row patch map, so a huge file no longer materialises its
   whole table. Saving re-reads the file, re-applies the patches and writes it back.
@@ -56,5 +60,6 @@ Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus")
 Upstream source files keep their original style (4-space indent, single quotes) and are
 excluded from this repo's auto-formatting, so `git merge upstream/main` stays cheap. Decisions
 behind that choice are recorded in [docs/adr/0001-fork-office-viewer.md](./docs/adr/0001-fork-office-viewer.md).
+
 
 

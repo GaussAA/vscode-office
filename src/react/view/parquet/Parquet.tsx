@@ -25,6 +25,29 @@ import './Parquet.less';
 const PAGE_SIZE = getPageSize();
 /** Above this many rows, editing is disabled: saving would re-read the whole file. */
 const EDIT_ROW_LIMIT = 200_000;
+/** Rows read per batch while searching the whole file. */
+const SEARCH_BATCH = 5_000;
+/** Cap on matched rows kept in memory (highlight + navigation). */
+const SEARCH_MAX_ROWS = 5_000;
+
+/** Wrap the matched runs of a cell value in <mark>, so a hit is visible in place. */
+function highlightCell(text: string, needle: string) {
+    if (!needle) return text;
+    const lower = text.toLowerCase();
+    const query = needle.toLowerCase();
+    const parts: React.ReactNode[] = [];
+    let cursor = 0;
+    let key = 0;
+    while (cursor < text.length && key < 20) {
+        const at = lower.indexOf(query, cursor);
+        if (at < 0) break;
+        if (at > cursor) parts.push(text.slice(cursor, at));
+        parts.push(<mark key={key++} className="parquet-viewer__hit">{text.slice(at, at + query.length)}</mark>);
+        cursor = at + query.length;
+    }
+    if (cursor < text.length) parts.push(text.slice(cursor));
+    return parts;
+}
 const PARQUET_VSCODE_THEME_KEY = 'parquet-vscode-theme';
 
 type ColumnIconKind = 'bool' | 'numeric' | 'string' | 'datetime' | 'structure' | 'field';
@@ -96,6 +119,10 @@ function ParquetViewer() {
     const [largeFile, setLargeFile] = useState(false);
     const [rowJump, setRowJump] = useState('');
     const [inspected, setInspected] = useState<{ row: number; column: string; value: unknown } | null>(null);
+    const [query, setQuery] = useState('');
+    const [searching, setSearching] = useState(false);
+    const [searchProgress, setSearchProgress] = useState<{ scanned: number; total: number; matches: number } | null>(null);
+    const [matchRows, setMatchRows] = useState<Set<number>>(() => new Set());
     const [page, setPage] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -114,6 +141,7 @@ function ParquetViewer() {
     const pageLoadSeq = useRef(0);
     /** Already fetched pages, so going back/forward does not re-read them. */
     const pageCache = useRef(new Map<number, Record<string, unknown>[]>());
+    const searchSeq = useRef(0);
     const dirtyRef = useRef(false);
     const savingRef = useRef(false);
     const editInputRef = useRef<InputRef | null>(null);
@@ -246,6 +274,11 @@ function ParquetViewer() {
         editsRef.current.clear();
         pageCache.current.clear();
         setInspected(null);
+        searchSeq.current++;
+        setSearching(false);
+        setSearchProgress(null);
+        setMatchRows(new Set());
+        setQuery('');
         setPage(0);
         cancelEdit();
         dirtyRef.current = false;
@@ -354,6 +387,69 @@ function ParquetViewer() {
         return `${start.toLocaleString()}–${end.toLocaleString()} of ${fileInfo.rowCount.toLocaleString()}`;
     }, [fileInfo, page]);
 
+    const runSearch = useCallback(async () => {
+        const info = fileInfoRef.current;
+        const needle = query.trim().toLowerCase();
+        const seq = ++searchSeq.current;
+        setMatchRows(new Set());
+        if (!info || !needle) {
+            setSearching(false);
+            setSearchProgress(null);
+            return;
+        }
+        setSearching(true);
+        setSearchProgress({ scanned: 0, total: info.rowCount, matches: 0 });
+        const found = new Set<number>();
+        try {
+            // Batch by batch, so a 250k-row file never lands in memory at once and the
+            // scan can be cancelled by a newer query.
+            for (let start = 0; start < info.rowCount; start += SEARCH_BATCH) {
+                if (seq !== searchSeq.current) return;
+                const end = Math.min(info.rowCount, start + SEARCH_BATCH);
+                const rows = await readParquetRows(info.file, info.metadata, start, end);
+                for (let offset = 0; offset < rows.length; offset++) {
+                    const row = rows[offset];
+                    const hit = info.columns.some(column =>
+                        formatCellValue(row[column.name]).toLowerCase().includes(needle));
+                    if (hit) found.add(start + offset);
+                }
+                setSearchProgress({ scanned: end, total: info.rowCount, matches: found.size });
+                if (found.size >= SEARCH_MAX_ROWS) break;
+                await new Promise(resolve => window.setTimeout(resolve, 0));
+            }
+            if (seq !== searchSeq.current) return;
+            setMatchRows(found);
+            if (found.size > 0) {
+                const first = found.values().next().value as number;
+                const target = Math.floor(first / PAGE_SIZE);
+                setPage(current => (current === target ? current : target));
+            }
+        } catch (e) {
+            if (seq === searchSeq.current) setError(e instanceof Error ? e.message : 'Search failed');
+        } finally {
+            if (seq === searchSeq.current) setSearching(false);
+        }
+    }, [query]);
+
+    const jumpMatch = useCallback((direction: 1 | -1) => {
+        if (matchRows.size === 0) return;
+        const sorted = [...matchRows].sort((a, b) => a - b);
+        const pageStart = page * PAGE_SIZE;
+        const pageEnd = pageStart + PAGE_SIZE;
+        const target = direction > 0
+            ? sorted.find(row => row >= pageEnd) ?? sorted[0]
+            : [...sorted].reverse().find(row => row < pageStart) ?? sorted[sorted.length - 1];
+        setPage(Math.floor(target / PAGE_SIZE));
+    }, [matchRows, page]);
+
+    // clearing the box drops the previous results
+    useEffect(() => {
+        if (query.trim()) return;
+        searchSeq.current++;
+        setSearching(false);
+        setSearchProgress(null);
+        setMatchRows(new Set());
+    }, [query]);
     const tableColumns = useMemo<ColumnsType<TableRow>>(() => {
         if (!fileInfo) return [];
         const cols: ColumnsType<TableRow> = [
@@ -411,14 +507,14 @@ function ParquetViewer() {
                             onDoubleClick={() => startEdit(rowIndex, column, value)}
                             onClick={() => setInspected({ row: rowIndex, column: column.name, value })}
                         >
-                            {isNull ? 'NULL' : formatCellValue(value)}
+                            {isNull ? 'NULL' : highlightCell(formatCellValue(value), query.trim())}
                         </span>
                     );
                 },
             });
         }
         return cols;
-    }, [cancelEdit, commitEdit, editValue, editingColumn, editingRow, fileInfo, page, readOnly, startEdit]);
+    }, [cancelEdit, commitEdit, editValue, editingColumn, editingRow, fileInfo, page, query, readOnly, startEdit]);
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -533,6 +629,59 @@ function ParquetViewer() {
                                         <span className={`codicon ${saving ? 'codicon-loading codicon-modifier-spin' : 'codicon-save'}`} />
                                         {$t('parquet.save')}
                                     </button>
+                                    <div className="parquet-viewer__find">
+                                        <input
+                                            className="parquet-viewer__find-input"
+                                            placeholder="Find in file"
+                                            value={query}
+                                            onChange={event => setQuery(event.target.value)}
+                                            onKeyDown={event => {
+                                                if (event.key === 'Enter') void runSearch();
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="parquet-viewer__find-btn"
+                                            onClick={() => { void runSearch(); }}
+                                            disabled={searching || !fileInfo}
+                                            title="Search all rows"
+                                            aria-label="Search all rows"
+                                        >
+                                            <span className={`codicon ${searching ? 'codicon-loading codicon-modifier-spin' : 'codicon-search'}`} />
+                                        </button>
+                                        {searching && searchProgress && (
+                                            <span className="parquet-viewer__find-count">
+                                                {Math.round((searchProgress.scanned / Math.max(1, searchProgress.total)) * 100)}%
+                                                {' · '}
+                                                {searchProgress.matches}
+                                            </span>
+                                        )}
+                                        {!searching && matchRows.size > 0 && (
+                                            <>
+                                                <span className="parquet-viewer__find-count">
+                                                    {matchRows.size.toLocaleString()} row{matchRows.size === 1 ? '' : 's'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    className="parquet-viewer__find-btn"
+                                                    onClick={() => jumpMatch(-1)}
+                                                    title="Previous match"
+                                                    aria-label="Previous match"
+                                                >
+                                                    <span className="codicon codicon-chevron-up" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="parquet-viewer__find-btn"
+                                                    onClick={() => jumpMatch(1)}
+                                                    title="Next match"
+                                                    aria-label="Next match"
+                                                >
+                                                    <span className="codicon codicon-chevron-down" />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                                 <button
                                     type="button"
@@ -552,6 +701,7 @@ function ParquetViewer() {
                                     pagination={false}
                                     size="small"
                                     scroll={{ y: tableHeight, x: 'max-content' }}
+                                    rowClassName={(_row, index) => (matchRows.has(page * PAGE_SIZE + index) ? 'parquet-viewer__row--match' : '')}
                                 />
                             </div>
                             {inspected && (
@@ -658,6 +808,8 @@ export default function Parquet() {
         </App>
     );
 }
+
+
 
 
 

@@ -648,3 +648,67 @@ body:has(.parquet-app) {
     color: var(--vscode-foreground, #cccccc);
 }
 
+
+/* fork: whole-file search */
+.parquet-viewer__find {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+}
+
+.parquet-viewer__find-input {
+    width: 180px;
+    height: 24px;
+    padding: 0 8px;
+    border: 1px solid var(--vscode-input-border, #3c3c3c);
+    border-radius: 3px;
+    background: var(--vscode-input-background, #313131);
+    color: var(--vscode-input-foreground, #cccccc);
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+}
+
+.parquet-viewer__find-input:focus {
+    border-color: var(--vscode-focusBorder, #0078d4);
+}
+
+.parquet-viewer__find-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--vscode-foreground, #cccccc);
+    cursor: pointer;
+}
+
+.parquet-viewer__find-btn:hover:not(:disabled) {
+    background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+}
+
+.parquet-viewer__find-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.parquet-viewer__find-count {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground, #9d9d9d);
+    font-variant-numeric: tabular-nums;
+}
+
+.parquet-viewer__hit {
+    background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+    color: inherit;
+    border-radius: 2px;
+    padding: 0;
+}
+
+.parquet-table tbody tr.parquet-viewer__row--match > td {
+    background: color-mix(in srgb, var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33)) 22%, transparent);
+}

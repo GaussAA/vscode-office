@@ -208,6 +208,34 @@ const scenarios = [
         },
     },
     {
+        name: 'parquet-search',
+        docs: 'parquet-search.png',
+        async run({ page, base }) {
+            await openParquet(page, base, '?mixed=1')
+            await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__find-input');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'service-c-54');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                document.querySelector('.parquet-viewer__find-btn')
+                    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`)
+            const done = await page.waitFor(
+                `document.querySelector('.parquet-viewer__find-count')?.innerText === '1 row'`, 15000)
+            expect(done, 'whole-file search did not report a match')
+            const state = json(await page.evaluate(`JSON.stringify({
+                count: document.querySelector('.parquet-viewer__find-count')?.innerText ?? null,
+                hits: document.querySelectorAll('.parquet-viewer__hit').length,
+                rows: document.querySelectorAll('.parquet-viewer__row--match').length,
+                range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
+            })`))
+            expect(state.count === '1 row', `unexpected match count: ${state.count}`)
+            expect(state.hits > 0, 'matched cell was not highlighted')
+            expect(state.rows === 1, `expected 1 marked row, got ${state.rows}`)
+            expect(state.range === '51–100 of 300', `did not jump to the match page: ${state.range}`)
+            return `${state.count} at ${state.range}, ${state.hits} highlighted cell(s)`
+        },
+    },    {
         name: 'parquet-prefetch',
         async run({ page, base, stats }) {
             await openParquet(page, base, '?mixed=1')
@@ -271,4 +299,5 @@ main().catch(error => {
     console.error(error instanceof Error ? error.message : error)
     process.exit(1)
 })
+
 
