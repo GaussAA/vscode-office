@@ -63,6 +63,10 @@ _Avoid_: match, span
 `scripts/typecheck-baseline.json` 里记录的已知类型错误，只许减不许增。它现在是空的，所以规则退化为：任何类型错误都会让 `pnpm check` 失败。
 _Avoid_: whitelist（它曾经是白名单；现在只是一个已清空的棘轮）
 
+**Platform baseline（平台基线）**:
+扩展对外承诺的宿主下限，与它编译时实际使用的类型定义，构成的整体：`engines.vscode`、`@types/vscode`、`@types/node` 三者必须互相自洽。它回答的唯一问题是「我们敢用哪些 API」，不是三个可以各自漂移的版本号——一旦 `engines` 落后于 `@types`，编译通过就只是假象。
+_Avoid_: 引擎版本、最低支持版本（只提 `engines` 会掩盖另外两项）
+
 **Upstream（上游）**:
 我们 fork 的来源仓库 `cweijan/vscode-office`。它是**只读参考资料**，不是合并来源：需要上游的修复时读它的 diff 自己重写（见 [ADR-0002](./docs/adr/0002-independent-evolution.md)）。
 _Avoid_: 原版, 官方, 作者版；也别说「合并上游」
