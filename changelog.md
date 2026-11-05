@@ -1,5 +1,15 @@
 # Change log
 
+# Unreleased
+
+Activation:
+
+- The extension no longer activates on every VS Code start. It now wakes up when a viewer
+  is opened, when the workspace looks like a git repository (`.git/HEAD`), when a git
+  history panel needs restoring, or when an `.http` file is opened. Two consequences worth
+  knowing: the `Git` status-bar entry appears once the extension has activated rather than
+  at startup, and in a non-git workspace nothing loads until you open a file.
+
 # 4.4.1 2026-11-05
 
 Parquet viewer:

@@ -61,6 +61,20 @@ async function parquetFixture(): Promise<vscode.Uri> {
 	return uri
 }
 
+describe('activation is lazy', () => {
+	it('is not active before anything opens a viewer or a git workspace', () => {
+		const extension = vscode.extensions.getExtension(EXTENSION_ID)
+		assert.ok(extension, `${EXTENSION_ID} is not installed in the development host`)
+		// The fixture workspace is a plain folder inside the repo: no `.git` at its root,
+		// no `.http` file open. Nothing should have woken the extension up yet.
+		assert.strictEqual(
+			extension.isActive,
+			false,
+			'the extension activated at startup again -- check package.json#activationEvents',
+		)
+	})
+})
+
 describe('extension activation', () => {
 	it('is installed and activates without throwing', async () => {
 		const extension = vscode.extensions.getExtension(EXTENSION_ID)

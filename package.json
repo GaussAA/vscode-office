@@ -46,7 +46,9 @@
     "url": "https://github.com/GaussAA/vscode-office.git"
   },
   "activationEvents": [
-    "onStartupFinished"
+    "workspaceContains:.git/HEAD",
+    "onWebviewPanel:office-git-history",
+    "onLanguage:http"
   ],
   "main": "./out/extension.js",
   "browser": "./out/extension.web.js",
