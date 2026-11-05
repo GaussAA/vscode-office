@@ -2,7 +2,7 @@
  * Typecheck gate.
  *
  * Runs tsc over the whole `src` tree (extension host + every webview) with
- * `tsconfig.check.json`, then compares the errors against a checked-in baseline.
+ * `tsconfig.json`, then compares the errors against a checked-in baseline.
  *
  * The baseline is a ratchet, not an allowlist of paths:
  *  - every error is identified by file + code + message (line numbers excluded, so
@@ -27,7 +27,7 @@ const verbose = process.argv.includes('--verbose')
 const tsc = join(root, 'node_modules', 'typescript', 'bin', 'tsc')
 const result = spawnSync(
     process.execPath,
-    [tsc, '-p', join(root, 'tsconfig.check.json'), '--pretty', 'false'],
+    [tsc, '-p', join(root, 'tsconfig.json'), '--pretty', 'false'],
     { cwd: root, encoding: 'utf8' },
 )
 

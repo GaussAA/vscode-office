@@ -1,27 +1,37 @@
 {
 	"compilerOptions": {
-		"module": "ESNext",
-		"target": "es2019",
-		"outDir": "out",
-		"experimentalDecorators": true,
+		"target": "ES2022",
 		"lib": [
-			"es6",
-			"es2017",
-			"es2019"
+			"ES2022",
+			"DOM",
+			"DOM.Iterable"
 		],
-		"sourceMap": true,
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"jsx": "react-jsx",
+		"baseUrl": ".",
 		"paths": {
-            "@/*": [
-                "./src/*"
-            ]
-        },
+			"@/*": [
+				"./src/*"
+			]
+		},
 		"resolveJsonModule": true,
-        "esModuleInterop": true,
-		"strict": false 
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"strict": false,
+		"experimentalDecorators": true,
+		"useDefineForClassFields": true
 	},
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx"
+	],
 	"exclude": [
-		"src/react",
 		"node_modules",
-		".vscode-test"
+		".vscode-test",
+		"out"
 	]
 }

@@ -4,7 +4,7 @@
 
 Issues 已同步到 [GaussAA/vscode-office #5](https://github.com/GaussAA/vscode-office/issues/5)（tracking），T01–T19 对应 #6–#24，父子关系与 blocked-by 已用 GitHub 原生依赖记录。
 
-**已完成**：T01 的代码部分（#6，剩 Marketplace 后台配置与一次真实 tag 发布）、T02（#7）、T03（#8）、T04（#9）。
+**已完成**：T01 的代码部分（#6，剩 Marketplace 后台配置与一次真实 tag 发布）、T02（#7）、T03（#8）、T04（#9）、T05 的沙箱部分（#10，全局 CSP 拆成 #25）、T06（#11）、T07（#12）、T10（#15）、T12（#17）。
 
 ## 判据
 
