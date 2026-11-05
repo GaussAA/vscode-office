@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '@vscode/codicons/dist/codicon.css';
 import { $t } from '../../i18n/i18nConfig.ts';
 import { handler, vscodeApi } from '../../util/vscode.ts';
-import { loadOfficeBuffer } from '../../util/loadOfficeContent.ts';
+import { arrayBufferFromPayload } from '../../util/loadOfficeContent.ts';
+import { openParquetSource } from '../../util/parquetSource.ts';
 import SponsorBar from '../components/SponsorBar.tsx';
 import {
     formatCellValue,
@@ -246,8 +247,12 @@ function ParquetViewer() {
         readOnlyRef.current = fileReadOnly;
         setReadOnly(fileReadOnly);
         try {
-            const buffer = await loadOfficeBuffer(payload);
-            const info = await openParquetFile(buffer);
+            // Files arrive either as an inline byte array (virtual documents) or as a
+            // fetchable URI. For URIs we probe Range support so hyparquet pulls only the
+            // footer and the pages it needs, instead of the whole file.
+            const info = payload.buffer?.length
+                ? await openParquetFile(arrayBufferFromPayload(payload))
+                : await openParquetFile((await openParquetSource(payload.path ?? '')).file);
             fileInfoRef.current = info;
             setFileInfo(info);
         } catch (e) {
@@ -519,4 +524,6 @@ export default function Parquet() {
         </App>
     );
 }
+
+
 

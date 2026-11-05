@@ -18,6 +18,13 @@ Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus")
   slices 50 per page; this fork reads only the visible page with `rowStart`/`rowEnd` and
   keeps edits in an absolute-row patch map, so a huge file no longer materialises its
   whole table. Saving re-reads the file, re-applies the patches and writes it back.
+- **Parquet bytes are fetched by range when the host allows it.** Before loading, the
+  viewer probes the resource with a 2-byte `Range` request. If the host answers `206`,
+  hyparquet is backed by a lazy buffer and only the footer plus the needed pages are
+  downloaded (LRU-cached, 64 MB cap). If the host ignores `Range`, the probe response is
+  reused as the full buffer, i.e. exactly the old behaviour. Whether `vscode-webview://`
+  honours `Range` depends on the VS Code version and host, so the viewer detects it
+  instead of assuming — the console logs `[parquet] source: ranged|full`.
 - **New JSONL viewer** (`*.jsonl`, `*.ndjson`): a two-pane layout — a directory of
   entries on the left, the full tree (or raw text) of the selected entry on the right.
   One line is one self-describing JSON document, so heterogeneous keys are natural

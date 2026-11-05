@@ -63,8 +63,13 @@ function findLeafElement(tree: SchemaTree, pathParts: string[]): SchemaElement |
     return null;
 }
 
-export async function openParquetFile(buffer: ArrayBuffer): Promise<ParquetFileInfo> {
-    const file = asyncBufferFromArrayBuffer(buffer);
+function isAsyncBuffer(source: ArrayBuffer | AsyncBuffer): source is AsyncBuffer {
+    const candidate = source as AsyncBuffer;
+    return typeof candidate?.slice === 'function' && typeof candidate?.byteLength === 'number';
+}
+
+export async function openParquetFile(source: ArrayBuffer | AsyncBuffer): Promise<ParquetFileInfo> {
+    const file = isAsyncBuffer(source) ? source : asyncBufferFromArrayBuffer(source);
     const metadata = await parquetMetadataAsync(file);
     const schemaTree = parquetSchema(metadata);
     const columnNames = getPhysicalColumns(schemaTree);
@@ -252,4 +257,5 @@ export function formatCellValue(value: unknown): string {
     }
     return String(value);
 }
+
 
