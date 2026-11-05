@@ -16,6 +16,15 @@ export const repoRoot = join(here, '..', '..')
 /** Committed sample: 300 rows, two DOUBLE/FLOAT columns, ZSTD compressed. */
 const zstdSample = join(here, 'fixtures', 'zstd.parquet')
 
+/**
+ * Committed sample: a one-paragraph docx. Without it the harness hands the Word route an
+ * empty buffer, the viewer renders "Empty file content", and "the route mounted" says
+ * nothing about whether the editor works. A .docx is a zip, so it is generated once and
+ * committed rather than built here.
+ */
+const docxSample = join(here, 'fixtures', 'smoke.docx')
+
+
 const BIG_ROWS = 250_000
 const EDIT_LIMIT = 200_000
 
@@ -30,6 +39,9 @@ export function createFixtures(cacheDir) {
     mkdirSync(cacheDir, { recursive: true })
     if (!existsSync(zstdSample)) {
         throw new Error(`missing committed fixture: ${zstdSample}`)
+    }
+    if (!existsSync(docxSample)) {
+        throw new Error(`missing committed fixture: ${docxSample}`)
     }
 
     const mixed = writeIfMissing(join(cacheDir, 'mixed.parquet'), () => {
@@ -72,6 +84,7 @@ export function createFixtures(cacheDir) {
     return {
         sample: zstdSample,
         sampleBytes: readFileSync(zstdSample).byteLength,
+        docx: docxSample,
         mixed,
         big,
         bigRows: BIG_ROWS,

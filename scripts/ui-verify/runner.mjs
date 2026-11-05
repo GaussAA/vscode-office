@@ -310,6 +310,27 @@ const scenarios = [
             return `${routes.length} routes mounted without uncaught errors`
         },
     },    {
+        name: 'word-viewer',
+        docs: 'word-viewer.png',
+        async run({ page, base }) {
+            await page.navigate(`${base}/harness-route?route=word`)
+            // "something is in #root" would accept the loading spinner, and the upstream smoke
+            // cannot tell a rendered document from a failed open. Require both the editor's own
+            // DOM and the paragraph text from the fixture (`scripts/ui-verify/fixtures/smoke.docx`).
+            const paragraph = 'Smoke fixture paragraph'
+            const mounted = await page.waitFor(`document.querySelectorAll('[class*="docx-"]').length > 0`, 30000)
+            const textRendered = await page.waitFor(
+                `(document.body.innerText || '').includes(${JSON.stringify(paragraph)})`, 20000)
+            const state = json(await page.evaluate(`JSON.stringify({
+                docxNodes: document.querySelectorAll('[class*="docx-"]').length,
+                canvases: document.querySelectorAll('canvas').length,
+                text: (document.body.innerText || '').replace(/\\s+/g, ' ').slice(0, 160),
+            })`))
+            expect(mounted, `the Word editor never rendered: ${JSON.stringify(state)}`)
+            expect(textRendered, `the document text is missing from the rendered page: ${JSON.stringify(state)}`)
+            return `${state.docxNodes} editor nodes, fixture paragraph rendered`
+        },
+    },    {
         name: 'parquet-prefetch',
         async run({ page, base, stats }) {
             await openParquet(page, base, '?mixed=1')

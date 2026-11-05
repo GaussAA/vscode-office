@@ -232,7 +232,9 @@ function smokeStub(route) {
       setTimeout(function () {
         const content = ${JSON.stringify(name)} === 'smoke.ttf'
           ? { fileName: 'smoke.ttf', path: '/codicon.ttf', readOnly: true }
-          : { fileName: ${JSON.stringify(name)}, path: '/${name}', buffer: [], content: '', readOnly: true };
+          : ${JSON.stringify(name)} === 'smoke.docx'
+            ? { fileName: 'smoke.docx', path: '/smoke.docx', readOnly: true }
+            : { fileName: ${JSON.stringify(name)}, path: '/${name}', buffer: [], content: '', readOnly: true };
         window.postMessage({ type: 'open', content: content }, '*');
       }, 60);
     },
@@ -283,6 +285,14 @@ export function startHarness(fixtures, port = 0) {
             if (!existsSync(font)) { res.writeHead(404).end('missing font'); return }
             res.writeHead(200, { 'content-type': 'font/ttf' })
             res.end(readFileSync(font))
+            return
+        }
+
+        // The Word route fetches its document by path (`loadOfficeBuffer` throws on an empty
+        // buffer), so the fixture has to be a real docx served over HTTP.
+        if (path === '/smoke.docx') {
+            res.writeHead(200, { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+            res.end(readFileSync(fixtures.docx))
             return
         }
 
