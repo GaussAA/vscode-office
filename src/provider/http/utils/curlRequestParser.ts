@@ -103,11 +103,11 @@ export class CurlRequestParser implements RequestParser {
             if (!Array.isArray(parsedHeaders)) {
                 parsedHeaders = [parsedHeaders];
             }
-            headers = parseRequestHeaders(parsedHeaders, this.settings.defaultHeaders, url);
+            headers = parseRequestHeaders(parsedHeaders as string[], this.settings.defaultHeaders, url);
         }
 
         // parse cookie
-        const cookieString: string = parsedArguments.b || parsedArguments.cookie;
+        const cookieString = (parsedArguments.b ?? parsedArguments.cookie) as string | undefined;
         if (cookieString?.includes('=')) {
             // Doesn't support cookie jar
             headers['Cookie'] = cookieString;
@@ -115,7 +115,7 @@ export class CurlRequestParser implements RequestParser {
 
         const user = parsedArguments.u || parsedArguments.user;
         if (user) {
-            headers['Authorization'] = `Basic ${base64(user)}`;
+            headers['Authorization'] = `Basic ${base64(user as string)}`;
         }
 
         // parse body
@@ -144,7 +144,8 @@ export class CurlRequestParser implements RequestParser {
             method = body ? "POST" : "GET";
         }
 
-        return new HttpRequest(method, url, headers, body, body, name);
+        // `body` comes from the parsed CLI arguments, so its shape is only known here.
+        return new HttpRequest(method, url, headers, body as HttpRequest['body'], typeof body === 'string' ? body : undefined, name);
     }
 
     private static mergeIntoSingleLine(text: string): string {

@@ -69,7 +69,8 @@ export class MimeUtility {
             case 'utf-16le':
                 return 'utf16le';
             case 'utf-16be':
-                return 'utf16be';
+                // Node has no utf16be decoder; decodeBuffer byte-swaps first.
+                return 'utf16le';
             default:
                 return 'utf8';
         }
@@ -77,7 +78,10 @@ export class MimeUtility {
 
     public static decodeBuffer(buffer: Buffer, charset?: string): string {
         try {
-            return buffer.toString(this.toBufferEncoding(charset));
+            // `utf-16be` used to be handed to Buffer.toString, which throws 'Unknown encoding'.
+            const normalized = (charset ?? '').trim().toLowerCase().replace(/_/g, '-');
+            const source = normalized === 'utf-16be' ? Buffer.from(buffer).swap16() : buffer;
+            return source.toString(this.toBufferEncoding(charset));
         } catch {
             return buffer.toString('utf8');
         }

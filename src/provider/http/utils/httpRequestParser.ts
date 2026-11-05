@@ -27,7 +27,7 @@ export class HttpRequestParser implements RequestParser {
     public constructor(private readonly requestRawText: string, private readonly settings: RestClientSettings) {
     }
 
-    public async parseHttpRequest(name?: string, withHeader: boolean): Promise<HttpRequest> {
+    public async parseHttpRequest(name?: string, withHeader?: boolean): Promise<HttpRequest> {
         // parse follows http://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html
         // split the request raw text into lines
         const lines: string[] = this.requestRawText.split(EOL);
@@ -147,8 +147,8 @@ export class HttpRequestParser implements RequestParser {
         }
 
         const graphQlPayload = {
-            query: body,
-            variables: variables ? JSON.parse(variables) : {}
+            query: typeof body === 'string' ? body : '',
+            variables: typeof variables === 'string' && variables ? JSON.parse(variables) : {}
         };
         return JSON.stringify(graphQlPayload);
     }
@@ -209,7 +209,7 @@ export class HttpRequestParser implements RequestParser {
                         if (fileAbsolutePath) {
                             if (groupsValues.processVariables) {
                                 const buffer = fs.readFileSync(fileAbsolutePath);
-                                const fileContent = buffer.toString(groupsValues.encoding || this.defaultFileEncoding);
+                                const fileContent = buffer.toString((groupsValues.encoding || this.defaultFileEncoding) as BufferEncoding);
                                 const resolvedContent = await VariableProcessor.processRawRequest(fileContent);
                                 combinedStream.append(resolvedContent);
                             } else {

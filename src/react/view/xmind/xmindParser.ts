@@ -23,6 +23,7 @@ const DEFAULT_ROOT_TOPIC_ID = 'root-topic';
 
 type MindArrow = NonNullable<MindElixirData['arrows']>[number];
 type MindSummary = NonNullable<MindElixirData['summaries']>[number];
+type SheetLegend = NonNullable<Sheet['legend']>;
 
 function createEmptyXmindSheet(): Sheet {
     return {
@@ -40,8 +41,8 @@ function createEmptyXmindSheet(): Sheet {
         legend: {
             visibility: 'visible',
             position: { x: 0, y: 0 },
-            markers: {},
-            groups: {},
+            markers: {} as unknown as SheetLegend['markers'],
+            groups: {} as unknown as SheetLegend['groups'],
         },
         settings: {
             'infoItems/infoItem': [],
@@ -96,7 +97,7 @@ async function buildImageResourceMap(buffer: ArrayBuffer): Promise<{
 
         const mime = getMimeType(normalizedPath);
         const data = await entry.async('uint8array');
-        const blob = new Blob([data], { type: mime });
+        const blob = new Blob([data as unknown as BlobPart], { type: mime });
         const blobUrl = URL.createObjectURL(blob);
         blobUrls.push(blobUrl);
 

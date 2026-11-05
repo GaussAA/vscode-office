@@ -14,14 +14,14 @@ export class RequestVariableHoverProvider implements HoverProvider {
 
         const { name, value, warning, error } = await RequestVariableProvider.Instance.get(fullPath, document);
         if (!error && !warning) {
-            const contents: MarkedString[] = [];
+            const contents: Array<MarkedString | MarkdownString> = [];
             if (value) {
                 contents.push(typeof value === 'string' ? value : { language: 'json', value: JSON.stringify(value, null, 2) });
             }
 
             contents.push(new MarkdownString(`*Request Variable* \`${name}\``));
 
-            return new Hover(contents, wordRange);
+            return new Hover(contents as unknown as MarkedString[], wordRange);
         }
 
         return undefined;

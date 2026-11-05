@@ -22,7 +22,7 @@ export class CustomVariableDiagnosticsProvider {
 
     private pendingHttpDocuments = new Set<TextDocument>();
 
-    private timer: NodeJS.Timer | undefined;
+    private timer: ReturnType<typeof setTimeout> | undefined;
 
     private fileVariableReferenceCache = new DocumentCache<Map<string, VariableWithPosition[]>>();
 

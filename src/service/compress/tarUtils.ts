@@ -9,9 +9,8 @@ function normalizeTarPath(path: string): string {
 }
 
 function isTarDirectory(entry: ReadEntry): boolean {
-    return entry.type === 'Directory'
-        || entry.type === '5'
-        || entry.path.endsWith('/');
+    // node-tar normalizes the numeric type flags ('5'), so only the named form can occur.
+    return entry.type === 'Directory' || entry.path.endsWith('/');
 }
 
 export interface TarEntryInfo {

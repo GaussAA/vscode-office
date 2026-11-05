@@ -144,7 +144,11 @@ async function copyEntry(writer: ZipWriter<Blob>, entry: Entry, writerOptions: R
         lastModDate: entry.lastModDate,
         lastAccessDate: entry.lastAccessDate,
         creationDate: entry.creationDate,
-        comment: entry.comment ? new TextDecoder().decode(entry.comment) : undefined,
+        comment: typeof entry.comment === 'string'
+            ? entry.comment
+            : entry.comment
+                ? new TextDecoder().decode(entry.comment as unknown as ArrayBuffer)
+                : undefined,
         externalFileAttributes: entry.externalFileAttributes,
         internalFileAttributes: entry.internalFileAttributes,
         versionMadeBy: entry.versionMadeBy,
@@ -177,7 +181,7 @@ async function rebuildZip(
     },
 ): Promise<Buffer> {
     const writerOptions = getWriterOptions(options.encoding);
-    const reader = new ZipReader(new BlobReader(new Blob([data])), getReaderOptions(options.encoding));
+    const reader = new ZipReader(new BlobReader(new Blob([data as unknown as BlobPart])), getReaderOptions(options.encoding));
     const entries = await reader.getEntries();
     const exclude = new Set((options.exclude ?? []).map(normalizePath));
     const blobWriter = new BlobWriter('application/zip');
@@ -216,7 +220,7 @@ export class ZipArchive {
     }
 
     async parse(encoding: string = this.encoding): Promise<ZipParseResult> {
-        const reader = new ZipReader(new BlobReader(new Blob([this.data])), getReaderOptions(encoding));
+        const reader = new ZipReader(new BlobReader(new Blob([this.data as unknown as BlobPart])), getReaderOptions(encoding));
         const entries = await reader.getEntries();
         await reader.close();
         return buildTree(entries);

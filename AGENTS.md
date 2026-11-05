@@ -51,7 +51,7 @@ pnpm install          # 依赖（pnpm，不是 npm）
 pnpm build            # 构建到 out/（vite + esbuild 多步）
 pnpm run package      # 打 vsix（@vscode/vsce 已是 devDependency；需先 build）
 pnpm lint             # eslint 整个 src；0 problem 才通过
-pnpm typecheck        # tsc 覆盖整个 src（含 webview）；对基线上限，只许减不许增
+pnpm typecheck        # tsc 覆盖整个 src（含 webview）；基线现在是空的 = 零错误
 pnpm typecheck:update # 重写基线 —— 审 diff，它只应变小
 pnpm test             # node:test 单测（先 esbuild 打包纯逻辑模块）
 pnpm check            # lint + typecheck + test（pre-commit 跑这个）
@@ -59,4 +59,4 @@ pnpm check:full       # check + build + verify:ui（CI 跑这个）
 pnpm verify:ui        # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
 ```
 
-**闸门是 fail-closed 的**：`scripts/typecheck.mjs` 把每个类型错误按「文件 + 错误码 + 消息」与 `scripts/typecheck-baseline.json` 比对，出现基线外的错误就红；基线里的错误消失了只提示你收缩基线。不要用 `typecheck:update` 把新错误塞进基线 —— 那是这个闸门唯一能欺骗自己的方式。
+**闸门是 fail-closed 的**：`scripts/typecheck.mjs` 把每个类型错误按「文件 + 错误码 + 消息」与 `scripts/typecheck-baseline.json` 比对，出现基线外的错误就红。基线已经清空（继承来的 75 条全部修掉），所以现在的规则很简单：**任何类型错误都会让构建失败**。不要用 `typecheck:update` 把新错误塞进基线 —— 那是这个闸门唯一能欺骗自己的方式。

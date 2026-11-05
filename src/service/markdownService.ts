@@ -2,7 +2,16 @@ import { adjustImgPath } from "@/common/fileUtil";
 import { Output } from "@/common/Output";
 import { spawn } from 'child_process';
 import chromeFinder from 'chrome-finder';
-import { fileTypeFromFile } from 'file-type';
+import * as fileTypeModule from 'file-type';
+
+/**
+ * file-type v19 ships two entries: the `node` one (which exports this) and the `core` one
+ * (which TypeScript resolves and which does not declare it). The web build uses
+ * src/shims/file-type.ts, so the call is valid on every host.
+ */
+const fileTypeFromFile = (fileTypeModule as unknown as {
+    fileTypeFromFile?: (path: string) => Promise<{ ext?: string } | undefined>;
+}).fileTypeFromFile;
 import { copyFileSync, existsSync, lstatSync, mkdirSync, renameSync } from 'fs';
 import { homedir } from 'os';
 import path, { dirname, extname, isAbsolute, join, parse } from 'path';
@@ -161,7 +170,7 @@ export class MarkdownService {
 
     public static async imgExtGuide(absPath: string, relPath: string) {
         const oldExt = extname(absPath)
-        const { ext = "png" } = (await fileTypeFromFile(absPath)) ?? {};
+        const { ext = "png" } = (await fileTypeFromFile?.(absPath)) ?? {};
         if (oldExt != `.${ext}`) {
             relPath = relPath.replace(oldExt, `.${ext}`)
             renameSync(absPath, absPath.replace(oldExt, `.${ext}`))
