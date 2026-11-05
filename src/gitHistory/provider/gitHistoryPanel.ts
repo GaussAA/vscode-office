@@ -135,6 +135,9 @@ export class GitHistoryPanel {
             { viewColumn: column, preserveFocus: true },
             {
                 enableScripts: true,
+                // Kept on purpose: restoring this panel means re-running `git log` over the
+                // repository, which on a large history costs more than the retained heap.
+                // The custom editors no longer set it (see common/customEditorOptions.ts).
                 retainContextWhenHidden: true,
                 localResourceRoots: GitHistoryPanel.getLocalResourceRoots(context),
             }

@@ -22,6 +22,9 @@ export class HtmlService {
             "office-viewer.viewHtml", basename(uri.fsPath),
             { viewColumn: ViewColumn.Two, preserveFocus: true },
             {
+                // Kept on purpose: this panel re-reads and re-renders the whole document when
+                // recreated, and it is a single explicit panel rather than a default applied to
+                // every viewer. The custom editors no longer set it.
                 retainContextWhenHidden: true,
                 enableScripts: true,
                 localResourceRoots: [...getExtensionResourceRoots(context), folderUri],

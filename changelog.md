@@ -21,6 +21,9 @@ Custom editors:
 
 - The same file can be opened in two editor groups at once. Previously the second open was
   refused and left you with a single viewer.
+- A viewer is no longer kept alive while its tab is hidden. Hidden tabs used to hold a full
+  webview (DOM, JS heap) for every open file; they are now recreated when you come back, and
+  the parquet viewer returns to the page you left it on.
 
 Spreadsheets:
 
