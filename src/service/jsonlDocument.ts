@@ -84,8 +84,6 @@ export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: nu
     return { text, size };
 }
 
-const decodeLine = readJsonlLineText;
-
 /** Build a summary for a line whose text has already been decoded. */
 export function summarizeDecodedLine(line: number, decoded: DecodedLine): JsonlEntrySummary {
     return classify(line, decoded, true);
@@ -130,7 +128,7 @@ export function buildJsonlSummary(
     index: JsonlIndex,
     line: number,
 ): JsonlEntrySummary {
-    return classify(line, decodeLine(bytes, index, line), true);
+    return classify(line, readJsonlLineText(bytes, index, line), true);
 }
 
 export function buildJsonlSummaries(
@@ -154,7 +152,7 @@ export function buildJsonlEntry(
     index: JsonlIndex,
     line: number,
 ): JsonlEntryDetail {
-    const decoded = decodeLine(bytes, index, line);
+    const decoded = readJsonlLineText(bytes, index, line);
     const detail: JsonlEntryDetail = {
         ...classify(line, decoded, false),
         text: truncate(decoded.text, JSONL_MAX_TEXT_CHARS),

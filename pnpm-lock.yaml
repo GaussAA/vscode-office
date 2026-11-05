@@ -223,9 +223,6 @@ importers:
       buffer:
         specifier: ^6.0.3
         version: 6.0.3
-      chart.js:
-        specifier: ^4.5.1
-        version: 4.6.1
       chrome-finder:
         specifier: ^1.0.7
         version: 1.0.7
@@ -319,33 +316,6 @@ importers:
       pptxviewjs:
         specifier: ^1.1.9
         version: 1.1.9(chart.js@4.6.1)(jszip@3.10.2)
-      prosemirror-commands:
-        specifier: ^1.7.1
-        version: 1.7.2
-      prosemirror-dropcursor:
-        specifier: ^1.8.2
-        version: 1.8.4
-      prosemirror-history:
-        specifier: ^1.5.0
-        version: 1.5.1
-      prosemirror-keymap:
-        specifier: ^1.2.3
-        version: 1.2.3
-      prosemirror-model:
-        specifier: ^1.25.9
-        version: 1.25.12
-      prosemirror-state:
-        specifier: ^1.4.4
-        version: 1.4.4
-      prosemirror-tables:
-        specifier: ^1.8.5
-        version: 1.8.5
-      prosemirror-transform:
-        specifier: ^1.12.0
-        version: 1.12.4
-      prosemirror-view:
-        specifier: ^1.41.9
-        version: 1.42.9
       puppeteer-core:
         specifier: ^25.1.0
         version: 25.16.0(yauzl@3.4.0)
@@ -6155,7 +6125,8 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@kurkle/color@0.3.4': {}
+  '@kurkle/color@0.3.4':
+    optional: true
 
   '@lezer/common@1.5.5': {}
 
@@ -7478,6 +7449,7 @@ snapshots:
   chart.js@4.6.1:
     dependencies:
       '@kurkle/color': 0.3.4
+    optional: true
 
   chokidar@3.6.0:
     dependencies:

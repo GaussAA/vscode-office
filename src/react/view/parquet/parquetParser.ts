@@ -25,11 +25,8 @@ export interface ParquetFileInfo {
     createdBy?: string;
 }
 
-const PAGE_SIZE = 50;
-
-export function getPageSize(): number {
-    return PAGE_SIZE;
-}
+/** Rows per page in the webview table. Shared so paging and row addressing agree. */
+export const PARQUET_PAGE_SIZE = 50;
 
 function asyncBufferFromArrayBuffer(buffer: ArrayBuffer): AsyncBuffer {
     return {

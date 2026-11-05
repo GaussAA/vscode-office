@@ -21,9 +21,6 @@ const RANGE_CACHE_ENTRIES = 48;
 
 export interface ParquetSource {
     file: AsyncBuffer;
-    /** True when the resource answered range requests. */
-    ranged: boolean;
-    byteLength: number;
 }
 
 class RangeCache {
@@ -98,7 +95,7 @@ export async function openParquetSource(url: string): Promise<ParquetSource> {
             await probe.arrayBuffer();
             if (Number.isFinite(total) && total > 0) {
                 console.info('[parquet] source: ranged', total, 'bytes');
-                return { file: makeRangeBuffer(url, total), ranged: true, byteLength: total };
+                return { file: makeRangeBuffer(url, total) };
             }
         }
         if (probe.status === 200) {
@@ -106,7 +103,7 @@ export async function openParquetSource(url: string): Promise<ParquetSource> {
             // so keep it instead of downloading the same bytes twice.
             const buffer = await probe.arrayBuffer();
             console.info('[parquet] source: full (no range support)', buffer.byteLength, 'bytes');
-            return { file: makeBufferFromArrayBuffer(buffer), ranged: false, byteLength: buffer.byteLength };
+            return { file: makeBufferFromArrayBuffer(buffer) };
         }
         await probe.arrayBuffer().catch(() => undefined);
     } catch {
@@ -119,5 +116,5 @@ export async function openParquetSource(url: string): Promise<ParquetSource> {
     }
     const buffer = await response.arrayBuffer();
     console.info('[parquet] source: full', buffer.byteLength, 'bytes');
-    return { file: makeBufferFromArrayBuffer(buffer), ranged: false, byteLength: buffer.byteLength };
+    return { file: makeBufferFromArrayBuffer(buffer) };
 }

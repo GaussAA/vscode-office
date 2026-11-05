@@ -33,7 +33,6 @@ export interface JsonlInfoPayload {
     cacheId: string;
     lineCount: number;
     byteSize: number;
-    readOnly: boolean;
 }
 
 export interface JsonlRangeRequest {

@@ -55,11 +55,27 @@ Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus")
   fork can be installed next to the original instead of replacing it.
 - **Parquet viewer is `priority: default`**, so `.parquet` opens in the viewer directly.
 
-## Kept as-is on purpose
+## Third-party code vendored in this repository
 
-Upstream source files keep their original style (4-space indent, single quotes) and are
-excluded from this repo's auto-formatting, so `git merge upstream/main` stays cheap. Decisions
-behind that choice are recorded in [docs/adr/0001-fork-office-viewer.md](./docs/adr/0001-fork-office-viewer.md).
+Two MIT-licensed projects are copied into the tree rather than installed from npm. Their
+licenses require attribution, which this section provides. The copies are unmodified snapshots
+plus upstream Office Viewer's own patches; consult `git log` for the history of each path.
+
+| Path | Project | License | Upstream |
+| --- | --- | --- | --- |
+| `src/react/view/excel/x-spreadsheet/` | `x-data-spreadsheet` (patch applied upstream in `48b10e4`, "Migrate @antv/s2 to x-data-spreadsheet") | MIT | https://github.com/myliang/x-spreadsheet |
+| `src/service/zip/pretty-bytes/` | `pretty-bytes` | MIT | https://github.com/sindresorhus/pretty-bytes |
+
+Copyright for each remains with its original authors.
+
+## Working with upstream
+
+This fork evolves independently. `upstream` is a read-only reference: when we need a fix from
+it, we read the diff and reimplement it rather than merging its history. Upstream files may be
+rewritten; the discipline that replaces "keep it mergeable" is "one change per commit, and each
+commit can be reverted on its own". See
+[docs/adr/0002-independent-evolution.md](./docs/adr/0002-independent-evolution.md).
+
 
 
 

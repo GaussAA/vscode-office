@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { Handler } from '@/common/handler';
 import { ReactApp } from '@/common/reactApp';
 import { getExtensionResourceRoots } from '@/common/extensionResource';
-import { isUriReadOnly } from '@/common/fileReadOnly';
+import { buildDocumentCacheId } from '@/provider/handlers/officeContent';
 import {
     buildJsonlEntry,
     buildJsonlIndex,
@@ -76,13 +76,12 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
         // Only the newest search may emit results; older scans die on their next tick.
         let latestSearchId = 0;
 
-        const emitInfo = async () => {
+        const emitInfo = () => {
             const payload: JsonlInfoPayload = {
                 fileName: document.uri.path.split('/').pop() ?? document.uri.fsPath,
-                cacheId: `${document.uri.scheme}:${document.uri.toString()}`,
+                cacheId: buildDocumentCacheId(document.uri),
                 lineCount: document.index.lineCount,
                 byteSize: document.bytes.byteLength,
-                readOnly: await isUriReadOnly(document.uri),
             };
             handler.emit('jsonlInfo', payload);
         };

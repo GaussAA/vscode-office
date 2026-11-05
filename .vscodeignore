@@ -28,3 +28,10 @@ pnpm-workspace.yaml
 scripts/**
 .ui-verify/**
 
+# agent-facing docs and screenshots -- not part of the product
+docs/**
+AGENTS.md
+CLAUDE.md
+GLOSSARY.md
+.github/**
+*.vsix

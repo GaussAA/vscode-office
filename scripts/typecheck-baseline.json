@@ -360,11 +360,6 @@
     "message": "'\"file-type\"' has no exported member named 'fileTypeFromFile'. Did you mean 'fileTypeFromBlob'?"
   },
   {
-    "file": "src/service/parquet/parquetUtil.ts",
-    "code": "TS2322",
-    "message": "Type '(start: number, end?: number) => ArrayBuffer | SharedArrayBuffer' is not assignable to type '(start: number, end?: number) => Awaitable<ArrayBuffer>'."
-  },
-  {
     "file": "src/service/zip/zipArchive.ts",
     "code": "TS2322",
     "message": "Type 'Buffer<ArrayBufferLike>' is not assignable to type 'BlobPart'."

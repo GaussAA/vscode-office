@@ -10,7 +10,7 @@ import { openParquetSource } from '../../util/parquetSource.ts';
 import SponsorBar from '../components/SponsorBar.tsx';
 import {
     formatCellValue,
-    getPageSize,
+    PARQUET_PAGE_SIZE,
     isColumnEditable,
     openParquetFile,
     parseCellInput,
@@ -22,7 +22,7 @@ import {
 } from './parquetParser.ts';
 import './Parquet.less';
 
-const PAGE_SIZE = getPageSize();
+const PAGE_SIZE = PARQUET_PAGE_SIZE;
 /** Above this many rows, editing is disabled: saving would re-read the whole file. */
 const EDIT_ROW_LIMIT = 200_000;
 /** Rows read per batch while searching the whole file. */
