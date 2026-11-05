@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { JsonlEntrySummary } from '../../../common/jsonlTypes.ts';
 import { ROW_HEIGHT, formatBytes, highlightParts } from './jsonlFormat.tsx';
+import { $t } from '../../i18n/i18nConfig.ts';
 
 interface Props {
     /** Ordered rows: a contiguous window in directory mode, the matches in search mode. */
@@ -30,7 +31,7 @@ export default function JsonlIndex({
     onSelect,
     onNeedMore,
     header,
-    emptyText = 'No entries',
+    emptyText,
     highlight,
 }: Props) {
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -95,14 +96,14 @@ export default function JsonlIndex({
                 title = (
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
-                        <span className="jsonl-type">empty</span>
+                        <span className="jsonl-type">{$t('jsonl.chipEmpty')}</span>
                     </span>
                 );
             } else if (entry.error) {
                 title = (
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
-                        <span className="jsonl-chip jsonl-chip--error">invalid</span>
+                        <span className="jsonl-chip jsonl-chip--error">{$t('jsonl.chipInvalid')}</span>
                         <span className="jsonl-entry__raw jsonl-entry__raw--error" title={entry.raw}>{renderText(entry)}</span>
                     </span>
                 );
@@ -110,7 +111,7 @@ export default function JsonlIndex({
                 title = (
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
-                        <span className="jsonl-chip jsonl-chip--warn">too large</span>
+                        <span className="jsonl-chip jsonl-chip--warn">{$t('jsonl.chipTooLarge')}</span>
                         <span className="jsonl-muted">{formatBytes(entry.size)}</span>
                     </span>
                 );
@@ -150,7 +151,7 @@ export default function JsonlIndex({
         <div className="jsonl-index" ref={containerRef} tabIndex={0} onKeyDown={onKeyDown}>
             {header}
             {items.length === 0 ? (
-                <div className="jsonl-empty">{emptyText}</div>
+                <div className="jsonl-empty">{emptyText ?? $t('jsonl.empty')}</div>
             ) : (
                 <Tree
                     className="jsonl-index__tree"

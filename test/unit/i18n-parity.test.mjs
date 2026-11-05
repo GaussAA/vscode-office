@@ -33,22 +33,20 @@ const LOCALES = {
  * without translating it raises this budget, which is exactly the kind of change that should
  * be a conscious decision rather than a silent fallback.
  *
- * The remaining 24 keys below are the `parquet` chrome this fork added (search, pager,
- * inspector, codec warning) plus the `jsonl` viewer, which do not exist in these catalogs
- * yet. Translating 26 keys into seven languages is a job for a native speaker, not a commit
- * hook; until then the English fallback is correct but unlocalised, and this budget keeps
- * the gap from growing.
+ * The 55 keys below are the `parquet` chrome and the whole `jsonl` viewer. Translating them
+ * into seven languages is a job for a native speaker, not a commit hook; until then the
+ * English fallback is correct but unlocalised, and this budget keeps the gap from growing.
  */
 const MAX_MISSING = {
     'zh-cn': 0,
     'zh-tw': 0,
-    ja: 26,
-    de: 26,
-    fr: 26,
-    es: 26,
-    'pt-br': 26,
-    ko: 26,
-    ru: 26,
+    ja: 55,
+    de: 55,
+    fr: 55,
+    es: 55,
+    'pt-br': 55,
+    ko: 55,
+    ru: 55,
 }
 
 function flatten(tree, prefix = '') {

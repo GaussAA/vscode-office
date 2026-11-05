@@ -11,6 +11,7 @@ import {
     type JsonlSearchBatch,
 } from '../../../common/jsonlTypes.ts';
 import { handler } from '../../util/vscode.ts';
+import { $t } from '../../i18n/i18nConfig.ts';
 import {
     getVscodeThemeColor,
     isVscodeDarkTheme,
@@ -286,16 +287,19 @@ export default function JsonlViewer() {
                 : 0;
             return (
                 <div className="jsonl-index__banner">
-                    Searching… {percent}% · {searchMeta?.matches ?? 0} matches
+                    {$t('jsonl.searching', { percent, count: searchMeta?.matches ?? 0 })}
                 </div>
             );
         }
         if (!searchMeta) return undefined;
+        const label = searchMeta.matches === 1
+            ? $t('jsonl.matchCountOne', { count: searchMeta.matches })
+            : $t('jsonl.matchCountMany', { count: searchMeta.matches });
         return (
             <div className="jsonl-index__banner">
                 {searchMeta.matches === 0
-                    ? 'No matches'
-                    : `${searchMeta.matches} match${searchMeta.matches === 1 ? '' : 'es'}${searchMeta.capped ? ' · stopped at 10,000' : ''}`}
+                    ? $t('jsonl.noMatches')
+                    : `${label}${searchMeta.capped ? $t('jsonl.cappedSuffix') : ''}`}
             </div>
         );
     }, [searchActive, searching, searchMeta]);
@@ -325,7 +329,7 @@ export default function JsonlViewer() {
                 <div className="jsonl-toolbar">
                     <div className="jsonl-toolbar__left">
                         <span className="jsonl-file-name" title={info?.fileName}>{info?.fileName ?? 'JSONL'}</span>
-                        <span className="jsonl-meta">{total.toLocaleString()} entries</span>
+                        <span className="jsonl-meta">{$t('jsonl.entriesCount', { count: total.toLocaleString() })}</span>
                         <span className="jsonl-dot">·</span>
                         <span className="jsonl-meta">{formatBytes(info?.byteSize ?? 0)}</span>
                     </div>
@@ -334,7 +338,7 @@ export default function JsonlViewer() {
                             size="small"
                             allowClear
                             prefix={<SearchOutlined />}
-                            placeholder="Search entries"
+                            placeholder={$t('jsonl.searchPlaceholder')}
                             className="jsonl-search"
                             value={query}
                             onChange={event => handleQueryChange(event.target.value)}
@@ -344,17 +348,17 @@ export default function JsonlViewer() {
                             min={1}
                             max={Math.max(1, total)}
                             value={jumpValue}
-                            placeholder="entry #"
+                            placeholder={$t('jsonl.jumpPlaceholder')}
                             className="jsonl-jump"
                             onChange={value => setJumpValue(typeof value === 'number' ? value : null)}
                             onPressEnter={jump}
                         />
-                        <Button size="small" onClick={jump}>Go</Button>
+                        <Button size="small" onClick={jump}>{$t('jsonl.go')}</Button>
                         <Button
                             type="text"
                             size="small"
                             icon={<ReloadOutlined />}
-                            title="Reload from disk"
+                            title={$t('jsonl.reload')}
                             onClick={() => handler.emit('jsonlReload')}
                         />
                     </div>
@@ -372,8 +376,8 @@ export default function JsonlViewer() {
                             highlight={searchActive ? query.trim() : undefined}
                             emptyText={
                                 searchActive
-                                    ? (searching ? 'Searching…' : 'No matches')
-                                    : (chunkLoading ? 'Loading…' : 'No entries')
+                                    ? (searching ? $t('jsonl.searchingShort') : $t('jsonl.noMatches'))
+                                    : (chunkLoading ? $t('jsonl.loading') : $t('jsonl.empty'))
                             }
                         />
                     </Splitter.Panel>

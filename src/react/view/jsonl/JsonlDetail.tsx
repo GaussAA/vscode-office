@@ -1,4 +1,5 @@
 import { CopyOutlined } from '@ant-design/icons';
+import { $t } from '../../i18n/i18nConfig.ts';
 import { Button, Modal, Segmented, Tree } from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JsonlEntryDetail } from '../../../common/jsonlTypes.ts';
@@ -115,10 +116,10 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
         if (!built) return;
         if (built.count > EXPAND_ALL_CONFIRM) {
             Modal.confirm({
-                title: 'Expand every node?',
-                content: `This entry has ${built.count}${built.truncated ? '+' : ''} nodes. Expanding all of them may make the pane slow.`,
-                okText: 'Expand all',
-                cancelText: 'Cancel',
+                title: $t('jsonl.expandAllConfirmTitle'),
+                content: $t('jsonl.expandAllConfirmBody', { count: `${built.count}${built.truncated ? '+' : ''}` }),
+                okText: $t('jsonl.expandAll'),
+                cancelText: $t('common.cancel'),
                 onOk: () => setExpanded(built.allKeys),
             });
             return;
@@ -167,20 +168,20 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
             <span className="jsonl-detail__index">L{index + 1}</span>
             {entry && (
                 <span className={`jsonl-chip jsonl-chip--${entry.error ? 'error' : entry.empty ? 'empty' : 'type'}`}>
-                    {entry.empty ? 'empty' : entry.error ? 'invalid JSON' : entry.tooLarge ? 'too large' : typeLabel(entry.value)}
+                    {entry.empty ? $t('jsonl.chipEmpty') : entry.error ? $t('jsonl.invalidJson') : entry.tooLarge ? $t('jsonl.chipTooLarge') : typeLabel(entry.value)}
                 </span>
             )}
             {entry && <span className="jsonl-meta">{formatBytes(entry.size)}</span>}
             <span className="jsonl-detail__spacer" />
             {entry?.value !== undefined && (
                 <>
-                    <Button size="small" type="text" onClick={expandAll}>Expand all</Button>
-                    <Button size="small" type="text" onClick={collapseAll}>Collapse all</Button>
+                    <Button size="small" type="text" onClick={expandAll}>{$t('jsonl.expandAll')}</Button>
+                    <Button size="small" type="text" onClick={collapseAll}>{$t('jsonl.collapseAll')}</Button>
                     <Button size="small" type="text" icon={<CopyOutlined />} onClick={copyValue}>
-                        {copied === 'value' ? 'Copied' : 'Value'}
+                        {copied === 'value' ? $t('common.copied') : $t('jsonl.value')}
                     </Button>
                     <Button size="small" type="text" onClick={copyPath}>
-                        {copied === 'path' ? 'Copied' : 'Path'}
+                        {copied === 'path' ? $t('common.copied') : $t('jsonl.path')}
                     </Button>
                 </>
             )}
@@ -188,31 +189,31 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
                 size="small"
                 value={mode}
                 onChange={value => onModeChange(value as DetailMode)}
-                options={[{ label: 'Tree', value: 'tree' }, { label: 'Raw', value: 'raw' }]}
+                options={[{ label: $t('jsonl.tree'), value: 'tree' }, { label: $t('jsonl.raw'), value: 'raw' }]}
             />
         </div>
     );
 
     let body: React.ReactNode;
     if (!entry) {
-        body = <div className="jsonl-empty">{loading ? 'Loading…' : 'Select an entry on the left'}</div>;
+        body = <div className="jsonl-empty">{loading ? $t('jsonl.loading') : $t('jsonl.selectEntry')}</div>;
     } else if (mode === 'raw') {
         body = (
             <pre className="jsonl-detail__raw">{entry.text ?? entry.raw}</pre>
         );
     } else if (entry.empty) {
-        body = <div className="jsonl-empty">Empty line</div>;
+        body = <div className="jsonl-empty">{$t('jsonl.emptyLine')}</div>;
     } else if (entry.error) {
         body = (
             <div className="jsonl-detail__error">
-                <div className="jsonl-chip jsonl-chip--error">invalid JSON</div>
+                <div className="jsonl-chip jsonl-chip--error">{$t('jsonl.invalidJson')}</div>
                 <pre className="jsonl-detail__raw">{entry.text ?? entry.raw}</pre>
             </div>
         );
     } else if (entry.tooLarge) {
         body = (
             <div className="jsonl-detail__error">
-                <div className="jsonl-chip jsonl-chip--warn">too large to parse</div>
+                <div className="jsonl-chip jsonl-chip--warn">{$t('jsonl.tooLargeToParse')}</div>
                 <pre className="jsonl-detail__raw">{entry.text ?? entry.raw}</pre>
             </div>
         );
@@ -238,7 +239,7 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
         );
         body = wrap ? <div className="jsonl-detail__scroll">{tree}</div> : tree;
     } else {
-        body = <div className="jsonl-empty">No tree</div>;
+        body = <div className="jsonl-empty">{$t('jsonl.noTree')}</div>;
     }
 
     return (
