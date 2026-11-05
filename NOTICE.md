@@ -18,7 +18,10 @@ Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus")
   slices 50 per page; this fork reads only the visible page with `rowStart`/`rowEnd` and
   keeps edits in an absolute-row patch map, so a huge file no longer materialises its
   whole table. Saving re-reads the file, re-applies the patches and writes it back.
-- **Parquet bytes are fetched by range when the host allows it.** Before loading, the
+- **Large parquet files open read-only, and every page is reachable by row number.** Editing
+  re-reads and rewrites the whole file, so above 200 000 rows the viewer disables editing and
+  says why. The footer takes a row number (`Go`) and shows the visible range
+  (`239,951–240,000 of 250,000`), which is the only usable navigation on a multi-million-row file.- **Parquet bytes are fetched by range when the host allows it.** Before loading, the
   viewer probes the resource with a 2-byte `Range` request. If the host answers `206`,
   hyparquet is backed by a lazy buffer and only the footer plus the needed pages are
   downloaded (LRU-cached, 64 MB cap). If the host ignores `Range`, the probe response is
@@ -46,3 +49,4 @@ Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus")
 Upstream source files keep their original style (4-space indent, single quotes) and are
 excluded from this repo's auto-formatting, so `git merge upstream/main` stays cheap. Decisions
 behind that choice are recorded in [docs/adr/0001-fork-office-viewer.md](./docs/adr/0001-fork-office-viewer.md).
+

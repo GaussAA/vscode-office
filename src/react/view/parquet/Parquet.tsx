@@ -23,6 +23,8 @@ import {
 import './Parquet.less';
 
 const PAGE_SIZE = getPageSize();
+/** Above this many rows, editing is disabled: saving would re-read the whole file. */
+const EDIT_ROW_LIMIT = 200_000;
 const PARQUET_VSCODE_THEME_KEY = 'parquet-vscode-theme';
 
 type ColumnIconKind = 'bool' | 'numeric' | 'string' | 'datetime' | 'structure' | 'field';
@@ -91,6 +93,8 @@ function ParquetViewer() {
     const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
     const [pageRows, setPageRows] = useState<Record<string, unknown>[]>([]);
     const [pageLoading, setPageLoading] = useState(false);
+    const [largeFile, setLargeFile] = useState(false);
+    const [rowJump, setRowJump] = useState('');
     const [page, setPage] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -255,6 +259,12 @@ function ParquetViewer() {
                 : await openParquetFile((await openParquetSource(payload.path ?? '')).file);
             fileInfoRef.current = info;
             setFileInfo(info);
+
+            // Saving re-reads every row, so editing a huge file is not offered at all.
+            const tooBigToEdit = info.rowCount > EDIT_ROW_LIMIT;
+            setLargeFile(tooBigToEdit);
+            readOnlyRef.current = fileReadOnly || tooBigToEdit;
+            setReadOnly(fileReadOnly || tooBigToEdit);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to load parquet file');
         } finally {
@@ -290,6 +300,22 @@ function ParquetViewer() {
             });
     }, [fileInfo, page]);
 
+    const jumpToRow = useCallback(() => {
+        const info = fileInfoRef.current;
+        if (!info) return;
+        const target = Number.parseInt(rowJump, 10);
+        if (!Number.isFinite(target)) return;
+        const row = Math.max(1, Math.min(info.rowCount, target));
+        cancelEdit();
+        setPage(Math.floor((row - 1) / PAGE_SIZE));
+    }, [rowJump, cancelEdit]);
+
+    const rowRange = useMemo(() => {
+        if (!fileInfo) return '';
+        const start = page * PAGE_SIZE + 1;
+        const end = Math.min(fileInfo.rowCount, (page + 1) * PAGE_SIZE);
+        return `${start.toLocaleString()}–${end.toLocaleString()} of ${fileInfo.rowCount.toLocaleString()}`;
+    }, [fileInfo, page]);
     const tableColumns = useMemo<ColumnsType<TableRow>>(() => {
         if (!fileInfo) return [];
         const cols: ColumnsType<TableRow> = [
@@ -429,7 +455,9 @@ function ParquetViewer() {
                 <main className="parquet-viewer__main">
                     {readOnly && !loading && !error && fileInfo && (
                         <div className="parquet-viewer__readonly-banner">
-                            {$t('viewer.readOnly')}
+                            {largeFile
+                                ? `Read-only: ${fileInfo.rowCount.toLocaleString()} rows. Editing is disabled because saving re-reads the whole file.`
+                                : $t('viewer.readOnly')}
                         </div>
                     )}
                     {error ? (
@@ -494,7 +522,23 @@ function ParquetViewer() {
                                     >
                                         <span className="codicon codicon-chevron-left" />
                                     </button>
-                                    <span className="parquet-viewer__pager-info">{page + 1} / {totalPages}</span>
+                                    <Input
+                                        size="small"
+                                        className="parquet-viewer__row-jump"
+                                        placeholder="row"
+                                        value={rowJump}
+                                        onChange={(event) => setRowJump(event.target.value)}
+                                        onPressEnter={jumpToRow}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="parquet-viewer__pager-btn"
+                                        onClick={jumpToRow}
+                                        title="Go to row"
+                                    >
+                                        Go
+                                    </button>
+                                    <span className="parquet-viewer__pager-info">{rowRange}</span>
                                     <button
                                         type="button"
                                         className="parquet-viewer__pager-btn"
@@ -524,6 +568,8 @@ export default function Parquet() {
         </App>
     );
 }
+
+
 
 
 
