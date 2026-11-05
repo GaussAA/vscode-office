@@ -22,6 +22,13 @@ Custom editors:
 - The same file can be opened in two editor groups at once. Previously the second open was
   refused and left you with a single viewer.
 
+Spreadsheets:
+
+- The XLSX engine now comes from SheetJS's own CDN (0.20.3) instead of npm, where the package
+  stopped at 0.18.5 in 2022. That pulls in the fixes for CVE-2023-30533 (prototype pollution)
+  and CVE-2024-22363 (regular-expression denial of service), neither of which had a fix on
+  npm. No API change: reading and exporting behave the same.
+
 Word viewer:
 
 - Moved to `@docx-editor.dev/react` (`@eigenpal/docx-editor-react` is deprecated on npm and
