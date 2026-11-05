@@ -1,3 +1,5 @@
+@import '../../common/highlight.less';
+
 body:has(.parquet-app) {
     width: 100vw;
     height: 100vh;
@@ -50,39 +52,6 @@ body:has(.parquet-app) {
     overflow: hidden;
 }
 
-.parquet-viewer--light {
-    --pv-bg: #ffffff;
-    --pv-sider-bg: #f6f8fa;
-    --pv-header-bg: #f3f4f6;
-    --pv-border: #d8dee4;
-    --pv-fg: #1f2328;
-    --pv-muted: #656d76;
-    --pv-hover: #eef1f4;
-    --pv-active-bg: #ddf4ff;
-    --pv-active-fg: #0969da;
-    --pv-accent: #0969da;
-    --pv-accent-hover: #0550ae;
-    --pv-error: #cf222e;
-    --pv-input-bg: #ffffff;
-    --pv-input-border: #d0d7de;
-    --pv-shadow: 0 1px 0 rgba(27, 31, 36, 0.04);
-    --pv-type-bg: #eaeef2;
-    --pv-type-fg: #57606a;
-    --pv-banner-bg: #fff8c5;
-    --pv-banner-fg: #5c4b00;
-    --pv-scrollbar-thumb: #c7cad1;
-    --pv-scrollbar-track: #f3f4f6;
-    --pv-icon-rows: #0969da;
-    --pv-icon-columns: #bf8700;
-    --pv-icon-author: #8250df;
-    --pv-icon-schema: #0e8a87;
-    --pv-icon-bool: #cf222e;
-    --pv-icon-numeric: #0969da;
-    --pv-icon-string: #1a7f37;
-    --pv-icon-datetime: #8250df;
-    --pv-icon-structure: #0e8a87;
-    --pv-icon-field: #bf8700;
-}
 
 .parquet-icon {
     flex-shrink: 0;
@@ -700,13 +669,6 @@ body:has(.parquet-app) {
     font-size: 11px;
     color: var(--vscode-descriptionForeground, #9d9d9d);
     font-variant-numeric: tabular-nums;
-}
-
-.parquet-viewer__hit {
-    background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
-    color: inherit;
-    border-radius: 2px;
-    padding: 0;
 }
 
 .parquet-table tbody tr.parquet-viewer__row--match > td {

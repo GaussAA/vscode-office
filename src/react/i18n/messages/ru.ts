@@ -11,8 +11,6 @@ export default {
         delete: 'Удалить',
         loading: 'Загрузка...',
         officeViewer: 'Просмотр Office',
-        switchToLight: 'Переключить на светлую тему',
-        switchToDark: 'Переключить на адаптивную тёмную тему',
         editInVscode: 'Редактировать в VS Code',
     },
     webUnsupported: {

@@ -11,8 +11,6 @@ export default {
         delete: 'Supprimer',
         loading: 'Chargement...',
         officeViewer: 'Office Viewer',
-        switchToLight: 'Passer en mode clair',
-        switchToDark: 'Passer en mode sombre adaptatif',
         editInVscode: 'Modifier dans VS Code',
     },
     webUnsupported: {

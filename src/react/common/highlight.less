@@ -1,0 +1,18 @@
+/*
+ * Search highlights, shared by every view that marks matches in place.
+ *
+ * These used to be `--vscode-editor-findMatchHighlightBackground` with `color: inherit`: a
+ * translucent orange wash on top of text that already carries a syntax colour. On the JSONL
+ * tree (green strings) and the parquet grid (green string columns) the result read as "slightly
+ * different green", so a hit was invisible — and an invisible search highlight is a broken
+ * search. The mark is opaque and forces its own foreground, so it works regardless of what is
+ * underneath and in both theme kinds.
+ */
+.jsonl-hit,
+.parquet-viewer__hit {
+    background: #f2cc60;
+    color: #1f2328;
+    border-radius: 2px;
+    padding: 0 1px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28);
+}

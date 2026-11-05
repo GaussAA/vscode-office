@@ -11,8 +11,6 @@ export default {
         delete: '刪除',
         loading: '載入中...',
         officeViewer: 'Office 檢視器',
-        switchToLight: '切換至淺色模式',
-        switchToDark: '切換至自適應深色模式',
         editInVscode: '在 VS Code 中編輯',
     },
     webUnsupported: {

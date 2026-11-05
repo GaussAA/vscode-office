@@ -11,8 +11,6 @@ export default {
         delete: 'Löschen',
         loading: 'Wird geladen...',
         officeViewer: 'Office Viewer',
-        switchToLight: 'Zum hellen Modus wechseln',
-        switchToDark: 'Zum adaptiven dunklen Modus wechseln',
         editInVscode: 'In VS Code bearbeiten',
     },
     webUnsupported: {

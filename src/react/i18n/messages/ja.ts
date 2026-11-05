@@ -11,8 +11,6 @@ export default {
         delete: '削除',
         loading: '読み込み中...',
         officeViewer: 'Office Viewer',
-        switchToLight: 'ライトモードに切り替え',
-        switchToDark: 'アダプティブダークモードに切り替え',
         editInVscode: 'VS Code で編集',
     },
     webUnsupported: {

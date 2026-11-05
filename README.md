@@ -52,7 +52,14 @@ Reading is lazy and stays usable on big files:
 ![Parquet types](docs/screenshots/parquet-types.png)
 
 **Find in file** scans in 5,000-row batches with progress, marks matching rows, highlights
-the matching text inside cells, and jumps to the first hit.
+the matching text inside cells, and jumps to the first hit. Matches are marked with an opaque
+amber chip rather than a translucent wash, so a hit stays readable on top of the coloured
+values underneath.
+
+The viewer follows the VS Code theme — including the antd widgets, which used to stay light
+under a dark view. There is no separate light/dark switch.
+
+![Parquet in a light theme](docs/screenshots/parquet-light.png)
 
 ### JSONL / NDJSON: a directory, not a grid
 

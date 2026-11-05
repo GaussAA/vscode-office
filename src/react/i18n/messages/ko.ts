@@ -11,8 +11,6 @@ export default {
         delete: '삭제',
         loading: '로딩 중...',
         officeViewer: 'Office 뷰어',
-        switchToLight: '라이트 모드로 전환',
-        switchToDark: '적응형 다크 모드로 전환',
         editInVscode: 'VS Code에서 편집',
     },
     webUnsupported: {

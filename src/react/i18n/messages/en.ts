@@ -11,8 +11,6 @@ export default {
         delete: 'Delete',
         loading: 'Loading...',
         officeViewer: 'Office Viewer',
-        switchToLight: 'Switch to light mode',
-        switchToDark: 'Switch to adaptive dark mode',
         editInVscode: 'Edit In VS Code',
     },
     webUnsupported: {

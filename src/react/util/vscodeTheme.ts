@@ -73,8 +73,19 @@ export function observeVscodeThemeChange(onChange: () => void): () => void {
     };
 }
 
-export function useVscodeSponsorDark(): boolean {
+/**
+ * The current VS Code theme kind, kept up to date when the user switches themes.
+ *
+ * Every view that has to branch on dark/light (antd algorithm, palette fallbacks) should use
+ * this rather than keeping its own switch: the parquet viewer used to own a manual toggle,
+ * which is how it ended up with three independent colour sources at once.
+ */
+export function useVscodeDarkTheme(): boolean {
     const [dark, setDark] = useState(isVscodeDarkTheme);
     useEffect(() => observeVscodeThemeChange(() => setDark(isVscodeDarkTheme())), []);
     return dark;
+}
+
+export function useVscodeSponsorDark(): boolean {
+    return useVscodeDarkTheme();
 }

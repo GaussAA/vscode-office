@@ -58,6 +58,10 @@ Rules that keep this suite useful:
 - Assert on **user-visible facts** (text, ranges, counts, computed heights), not internals.
 - One scenario per behaviour; name it after the fact it proves.
 - A scenario must fail for a real regression: no screenshot-only checks.
+- Colours are user-visible too: `parquet-theme-follows-vscode` asserts the _luminance_ of the
+  native input and of the antd input under both themes, because the two used to be driven by
+  different colour sources (a VS Code CSS variable and antd's default light tokens) and
+  disagreed with the page whenever the theme did not match.
 
 ## Route smoke vs. real scenarios
 

@@ -1,10 +1,10 @@
-import { MoonOutlined, SunOutlined } from '@ant-design/icons';
-import { App, Input, type InputRef, Table } from 'antd';
+import { App, ConfigProvider, Input, theme as antdTheme, type InputRef, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '@vscode/codicons/dist/codicon.css';
 import { $t } from '../../i18n/i18nConfig.ts';
-import { handler, vscodeApi } from '../../util/vscode.ts';
+import { handler } from '../../util/vscode.ts';
+import { getVscodeThemeColor, useVscodeDarkTheme } from '../../util/vscodeTheme.ts';
 import { arrayBufferFromPayload } from '../../util/loadOfficeContent.ts';
 import { openParquetSource } from '../../util/parquetSource.ts';
 import { highlightRuns } from '../../common/highlight.ts';
@@ -44,32 +44,6 @@ function highlightCell(text: string, needle: string) {
     });
     return parts;
 }
-const PARQUET_VSCODE_THEME_KEY = 'parquet-vscode-theme';
-
-function loadParquetVscodeTheme(): boolean {
-    const state = vscodeApi?.getState?.() as { parquetVscodeTheme?: boolean } | undefined;
-    if (state?.parquetVscodeTheme !== undefined) {
-        return state.parquetVscodeTheme;
-    }
-    try {
-        const saved = localStorage.getItem(PARQUET_VSCODE_THEME_KEY);
-        if (saved !== null) {
-            return saved === '1';
-        }
-    } catch { }
-    return true;
-}
-
-function saveParquetVscodeTheme(vscodeTheme: boolean) {
-    try {
-        localStorage.setItem(PARQUET_VSCODE_THEME_KEY, vscodeTheme ? '1' : '0');
-    } catch { }
-    if (vscodeApi?.setState) {
-        const prev = (vscodeApi.getState?.() ?? {}) as Record<string, unknown>;
-        vscodeApi.setState({ ...prev, parquetVscodeTheme: vscodeTheme });
-    }
-}
-
 /** Icon per category. The category itself is decided once, in parquetParser.categorizeType. */
 const COLUMN_ICONS: Record<ColumnCategory, string> = {
     bool: 'codicon-symbol-boolean',
@@ -120,7 +94,6 @@ function ParquetViewer() {
     const [readOnly, setReadOnly] = useState(false);
     /** `${absoluteRow}:${column}` for every patched cell, so render never reads a ref. */
     const [editedCells, setEditedCells] = useState<Set<string>>(() => new Set());
-    const [vscodeTheme, setVscodeTheme] = useState(loadParquetVscodeTheme);
     const fileInfoRef = useRef<ParquetFileInfo | null>(null);
     /** Owns the page cache, the edit patches, cancellation and the page<->row arithmetic. */
     const sessionRef = useRef<ParquetSession | null>(null);
@@ -140,14 +113,6 @@ function ParquetViewer() {
             key: `${page}-${index}`,
         }));
     }, [pageRows, page]);
-
-    const toggleTheme = () => {
-        setVscodeTheme((prev) => {
-            const next = !prev;
-            saveParquetVscodeTheme(next);
-            return next;
-        });
-    };
 
     const cancelEdit = useCallback(() => {
         setEditingRow(null);
@@ -504,7 +469,7 @@ function ParquetViewer() {
     const tableHeight = inspected ? 'calc(100vh - 196px)' : 'calc(100vh - 132px)';
 
     return (
-        <div className={`parquet-viewer${vscodeTheme ? '' : ' parquet-viewer--light'}`}>
+        <div className="parquet-viewer">
             {loading && (
                 <div className="parquet-viewer__overlay">
                     <span className="codicon codicon-loading codicon-modifier-spin" />
@@ -647,15 +612,6 @@ function ParquetViewer() {
                                         )}
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    className="parquet-theme-toggle"
-                                    title={vscodeTheme ? $t('common.switchToLight') : $t('common.switchToDark')}
-                                    onClick={toggleTheme}
-                                    aria-label={vscodeTheme ? $t('common.switchToLight') : $t('common.switchToDark')}
-                                >
-                                    {vscodeTheme ? <SunOutlined /> : <MoonOutlined />}
-                                </button>
                             </div>
                             <div className="parquet-viewer__table-wrap">
                                 <Table<TableRow>
@@ -765,11 +721,39 @@ function ParquetViewer() {
     );
 }
 
+/** antd tokens derived from the same VS Code variables the stylesheet uses. */
+function parquetAntdTheme(dark: boolean) {
+    return {
+        algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+        token: {
+            // A transparent container renders antd inputs as borders floating on the
+            // toolbar; the table is flattened to the page in the stylesheet instead.
+            colorBgContainer: getVscodeThemeColor('--vscode-editor-background', dark ? '#1e1e1e' : '#ffffff'),
+            colorBgElevated: getVscodeThemeColor('--vscode-editorWidget-background', dark ? '#202020' : '#ffffff'),
+            colorBorder: getVscodeThemeColor('--vscode-panel-border', dark ? '#2b2b2b' : '#e5e5e5'),
+            colorText: getVscodeThemeColor('--vscode-foreground', dark ? '#cccccc' : '#3b3b3b'),
+            colorTextSecondary: getVscodeThemeColor('--vscode-descriptionForeground', dark ? '#9d9d9d' : '#717171'),
+            colorPrimary: getVscodeThemeColor('--vscode-button-background', '#0078d4'),
+            colorError: getVscodeThemeColor('--vscode-errorForeground', '#f14c4c'),
+            colorWarning: getVscodeThemeColor('--vscode-editorWarning-foreground', '#cca700'),
+            colorFillAlter: getVscodeThemeColor('--vscode-editorGroupHeader-tabsBackground', dark ? '#2d2d2d' : '#f3f4f6'),
+            fontFamily: getVscodeThemeColor('--vscode-font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'),
+            fontSize: Number.parseInt(getVscodeThemeColor('--vscode-font-size', '13px'), 10) || 13,
+            controlHeightSM: 22,
+            borderRadius: 4,
+        },
+    };
+}
+
 export default function Parquet() {
+    const dark = useVscodeDarkTheme();
+    const antTheme = useMemo(() => parquetAntdTheme(dark), [dark]);
     return (
-        <App className="parquet-app">
-            <ParquetViewer />
-        </App>
+        <ConfigProvider theme={antTheme}>
+            <App className="parquet-app">
+                <ParquetViewer />
+            </App>
+        </ConfigProvider>
     );
 }
 

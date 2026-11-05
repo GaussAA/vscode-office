@@ -67,6 +67,18 @@ const pagerState = page => page.evaluate(`JSON.stringify({
     banner: document.querySelector('.parquet-viewer__readonly-banner')?.innerText ?? null,
 })`).then(json)
 
+/** Perceived luminance (0..1) of an element's background, or null when it has none. */
+const luminance = (page, selector) => page.evaluate(`(() => {
+    const element = document.querySelector(${JSON.stringify(selector)});
+    if (!element) return null;
+    const colour = getComputedStyle(element).backgroundColor || '';
+    const match = colour.match(/rgba?\\(\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)(?:\\s*,\\s*([\\d.]+))?/i);
+    if (!match) return null;
+    const alpha = match[4] === undefined ? 1 : Number(match[4]);
+    if (alpha < 0.5) return null;
+    return (0.299 * Number(match[1]) + 0.587 * Number(match[2]) + 0.114 * Number(match[3])) / 255;
+})()`)
+
 async function clickNextPage(page) {
     const before = (await pagerState(page)).range
     await page.evaluate(`[...document.querySelectorAll('.parquet-viewer__pager-btn')]
@@ -135,6 +147,7 @@ const scenarios = [
     },
     {
         name: 'jsonl-search',
+        docs: 'jsonl-search.png',
         async run({ page, base }) {
             await openJsonl(page, base)
             await page.evaluate(`(() => {
@@ -203,6 +216,25 @@ const scenarios = [
             expect(jumped.range === '239,951–240,000 of 250,000', `jump range: ${jumped.range}`)
             expect(jumped.first === '239951', `jump first row: ${jumped.first}`)
             return 'read-only + jump to row 240,000'
+        },
+    },
+    {
+        name: 'parquet-theme-follows-vscode',
+        docs: 'parquet-light.png',
+        async run({ page, base }) {
+            // Dark: antd widgets used to stay light even under a dark view, which put a white
+            // "row" box on a black toolbar.
+            await openParquet(page, base, '?mixed=1&theme=dark')
+            const darkRow = await luminance(page, '.parquet-viewer__row-jump')
+            expect(darkRow !== null && darkRow < 0.5, `row input stayed light in a dark theme (luminance ${darkRow})`)
+
+            // Light: a native input used to keep the dark VS Code var while the page went light.
+            await openParquet(page, base, '?mixed=1&theme=light')
+            const lightFind = await luminance(page, '.parquet-viewer__find-input')
+            const lightRow = await luminance(page, '.parquet-viewer__row-jump')
+            expect(lightFind !== null && lightFind > 0.5, `find input stayed dark in a light theme (luminance ${lightFind})`)
+            expect(lightRow !== null && lightRow > 0.5, `row input stayed dark in a light theme (luminance ${lightRow})`)
+            return 'antd + native inputs follow the VS Code theme'
         },
     },
     {
