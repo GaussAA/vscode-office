@@ -95,6 +95,7 @@ function ParquetViewer() {
     const [pageLoading, setPageLoading] = useState(false);
     const [largeFile, setLargeFile] = useState(false);
     const [rowJump, setRowJump] = useState('');
+    const [inspected, setInspected] = useState<{ row: number; column: string; value: unknown } | null>(null);
     const [page, setPage] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -111,6 +112,8 @@ function ParquetViewer() {
     /** Edits keyed by ABSOLUTE row index, re-applied to whatever page is displayed. */
     const editsRef = useRef(new Map<number, Record<string, unknown>>());
     const pageLoadSeq = useRef(0);
+    /** Already fetched pages, so going back/forward does not re-read them. */
+    const pageCache = useRef(new Map<number, Record<string, unknown>[]>());
     const dirtyRef = useRef(false);
     const savingRef = useRef(false);
     const editInputRef = useRef<InputRef | null>(null);
@@ -241,6 +244,8 @@ function ParquetViewer() {
         setPageRows([]);
         pageRowsRef.current = [];
         editsRef.current.clear();
+        pageCache.current.clear();
+        setInspected(null);
         setPage(0);
         cancelEdit();
         dirtyRef.current = false;
@@ -280,25 +285,57 @@ function ParquetViewer() {
         const seq = ++pageLoadSeq.current;
         const start = page * PAGE_SIZE;
         const end = Math.min(info.rowCount, start + PAGE_SIZE);
-        setPageLoading(true);
-        void readParquetRows(info.file, info.metadata, start, end)
-            .then(rows => {
-                if (seq !== pageLoadSeq.current) return;
-                const merged = rows.map((row, offset) => {
-                    const patch = editsRef.current.get(start + offset);
-                    return patch ? { ...row, ...patch } : row;
-                });
-                pageRowsRef.current = merged;
-                setPageRows(merged);
-            })
-            .catch(e => {
-                if (seq !== pageLoadSeq.current) return;
-                setError(e instanceof Error ? e.message : 'Failed to read rows');
-            })
-            .finally(() => {
-                if (seq === pageLoadSeq.current) setPageLoading(false);
+        const totalPages = Math.max(1, Math.ceil(info.rowCount / PAGE_SIZE));
+
+        const apply = (rows: Record<string, unknown>[]) => {
+            if (seq !== pageLoadSeq.current) return;
+            const merged = rows.map((row, offset) => {
+                const patch = editsRef.current.get(start + offset);
+                return patch ? { ...row, ...patch } : row;
             });
+            pageRowsRef.current = merged;
+            setPageRows(merged);
+            setPageLoading(false);
+        };
+
+        const cachePage = (pageIndex: number, rows: Record<string, unknown>[]) => {
+            if (!rows.length) return;
+            if (pageCache.current.size >= 6) {
+                const oldest = pageCache.current.keys().next().value;
+                if (oldest !== undefined) pageCache.current.delete(oldest);
+            }
+            pageCache.current.set(pageIndex, rows);
+        };
+
+        const cached = pageCache.current.get(page);
+        if (cached) {
+            apply(cached);
+        } else {
+            setPageLoading(true);
+            void readParquetRows(info.file, info.metadata, start, end)
+                .then(rows => {
+                    cachePage(page, rows);
+                    apply(rows);
+                })
+                .catch(e => {
+                    if (seq !== pageLoadSeq.current) return;
+                    setPageLoading(false);
+                    setError(e instanceof Error ? e.message : 'Failed to read rows');
+                });
+        }
+
+        // Prefetch the next page: one page of range reads in the background, so the
+        // common "read forward" motion is instant even on a remote/large file.
+        const nextPage = page + 1;
+        if (nextPage < totalPages && !pageCache.current.has(nextPage)) {
+            const nextStart = nextPage * PAGE_SIZE;
+            void readParquetRows(info.file, info.metadata, nextStart, Math.min(info.rowCount, nextStart + PAGE_SIZE))
+                .then(rows => cachePage(nextPage, rows))
+                .catch(() => undefined);
+        }
     }, [fileInfo, page]);
+
+    useEffect(() => { setInspected(null); }, [page, fileInfo]);
 
     const jumpToRow = useCallback(() => {
         const info = fileInfoRef.current;
@@ -316,6 +353,7 @@ function ParquetViewer() {
         const end = Math.min(fileInfo.rowCount, (page + 1) * PAGE_SIZE);
         return `${start.toLocaleString()}–${end.toLocaleString()} of ${fileInfo.rowCount.toLocaleString()}`;
     }, [fileInfo, page]);
+
     const tableColumns = useMemo<ColumnsType<TableRow>>(() => {
         if (!fileInfo) return [];
         const cols: ColumnsType<TableRow> = [
@@ -371,6 +409,7 @@ function ParquetViewer() {
                             className={classes}
                             title={isNull ? 'null' : formatCellValue(value)}
                             onDoubleClick={() => startEdit(rowIndex, column, value)}
+                            onClick={() => setInspected({ row: rowIndex, column: column.name, value })}
                         >
                             {isNull ? 'NULL' : formatCellValue(value)}
                         </span>
@@ -404,7 +443,8 @@ function ParquetViewer() {
             .emit('init');
     }, [loadParquet, message]);
 
-    const tableHeight = 'calc(100vh - 132px)';
+    // the inspector bar sits between the table and the footer, so shrink the table when it shows
+    const tableHeight = inspected ? 'calc(100vh - 196px)' : 'calc(100vh - 132px)';
 
     return (
         <div className={`parquet-viewer${vscodeTheme ? '' : ' parquet-viewer--light'}`}>
@@ -514,6 +554,44 @@ function ParquetViewer() {
                                     scroll={{ y: tableHeight, x: 'max-content' }}
                                 />
                             </div>
+                            {inspected && (
+                                <div className="parquet-viewer__inspector">
+                                    <span className="parquet-viewer__inspector-label">
+                                        {inspected.column} · row {inspected.row + 1}
+                                    </span>
+                                    <pre className="parquet-viewer__inspector-value">
+                                        {inspected.value === null || inspected.value === undefined
+                                            ? 'NULL'
+                                            : typeof inspected.value === 'string'
+                                                ? inspected.value
+                                                : formatCellValue(inspected.value)}
+                                    </pre>
+                                    <button
+                                        type="button"
+                                        className="parquet-viewer__pager-btn"
+                                        onClick={() => {
+                                            const text = inspected.value === null || inspected.value === undefined
+                                                ? 'null'
+                                                : typeof inspected.value === 'string'
+                                                    ? inspected.value
+                                                    : JSON.stringify(inspected.value);
+                                            void navigator.clipboard.writeText(text).catch(() => undefined);
+                                        }}
+                                        title="Copy value"
+                                    >
+                                        Copy
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="parquet-viewer__pager-btn"
+                                        onClick={() => setInspected(null)}
+                                        title="Close"
+                                        aria-label="Close"
+                                    >
+                                        <span className="codicon codicon-close" />
+                                    </button>
+                                </div>
+                            )}
                             <div className="parquet-viewer__footer">
                                 <span className="parquet-viewer__footer-total">
                                     {pageLoading && (
@@ -580,6 +658,9 @@ export default function Parquet() {
         </App>
     );
 }
+
+
+
 
 
 
