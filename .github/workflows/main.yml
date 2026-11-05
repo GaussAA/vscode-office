@@ -15,7 +15,7 @@ jobs:
         version: 12.16.1
     - uses: actions/setup-node@v4
       with:
-        node-version: 22.x
+        node-version: 24.x
         cache: pnpm
     - run: pnpm install --frozen-lockfile
     # Cheap and most likely to fail first: lint + typecheck + unit tests (~15s).

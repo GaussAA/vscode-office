@@ -1,0 +1,65 @@
+name: Release
+
+# Publishing used to happen from a developer machine with a long-lived Marketplace PAT.
+# That PAT is retired on 2026-12-01, so publishing moves here: a tag triggers a full
+# gate, then `vsce publish --oidc` (OpenID Connect trusted publishing) exchanges a
+# workflow-scoped identity token for short-lived Marketplace credentials. No secret is
+# stored for the Marketplace side; Open VSX still uses its own PAT.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Required by `vsce publish --oidc`: without it there is no id-token to exchange.
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Same gate as CI, re-run on the tagged commit: a tag is not evidence that the
+      # tree passed, so we do not take main.yml's word for it.
+      - name: Check, build, verify UI
+        run: xvfb-run -a pnpm check:full
+
+      - name: Package vsix
+        run: pnpm run package
+
+      - name: Upload vsix
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-vsix
+          path: '*.vsix'
+          if-no-files-found: error
+
+      # Guarded so a manual dispatch can package without publishing.
+      - name: Publish to VS Code Marketplace (OIDC)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: pnpm exec vsce publish --no-dependencies --oidc --packagePath ./office-viewer-plus-*.vsix
+
+      # `ovsx` also speaks OIDC: with no OVSX_PAT present it exchanges the workflow's
+      # id-token for a short-lived Open VSX token, so neither registry needs a stored
+      # secret. If the Open VSX publisher has not enabled trusted publishing yet, set
+      # OVSX_PAT as a repository secret and drop `--trusted-publishing` until it has.
+      - name: Publish to Open VSX (OIDC)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: pnpm exec ovsx publish --no-dependencies --trusted-publishing ./office-viewer-plus-*.vsix
