@@ -55,6 +55,14 @@ async function jumpJsonl(page, entry) {
 }
 
 async function openParquet(page, base, query = '') {
+    // The viewer remembers the page a document was left on (localStorage, keyed by path).
+    // Scenarios share one browser profile, so without this a scenario that ends on page 2
+    // would leave the next one unable to find row 1. Start every scenario from a clean slate;
+    // `parquet-restore-page` proves the restoring half deliberately.
+    await page.navigate(`${base}/stats`)
+    await page.evaluate(`Object.keys(localStorage)
+        .filter(key => key.startsWith('parquet-state:'))
+        .forEach(key => localStorage.removeItem(key))`)
     await page.navigate(`${base}/harness-parquet${query}`)
     // antd renders a No data row before the first page arrives, so wait for a real cell
     const ready = await page.waitFor(`!!document.querySelector('.parquet-viewer__cell')`)
@@ -189,6 +197,26 @@ const scenarios = [
             expect(second.range === '51–100 of 300', `page 2 range: ${second.range}`)
             expect(second.first === '51', `page 2 first row: ${second.first}`)
             return `1–50 then 51–100 of 300`
+        },
+    },
+    {
+        name: 'parquet-restore-page',
+        docs: 'parquet-restore-page.png',
+        async run({ page, base }) {
+            await openParquet(page, base, '?mixed=1')
+            await clickNextPage(page)
+            const second = await pagerState(page)
+            expect(second.range === '51–100 of 300', `page 2 range: ${second.range}`)
+
+            // A fresh document with the same localStorage: exactly what a tab switch does once
+            // the webview is allowed to be destroyed while kept hidden.
+            await page.navigate(`${base}/harness-parquet?mixed=1`)
+            const restored = await page.waitFor(
+                `document.querySelector('.parquet-viewer__pager-info')?.innerText === '51–100 of 300'`, 15000)
+            const after = await pagerState(page)
+            expect(restored, `the page was not restored after a reload, got ${after.range}`)
+            expect(after.first === '51', `restored page starts at row ${after.first}`)
+            return `reloaded onto ${after.range}`
         },
     },
     {

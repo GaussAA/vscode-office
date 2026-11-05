@@ -71,6 +71,37 @@ function collectCodecs(metadata: unknown): string[] {
     return [...codecs];
 }
 
+/**
+ * Where this document was left when its webview went away.
+ *
+ * Persisted per document, in `localStorage`, keyed by the document's path: webviews of one
+ * view type share a single origin, so an unkeyed entry would be overwritten by whichever
+ * parquet file was open last. The JSONL viewer does the same thing with its `cacheId`.
+ *
+ * This exists so the viewer comes back where the user left it once the webview is allowed
+ * to be destroyed when its tab is hidden (see `retainContextWhenHidden`).
+ */
+const PERSIST_PREFIX = 'parquet-state:';
+
+function loadPersistedPage(key: string | undefined): number {
+    if (!key) return 0;
+    try {
+        const raw = localStorage.getItem(PERSIST_PREFIX + key);
+        if (!raw) return 0;
+        const parsed = JSON.parse(raw) as { page?: number };
+        return typeof parsed.page === 'number' && parsed.page >= 0 ? parsed.page : 0;
+    } catch {
+        return 0;
+    }
+}
+
+function savePersistedPage(key: string | undefined, page: number) {
+    if (!key) return;
+    try {
+        localStorage.setItem(PERSIST_PREFIX + key, JSON.stringify({ page }));
+    } catch { }
+}
+
 function ParquetViewer() {
     const { message, modal } = App.useApp();
     const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
@@ -95,6 +126,8 @@ function ParquetViewer() {
     /** `${absoluteRow}:${column}` for every patched cell, so render never reads a ref. */
     const [editedCells, setEditedCells] = useState<Set<string>>(() => new Set());
     const fileInfoRef = useRef<ParquetFileInfo | null>(null);
+    /** localStorage key of the open document; empty for inline (virtual) buffers. */
+    const documentKeyRef = useRef<string | undefined>(undefined);
     /** Owns the page cache, the edit patches, cancellation and the page<->row arithmetic. */
     const sessionRef = useRef<ParquetSession | null>(null);
     const searchSeq = useRef(0);
@@ -222,6 +255,9 @@ function ParquetViewer() {
         setSearchProgress(null);
         setMatchRows(new Set());
         setQuery('');
+        // Clear the key before resetting the page, otherwise the reset would be persisted
+        // against the document we are leaving.
+        documentKeyRef.current = undefined;
         setPage(0);
         cancelEdit();
         dirtyRef.current = false;
@@ -238,6 +274,11 @@ function ParquetViewer() {
                 : await openParquetFile((await openParquetSource(payload.path ?? '')).file);
             fileInfoRef.current = info;
             setFileInfo(info);
+            // Come back to the page this document was left on, clamped: the file may have
+            // shrunk since. Only file-backed documents have a stable key.
+            documentKeyRef.current = payload.path;
+            const lastPage = Math.max(0, Math.ceil(info.rowCount / PAGE_SIZE) - 1);
+            setPage(Math.min(loadPersistedPage(payload.path), lastPage));
 
             const session = new ParquetSession(
                 {
@@ -289,6 +330,10 @@ function ParquetViewer() {
         setInspected(null);
         setPage(next);
     }, []);
+
+    useEffect(() => {
+        savePersistedPage(documentKeyRef.current, page);
+    }, [page, fileInfo]);
 
     const jumpToRow = useCallback(() => {
         const info = fileInfoRef.current;
