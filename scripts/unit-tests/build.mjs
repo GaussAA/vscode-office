@@ -24,6 +24,7 @@ const entries = {
     parquetParser: 'src/react/view/parquet/parquetParser.ts',
     parquetSession: 'src/react/view/parquet/parquetSession.ts',
     excelFind: 'src/react/view/excel/excel_find.ts',
+    highlight: 'src/react/common/highlight.ts',
 }
 
 for (const [name, entry] of Object.entries(entries)) {

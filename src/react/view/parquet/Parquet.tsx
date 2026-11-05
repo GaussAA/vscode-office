@@ -7,6 +7,7 @@ import { $t } from '../../i18n/i18nConfig.ts';
 import { handler, vscodeApi } from '../../util/vscode.ts';
 import { arrayBufferFromPayload } from '../../util/loadOfficeContent.ts';
 import { openParquetSource } from '../../util/parquetSource.ts';
+import { highlightRuns } from '../../common/highlight.ts';
 import { ParquetSession } from './parquetSession.ts';
 import SponsorBar from '../components/SponsorBar.tsx';
 import {
@@ -33,19 +34,14 @@ const SEARCH_MAX_ROWS = 5_000;
 /** Wrap the matched runs of a cell value in <mark>, so a hit is visible in place. */
 function highlightCell(text: string, needle: string) {
     if (!needle) return text;
-    const lower = text.toLowerCase();
-    const query = needle.toLowerCase();
     const parts: React.ReactNode[] = [];
-    let cursor = 0;
-    let key = 0;
-    while (cursor < text.length && key < 20) {
-        const at = lower.indexOf(query, cursor);
-        if (at < 0) break;
-        if (at > cursor) parts.push(text.slice(cursor, at));
-        parts.push(<mark key={key++} className="parquet-viewer__hit">{text.slice(at, at + query.length)}</mark>);
-        cursor = at + query.length;
-    }
-    if (cursor < text.length) parts.push(text.slice(cursor));
+    highlightRuns(text, needle).forEach((run, position) => {
+        if (!run.hit) {
+            parts.push(run.text);
+            return;
+        }
+        parts.push(<mark key={position} className="parquet-viewer__hit">{run.text}</mark>);
+    });
     return parts;
 }
 const PARQUET_VSCODE_THEME_KEY = 'parquet-vscode-theme';

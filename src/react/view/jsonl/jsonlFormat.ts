@@ -225,21 +225,3 @@ export function valueAtPath(root: unknown, path: PathSeg[]): unknown {
     }
     return current;
 }
-
-/** Split text into plain / matched runs for search highlighting. */
-export function highlightParts(text: string, needle?: string): Array<{ text: string; hit: boolean }> {
-    if (!needle) return [{ text, hit: false }];
-    const lower = text.toLowerCase();
-    const query = needle.toLowerCase();
-    const parts: Array<{ text: string; hit: boolean }> = [];
-    let cursor = 0;
-    while (cursor < text.length && parts.length < 40) {
-        const at = lower.indexOf(query, cursor);
-        if (at < 0) break;
-        if (at > cursor) parts.push({ text: text.slice(cursor, at), hit: false });
-        parts.push({ text: text.slice(at, at + query.length), hit: true });
-        cursor = at + query.length;
-    }
-    if (cursor < text.length) parts.push({ text: text.slice(cursor), hit: false });
-    return parts.length ? parts : [{ text, hit: false }];
-}

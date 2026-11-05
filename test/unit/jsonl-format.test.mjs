@@ -5,9 +5,9 @@ import {
     MAX_DEPTH,
     buildEntryModel,
     countNodes,
-    highlightParts,
     makePathKey,
 } from '../../out/unit-tests/jsonlFormat.mjs'
+import { MAX_HIGHLIGHT_RUNS, highlightRuns } from '../../out/unit-tests/highlight.mjs'
 
 const objectOfSize = size => Object.fromEntries(
     Array.from({ length: size }, (_, index) => [`key_${index}`, index]),
@@ -111,15 +111,15 @@ test('buildEntryModel: honours a node budget and reports truncation', () => {
     assert.equal(model.nodes.length, 10)
 })
 
-test('highlightParts: splits only the matched runs and is case-insensitive', () => {
-    const parts = highlightParts('Alpha alPHA omega', 'alpha')
+test('highlightRuns: splits only the matched runs and is case-insensitive', () => {
+    const parts = highlightRuns('Alpha alPHA omega', 'alpha')
     assert.equal(parts.filter(part => part.hit).length, 2)
     assert.equal(parts.map(part => part.text).join(''), 'Alpha alPHA omega')
-    assert.deepEqual(highlightParts('plain', ''), [{ text: 'plain', hit: false }])
+    assert.deepEqual(highlightRuns('plain', ''), [{ text: 'plain', hit: false }])
 })
 
-test('highlightParts: caps the number of runs on pathological input', () => {
-    const parts = highlightParts('a'.repeat(500), 'a')
+test('highlightRuns: caps the number of runs on pathological input', () => {
+    const parts = highlightRuns('a'.repeat(500), 'a')
     assert.ok(parts.length <= 41, `produced ${parts.length} runs`)
     assert.equal(parts.map(part => part.text).join('').length, 500)
 })

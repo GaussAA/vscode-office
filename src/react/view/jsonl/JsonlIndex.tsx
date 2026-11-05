@@ -3,7 +3,8 @@ import type { DataNode } from 'antd/es/tree';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { JsonlEntrySummary } from '../../../common/jsonlTypes.ts';
-import { ROW_HEIGHT, formatBytes, highlightParts } from './jsonlFormat.ts';
+import { ROW_HEIGHT, formatBytes } from './jsonlFormat.ts';
+import { highlightRuns } from '../../common/highlight.ts';
 import { $t } from '../../i18n/i18nConfig.ts';
 
 interface Props {
@@ -82,7 +83,7 @@ export default function JsonlIndex({
 
     const renderText = useCallback((entry: JsonlEntrySummary) => {
         const text = entry.snippet ?? entry.raw;
-        return highlightParts(text, highlight).map((part, position) => (
+        return highlightRuns(text, highlight).map((part, position) => (
             part.hit
                 ? <mark key={position} className="jsonl-hit">{part.text}</mark>
                 : <span key={position}>{part.text}</span>
