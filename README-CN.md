@@ -19,6 +19,64 @@
 - Java: `.class`（反编译）
 - 压缩文件: `.zip`、`.jar`、`.vsix`、`.rar`、`.7z`、`.tar`、`.tar.gz`、`.tgz`、`.apk`
 
+## 本仓库：Office Viewer Plus（fork）
+
+本仓库 fork 自 [cweijan/vscode-office](https://github.com/cweijan/vscode-office)（MIT，见
+[NOTICE.md](NOTICE.md)），以 `chaowu21.office-viewer-plus` 发布，可与原版并存安装。上面的功能
+全部保留，此外还增加了：
+
+### Parquet：上游打不开的压缩文件
+
+上游打包 `hyparquet` 时没有带解压器，ZSTD 压缩的 parquet 会直接报
+`parquet unsupported compression codec: ZSTD`。本 fork 接入了 `hyparquet-compressors`，
+SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解码。
+
+![ZSTD 压缩的 parquet](docs/screenshots/parquet-zstd.png)
+
+读取是懒加载的，大文件也不会卡：
+
+- **按页读取**：只解析当前可见的 50 行，377 MB 的文件不再把整张表读进内存；
+  编辑按"绝对行号 → 补丁"记录，翻页时重新叠加。
+- **支持时按 Range 取字节**：先用 2 字节探测，支持就只读 footer 和你看的页，否则退回一次性拉取；
+  控制台会打印 `[parquet] source: ranged|full`。
+- **超大文件自动只读**：保存需要全量重读，所以超过 20 万行时直接禁用编辑并说明原因。
+- **百万行也能导航**：按行号跳转，页脚显示当前区间（`239,951–240,000 of 250,000`）。
+- **按类型渲染**：数字右对齐 + 等宽数字，字符串/布尔/时间戳按主题着色，null 显示为 `NULL`，
+  编辑过的单元格有标记，点击单元格可查看完整值。
+
+![Parquet 类型着色](docs/screenshots/parquet-types.png)
+
+工具栏的 **Find in file** 按 5000 行一批扫描全文件，带进度、标记命中行、在单元格内高亮匹配文本，
+并自动跳到第一条命中。
+
+### JSONL / NDJSON：目录 + 树，而不是表格
+
+一行一个 JSON 值不适合表格，因此提供双栏视图：左侧列出条目，右侧把选中条目渲染成树（或原文）。
+
+![JSONL 双栏视图](docs/screenshots/jsonl-two-pane.png)
+
+- **文件字节不进 webview**：webview 只拿到可见条目的摘要和选中条目的完整值。
+- **全文件搜索**：分批流式返回，命中处带上下文片段并高亮。
+- **长值换行**而不是截断；节点数超过 500 的条目自动退回固定行高虚拟列表，避免极端行卡死界面。
+- 键盘：`←`/`→` 折叠展开，`Space` 切换，`Enter` 复制值，`Ctrl+Shift+C` 复制路径。
+
+### 验收方式
+
+```bash
+pnpm test        # 解析逻辑单测（node:test，不引入额外框架）
+pnpm verify:ui   # 无头浏览器 DOM 断言；截图输出到 .ui-verify/shots
+```
+
+CI 在每次 push 时都会跑这两项，以及 `pnpm build` 和 `pnpm run package`。`verify:ui -- --docs`
+可刷新上面的截图。设计取舍见 [docs/adr/0001-fork-office-viewer.md](docs/adr/0001-fork-office-viewer.md)。
+
+### 已知限制
+
+- 保存非 SNAPPY 的 parquet 会被重写成 SNAPPY（写端只支持它），保存前会提示。
+- 超过 20 万行的 parquet 只读；超大文件的全文件搜索受 I/O 限制（会读取访问到的每个 row group）。
+- JSONL 搜索匹配原始文本，不理解 JSON 路径。
+- 上游的遥测已完全移除。
+
 ## Git 历史
 
 Office Viewer 内置完整的 Git 历史工作区，让你无需离开 VS Code 即可浏览仓库。可从源代码管理视图、编辑器标题栏、编辑器右键菜单或文件资源管理器右键菜单打开。
@@ -149,3 +207,4 @@ Office Viewer 会收集**匿名使用数据**，用于了解各预览功能的�
 - HTTP: [REST Client](https://github.com/Huachao/vscode-restclient)
 - Markdown: [Vanessa219/vditor](https://github.com/Vanessa219/vditor)
 - Material Icon theme: [PKief/vscode-material-icon-theme](https://github.com/PKief/vscode-material-icon-theme)
+

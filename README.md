@@ -19,6 +19,77 @@ This extension lets you preview and edit common office and design files directly
 - Java: `.class` (decompiler)
 - Compressed files: `.zip`, `.jar`, `.vsix`, `.rar`, `.7z`, `.tar`, `.tar.gz`, `.tgz`, `.apk`
 
+## This fork: Office Viewer Plus
+
+This repository is a fork of [cweijan/vscode-office](https://github.com/cweijan/vscode-office)
+(MIT, see [NOTICE.md](NOTICE.md)). It builds as `chaowu21.office-viewer-plus` and installs
+alongside the original, so everything above still works. The fork adds:
+
+### Parquet: the files upstream cannot open
+
+Upstream bundles `hyparquet` without its decompressors, so a ZSTD-compressed file fails with
+`parquet unsupported compression codec: ZSTD`. This fork passes `compressors` from
+`hyparquet-compressors`, so SNAPPY, GZIP, BROTLI, ZSTD and LZ4 all decode.
+
+![ZSTD-compressed parquet](docs/screenshots/parquet-zstd.png)
+
+Reading is lazy and stays usable on big files:
+
+- **One page at a time.** Only the visible 50 rows are decoded, so a 377 MB file no longer
+  materialises its whole table. Edits are recorded per absolute row and re-applied when a
+  page is shown.
+- **Range requests when the host supports them.** A 2-byte probe decides between ranged
+  reads (footer plus the pages you look at) and a single full fetch; the console logs
+  `[parquet] source: ranged|full`.
+- **Large files open read-only.** Saving re-reads the file, so above 200,000 rows editing is
+  disabled with an explanation instead of failing later.
+- **Navigation for millions of rows.** Jump to any row number; the footer shows the visible
+  range (`239,951–240,000 of 250,000`).
+- **Type-aware cells.** Numbers are right-aligned with tabular figures, strings, booleans and
+  timestamps are coloured from the theme, nulls render as `NULL`, edited cells are marked,
+  and clicking a cell opens its full value.
+
+![Parquet types](docs/screenshots/parquet-types.png)
+
+**Find in file** scans in 5,000-row batches with progress, marks matching rows, highlights
+the matching text inside cells, and jumps to the first hit.
+
+### JSONL / NDJSON: a directory, not a grid
+
+One JSON value per line is not a table, so the fork ships a two-pane viewer: the left pane
+lists entries, the right pane renders the selected entry as a tree (or as raw text).
+
+![JSONL two-pane viewer](docs/screenshots/jsonl-two-pane.png)
+
+- **Bytes stay in the extension host.** The webview receives summaries for the visible
+  entries and one full value for the selected entry — never the file.
+- **Search across the whole file**, streamed in batches with a snippet around the match and
+  the term highlighted.
+- **Long values wrap** instead of being clipped, and entries above 500 nodes fall back to a
+  fixed-height virtual list so a pathological line cannot freeze the UI.
+- Keyboard: `←`/`→` collapse/expand, `Space` toggles, `Enter` copies the value,
+  `Ctrl+Shift+C` copies the path.
+
+### Verification
+
+```bash
+pnpm test        # unit tests for the parsing logic (node:test, no extra framework)
+pnpm verify:ui   # headless DOM scenarios; screenshots land in .ui-verify/shots
+```
+
+CI runs both on every push, together with `pnpm build` and `pnpm run package`. Add
+`-- --docs` to `verify:ui` to refresh the screenshots above. Design rationale lives in
+[docs/adr/0001-fork-office-viewer.md](docs/adr/0001-fork-office-viewer.md).
+
+### Known limits
+
+- Saving a non-SNAPPY parquet rewrites it as SNAPPY (the writer supports nothing else) and
+  warns first.
+- Parquet files above 200,000 rows are read-only; whole-file search on a very large file is
+  I/O bound because it reads every row group it visits.
+- JSONL search matches raw text, not JSON paths.
+- Upstream telemetry has been removed entirely.
+
 ## Git History
 
 Office Viewer includes a full Git History workspace for exploring repositories without leaving VS Code. Open it from the Source Control view, the editor title bar, the editor context menu, or the file explorer context menu.
