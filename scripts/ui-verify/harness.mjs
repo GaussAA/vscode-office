@@ -109,19 +109,24 @@ function jsonlStub(fixtures) {
 (function () {
   const summaries = ${JSON.stringify(summaries)};
   const fixtures = ${JSON.stringify(fixtures)};
+  const cancelled = new Set();
   const api = {
     postMessage(msg) {
       if (!msg) return;
       if (msg.type === 'init') {
         setTimeout(function () {
-          window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: 73482, readOnly: false } }, '*');
+          window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: 73482 } }, '*');
         }, 60);
       }
       if (msg.type === 'jsonlIndex') {
+        const requestId = msg.content.requestId;
         const start = msg.content.start, end = msg.content.end;
         setTimeout(function () {
-          window.postMessage({ type: 'jsonlEntries', content: { start, entries: summaries.slice(start, end) } }, '*');
+          window.postMessage({ type: 'jsonlEntries', content: { requestId, start, entries: summaries.slice(start, end) } }, '*');
         }, 60);
+      }
+      if (msg.type === 'jsonlSearchCancel') {
+        cancelled.add(msg.content.requestId);
       }
       if (msg.type === 'jsonlSearch') {
         const requestId = msg.content.requestId;
@@ -134,16 +139,19 @@ function jsonlStub(fixtures) {
         });
         const head = matched.slice(0, 3);
         setTimeout(function () {
+          if (cancelled.has(requestId)) return;
           window.postMessage({ type: 'jsonlSearchBatch', content: { requestId: requestId, query: q, entries: head, scanned: Math.floor(summaries.length / 2), total: summaries.length, matches: head.length, done: false, capped: false } }, '*');
         }, 80);
         setTimeout(function () {
+          if (cancelled.has(requestId)) return;
           window.postMessage({ type: 'jsonlSearchBatch', content: { requestId: requestId, query: q, entries: matched.slice(3), scanned: summaries.length, total: summaries.length, matches: matched.length, done: true, capped: false } }, '*');
         }, 200);
       }
       if (msg.type === 'jsonlEntry') {
-        const index = msg.content;
+        const requestId = msg.content.requestId;
+        const index = msg.content.index;
         setTimeout(function () {
-          window.postMessage({ type: 'jsonlEntryData', content: { index, entry: fixtures[index] } }, '*');
+          window.postMessage({ type: 'jsonlEntryData', content: { requestId, index, entry: fixtures[index] } }, '*');
         }, 60);
       }
     },

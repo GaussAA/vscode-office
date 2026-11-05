@@ -36,6 +36,8 @@ export interface JsonlInfoPayload {
 }
 
 export interface JsonlRangeRequest {
+    /** Echoed back on the reply, so the webview can drop a stale window. */
+    requestId: number;
     start: number;
     end: number;
 }
@@ -60,8 +62,15 @@ export interface JsonlEntrySummary {
 }
 
 export interface JsonlEntriesPayload {
+    requestId: number;
     start: number;
     entries: JsonlEntrySummary[];
+}
+
+/** One entry request; `index` is the zero-based line number. */
+export interface JsonlEntryRequest {
+    requestId: number;
+    index: number;
 }
 
 /** Everything the detail pane needs for one entry. */
@@ -73,6 +82,7 @@ export interface JsonlEntryDetail extends JsonlEntrySummary {
 }
 
 export interface JsonlEntryPayload {
+    requestId: number;
     index: number;
     entry: JsonlEntryDetail;
 }
@@ -88,6 +98,14 @@ export const JSONL_SEARCH_MAX_MATCHES = 10_000;
 export interface JsonlSearchRequest {
     requestId: number;
     query: string;
+}
+
+/**
+ * Stop a scan the webview no longer wants. Without this the host keeps decoding until its
+ * next cancellation check — the webview can only ignore output, not stop the work.
+ */
+export interface JsonlSearchCancel {
+    requestId: number;
 }
 
 export interface JsonlSearchBatch {

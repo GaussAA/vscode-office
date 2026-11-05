@@ -3,29 +3,19 @@ import { Handler } from '@/common/handler';
 import { ReactApp } from '@/common/reactApp';
 import { getExtensionResourceRoots } from '@/common/extensionResource';
 import { buildDocumentCacheId } from '@/provider/handlers/officeContent';
-import {
-    buildJsonlEntry,
-    buildJsonlIndex,
-    buildJsonlSummaries,
-    matchSnippet,
-    readJsonlLineText,
-    summarizeDecodedLine,
-    type JsonlIndex,
-} from '@/service/jsonlDocument';
+import { buildJsonlIndex } from '@/service/jsonlDocument';
+import { JsonlSession } from '@/service/jsonlSession';
 import {
     JSONL_CHUNK_SIZE,
-    JSONL_SEARCH_BATCH,
-    JSONL_SEARCH_MAX_MATCHES,
+    type JsonlEntriesPayload,
     type JsonlEntryPayload,
-    type JsonlEntrySummary,
+    type JsonlEntryRequest,
     type JsonlInfoPayload,
     type JsonlRangeRequest,
     type JsonlSearchBatch,
+    type JsonlSearchCancel,
     type JsonlSearchRequest,
 } from '@/common/jsonlTypes';
-
-/** Lines scanned per event-loop turn while searching. */
-const SEARCH_STEP = 20_000;
 
 /**
  * The document's bytes live here, in the extension host, for its whole lifetime.
@@ -35,13 +25,11 @@ class JsonlDocument implements vscode.CustomDocument {
 
     constructor(
         public readonly uri: vscode.Uri,
-        public bytes: Uint8Array,
-        public index: JsonlIndex,
+        public session: JsonlSession,
     ) { }
 
     dispose(): void {
-        this.bytes = new Uint8Array(0);
-        this.index = { offsets: [], lineCount: 0 };
+        this.session.cancelSearch();
     }
 }
 
@@ -61,7 +49,7 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
 
     async openCustomDocument(uri: vscode.Uri): Promise<JsonlDocument> {
         const bytes = await vscode.workspace.fs.readFile(uri);
-        return new JsonlDocument(uri, bytes, buildJsonlIndex(bytes));
+        return new JsonlDocument(uri, new JsonlSession(bytes, buildJsonlIndex(bytes)));
     }
 
     async resolveCustomEditor(document: JsonlDocument, webviewPanel: vscode.WebviewPanel): Promise<void> {
@@ -73,112 +61,50 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
         };
 
         const handler = Handler.bind(webviewPanel, document.uri);
-        // Only the newest search may emit results; older scans die on their next tick.
-        let latestSearchId = 0;
+        const session = document.session;
 
         const emitInfo = () => {
             const payload: JsonlInfoPayload = {
                 fileName: document.uri.path.split('/').pop() ?? document.uri.fsPath,
                 cacheId: buildDocumentCacheId(document.uri),
-                lineCount: document.index.lineCount,
-                byteSize: document.bytes.byteLength,
+                lineCount: session.lineCount,
+                byteSize: session.byteSize,
             };
             handler.emit('jsonlInfo', payload);
         };
 
         const reload = async () => {
             const bytes = await vscode.workspace.fs.readFile(document.uri);
-            document.bytes = bytes;
-            document.index = buildJsonlIndex(bytes);
-            latestSearchId++;
-            await emitInfo();
+            session.reload(bytes, buildJsonlIndex(bytes));
+            emitInfo();
         };
 
-        const runSearch = (request: JsonlSearchRequest) => {
-            const requestId = request?.requestId ?? 0;
-            latestSearchId = requestId;
-            const query = (request?.query ?? '').trim();
-            const total = document.index.lineCount;
-
-            if (!query) {
-                handler.emit('jsonlSearchBatch', {
-                    requestId, query, entries: [], scanned: 0, total, matches: 0, done: true, capped: false,
-                } satisfies JsonlSearchBatch);
-                return;
-            }
-
-            const needle = query.toLowerCase();
-            let matches = 0;
-            let scanned = 0;
-            let capped = false;
-            let pending: JsonlEntrySummary[] = [];
-
-            const flush = (done: boolean) => {
-                const batch: JsonlSearchBatch = {
-                    requestId, query, entries: pending, scanned, total, matches, done, capped,
-                };
-                pending = [];
-                handler.emit('jsonlSearchBatch', batch);
-            };
-
-            const step = () => {
-                if (requestId !== latestSearchId) return;
-                const end = Math.min(total, scanned + SEARCH_STEP);
-                for (let line = scanned; line < end; line++) {
-                    const decoded = readJsonlLineText(document.bytes, document.index, line);
-                    if (!decoded.text.toLowerCase().includes(needle)) continue;
-                    matches++;
-                    pending.push({
-                        ...summarizeDecodedLine(line, decoded),
-                        snippet: matchSnippet(decoded.text, needle),
-                    });
-                    if (pending.length >= JSONL_SEARCH_BATCH) flush(false);
-                    if (matches >= JSONL_SEARCH_MAX_MATCHES) {
-                        capped = true;
-                        break;
-                    }
-                }
-                scanned = end;
-
-                if (capped || scanned >= total) {
-                    flush(true);
-                    return;
-                }
-                flush(false);
-                setTimeout(step, 0);
-            };
-
-            setTimeout(step, 0);
-        };
         handler
-            .on('init', () => { void emitInfo(); })
-            .on('jsonlReload', () => { void reload(); })
-            .on('fileChange', () => { void reload(); })
-            .on('jsonlIndex', (range: JsonlRangeRequest) => {
-                const start = Math.max(0, range?.start ?? 0);
-                const end = Math.min(
-                    range?.end ?? start + JSONL_CHUNK_SIZE,
-                    document.index.lineCount,
-                );
-                handler.emit('jsonlEntries', {
-                    start,
-                    entries: buildJsonlSummaries(document.bytes, document.index, start, end),
+            .on('init', () => { emitInfo() })
+            .on('jsonlReload', () => { void reload() })
+            .on('fileChange', () => { void reload() })
+            .on('jsonlIndex', (request: JsonlRangeRequest) => {
+                if (typeof request?.requestId !== 'number') return;
+                const start = Math.max(0, request.start ?? 0);
+                const end = request.end ?? start + JSONL_CHUNK_SIZE;
+                const payload: JsonlEntriesPayload = session.readRange(request.requestId, start, end);
+                handler.emit('jsonlEntries', payload);
+            })
+            .on('jsonlEntry', (request: JsonlEntryRequest) => {
+                if (typeof request?.requestId !== 'number') return;
+                const payload: JsonlEntryPayload | null = session.readEntry(request.requestId, request.index);
+                if (payload) handler.emit('jsonlEntryData', payload);
+            })
+            .on('jsonlSearch', (request: JsonlSearchRequest) => {
+                if (typeof request?.requestId !== 'number') return;
+                // A newer search supersedes the running one; the session stops it on its next turn.
+                session.cancelSearch();
+                session.search(request.requestId, request.query, {
+                    onBatch: (batch: JsonlSearchBatch) => { handler.emit('jsonlSearchBatch', batch); },
                 });
             })
-            .on('jsonlEntry', (index: number) => {
-                if (typeof index !== 'number' || index < 0 || index >= document.index.lineCount) {
-                    return;
-                }
-                const payload: JsonlEntryPayload = {
-                    index,
-                    entry: buildJsonlEntry(document.bytes, document.index, index),
-                };
-                handler.emit('jsonlEntryData', payload);
-            })
-            .on('jsonlSearch', (request: JsonlSearchRequest) => runSearch(request));
+            .on('jsonlSearchCancel', (_request: JsonlSearchCancel) => { session.cancelSearch(); });
 
         await ReactApp.view(webview, { route: 'jsonl' });
     }
 }
-
-

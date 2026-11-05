@@ -244,8 +244,9 @@ const scenarios = [
             for (const route of routes) {
                 page.clearExceptions()
                 await page.navigate(`${base}/harness-route?route=${route}`)
-                await page.sleep(900)
-                const mounted = await page.evaluate(`!!document.querySelector('#root')?.children.length`)
+                // Poll instead of sleeping: the excel/epub chunks are ~1 MB and mount slower on
+                // a loaded machine than any fixed delay we would pick (this used to flake).
+                const mounted = await page.waitFor(`!!document.querySelector('#root')?.children.length`, 6000)
                 const errors = page.exceptions()
                 if (!mounted) failures.push(`${route}: nothing mounted`)
                 if (errors.length) failures.push(`${route}: ${errors[0].split('\n')[0]}`)

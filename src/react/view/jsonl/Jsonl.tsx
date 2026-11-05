@@ -64,8 +64,16 @@ function savePersisted(cacheId: string, state: PersistedState) {
 
 export default function JsonlViewer() {
     const [info, setInfo] = useState<JsonlInfoPayload | null>(null);
-    const [entries, setEntries] = useState<Map<number, JsonlEntrySummary>>(() => new Map());
-    const [loaded, setLoaded] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
+    /**
+     * The directory window: one contiguous range and its rows, in a single value. The old
+     * pair of a `Map` plus a `{start,end}` could disagree — a late reply extended the range
+     * without filling the middle, and nothing ever asked for the hole.
+     */
+    const [directory, setDirectory] = useState<{ start: number; end: number; items: JsonlEntrySummary[] }>({
+        start: 0,
+        end: 0,
+        items: [],
+    });
     const [selected, setSelected] = useState(0);
     const [detail, setDetail] = useState<JsonlEntryDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -83,7 +91,10 @@ export default function JsonlViewer() {
     const infoRef = useRef<JsonlInfoPayload | null>(null);
     const selectedRef = useRef(0);
     const queryRef = useRef('');
-    const requestKind = useRef<'initial' | 'append'>('initial');
+    const rangeSeq = useRef(0);
+    /** requestId -> what that request is allowed to do to the window when its reply lands. */
+    const rangeMode = useRef(new Map<number, 'replace' | 'append'>());
+    const entrySeq = useRef(0);
     const searchSeq = useRef(0);
     const searchTimer = useRef<number | undefined>(undefined);
     const searchAutoSelected = useRef(false);
@@ -93,15 +104,18 @@ export default function JsonlViewer() {
     useEffect(() => { queryRef.current = query; }, [query]);
     useEffect(() => observeVscodeThemeChange(() => setDark(isVscodeDarkTheme())), []);
 
-    const requestRange = useCallback((start: number, end: number) => {
+    const requestRange = useCallback((start: number, end: number, mode: 'replace' | 'append') => {
+        const requestId = ++rangeSeq.current;
+        rangeMode.current.set(requestId, mode);
         setChunkLoading(true);
-        handler.emit('jsonlIndex', { start, end });
+        handler.emit('jsonlIndex', { requestId, start, end });
     }, []);
 
     const requestEntry = useCallback((index: number) => {
+        const requestId = ++entrySeq.current;
         setDetail(null);
         setDetailLoading(true);
-        handler.emit('jsonlEntry', index);
+        handler.emit('jsonlEntry', { requestId, index });
     }, []);
 
     const selectEntry = useCallback((index: number) => {
@@ -111,14 +125,16 @@ export default function JsonlViewer() {
 
     /** Load a window of entries around `target`. */
     const recenter = useCallback((target: number, lineCount: number) => {
-        requestKind.current = 'initial';
         const begin = Math.max(0, Math.min(target - 100, Math.max(0, lineCount - JSONL_CHUNK_SIZE)));
-        requestRange(begin, begin + JSONL_CHUNK_SIZE);
+        requestRange(begin, begin + JSONL_CHUNK_SIZE, 'replace');
     }, [requestRange]);
 
     const startSearch = useCallback((text: string) => {
         const trimmed = text.trim();
+        const previous = searchSeq.current;
         const requestId = ++searchSeq.current;
+        // Tell the host to stop the old scan; ignoring its output would leave it running.
+        if (previous) handler.emit('jsonlSearchCancel', { requestId: previous });
         searchAutoSelected.current = false;
         setSearchEntries([]);
         setSearchMeta(null);
@@ -150,7 +166,7 @@ export default function JsonlViewer() {
             }
             target = Math.max(0, Math.min(payload.lineCount - 1, target));
 
-            setEntries(new Map());
+            setDirectory({ start: 0, end: 0, items: [] });
             setSelected(target);
             recenter(target, payload.lineCount);
             requestEntry(target);
@@ -161,21 +177,24 @@ export default function JsonlViewer() {
         });
 
         handler.on('jsonlEntries', (payload: JsonlEntriesPayload) => {
-            setChunkLoading(false);
+            const mode = rangeMode.current.get(payload.requestId);
+            if (!mode) return; // a reply nobody is waiting for any more
+            rangeMode.current.delete(payload.requestId);
+            if (payload.requestId === rangeSeq.current) setChunkLoading(false);
             if (!payload.entries.length) return;
-            setEntries(prev => {
-                const next = new Map(prev);
-                for (const entry of payload.entries) next.set(entry.index, entry);
-                return next;
-            });
+
             const end = payload.start + payload.entries.length;
-            setLoaded(prev => (requestKind.current === 'append'
-                ? { start: prev.start, end }
-                : { start: payload.start, end }));
-            requestKind.current = 'append';
+            setDirectory(prev => {
+                if (mode === 'replace') return { start: payload.start, end, items: payload.entries };
+                // An append is only valid when it continues the window; anything else is
+                // stale, and moving `end` would claim rows we never received.
+                if (payload.start !== prev.end) return prev;
+                return { start: prev.start, end, items: [...prev.items, ...payload.entries] };
+            });
         });
 
         handler.on('jsonlEntryData', (payload: JsonlEntryPayload) => {
+            if (payload.requestId !== entrySeq.current) return;
             if (payload.index !== selectedRef.current) return;
             setDetail(payload.entry);
             setDetailLoading(false);
@@ -205,6 +224,8 @@ export default function JsonlViewer() {
     }, [recenter, requestEntry, selectEntry, startSearch]);
 
     const clearSearch = useCallback(() => {
+        // Stop the host-side scan instead of letting it run to completion unread.
+        if (searching) handler.emit('jsonlSearchCancel', { requestId: searchSeq.current });
         setSearching(false);
         setSearchEntries([]);
         setSearchMeta(null);
@@ -213,7 +234,7 @@ export default function JsonlViewer() {
             pendingJump.current = null;
             recenter(Math.max(0, Math.min(info.lineCount - 1, target)), info.lineCount);
         }
-    }, [info, recenter]);
+    }, [info, recenter, searching]);
 
     const handleQueryChange = useCallback((next: string) => {
         window.clearTimeout(searchTimer.current);
@@ -236,23 +257,12 @@ export default function JsonlViewer() {
     }, [info, leftWidth, selected, mode]);
 
     const onNeedMore = useCallback(() => {
-        if (!info || loaded.end >= info.lineCount || chunkLoading) return;
-        requestKind.current = 'append';
-        requestRange(loaded.end, Math.min(info.lineCount, loaded.end + JSONL_CHUNK_SIZE));
-    }, [info, loaded.end, chunkLoading, requestRange]);
+        if (!info || directory.end >= info.lineCount || chunkLoading) return;
+        requestRange(directory.end, Math.min(info.lineCount, directory.end + JSONL_CHUNK_SIZE), 'append');
+    }, [info, directory.end, chunkLoading, requestRange]);
 
     const searchActive = query.trim().length > 0;
-
-    const directoryItems = useMemo<JsonlEntrySummary[]>(() => {
-        const list: JsonlEntrySummary[] = [];
-        for (let index = loaded.start; index < loaded.end; index++) {
-            const entry = entries.get(index);
-            if (entry) list.push(entry);
-        }
-        return list;
-    }, [entries, loaded]);
-
-    const items = searchActive ? searchEntries : directoryItems;
+    const items = searchActive ? searchEntries : directory.items;
 
     const jump = useCallback(() => {
         if (!info || jumpValue == null) return;
@@ -264,9 +274,9 @@ export default function JsonlViewer() {
             requestEntry(target);
             return;
         }
-        if (target < loaded.start || target >= loaded.end) recenter(target, info.lineCount);
+        if (target < directory.start || target >= directory.end) recenter(target, info.lineCount);
         selectEntry(target);
-    }, [info, jumpValue, loaded, query, recenter, requestEntry, selectEntry]);
+    }, [info, jumpValue, directory, query, recenter, requestEntry, selectEntry]);
 
     const banner = useMemo(() => {
         if (!searchActive) return undefined;
