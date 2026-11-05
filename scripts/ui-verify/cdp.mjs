@@ -156,10 +156,24 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
         close: async () => {
             try { socket.close() } catch { /* already closed */ }
             try { child.kill() } catch { /* already gone */ }
-            await sleep(100)
-            rmSync(userDataDir, { recursive: true, force: true })
+            // Wait for Chrome to actually exit: on Linux it keeps writing to the profile
+            // for a moment, and rmSync then fails with ENOTEMPTY in the middle of a run.
+            await new Promise(resolve => {
+                if (child.exitCode !== null || child.signalCode !== null) return resolve()
+                const timer = setTimeout(resolve, 3000)
+                child.once('exit', () => {
+                    clearTimeout(timer)
+                    resolve()
+                })
+            })
+            try {
+                rmSync(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+            } catch {
+                // a leftover profile in tmpdir is not worth failing the run for
+            }
         },
     }
 }
+
 
 
