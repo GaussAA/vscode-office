@@ -17,6 +17,7 @@ import {
     JSONL_SEARCH_BATCH,
     JSONL_SEARCH_MAX_MATCHES,
     type JsonlEntryPayload,
+    type JsonlEntrySummary,
     type JsonlInfoPayload,
     type JsonlRangeRequest,
     type JsonlSearchBatch,

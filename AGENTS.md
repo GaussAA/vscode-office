@@ -46,5 +46,6 @@ pnpm install     # 依赖（pnpm，不是 npm）
 pnpm build       # vite 构建到 out/
 pnpm run package # vsce 打包 vsix（需先 build）
 pnpm test        # node:test 单测（先 esbuild 打包纯逻辑模块）
+pnpm typecheck   # tsc 只检查 fork 自有文件（上游 57 个历史错误忽略）
 pnpm verify:ui   # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
 ```

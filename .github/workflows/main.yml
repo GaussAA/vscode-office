@@ -23,6 +23,8 @@ jobs:
         echo ">>> Start compile office-viewer-plus."
         pnpm build
         echo ">>> Compile ok."
+    - name: Typecheck (fork-owned files)
+      run: pnpm typecheck
     - name: Unit tests
       run: pnpm test
     - name: UI verification (headless DOM assertions)
@@ -35,6 +37,7 @@ jobs:
         name: office-viewer-plus-vsix
         path: '*.vsix'
         if-no-files-found: error
+
 
 
 

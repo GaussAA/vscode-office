@@ -10,7 +10,6 @@ pnpm exec lint-staged
 # off-by-one that shipped once.
 pnpm test
 
-# Typecheck is still missing on purpose: upstream's tsconfig pairs
-# resolveJsonModule with moduleResolution "classic", so `tsc --noEmit` fails before
-# it checks a single file. Fix that first, then uncomment:
-#   pnpm exec tsc --noEmit
+# Typecheck: ~4s. Upstream's tsconfig is broken (TS5070) and still carries ~57 type
+# errors of its own, so this gate fails only on errors in files this fork owns.
+pnpm typecheck
