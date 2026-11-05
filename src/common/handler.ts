@@ -8,6 +8,15 @@ export class Handler {
     private isEnd: boolean;
     constructor(public panel: WebviewPanel, private eventEmitter: SimpleEventEmitter) { }
 
+    /**
+     * True once the panel has been disposed. Async work started from a resolver can
+     * outlive its panel; touching `webview.html` afterwards throws, and a fire-and-forget
+     * caller turns that into an unhandled rejection rather than a visible failure.
+     */
+    get disposed(): boolean {
+        return this.isEnd === true;
+    }
+
     on(event: string, callback: (content: any) => any | Promise<any>): this {
         if (event != 'init') {
             const listens = this.eventEmitter.listeners(event)

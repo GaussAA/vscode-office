@@ -343,6 +343,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
             vscode.Uri.file(getWorkspacePath(folderPath)) : folderPath;
         const baseUrl = webview.asWebviewUri(basePath).toString().replace(/\?.+$/, '').replace('https://git', 'https://file');
         const indexHtml = await readExtensionText(this.context, 'resource', 'markdown', 'index.html');
+        // `resolveCustomTextEditor` starts this with `void`, so a panel closed while we
+        // await the HTML leaves nothing to report the failure to.
+        if (handler.disposed) return;
         webview.html = Util.buildPath(
             indexHtml.replace("{{baseUrl}}", baseUrl), webview, contextUri
         );
