@@ -122,13 +122,19 @@ function classify(line: number, decoded: DecodedLine, parse: boolean): JsonlEntr
     }
 }
 
-/** Directory payload: parse only far enough to derive the identity label. */
+/**
+ * Directory payload: parse only far enough to derive the identity label.
+ *
+ * `baseLine` exists because a caller may hold only a window of the file: the window's local
+ * index starts at 0, but the entries it produces must still carry absolute line numbers.
+ */
 export function buildJsonlSummary(
     bytes: Uint8Array,
     index: JsonlIndex,
     line: number,
+    baseLine = 0,
 ): JsonlEntrySummary {
-    return classify(line, readJsonlLineText(bytes, index, line), true);
+    return classify(baseLine + line, readJsonlLineText(bytes, index, line), true);
 }
 
 export function buildJsonlSummaries(
@@ -136,12 +142,13 @@ export function buildJsonlSummaries(
     index: JsonlIndex,
     start: number,
     end: number,
+    baseLine = 0,
 ): JsonlEntrySummary[] {
     const from = Math.max(0, Math.min(start, index.lineCount));
     const to = Math.max(from, Math.min(end, index.lineCount));
     const entries: JsonlEntrySummary[] = [];
     for (let i = from; i < to; i++) {
-        entries.push(buildJsonlSummary(bytes, index, i));
+        entries.push(buildJsonlSummary(bytes, index, i, baseLine));
     }
     return entries;
 }
@@ -151,10 +158,11 @@ export function buildJsonlEntry(
     bytes: Uint8Array,
     index: JsonlIndex,
     line: number,
+    baseLine = 0,
 ): JsonlEntryDetail {
     const decoded = readJsonlLineText(bytes, index, line);
     const detail: JsonlEntryDetail = {
-        ...classify(line, decoded, false),
+        ...classify(baseLine + line, decoded, false),
         text: truncate(decoded.text, JSONL_MAX_TEXT_CHARS),
     };
     const empty = decoded.text.trim() === '';

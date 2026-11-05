@@ -43,11 +43,12 @@ Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus")
   entries on the left, the full tree (or raw text) of the selected entry on the right.
   One line is one self-describing JSON document, so heterogeneous keys are natural
   instead of being forced into a fake schema; a table would have to invent one.
-  The file's bytes and line index stay in the extension host; the webview receives
-  parsed summaries and, for the selected entry only, its full value. The directory pane
-  can search the whole file: the scan runs in the extension host in cancellable batches,
-  streams matches as it finds them (200 per message, hard stop at 10 000), and shows a
-  snippet centred on the match with the term highlighted. Read-only.
+  The extension host keeps the line index and reads one byte window per request, so
+  opening a 500 MB log costs a few megabytes rather than its own size; the webview
+  receives parsed summaries and, for the selected entry only, its full value. The
+  directory pane can search the whole file: the scan runs in the extension host in
+  cancellable batches, streams matches as it finds them (200 per message, hard stop at
+  10 000), and shows a snippet centred on the match with the term highlighted. Read-only.
 - **Telemetry removed** (`src/service/telemetryService.ts`, `telemetry.json`,
   `docs/telemetry.md`). Upstream reported anonymous usage to its own Azure Application
   Insights resource; none of that remains.

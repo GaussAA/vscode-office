@@ -18,6 +18,7 @@ mkdirSync(outdir, { recursive: true })
 
 const entries = {
     jsonlDocument: 'src/service/jsonlDocument.ts',
+    jsonlFile: 'src/service/jsonlFile.ts',
     jsonlSession: 'src/service/jsonlSession.ts',
     jsonlFormat: 'src/react/view/jsonl/jsonlFormat.tsx',
     parquetParser: 'src/react/view/parquet/parquetParser.ts',
