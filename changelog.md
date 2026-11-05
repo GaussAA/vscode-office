@@ -10,6 +10,13 @@ Activation:
   knowing: the `Git` status-bar entry appears once the extension has activated rather than
   at startup, and in a non-git workspace nothing loads until you open a file.
 
+HTML preview:
+
+- The previewed page now renders inside a sandboxed frame instead of the extension's own
+  webview. It still runs its own scripts and loads its images, but it shares no storage
+  with the panel hosting it and cannot reach the extension host's message bridge.
+- Reload on edit still works; the frame is re-fed rather than re-created.
+
 # 4.4.1 2026-11-05
 
 Parquet viewer:

@@ -47,6 +47,18 @@ async function closeAllEditors(): Promise<void> {
 	await vscode.commands.executeCommand('workbench.action.closeAllEditors')
 }
 
+/** Diagnostic tail for tab-lookup failures: what was actually open. */
+function describeTabs(): string {
+	const tabs = vscode.window.tabGroups.all.flatMap(group =>
+		group.tabs.map(tab => {
+			const input = tab.input as { viewType?: string } | undefined
+			const kind = input?.constructor?.name ?? 'none'
+			return `${tab.label}[${kind}${input?.viewType ? `/${input.viewType}` : ''}]`
+		}),
+	)
+	return tabs.length > 0 ? tabs.join(' | ') : 'none'
+}
+
 async function parquetFixture(): Promise<vscode.Uri> {
 	const dir = vscode.Uri.file(path.join(os.tmpdir(), 'office-viewer-smoke'))
 	await vscode.workspace.fs.createDirectory(dir)
@@ -98,6 +110,37 @@ describe('contributed commands', () => {
 		const available = new Set(await vscode.commands.getCommands(true))
 		const missing = declared.filter(command => !available.has(command))
 		assert.deepStrictEqual(missing, [], `commands not registered: ${missing.join(', ')}`)
+	})
+})
+
+describe('html preview', () => {
+	afterEach(async () => {
+		await closeAllEditors()
+	})
+
+	// The preview renders an untrusted document, and it does so in its own panel with its
+	// own origin. This only proves the panel opens; that the document lands in a sandboxed
+	// frame is pinned by test/unit/html-preview-shell.test.mjs, which a browser-side test
+	// could not do here anyway.
+	it('opens its own webview panel for a file', async () => {
+		const uri = vscode.Uri.joinPath(workspaceRoot(), 'sample.html')
+		await vscode.commands.executeCommand('chaowu21.office.html.preview', uri)
+
+		const deadline = Date.now() + 30000
+		while (Date.now() < deadline) {
+			for (const group of vscode.window.tabGroups.all) {
+				for (const tab of group.tabs) {
+					const input = tab.input
+					// VS Code prefixes panel view types with `mainThreadWebview-`, so compare
+					// on the suffix rather than on an exact match.
+					if (input instanceof vscode.TabInputWebview && String(input.viewType).includes('office-viewer.viewHtml')) {
+						return
+					}
+				}
+			}
+			await new Promise(resolve => setTimeout(resolve, 100))
+		}
+		throw new Error(`no webview panel appeared for office-viewer.viewHtml; tabs: ${describeTabs()}`)
 	})
 })
 
