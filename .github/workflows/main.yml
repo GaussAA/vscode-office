@@ -26,5 +26,6 @@ jobs:
     - name: UI verification (headless DOM assertions)
       run: xvfb-run -a pnpm verify:ui
     - name: Package vsix
-      run: pnpm run package
+      run: pnpm dlx @vscode/vsce package --no-dependencies
+
 
