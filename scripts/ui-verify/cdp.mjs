@@ -41,7 +41,7 @@ function freePort() {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-async function waitForTarget(port, timeoutMs = 15000) {
+async function waitForTarget(port, timeoutMs = 30000) {
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
         try {
@@ -67,20 +67,34 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
 
     const port = await freePort()
     const userDataDir = mkdtempSync(join(tmpdir(), 'ovp-ui-'))
+    const isLinux = process.platform === 'linux'
     const args = [
         headless ? '--headless=new' : '',
         '--disable-gpu',
         '--no-first-run',
         '--no-default-browser-check',
         '--disable-extensions',
+        // CI containers: the sandbox needs privileges the runner lacks, and /dev/shm is
+        // small enough that Chrome dies before it opens the DevTools port.
+        ...(isLinux ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] : []),
         `--user-data-dir=${userDataDir}`,
         `--remote-debugging-port=${port}`,
         `--window-size=${width},${height}`,
         'about:blank',
     ].filter(Boolean)
-    const process = spawn(exe, args, { stdio: 'ignore' })
+    const child = spawn(exe, args, { stdio: ['ignore', 'ignore', 'pipe'] })
+    let stderr = ''
+    child.stderr?.on('data', chunk => {
+        stderr = (stderr + chunk.toString()).slice(-2000)
+    })
 
-    const wsUrl = await waitForTarget(port)
+    let wsUrl
+    try {
+        wsUrl = await waitForTarget(port)
+    } catch (error) {
+        const detail = stderr.trim() ? `\nChrome stderr:\n${stderr.trim()}` : ''
+        throw new Error(`${error.message}${detail}`)
+    }
     const socket = new WebSocket(wsUrl)
     const pending = new Map()
     let sequence = 0
@@ -138,11 +152,14 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
             return false
         },
         sleep,
+        child,
         close: async () => {
             try { socket.close() } catch { /* already closed */ }
-            try { process.kill() } catch { /* already gone */ }
+            try { child.kill() } catch { /* already gone */ }
             await sleep(100)
             rmSync(userDataDir, { recursive: true, force: true })
         },
     }
 }
+
+
