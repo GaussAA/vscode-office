@@ -6,7 +6,7 @@ status: accepted
 
 `engines.vscode` 停在 `^1.64.0`（VS Code 2022-02，宿主 Node 14.16 / Chromium 91），而 `@types/vscode` 因为 caret 范围被解析到 1.144.0、`@types/node` 声明 `^26.1.0`（任何 VS Code 都不存在的 Node）。三者各自看着有理，合起来的效果是：**按 2026 年的 API 过类型检查、对外承诺 2022 年的宿主、而 vsce 只比对声明字符串的 major.minor 所以不会拦你**。这不是"保守"，它在语法层面已经无法兑现 —— Chromium 91 没有 `:has()` 与 CSS 嵌套，Node 14.16 没有 `structuredClone` / `fetch` / `node:` 前缀。
 
-决策：`engines.vscode` 与 `@types/vscode` 提升到同一 major.minor，`@types/node` 降到宿主真实 Node 的 major，三条不等式由脚本在 CI 断言，任何漂移都让 `pnpm check` 失败。副作用是白捡的：`engines >= 1.74` 之后 `activationEvents` 可以整体交给 `contributes` 隐式激活。
+决策：`engines.vscode` 与 `@types/vscode` 提升到同一 major.minor，`@types/node` 降到**最低支持宿主**的 Node major（不是当前 stable 的），三条不等式由脚本在 CI 断言，任何漂移都让 `pnpm check` 失败。副作用是白捡的：`engines >= 1.74` 之后 `activationEvents` 可以整体交给 `contributes` 隐式激活。
 
 ## Considered Options
 

@@ -6,7 +6,7 @@
   "publisher": "chaowu21",
   "icon": "image/logo.png",
   "engines": {
-    "vscode": "^1.64.0"
+    "vscode": "^1.100.0"
   },
   "keywords": [
     "pdf",
@@ -820,8 +820,10 @@
     "typecheck": "node scripts/typecheck.mjs",
     "typecheck:update": "node scripts/typecheck.mjs --update",
     "test": "node scripts/unit-tests/build.mjs && node --test \"test/unit/*.test.mjs\"",
-    "test:smoke": "node scripts/smoke/build.mjs && vscode-test",
-    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "test:smoke": "node scripts/smoke/build.mjs && vscode-test --label smoke-stable",
+    "test:smoke:min": "node scripts/smoke/build.mjs && vscode-test --label smoke-min",
+    "check": "pnpm lint && node scripts/check-baseline.mjs && pnpm typecheck && pnpm test",
+    "check:baseline": "node scripts/check-baseline.mjs",
     "check:full": "pnpm check && pnpm build && pnpm test:smoke && pnpm verify:ui",
     "verify:ui": "node scripts/ui-verify/runner.mjs",
     "verify:ui:docs": "node scripts/ui-verify/runner.mjs --docs",
@@ -829,10 +831,10 @@
   },
   "devDependencies": {
     "@types/diff-match-patch": "1.0.32",
-    "@types/node": "^26.1.0",
+    "@types/node": "^20.19.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@types/vscode": "^1.64.0",
+    "@types/vscode": "~1.100.0",
     "@typescript-eslint/eslint-plugin": "^8.62.1",
     "@typescript-eslint/parser": "^8.62.1",
     "@vitejs/plugin-react": "^6.0.2",

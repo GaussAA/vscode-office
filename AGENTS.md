@@ -54,8 +54,10 @@ pnpm lint             # eslint 整个 src；0 problem 才通过
 pnpm typecheck        # tsc 覆盖整个 src（含 webview）；基线现在是空的 = 零错误
 pnpm typecheck:update # 重写基线 —— 审 diff，它只应变小
 pnpm test             # node:test 单测（先 esbuild 打包纯逻辑模块）
-pnpm test:smoke       # 集成 smoke：真实 VS Code 宿主里验证激活与 custom editor 路由（需先 build）
-pnpm check            # lint + typecheck + test（pre-commit 跑这个）
+pnpm test:smoke       # 集成 smoke：真实 VS Code（stable）里验证激活与 custom editor 路由（需先 build）
+pnpm test:smoke:min   # 同上，但跑在 engines.vscode 的下限上 —— 下限只有被执行过才算数
+pnpm check:baseline   # 断言 engines / @types/vscode / @types/node 三者自洽
+pnpm check            # lint + baseline + typecheck + test（pre-commit 跑这个）
 pnpm check:full       # check + build + test:smoke + verify:ui（CI 跑这个）
 pnpm verify:ui        # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
 ```

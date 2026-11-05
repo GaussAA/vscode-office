@@ -4,6 +4,8 @@
 
 Issues 已同步到 [GaussAA/vscode-office #5](https://github.com/GaussAA/vscode-office/issues/5)（tracking），T01–T19 对应 #6–#24，父子关系与 blocked-by 已用 GitHub 原生依赖记录。
 
+**已完成**：T02（#7）、T03（#8）、T01 的代码部分（#6，剩 Marketplace 后台配置与一次真实 tag 发布）。
+
 ## 判据
 
 一条升级进入清单，必须回答三个问题；缺一条就进 ADR-0004 的"不追"清单：
