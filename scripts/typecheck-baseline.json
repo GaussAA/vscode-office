@@ -65,56 +65,6 @@
     "message": "Argument of type 'string' is not assignable to parameter of type 'BufferEncoding'."
   },
   {
-    "file": "src/react/view/epub/Epub.tsx",
-    "code": "TS2339",
-    "message": "Property 'manager' does not exist on type 'Rendition'."
-  },
-  {
-    "file": "src/react/view/epub/Epub.tsx",
-    "code": "TS2352",
-    "message": "Conversion of type 'PackagingMetadataObject' to type 'Record<string, string>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
-  },
-  {
-    "file": "src/react/view/epub/Epub.tsx",
-    "code": "TS2367",
-    "message": "This comparison appears to be unintentional because the types 'string' and 'number' have no overlap."
-  },
-  {
-    "file": "src/react/view/epub/Epub.tsx",
-    "code": "TS2367",
-    "message": "This comparison appears to be unintentional because the types 'string' and 'number' have no overlap."
-  },
-  {
-    "file": "src/react/view/epub/epubConfig.ts",
-    "code": "TS2322",
-    "message": "Type 'Location' is not assignable to type 'number'."
-  },
-  {
-    "file": "src/react/view/epub/epubConfig.ts",
-    "code": "TS2339",
-    "message": "Property 'spineItems' does not exist on type 'Spine'."
-  },
-  {
-    "file": "src/react/view/epub/epubConfig.ts",
-    "code": "TS2339",
-    "message": "Property 'spineItems' does not exist on type 'Spine'."
-  },
-  {
-    "file": "src/react/view/epub/epubConfig.ts",
-    "code": "TS2351",
-    "message": "This expression is not constructable."
-  },
-  {
-    "file": "src/react/view/epub/epubConfig.ts",
-    "code": "TS2365",
-    "message": "Operator '>=' cannot be applied to types 'Location' and 'number'."
-  },
-  {
-    "file": "src/react/view/epub/epubConfig.ts",
-    "code": "TS2488",
-    "message": "Type 'Contents' must have a '[Symbol.iterator]()' method that returns an iterator."
-  },
-  {
     "file": "src/react/view/xmind/xmindParser.ts",
     "code": "TS2322",
     "message": "Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'BlobPart'."

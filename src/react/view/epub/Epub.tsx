@@ -256,7 +256,8 @@ export default function Epub() {
                 if (target.parentElement?.tagName.toLowerCase() === 'a') {
                     return;
                 }
-                const manager = rendition.manager as { container?: HTMLElement; getContents?: () => { window: Window }[] };
+                // epubjs keeps the manager off its public types; it is how the viewer finds the iframe.
+        const manager = (rendition as unknown as { manager?: { container?: HTMLElement; getContents?: () => { window: Window }[] } }).manager;
                 const container = manager.container;
                 if (!container) {
                     return;
@@ -297,7 +298,7 @@ export default function Epub() {
                 book.coverUrl(),
             ]);
 
-            const metaRecord = metadata as Record<string, string | undefined>;
+            const metaRecord = metadata as unknown as Record<string, string | undefined>;
             setMeta({
                 title: metadata.title?.trim() || 'Untitled',
                 author: resolveEpubAuthor(metadata.creator),
@@ -353,7 +354,9 @@ export default function Epub() {
         if (!book || !rendition) {
             return;
         }
-        const cfi = book.locations.cfiFromLocation(value);
+        // The types say `string`, the implementation returns `-1` when the location is
+        // unknown; both shapes have to be tolerated.
+        const cfi = book.locations.cfiFromLocation(value) as string | number;
         if (cfi && cfi !== -1) {
             rendition.display(String(cfi));
         }
@@ -371,8 +374,8 @@ export default function Epub() {
             setLocationDraft(String(locationCurrent));
             return;
         }
-        const cfi = book.locations.cfiFromLocation(parsed);
-        if (cfi === -1) {
+        const cfi = book.locations.cfiFromLocation(parsed) as string | number;
+        if (!cfi || cfi === -1) {
             setLocationDraft(String(locationCurrent));
             return;
         }

@@ -140,7 +140,9 @@ export function bindReaderMetaKeyRelay(doc: Document) {
             return;
         }
         if (evt.metaKey && navigator.userAgent.includes('Mac OS')) {
-            const newEvent = new evt.constructor(evt.type, evt) as Event;
+            // `constructor` is typed as Function; it is the concrete event class here.
+            const EventCtor = evt.constructor as new (type: string, init?: KeyboardEventInit) => KeyboardEvent;
+            const newEvent = new EventCtor(evt.type, evt);
             window.parent.document.body.dispatchEvent(newEvent);
         }
     });
@@ -199,7 +201,9 @@ export function applyEpubTheme(rendition: Rendition, settings: EpubSettings, roo
         root.style.color = fg;
     }
     const css = themeRulesToCss(buildThemeRules(settings));
-    for (const content of rendition.getContents()) {
+    // `getContents()` returns one Contents or an array, depending on how many are rendered.
+    const contents = rendition.getContents();
+    for (const content of Array.isArray(contents) ? contents : [contents]) {
         content.addStylesheetCss(css, EPUB_THEME_STYLE_KEY);
     }
 }
@@ -278,7 +282,7 @@ function resolveSpineSection(book: Book, href: string) {
         return null;
     }
 
-    for (const section of book.spine.spineItems) {
+    for (const section of spineSectionList(book)) {
         const sectionHref = section.href ?? '';
         if (sectionHref === pathTail || sectionHref.endsWith(`/${pathTail}`)) {
             return section;
@@ -359,8 +363,17 @@ function buildSpineFirstLocationMap(book: Book): Map<number, number> {
     return map;
 }
 
+type SpineSection = NonNullable<ReturnType<Book['spine']['get']>>;
+
+/** epubjs exposes the parsed sections on `spine.spineItems`, which its types omit. */
+function spineSectionList(book: Book): SpineSection[] {
+    const spine = book.spine as unknown as { spineItems?: SpineSection[] };
+    return spine.spineItems ?? [];
+}
+
 function locationFromHref(book: Book, cfi: string): number {
-    const location = book.locations.locationFromCfi(cfi);
+    // The type says `Location`, the implementation returns a number.
+    const location = book.locations.locationFromCfi(cfi) as unknown as number;
     if (location >= 0) {
         return location;
     }
@@ -461,9 +474,10 @@ export interface SearchHit {
 
 export async function searchEpubBook(book: Book, query: string, limit = 200): Promise<SearchHit[]> {
     const hits: SearchHit[] = [];
-    for (const item of book.spine.spineItems) {
+    for (const item of spineSectionList(book)) {
         await item.load(book.load.bind(book));
-        const results = item.find(query);
+        // `find` is typed as returning Elements, but epubjs returns match records.
+        const results = item.find(query) as unknown as Array<{ cfi: string; excerpt: string }>;
         item.unload();
         for (const result of results) {
             hits.push({ cfi: result.cfi, excerpt: result.excerpt });
