@@ -208,10 +208,10 @@ function ParquetViewer() {
             return;
         }
         modal.confirm({
-            title: 'Saving will change the compression codec',
-            content: `This file stores its columns as ${reencoded.join(', ')}. Saving writes every column back as SNAPPY, so the file's encoding changes even though the data does not.`,
-            okText: 'Save anyway',
-            cancelText: 'Cancel',
+            title: $t('parquet.codecWarningTitle'),
+            content: $t('parquet.codecWarningBody', { codecs: reencoded.join(', ') }),
+            okText: $t('parquet.saveAnyway'),
+            cancelText: $t('common.cancel'),
             onOk: () => { void write(); },
         });
     }, [message, modal]);
@@ -482,7 +482,7 @@ function ParquetViewer() {
                             onDoubleClick={() => startEdit(rowIndex, column, value)}
                             onClick={() => setInspected({ row: rowIndex, column: column.name, value })}
                         >
-                            {isNull ? 'NULL' : highlightCell(formatCellValue(value), query.trim())}
+                            {isNull ? $t('parquet.nullLabel') : highlightCell(formatCellValue(value), query.trim())}
                         </span>
                     );
                 },
@@ -579,7 +579,7 @@ function ParquetViewer() {
                     {readOnly && !loading && !error && fileInfo && (
                         <div className="parquet-viewer__readonly-banner">
                             {largeFile
-                                ? `Read-only: ${fileInfo.rowCount.toLocaleString()} rows. Editing is disabled because saving re-reads the whole file.`
+                                ? $t('parquet.readOnlyLarge', { count: fileInfo.rowCount.toLocaleString() })
                                 : $t('viewer.readOnly')}
                         </div>
                     )}
@@ -607,7 +607,7 @@ function ParquetViewer() {
                                     <div className="parquet-viewer__find">
                                         <input
                                             className="parquet-viewer__find-input"
-                                            placeholder="Find in file"
+                                            placeholder={$t('parquet.findInFile')}
                                             value={query}
                                             onChange={event => handleQueryChange(event.target.value)}
                                             onKeyDown={event => {
@@ -619,8 +619,8 @@ function ParquetViewer() {
                                             className="parquet-viewer__find-btn"
                                             onClick={() => { void runSearch(); }}
                                             disabled={searching || !fileInfo}
-                                            title="Search all rows"
-                                            aria-label="Search all rows"
+                                            title={$t('parquet.searchAllRows')}
+                                            aria-label={$t('parquet.searchAllRows')}
                                         >
                                             <span className={`codicon ${searching ? 'codicon-loading codicon-modifier-spin' : 'codicon-search'}`} />
                                         </button>
@@ -634,14 +634,16 @@ function ParquetViewer() {
                                         {!searching && matchRows.size > 0 && (
                                             <>
                                                 <span className="parquet-viewer__find-count">
-                                                    {matchRows.size.toLocaleString()} row{matchRows.size === 1 ? '' : 's'}
+                                                    {matchRows.size === 1
+                                                    ? $t('parquet.matchCountOne', { count: '1' })
+                                                    : $t('parquet.matchCountMany', { count: matchRows.size.toLocaleString() })}
                                                 </span>
                                                 <button
                                                     type="button"
                                                     className="parquet-viewer__find-btn"
                                                     onClick={() => jumpMatch(-1)}
-                                                    title="Previous match"
-                                                    aria-label="Previous match"
+                                                    title={$t('parquet.previousMatch')}
+                                                    aria-label={$t('parquet.previousMatch')}
                                                 >
                                                     <span className="codicon codicon-chevron-up" />
                                                 </button>
@@ -649,8 +651,8 @@ function ParquetViewer() {
                                                     type="button"
                                                     className="parquet-viewer__find-btn"
                                                     onClick={() => jumpMatch(1)}
-                                                    title="Next match"
-                                                    aria-label="Next match"
+                                                    title={$t('parquet.nextMatch')}
+                                                    aria-label={$t('parquet.nextMatch')}
                                                 >
                                                     <span className="codicon codicon-chevron-down" />
                                                 </button>
@@ -686,7 +688,7 @@ function ParquetViewer() {
                                     </span>
                                     <pre className="parquet-viewer__inspector-value">
                                         {inspected.value === null || inspected.value === undefined
-                                            ? 'NULL'
+                                            ? $t('parquet.nullLabel')
                                             : typeof inspected.value === 'string'
                                                 ? inspected.value
                                                 : formatCellValue(inspected.value)}
@@ -702,7 +704,7 @@ function ParquetViewer() {
                                                     : JSON.stringify(inspected.value);
                                             void navigator.clipboard.writeText(text).catch(() => undefined);
                                         }}
-                                        title="Copy value"
+                                        title={$t('parquet.copyValue')}
                                     >
                                         Copy
                                     </button>
@@ -710,8 +712,8 @@ function ParquetViewer() {
                                         type="button"
                                         className="parquet-viewer__pager-btn"
                                         onClick={() => setInspected(null)}
-                                        title="Close"
-                                        aria-label="Close"
+                                        title={$t('common.close')}
+                                        aria-label={$t('common.close')}
                                     >
                                         <span className="codicon codicon-close" />
                                     </button>
@@ -733,14 +735,14 @@ function ParquetViewer() {
                                         className="parquet-viewer__pager-btn"
                                         disabled={page <= 0}
                                         onClick={() => { cancelEdit(); goToPage((p) => Math.max(0, p - 1)); }}
-                                        aria-label="Previous page"
+                                        aria-label={$t('parquet.previousPage')}
                                     >
                                         <span className="codicon codicon-chevron-left" />
                                     </button>
                                     <Input
                                         size="small"
                                         className="parquet-viewer__row-jump"
-                                        placeholder="row"
+                                        placeholder={$t('parquet.rowLabel')}
                                         value={rowJump}
                                         onChange={(event) => setRowJump(event.target.value)}
                                         onPressEnter={jumpToRow}
@@ -749,9 +751,9 @@ function ParquetViewer() {
                                         type="button"
                                         className="parquet-viewer__pager-btn"
                                         onClick={jumpToRow}
-                                        title="Go to row"
+                                        title={$t('parquet.goToRow')}
                                     >
-                                        Go
+                                        {$t('parquet.go')}
                                     </button>
                                     <span className="parquet-viewer__pager-info">{rowRange}</span>
                                     <button
@@ -759,7 +761,7 @@ function ParquetViewer() {
                                         className="parquet-viewer__pager-btn"
                                         disabled={page >= totalPages - 1}
                                         onClick={() => { cancelEdit(); goToPage((p) => Math.min(totalPages - 1, p + 1)); }}
-                                        aria-label="Next page"
+                                        aria-label={$t('parquet.nextPage')}
                                     >
                                         <span className="codicon codicon-chevron-right" />
                                     </button>

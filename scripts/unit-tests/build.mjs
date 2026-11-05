@@ -38,4 +38,39 @@ for (const [name, entry] of Object.entries(entries)) {
     })
 }
 
+// The message catalogs live in one file each; bundle them behind a single entry so the
+// parity test can compare them without importing ten paths. Export names stay identifier
+// safe; the test maps them back to locale codes.
+const locales = {
+    en: 'en',
+    zhCn: 'zh-cn',
+    zhTw: 'zh-tw',
+    ja: 'ja',
+    de: 'de',
+    fr: 'fr',
+    es: 'es',
+    ptBr: 'pt-br',
+    ko: 'ko',
+    ru: 'ru',
+}
+const catalogSource = Object.entries(locales)
+    .map(([identifier, file]) => `export { default as ${identifier} } from './src/react/i18n/messages/${file}'`)
+    .join('\n')
+
+await build({
+    stdin: {
+        contents: catalogSource,
+        resolveDir: root,
+        sourcefile: 'i18n-catalog.ts',
+        loader: 'ts',
+    },
+    outfile: join(outdir, 'i18nCatalog.mjs'),
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node20',
+    alias: { '@': join(root, 'src') },
+    logLevel: 'warning',
+})
+
 console.log(`bundled ${Object.keys(entries).length} modules into ${outdir}`)
