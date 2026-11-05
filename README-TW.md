@@ -19,6 +19,64 @@
 - Java: `.class`（反編譯）
 - 壓縮檔案: `.zip`、`.jar`、`.vsix`、`.rar`、`.7z`、`.tar`、`.tar.gz`、`.tgz`、`.apk`
 
+## 本儲存庫：Office Viewer Plus（fork）
+
+本儲存庫 fork 自 [cweijan/vscode-office](https://github.com/cweijan/vscode-office)（MIT，見
+[NOTICE.md](NOTICE.md)），以 `chaowu21.office-viewer-plus` 發布，可與原版並存安裝。上述功能
+全部保留，此外還增加了：
+
+### Parquet：上游打不開的壓縮檔案
+
+上游打包 `hyparquet` 時沒有帶解壓器，ZSTD 壓縮的 parquet 會直接報
+`parquet unsupported compression codec: ZSTD`。本 fork 接入了 `hyparquet-compressors`，
+SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解碼。
+
+![ZSTD 壓縮的 parquet](docs/screenshots/parquet-zstd.png)
+
+讀取是懶載入的，大檔案也不會卡住：
+
+- **按頁讀取**：只解析目前可見的 50 列，377 MB 的檔案不再把整張表讀進記憶體；編輯以
+  「絕對列號 → 修補」記錄，換頁時重新套用。
+- **支援時按 Range 取位元組**：先用 2 位元組探測，支援就只讀 footer 和你看的頁，否則退回
+  一次性抓取；主控台會印出 `[parquet] source: ranged|full`。
+- **超大檔案自動唯讀**：儲存需要全量重讀，所以超過 20 萬列時直接停用編輯並說明原因。
+- **百萬列也能導覽**：按列號跳轉，頁尾顯示目前區間（`239,951–240,000 of 250,000`）。
+- **依型別呈現**：數字靠右對齊 + 等寬數字，字串/布林/時間戳依主題著色，null 顯示為 `NULL`，
+  編輯過的儲存格有標記，點擊儲存格可查看完整值。
+
+![Parquet 型別著色](docs/screenshots/parquet-types.png)
+
+工具列的 **Find in file** 以 5000 列為一批掃描整個檔案，帶進度、標記命中的列、在儲存格內
+醒目顯示符合的文字，並自動跳到第一筆命中。
+
+### JSONL / NDJSON：目錄 + 樹狀，而不是表格
+
+一行一個 JSON 值不適合表格，因此提供雙欄檢視：左側列出項目，右側把選取項目呈現為樹狀（或原文）。
+
+![JSONL 雙欄檢視](docs/screenshots/jsonl-two-pane.png)
+
+- **檔案位元組不進 webview**：webview 只拿到可見項目的摘要和選取項目的完整值。
+- **全檔案搜尋**：分批串流回傳，命中處帶上下文片段並醒目顯示。
+- **長值換行**而不是截斷；節點數超過 500 的項目自動退回固定列高的虛擬清單，避免極端列卡死介面。
+- 鍵盤：`←`/`→` 摺疊展開，`Space` 切換，`Enter` 複製值，`Ctrl+Shift+C` 複製路徑。
+
+### 驗收方式
+
+```bash
+pnpm test        # 解析邏輯單元測試（node:test，不引入額外框架）
+pnpm verify:ui   # 無頭瀏覽器 DOM 斷言；截圖輸出到 .ui-verify/shots
+```
+
+CI 在每次 push 時都會跑這兩項，以及 `pnpm build` 和 `pnpm run package`。`verify:ui -- --docs`
+可更新上面的截圖。設計取捨見 [docs/adr/0001-fork-office-viewer.md](docs/adr/0001-fork-office-viewer.md)。
+
+### 已知限制
+
+- 儲存非 SNAPPY 的 parquet 會被重寫成 SNAPPY（寫入端只支援它），儲存前會提示。
+- 超過 20 萬列的 parquet 唯讀；超大檔案的全檔案搜尋受 I/O 限制（會讀取走訪到的每個 row group）。
+- JSONL 搜尋比對原始文字，不理解 JSON 路徑。
+- 上游的遙測已完全移除。
+
 ## Git 歷史
 
 Office Viewer 內建完整的 Git 歷史工作區，讓你無需離開 VS Code 即可瀏覽儲存庫。可從原始碼控制檢視、編輯器標題列、編輯器右鍵選單或檔案總管右鍵選單開啟。
