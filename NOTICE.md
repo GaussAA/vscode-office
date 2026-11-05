@@ -14,6 +14,10 @@ Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus")
   `hyparquet-compressors`, covering SNAPPY, GZIP, BROTLI, ZSTD, LZ4 and LZ4_RAW.
   Because the writer can only encode SNAPPY, saving a non-SNAPPY file now warns that the
   codec will change before writing.
+- **Parquet rows are read one page at a time.** Upstream reads every row into memory and
+  slices 50 per page; this fork reads only the visible page with `rowStart`/`rowEnd` and
+  keeps edits in an absolute-row patch map, so a huge file no longer materialises its
+  whole table. Saving re-reads the file, re-applies the patches and writes it back.
 - **New JSONL viewer** (`*.jsonl`, `*.ndjson`): a two-pane layout — a directory of
   entries on the left, the full tree (or raw text) of the selected entry on the right.
   One line is one self-describing JSON document, so heterogeneous keys are natural

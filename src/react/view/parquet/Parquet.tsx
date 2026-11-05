@@ -14,6 +14,7 @@ import {
     openParquetFile,
     parseCellInput,
     readAllParquetRows,
+    readParquetRows,
     writeParquetBuffer,
     type ParquetColumnInfo,
     type ParquetFileInfo,
@@ -87,7 +88,8 @@ function collectCodecs(metadata: unknown): string[] {
 function ParquetViewer() {
     const { message, modal } = App.useApp();
     const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
-    const [allRows, setAllRows] = useState<Record<string, unknown>[]>([]);
+    const [pageRows, setPageRows] = useState<Record<string, unknown>[]>([]);
+    const [pageLoading, setPageLoading] = useState(false);
     const [page, setPage] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -100,7 +102,10 @@ function ParquetViewer() {
     const [vscodeTheme, setVscodeTheme] = useState(loadParquetVscodeTheme);
     const readOnlyRef = useRef(false);
     const fileInfoRef = useRef<ParquetFileInfo | null>(null);
-    const allRowsRef = useRef<Record<string, unknown>[]>([]);
+    const pageRowsRef = useRef<Record<string, unknown>[]>([]);
+    /** Edits keyed by ABSOLUTE row index, re-applied to whatever page is displayed. */
+    const editsRef = useRef(new Map<number, Record<string, unknown>>());
+    const pageLoadSeq = useRef(0);
     const dirtyRef = useRef(false);
     const savingRef = useRef(false);
     const editInputRef = useRef<InputRef | null>(null);
@@ -111,12 +116,11 @@ function ParquetViewer() {
     }, [fileInfo?.rowCount]);
 
     const tableRows = useMemo<TableRow[]>(() => {
-        const start = page * PAGE_SIZE;
-        return allRows.slice(start, start + PAGE_SIZE).map((row, index) => ({
+        return pageRows.map((row, index) => ({
             ...row,
             key: `${page}-${index}`,
         }));
-    }, [allRows, page]);
+    }, [pageRows, page]);
 
     const toggleTheme = () => {
         setVscodeTheme((prev) => {
@@ -143,11 +147,19 @@ function ParquetViewer() {
         const info = fileInfoRef.current;
         if (!info || !dirtyRef.current || savingRef.current || readOnlyRef.current) return;
 
-        const write = () => {
+        const write = async () => {
             savingRef.current = true;
             setSaving(true);
             try {
-                const buffer = writeParquetBuffer(info.columns, allRowsRef.current);
+                // Display rows are loaded lazily, so saving re-reads the whole file and
+                // re-applies every recorded edit before serialising. This is the price of
+                // keeping the writer's semantics while not holding every row in memory.
+                const rows = await readAllParquetRows(info.file, info.metadata);
+                for (const [index, patch] of editsRef.current) {
+                    const row = rows[index];
+                    if (row) Object.assign(row, patch);
+                }
+                const buffer = writeParquetBuffer(info.columns, rows);
                 handler.emit('save', [...new Uint8Array(buffer)]);
             } catch (e) {
                 savingRef.current = false;
@@ -162,7 +174,7 @@ function ParquetViewer() {
         // writer only encodes SNAPPY. Saving would silently re-encode the file, so warn.
         const reencoded = collectCodecs(info.metadata).filter(codec => codec !== 'SNAPPY');
         if (reencoded.length === 0) {
-            write();
+            void write();
             return;
         }
         modal.confirm({
@@ -170,7 +182,7 @@ function ParquetViewer() {
             content: `This file stores its columns as ${reencoded.join(', ')}. Saving writes every column back as SNAPPY, so the file's encoding changes even though the data does not.`,
             okText: 'Save anyway',
             cancelText: 'Cancel',
-            onOk: write,
+            onOk: () => { void write(); },
         });
     }, [message, modal]);
 
@@ -189,8 +201,9 @@ function ParquetViewer() {
 
     const commitEdit = useCallback((rowIndex: number, column: ParquetColumnInfo) => {
         if (editingRow !== rowIndex || editingColumn !== column.name) return;
-        const rows = [...allRowsRef.current];
-        const row = rows[rowIndex];
+        const pageStart = page * PAGE_SIZE;
+        const offset = rowIndex - pageStart;
+        const row = pageRowsRef.current[offset];
         if (!row) {
             cancelEdit();
             return;
@@ -200,20 +213,29 @@ function ParquetViewer() {
             cancelEdit();
             return;
         }
-        row[column.name] = nextValue;
-        allRowsRef.current = rows;
-        setAllRows(rows);
+
+        // Record the edit against the absolute row so it survives page changes and
+        // is re-applied when the file is saved.
+        const patch = editsRef.current.get(rowIndex) ?? {};
+        patch[column.name] = nextValue;
+        editsRef.current.set(rowIndex, patch);
+
+        const rows = [...pageRowsRef.current];
+        rows[offset] = { ...row, [column.name]: nextValue };
+        pageRowsRef.current = rows;
+        setPageRows(rows);
         cancelEdit();
         markDirty();
-    }, [cancelEdit, editValue, editingColumn, editingRow, markDirty]);
+    }, [cancelEdit, editValue, editingColumn, editingRow, markDirty, page]);
 
     const loadParquet = useCallback(async (payload: { path?: string; buffer?: number[]; readOnly?: boolean }) => {
         setLoading(true);
         setError(null);
         setFileInfo(null);
         fileInfoRef.current = null;
-        setAllRows([]);
-        allRowsRef.current = [];
+        setPageRows([]);
+        pageRowsRef.current = [];
+        editsRef.current.clear();
         setPage(0);
         cancelEdit();
         dirtyRef.current = false;
@@ -226,18 +248,42 @@ function ParquetViewer() {
         try {
             const buffer = await loadOfficeBuffer(payload);
             const info = await openParquetFile(buffer);
-            const rows = await readAllParquetRows(info.file, info.metadata);
-            const nextInfo = { ...info, rowCount: rows.length };
-            fileInfoRef.current = nextInfo;
-            setFileInfo(nextInfo);
-            allRowsRef.current = rows;
-            setAllRows(rows);
+            fileInfoRef.current = info;
+            setFileInfo(info);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to load parquet file');
         } finally {
             setLoading(false);
         }
     }, [cancelEdit]);
+
+    // Rows are read one page at a time; a big file no longer materialises every row
+    // in the webview. Edits recorded so far are overlaid on the freshly read page.
+    useEffect(() => {
+        const info = fileInfo;
+        if (!info) return;
+        const seq = ++pageLoadSeq.current;
+        const start = page * PAGE_SIZE;
+        const end = Math.min(info.rowCount, start + PAGE_SIZE);
+        setPageLoading(true);
+        void readParquetRows(info.file, info.metadata, start, end)
+            .then(rows => {
+                if (seq !== pageLoadSeq.current) return;
+                const merged = rows.map((row, offset) => {
+                    const patch = editsRef.current.get(start + offset);
+                    return patch ? { ...row, ...patch } : row;
+                });
+                pageRowsRef.current = merged;
+                setPageRows(merged);
+            })
+            .catch(e => {
+                if (seq !== pageLoadSeq.current) return;
+                setError(e instanceof Error ? e.message : 'Failed to read rows');
+            })
+            .finally(() => {
+                if (seq === pageLoadSeq.current) setPageLoading(false);
+            });
+    }, [fileInfo, page]);
 
     const tableColumns = useMemo<ColumnsType<TableRow>>(() => {
         if (!fileInfo) return [];
@@ -425,6 +471,12 @@ function ParquetViewer() {
                             </div>
                             <div className="parquet-viewer__footer">
                                 <span className="parquet-viewer__footer-total">
+                                    {pageLoading && (
+                                        <span
+                                            className="codicon codicon-loading codicon-modifier-spin"
+                                            style={{ marginRight: 6 }}
+                                        />
+                                    )}
                                     {$t('parquet.totalRows', { count: fileInfo.rowCount.toLocaleString() })}
                                 </span>
                                 <div className="parquet-viewer__pager">
@@ -467,3 +519,4 @@ export default function Parquet() {
         </App>
     );
 }
+

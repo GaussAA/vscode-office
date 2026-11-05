@@ -85,6 +85,28 @@ export async function openParquetFile(buffer: ArrayBuffer): Promise<ParquetFileI
     };
 }
 
+/** Read a row range only — the table pages through big files with this. */
+export async function readParquetRows(
+    file: AsyncBuffer,
+    metadata: FileMetaData,
+    start: number,
+    end: number,
+): Promise<Record<string, unknown>[]> {
+    const rowCount = Number(metadata.num_rows);
+    const from = Math.max(0, Math.min(start, rowCount));
+    const to = Math.max(from, Math.min(end, rowCount));
+    if (to <= from) {
+        return [];
+    }
+    return parquetReadObjects({
+        file,
+        metadata,
+        rowStart: from,
+        rowEnd: to,
+        rowFormat: 'object',
+        compressors,
+    });
+}
 export async function readAllParquetRows(file: AsyncBuffer, metadata: FileMetaData): Promise<Record<string, unknown>[]> {
     const rowCount = Number(metadata.num_rows);
     if (rowCount <= 0) {
@@ -230,3 +252,4 @@ export function formatCellValue(value: unknown): string {
     }
     return String(value);
 }
+
