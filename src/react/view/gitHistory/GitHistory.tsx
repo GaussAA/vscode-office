@@ -64,7 +64,6 @@ const ROW_HEIGHT = 28;
 const TABLE_HEADER_HEIGHT = 28;
 const INITIAL_MAX_COMMITS = 300;
 const LOAD_MORE_COMMITS = 100;
-const QUICK_SYNC_DEFAULT_MESSAGE = () => $t('git.quickSync');
 const WARNING_ACTIONS = new Set(['merge']);
 
 function countRealCommits(commits: ReadonlyArray<GitCommit>): number {
@@ -185,7 +184,6 @@ function GitHistoryView({
     const { menu, showMenu, closeMenu } = useContextMenu();
     const menuContextRef = useRef<MenuContext | null>(null);
     const menuMetaRef = useRef<Record<string, MenuPayloadMeta>>({});
-    const pendingQuickSyncCommitMessageRef = useRef(QUICK_SYNC_DEFAULT_MESSAGE());
     const pendingOpenRemoteRepoRef = useRef<string | null>(null);
     const selectionAnchorRef = useRef<number | null>(null);
     const selectedIndicesRef = useRef(selectedIndices);

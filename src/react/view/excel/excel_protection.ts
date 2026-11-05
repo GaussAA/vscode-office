@@ -33,12 +33,14 @@ export function readCellEditableFromExcel(cell: ExcelJS.Cell, sheetProtected: bo
 }
 
 function protectionOptionsFromStored(stored: StoredSheetProtection): Partial<ExcelJS.WorksheetProtection> {
+    // These five are dropped on purpose: they are the stored hash material, not worksheet
+    // protection options. The underscore prefix says so to the linter.
     const {
-        password,
-        hashValue,
-        saltValue,
-        spinCount,
-        algorithmName,
+        password: _password,
+        hashValue: _hashValue,
+        saltValue: _saltValue,
+        spinCount: _spinCount,
+        algorithmName: _algorithmName,
         ...rest
     } = stored;
     return rest as Partial<ExcelJS.WorksheetProtection>;

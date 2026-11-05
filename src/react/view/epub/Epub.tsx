@@ -262,7 +262,6 @@ export default function Epub() {
                 if (!container) {
                     return;
                 }
-                const third = container.clientWidth / 3;
                 const x = event.pageX - container.scrollLeft;
                 if (x > container.clientWidth - 20) {
                     event.preventDefault();

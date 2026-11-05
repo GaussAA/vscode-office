@@ -17,7 +17,7 @@ export default function FontViewer() {
     const [glyph, setGlyph] = useState(null)
     const [selectedKey, setSelectedKey] = useState<string | null>(null)
     const previewRef = useRef<HTMLCanvasElement>(null)
-    const [_, height] = useWindowSize()
+    const [, height] = useWindowSize()
 
     useEffect(() => {
         handler.on("open", async (content) => {

@@ -22,13 +22,6 @@ import { parseWebviewResourceUri } from '@/common/webviewUri';
 import { MarkdownDocumentSync } from '@/service/markdown/documentSync';
 import { openLinkedFile } from '@/service/markdown/linkedFile';
 
-function getRuntimePlatform(): string {
-    if (typeof process !== 'undefined' && process.platform) {
-        return process.platform;
-    }
-    return 'web';
-}
-
 export interface MarkdownEditorProviderOptions {
     isWeb?: boolean;
 }

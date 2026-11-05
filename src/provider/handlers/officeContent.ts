@@ -188,7 +188,6 @@ export async function emitVirtualOfficeOpen(handler: Handler, uri: Uri): Promise
 }
 
 export async function emitFileOfficeOpen(handler: Handler, uri: Uri, webview: Webview): Promise<void> {
-    const now = Date.now();
     const readOnly = await isUriReadOnly(uri);
     handler.emit('open', {
         ext: extname(uri.fsPath),

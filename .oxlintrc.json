@@ -1,0 +1,59 @@
+// oxlint config — replaces ESLint.
+//
+// Why: the ESLint stack pinned `typescript <6.1` through @typescript-eslint's peer range,
+// which blocked TypeScript 7 (see #18). oxlint does not depend on the TypeScript package
+// at all, runs the whole tree in under a second, and understands the TS/JSX syntax we use.
+//
+// Scope is deliberately the same as the old gate: `src/**/*.{ts,tsx}` only. The vendored
+// JavaScript under `src/**/*.js` (x-spreadsheet, markdown-it plugins) was never linted and
+// is not being dragged in by a tool swap.
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "react-hooks", "import", "unicorn", "oxc"],
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2024": true
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    // The old gate only caught unused *imports* (eslint-plugin-unused-imports); oxlint has
+    // no such plugin, so `no-unused-vars` takes over with parameters ignored. That is
+    // strictly stronger: it also caught 14 pieces of dead code when this landed.
+    "no-unused-vars": [
+      "error",
+      { "args": "none", "caughtErrors": "none", "varsIgnorePattern": "^_", "argsIgnorePattern": "^_" }
+    ],
+
+    // Everything below fires only on code inherited from upstream, and none of it was
+    // enforced by the ESLint config we replaced. They are left off to keep this a tooling
+    // swap rather than a refactor; each is a candidate for its own cleanup PR.
+    //   no-useless-escape (31): escaped characters that do not need escaping, in the
+    //     request parser / pretty-data regexes.
+    //   no-cond-assign (11): `if ((match = re.exec(...)))`, which is the intended idiom.
+    //   react-hooks immutability / exhaustive-deps / set-state-in-effect (6): oxlint's
+    //     react-hooks plugin is stricter than the version we ran; enabling these changes
+    //     component behaviour and needs its own verification pass.
+    //   unicorn no-useless-fallback-in-spread / no-new-array / no-useless-spread (7).
+    "no-useless-escape": "off",
+    "no-cond-assign": "off",
+    "no-extra-boolean-cast": "off",
+    "no-unnecessary-parameter-property-assignment": "off",
+    "immutability": "off",
+    "exhaustive-deps": "off",
+    "set-state-in-effect": "off",
+    "no-useless-fallback-in-spread": "off",
+    "no-new-array": "off",
+    "no-useless-spread": "off"
+  },
+  "ignorePatterns": [
+    "**/*.d.ts",
+    "src/**/*.js",
+    "vditor/**",
+    "out/**",
+    "node_modules/**",
+    ".vscode-test/**"
+  ]
+}

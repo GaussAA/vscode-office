@@ -10,10 +10,6 @@ interface FindWidgetProps {
     onNavigate: (index: number | null) => void;
 }
 
-function buildQueryKey(text: string, caseSensitive: boolean, useRegex: boolean): string {
-    return `${text}\0${caseSensitive}\0${useRegex}`;
-}
-
 export default function FindWidget({
     open, commits, currentIndex, onClose, onNavigate,
 }: FindWidgetProps) {
