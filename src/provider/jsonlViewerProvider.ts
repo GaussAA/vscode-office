@@ -3,12 +3,22 @@ import { Handler } from '@/common/handler';
 import { ReactApp } from '@/common/reactApp';
 import { getExtensionResourceRoots } from '@/common/extensionResource';
 import { isUriReadOnly } from '@/common/fileReadOnly';
-import { buildJsonlIndex, buildJsonlLines, type JsonlIndex } from '@/service/jsonlDocument';
-import { JSONL_WINDOW_SIZE, type JsonlInfoPayload, type JsonlReadRequest } from '@/common/jsonlTypes';
+import {
+    buildJsonlEntry,
+    buildJsonlIndex,
+    buildJsonlSummaries,
+    type JsonlIndex,
+} from '@/service/jsonlDocument';
+import {
+    JSONL_CHUNK_SIZE,
+    type JsonlEntryPayload,
+    type JsonlInfoPayload,
+    type JsonlRangeRequest,
+} from '@/common/jsonlTypes';
 
 /**
  * The document's bytes live here, in the extension host, for its whole lifetime.
- * The webview only ever sees parsed line payloads (see common/jsonlTypes.ts).
+ * The webview only ever sees parsed payloads (see common/jsonlTypes.ts).
  */
 class JsonlDocument implements vscode.CustomDocument {
 
@@ -26,7 +36,9 @@ class JsonlDocument implements vscode.CustomDocument {
 
 /**
  * JSONL viewer: one line is one self-describing JSON document, so the preview
- * surface is a tree (never a table — heterogeneous keys would force a fake schema).
+ * surface is a two-pane layout — a directory of entries on the left, the full
+ * tree of the selected entry on the right. Never a table: heterogeneous keys
+ * would force a schema that does not exist.
  */
 export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<JsonlDocument> {
 
@@ -54,6 +66,7 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
         const emitInfo = async () => {
             const payload: JsonlInfoPayload = {
                 fileName: document.uri.path.split('/').pop() ?? document.uri.fsPath,
+                cacheId: `${document.uri.scheme}:${document.uri.toString()}`,
                 lineCount: document.index.lineCount,
                 byteSize: document.bytes.byteLength,
                 readOnly: await isUriReadOnly(document.uri),
@@ -72,13 +85,26 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
             .on('init', () => { void emitInfo(); })
             .on('jsonlReload', () => { void reload(); })
             .on('fileChange', () => { void reload(); })
-            .on('jsonlRead', (range: JsonlReadRequest) => {
+            .on('jsonlIndex', (range: JsonlRangeRequest) => {
                 const start = Math.max(0, range?.start ?? 0);
-                const end = Math.min(range?.end ?? start + JSONL_WINDOW_SIZE, document.index.lineCount);
-                handler.emit('jsonlLines', {
+                const end = Math.min(
+                    range?.end ?? start + JSONL_CHUNK_SIZE,
+                    document.index.lineCount,
+                );
+                handler.emit('jsonlEntries', {
                     start,
-                    lines: buildJsonlLines(document.bytes, document.index, start, end),
+                    entries: buildJsonlSummaries(document.bytes, document.index, start, end),
                 });
+            })
+            .on('jsonlEntry', (index: number) => {
+                if (typeof index !== 'number' || index < 0 || index >= document.index.lineCount) {
+                    return;
+                }
+                const payload: JsonlEntryPayload = {
+                    index,
+                    entry: buildJsonlEntry(document.bytes, document.index, index),
+                };
+                handler.emit('jsonlEntryData', payload);
             });
 
         await ReactApp.view(webview, { route: 'jsonl' });

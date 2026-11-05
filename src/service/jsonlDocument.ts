@@ -1,9 +1,17 @@
 /**
- * Host-side JSONL reading: build a line index once, then hand out parsed lines
- * on demand. The file bytes never cross the postMessage boundary, which keeps
- * large files (hundreds of MB, millions of lines) out of the webview.
+ * Host-side JSONL reading: build a line index once, then hand out summaries
+ * (for the directory pane) or one full entry (for the detail pane) on demand.
+ * The file bytes never cross the postMessage boundary, which keeps large files
+ * (hundreds of MB, millions of lines) out of the webview.
  */
-import { JSONL_MAX_LINE_BYTES, type JsonlLinePayload } from '@/common/jsonlTypes';
+import {
+    JSONL_LABEL_KEYS,
+    JSONL_MAX_LINE_BYTES,
+    JSONL_MAX_TEXT_CHARS,
+    JSONL_RAW_PREVIEW_CHARS,
+    type JsonlEntryDetail,
+    type JsonlEntrySummary,
+} from '@/common/jsonlTypes';
 
 export interface JsonlIndex {
     lineCount: number;
@@ -12,7 +20,6 @@ export interface JsonlIndex {
 }
 
 const decoder = new TextDecoder('utf-8');
-const RAW_PREVIEW_CHARS = 400;
 
 export function buildJsonlIndex(bytes: Uint8Array): JsonlIndex {
     const offsets: number[] = [0];
@@ -38,49 +45,107 @@ function truncate(text: string, max: number): string {
     return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
 
-export function buildJsonlLine(
-    bytes: Uint8Array,
-    index: JsonlIndex,
-    line: number,
-): JsonlLinePayload {
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Derive a human-friendly label from the entry's TOP-LEVEL keys only.
+ * Nested `id`s belong to child records, so they are deliberately ignored.
+ */
+export function deriveLabel(value: unknown): string | undefined {
+    if (!isRecord(value)) return undefined;
+    for (const key of JSONL_LABEL_KEYS) {
+        if (!(key in value)) continue;
+        const candidate = value[key];
+        if (typeof candidate === 'string') {
+            const trimmed = candidate.trim();
+            if (trimmed) return truncate(trimmed, 40);
+            continue;
+        }
+        if (typeof candidate === 'number' || typeof candidate === 'bigint' || typeof candidate === 'boolean') {
+            return String(candidate);
+        }
+    }
+    return undefined;
+}
+
+interface DecodedLine {
+    text: string;
+    size: number;
+}
+
+function decodeLine(bytes: Uint8Array, index: JsonlIndex, line: number): DecodedLine {
     const slice = lineBytes(bytes, index, line);
     const text = decoder.decode(slice).replace(/[\r\n]+$/, '');
-    const size = Math.max(0, slice.length - (text.length < slice.length ? 1 : 0));
+    // size excludes the line terminator
+    const size = Math.max(0, text.length === 0 ? 0 : slice.length - (slice[slice.length - 1] === 0x0a ? 1 : 0));
+    return { text, size };
+}
 
+function classify(line: number, decoded: DecodedLine, parse: boolean): JsonlEntrySummary {
+    const { text, size } = decoded;
+    const raw = truncate(text, JSONL_RAW_PREVIEW_CHARS);
     if (text.trim() === '') {
         return { index: line, size, raw: '', empty: true };
     }
     if (size > JSONL_MAX_LINE_BYTES) {
-        return {
-            index: line,
-            size,
-            raw: truncate(text, RAW_PREVIEW_CHARS),
-            tooLarge: true,
-        };
+        return { index: line, size, raw, tooLarge: true };
+    }
+    if (!parse) {
+        return { index: line, size, raw };
     }
     try {
-        return { index: line, size, raw: truncate(text, RAW_PREVIEW_CHARS), value: JSON.parse(text) };
+        const value = JSON.parse(text);
+        return { index: line, size, raw, label: deriveLabel(value) };
     } catch (error) {
-        return {
-            index: line,
-            size,
-            raw: truncate(text, RAW_PREVIEW_CHARS),
-            error: error instanceof Error ? error.message : 'Invalid JSON',
-        };
+        return { index: line, size, raw, error: error instanceof Error ? error.message : 'Invalid JSON' };
     }
 }
 
-export function buildJsonlLines(
+/** Directory payload: parse only far enough to derive the identity label. */
+export function buildJsonlSummary(
+    bytes: Uint8Array,
+    index: JsonlIndex,
+    line: number,
+): JsonlEntrySummary {
+    return classify(line, decodeLine(bytes, index, line), true);
+}
+
+export function buildJsonlSummaries(
     bytes: Uint8Array,
     index: JsonlIndex,
     start: number,
     end: number,
-): JsonlLinePayload[] {
+): JsonlEntrySummary[] {
     const from = Math.max(0, Math.min(start, index.lineCount));
     const to = Math.max(from, Math.min(end, index.lineCount));
-    const lines: JsonlLinePayload[] = [];
+    const entries: JsonlEntrySummary[] = [];
     for (let i = from; i < to; i++) {
-        lines.push(buildJsonlLine(bytes, index, i));
+        entries.push(buildJsonlSummary(bytes, index, i));
     }
-    return lines;
+    return entries;
+}
+
+/** Detail payload: the whole parsed entry, for one line only. */
+export function buildJsonlEntry(
+    bytes: Uint8Array,
+    index: JsonlIndex,
+    line: number,
+): JsonlEntryDetail {
+    const decoded = decodeLine(bytes, index, line);
+    const detail: JsonlEntryDetail = {
+        ...classify(line, decoded, false),
+        text: truncate(decoded.text, JSONL_MAX_TEXT_CHARS),
+    };
+    const empty = decoded.text.trim() === '';
+    if (!empty && detail.size <= JSONL_MAX_LINE_BYTES) {
+        try {
+            detail.value = JSON.parse(decoded.text);
+            detail.label = deriveLabel(detail.value);
+        } catch (error) {
+            detail.error = error instanceof Error ? error.message : 'Invalid JSON';
+        }
+    }
+    return detail;
 }

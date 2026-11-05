@@ -2,46 +2,76 @@
  * Wire format shared by the extension host and the JSONL webview.
  *
  * The host owns the bytes and the line index; the webview only ever receives
- * parsed line payloads. Nothing here may import `vscode` — the webview bundle
+ * parsed payloads. Nothing here may import `vscode` — the webview bundle
  * imports it too.
+ *
+ * Two request/response pairs, deliberately separate:
+ *  - `jsonlIndex`  → `jsonlEntries` : light summaries for the left directory pane.
+ *  - `jsonlEntry`  → `jsonlEntryData`: the full parsed value of ONE entry, for the
+ *    right detail pane. Keeping them apart means scrolling the directory never
+ *    ships hundreds of full JSON documents to the webview.
  */
 
 /** A line larger than this is not parsed; it is shown as raw text instead. */
 export const JSONL_MAX_LINE_BYTES = 512 * 1024;
 
-/** Lines are loaded in windows of this size. */
-export const JSONL_WINDOW_SIZE = 200;
+/** Entries are streamed into the directory pane in chunks of this size. */
+export const JSONL_CHUNK_SIZE = 500;
+
+/** Top-level keys tried, in order, when deriving a human-friendly label. */
+export const JSONL_LABEL_KEYS = ['id', '_id', 'uuid', 'key', 'name', 'title', 'ts', 'timestamp'] as const;
+
+/** How many characters of the raw line are kept for previews. */
+export const JSONL_RAW_PREVIEW_CHARS = 400;
+
+/** Upper bound for the full text shipped to the raw view. */
+export const JSONL_MAX_TEXT_CHARS = 200_000;
 
 export interface JsonlInfoPayload {
     fileName: string;
+    /** Stable identity for state persistence (scheme + uri). */
+    cacheId: string;
     lineCount: number;
     byteSize: number;
     readOnly: boolean;
 }
 
-export interface JsonlReadRequest {
+export interface JsonlRangeRequest {
     start: number;
     end: number;
 }
 
-export interface JsonlLinePayload {
+/** One directory row: cheap to produce, cheap to keep in memory. */
+export interface JsonlEntrySummary {
     /** Zero-based line index. */
     index: number;
     /** Byte length of the line, excluding the newline. */
     size: number;
-    /** Preview / raw text, truncated to a display-friendly length. */
+    /** Truncated raw text, for the directory preview. */
     raw: string;
-    /** Parsed JSON, present only when the line parsed and was under the size cap. */
-    value?: unknown;
+    /** Derived identity, e.g. the value of the top-level `id` key. */
+    label?: string;
+    empty?: boolean;
     /** Parse error message, when the line is not valid JSON. */
     error?: string;
     /** True when the line exceeded JSONL_MAX_LINE_BYTES and was not parsed. */
     tooLarge?: boolean;
-    /** True for whitespace-only lines. */
-    empty?: boolean;
 }
 
-export interface JsonlLinesPayload {
+export interface JsonlEntriesPayload {
     start: number;
-    lines: JsonlLinePayload[];
+    entries: JsonlEntrySummary[];
+}
+
+/** Everything the detail pane needs for one entry. */
+export interface JsonlEntryDetail extends JsonlEntrySummary {
+    /** Parsed JSON, when the line parsed and was under the size cap. */
+    value?: unknown;
+    /** Full line text (capped), for the raw view. */
+    text?: string;
+}
+
+export interface JsonlEntryPayload {
+    index: number;
+    entry: JsonlEntryDetail;
 }

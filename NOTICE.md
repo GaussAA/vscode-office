@@ -14,10 +14,12 @@ Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus")
   `hyparquet-compressors`, covering SNAPPY, GZIP, BROTLI, ZSTD, LZ4 and LZ4_RAW.
   Because the writer can only encode SNAPPY, saving a non-SNAPPY file now warns that the
   codec will change before writing.
-- **New JSONL viewer** (`*.jsonl`, `*.ndjson`): a tree surface, not a table. One line is
-  one self-describing JSON document, so heterogeneous keys are natural instead of being
-  forced into a fake schema. The file's bytes and line index stay in the extension host;
-  the webview receives parsed lines only. Read-only in this version.
+- **New JSONL viewer** (`*.jsonl`, `*.ndjson`): a two-pane layout — a directory of
+  entries on the left, the full tree (or raw text) of the selected entry on the right.
+  One line is one self-describing JSON document, so heterogeneous keys are natural
+  instead of being forced into a fake schema; a table would have to invent one.
+  The file's bytes and line index stay in the extension host; the webview receives
+  parsed summaries and, for the selected entry only, its full value. Read-only.
 - **Telemetry removed** (`src/service/telemetryService.ts`, `telemetry.json`,
   `docs/telemetry.md`). Upstream reported anonymous usage to its own Azure Application
   Insights resource; none of that remains.
