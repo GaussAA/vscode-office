@@ -20,6 +20,7 @@ const entries = {
     jsonlDocument: 'src/service/jsonlDocument.ts',
     jsonlFormat: 'src/react/view/jsonl/jsonlFormat.tsx',
     parquetParser: 'src/react/view/parquet/parquetParser.ts',
+    parquetSession: 'src/react/view/parquet/parquetSession.ts',
 }
 
 for (const [name, entry] of Object.entries(entries)) {

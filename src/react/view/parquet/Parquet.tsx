@@ -7,6 +7,7 @@ import { $t } from '../../i18n/i18nConfig.ts';
 import { handler, vscodeApi } from '../../util/vscode.ts';
 import { arrayBufferFromPayload } from '../../util/loadOfficeContent.ts';
 import { openParquetSource } from '../../util/parquetSource.ts';
+import { ParquetSession } from './parquetSession.ts';
 import SponsorBar from '../components/SponsorBar.tsx';
 import {
     formatCellValue,
@@ -14,7 +15,6 @@ import {
     isColumnEditable,
     openParquetFile,
     parseCellInput,
-    readAllParquetRows,
     readParquetRows,
     writeParquetBuffer,
     type ParquetColumnInfo,
@@ -135,14 +135,9 @@ function ParquetViewer() {
     /** `${absoluteRow}:${column}` for every patched cell, so render never reads a ref. */
     const [editedCells, setEditedCells] = useState<Set<string>>(() => new Set());
     const [vscodeTheme, setVscodeTheme] = useState(loadParquetVscodeTheme);
-    const readOnlyRef = useRef(false);
     const fileInfoRef = useRef<ParquetFileInfo | null>(null);
-    const pageRowsRef = useRef<Record<string, unknown>[]>([]);
-    /** Edits keyed by ABSOLUTE row index, re-applied to whatever page is displayed. */
-    const editsRef = useRef(new Map<number, Record<string, unknown>>());
-    const pageLoadSeq = useRef(0);
-    /** Already fetched pages, so going back/forward does not re-read them. */
-    const pageCache = useRef(new Map<number, Record<string, unknown>[]>());
+    /** Owns the page cache, the edit patches, cancellation and the page<->row arithmetic. */
+    const sessionRef = useRef<ParquetSession | null>(null);
     const searchSeq = useRef(0);
     const dirtyRef = useRef(false);
     const savingRef = useRef(false);
@@ -183,20 +178,17 @@ function ParquetViewer() {
 
     const handleSave = useCallback(() => {
         const info = fileInfoRef.current;
-        if (!info || !dirtyRef.current || savingRef.current || readOnlyRef.current) return;
+        const session = sessionRef.current;
+        if (!info || !session || !dirtyRef.current || savingRef.current || session.readOnly) return;
 
         const write = async () => {
             savingRef.current = true;
             setSaving(true);
             try {
-                // Display rows are loaded lazily, so saving re-reads the whole file and
-                // re-applies every recorded edit before serialising. This is the price of
-                // keeping the writer's semantics while not holding every row in memory.
-                const rows = await readAllParquetRows(info.file, info.metadata);
-                for (const [index, patch] of editsRef.current) {
-                    const row = rows[index];
-                    if (row) Object.assign(row, patch);
-                }
+                // Display rows are lazy, so saving re-reads the whole file and re-applies every
+                // recorded edit before serialising. This is the price of keeping the writer's
+                // semantics while not holding every row in memory.
+                const rows = await session.rowsForSave();
                 const buffer = writeParquetBuffer(info.columns, rows);
                 handler.emit('save', [...new Uint8Array(buffer)]);
             } catch (e) {
@@ -225,7 +217,7 @@ function ParquetViewer() {
     }, [message, modal]);
 
     const startEdit = useCallback((rowIndex: number, column: ParquetColumnInfo, value: unknown) => {
-        if (readOnlyRef.current || !isColumnEditable(column.type)) return;
+        if (sessionRef.current?.readOnly || !isColumnEditable(column.type)) return;
         setEditingRow(rowIndex);
         setEditingColumn(column.name);
         setEditValue(formatCellValue(value));
@@ -239,9 +231,9 @@ function ParquetViewer() {
 
     const commitEdit = useCallback((rowIndex: number, column: ParquetColumnInfo) => {
         if (editingRow !== rowIndex || editingColumn !== column.name) return;
-        const pageStart = page * PAGE_SIZE;
-        const offset = rowIndex - pageStart;
-        const row = pageRowsRef.current[offset];
+        const session = sessionRef.current;
+        if (!session) return;
+        const row = session.rows[rowIndex - session.startOf(session.page)];
         if (!row) {
             cancelEdit();
             return;
@@ -252,30 +244,26 @@ function ParquetViewer() {
             return;
         }
 
-        // Record the edit against the absolute row so it survives page changes and
-        // is re-applied when the file is saved.
-        const patch = editsRef.current.get(rowIndex) ?? {};
-        patch[column.name] = nextValue;
-        editsRef.current.set(rowIndex, patch);
-        setEditedCells((prev) => new Set(prev).add(`${rowIndex}:${column.name}`));
-
-        const rows = [...pageRowsRef.current];
-        rows[offset] = { ...row, [column.name]: nextValue };
-        pageRowsRef.current = rows;
-        setPageRows(rows);
+        // The session records the edit against the absolute row, so it survives page changes
+        // and is re-applied when the file is saved.
+        if (!session.patch(rowIndex, column.name, nextValue)) {
+            cancelEdit();
+            return;
+        }
+        setPageRows([...session.rows]);
+        setEditedCells(new Set(session.editedCells));
         cancelEdit();
         markDirty();
-    }, [cancelEdit, editValue, editingColumn, editingRow, markDirty, page]);
+    }, [cancelEdit, editValue, editingColumn, editingRow, markDirty]);
 
     const loadParquet = useCallback(async (payload: { path?: string; buffer?: number[]; readOnly?: boolean }) => {
         setLoading(true);
         setError(null);
         setFileInfo(null);
         fileInfoRef.current = null;
+        sessionRef.current?.reset();
+        sessionRef.current = null;
         setPageRows([]);
-        pageRowsRef.current = [];
-        editsRef.current.clear();
-        pageCache.current.clear();
         setEditedCells(new Set());
         setInspected(null);
         searchSeq.current++;
@@ -290,8 +278,6 @@ function ParquetViewer() {
         savingRef.current = false;
         setSaving(false);
         const fileReadOnly = payload.readOnly === true;
-        readOnlyRef.current = fileReadOnly;
-        setReadOnly(fileReadOnly);
         try {
             // Files arrive either as an inline byte array (virtual documents) or as a
             // fetchable URI. For URIs we probe Range support so hyparquet pulls only the
@@ -302,11 +288,18 @@ function ParquetViewer() {
             fileInfoRef.current = info;
             setFileInfo(info);
 
-            // Saving re-reads every row, so editing a huge file is not offered at all.
-            const tooBigToEdit = info.rowCount > EDIT_ROW_LIMIT;
-            setLargeFile(tooBigToEdit);
-            readOnlyRef.current = fileReadOnly || tooBigToEdit;
-            setReadOnly(fileReadOnly || tooBigToEdit);
+            const session = new ParquetSession(
+                {
+                    rowCount: info.rowCount,
+                    readOnly: fileReadOnly,
+                    readRows: (start, end) => readParquetRows(info.file, info.metadata, start, end),
+                },
+                { pageSize: PAGE_SIZE, editRowLimit: EDIT_ROW_LIMIT },
+            );
+            sessionRef.current = session;
+            // Saving re-reads every row, so a huge file is read-only; the session derives both.
+            setLargeFile(session.largeFile);
+            setReadOnly(session.readOnly);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to load parquet file');
         } finally {
@@ -314,62 +307,30 @@ function ParquetViewer() {
         }
     }, [cancelEdit]);
 
-    // Rows are read one page at a time; a big file no longer materialises every row
-    // in the webview. Edits recorded so far are overlaid on the freshly read page.
+    // Rows are read one page at a time; a big file no longer materialises every row in the
+    // webview. The session owns the cache, the prefetch and the "only the newest page wins"
+    // guard, so this effect is only wiring.
     useEffect(() => {
-        const info = fileInfo;
-        if (!info) return;
-        const seq = ++pageLoadSeq.current;
-        const start = page * PAGE_SIZE;
-        const end = Math.min(info.rowCount, start + PAGE_SIZE);
-        const totalPages = Math.max(1, Math.ceil(info.rowCount / PAGE_SIZE));
-
-        const apply = (rows: Record<string, unknown>[]) => {
-            if (seq !== pageLoadSeq.current) return;
-            const merged = rows.map((row, offset) => {
-                const patch = editsRef.current.get(start + offset);
-                return patch ? { ...row, ...patch } : row;
+        const session = sessionRef.current;
+        if (!session) return;
+        let live = true;
+        setPageLoading(true);
+        void session
+            .showPage(page)
+            .then(snapshot => {
+                if (!live || snapshot.stale) return;
+                setPageRows(snapshot.rows);
+                setPageLoading(false);
+            })
+            .catch((e: unknown) => {
+                if (!live) return;
+                setPageLoading(false);
+                setError(e instanceof Error ? e.message : 'Failed to read rows');
             });
-            pageRowsRef.current = merged;
-            setPageRows(merged);
-            setPageLoading(false);
+        session.prefetch(page + 1);
+        return () => {
+            live = false;
         };
-
-        const cachePage = (pageIndex: number, rows: Record<string, unknown>[]) => {
-            if (!rows.length) return;
-            if (pageCache.current.size >= 6) {
-                const oldest = pageCache.current.keys().next().value;
-                if (oldest !== undefined) pageCache.current.delete(oldest);
-            }
-            pageCache.current.set(pageIndex, rows);
-        };
-
-        const cached = pageCache.current.get(page);
-        if (cached) {
-            apply(cached);
-        } else {
-            setPageLoading(true);
-            void readParquetRows(info.file, info.metadata, start, end)
-                .then(rows => {
-                    cachePage(page, rows);
-                    apply(rows);
-                })
-                .catch(e => {
-                    if (seq !== pageLoadSeq.current) return;
-                    setPageLoading(false);
-                    setError(e instanceof Error ? e.message : 'Failed to read rows');
-                });
-        }
-
-        // Prefetch the next page: one page of range reads in the background, so the
-        // common "read forward" motion is instant even on a remote/large file.
-        const nextPage = page + 1;
-        if (nextPage < totalPages && !pageCache.current.has(nextPage)) {
-            const nextStart = nextPage * PAGE_SIZE;
-            void readParquetRows(info.file, info.metadata, nextStart, Math.min(info.rowCount, nextStart + PAGE_SIZE))
-                .then(rows => cachePage(nextPage, rows))
-                .catch(() => undefined);
-        }
     }, [fileInfo, page]);
 
     /** Every page change drops the inspector: it points at a row on the old page. */
@@ -397,10 +358,11 @@ function ParquetViewer() {
 
     const runSearch = useCallback(async () => {
         const info = fileInfoRef.current;
+        const session = sessionRef.current;
         const needle = query.trim().toLowerCase();
         const seq = ++searchSeq.current;
         setMatchRows(new Set());
-        if (!info || !needle) {
+        if (!info || !session || !needle) {
             setSearching(false);
             setSearchProgress(null);
             return;
@@ -410,11 +372,12 @@ function ParquetViewer() {
         const found = new Set<number>();
         try {
             // Batch by batch, so a 250k-row file never lands in memory at once and the
-            // scan can be cancelled by a newer query.
+            // scan can be cancelled by a newer query. Reading through the session means the
+            // scan sees edited cells, exactly like the table does.
             for (let start = 0; start < info.rowCount; start += SEARCH_BATCH) {
                 if (seq !== searchSeq.current) return;
                 const end = Math.min(info.rowCount, start + SEARCH_BATCH);
-                const rows = await readParquetRows(info.file, info.metadata, start, end);
+                const rows = await session.readRange(start, end);
                 for (let offset = 0; offset < rows.length; offset++) {
                     const row = rows[offset];
                     const hit = info.columns.some(column =>

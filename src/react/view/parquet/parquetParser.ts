@@ -109,20 +109,6 @@ export async function readParquetRows(
         compressors,
     });
 }
-export async function readAllParquetRows(file: AsyncBuffer, metadata: FileMetaData): Promise<Record<string, unknown>[]> {
-    const rowCount = Number(metadata.num_rows);
-    if (rowCount <= 0) {
-        return [];
-    }
-    return parquetReadObjects({
-        file,
-        metadata,
-        rowStart: 0,
-        rowEnd: rowCount,
-        rowFormat: 'object',
-        compressors,
-    });
-}
 
 function inferColumnType(values: unknown[]): BasicType {
     let hasFloat = false;
