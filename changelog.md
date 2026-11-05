@@ -1,5 +1,19 @@
 # Change log
 
+# 4.4.1 2026-11-05
+
+Parquet viewer:
+
+- Follow the VS Code theme. The separate light/dark switch is gone: the page, the native
+  inputs and the antd widgets now read the editor's colours, so a light view no longer pairs
+  with a black search box, and a dark view no longer pairs with a white "row" box.
+- Search matches are marked with an opaque chip instead of a translucent wash, so a hit stays
+  readable on top of the coloured values underneath.
+
+JSONL viewer:
+
+- Same search-mark change: hits are no longer a slightly different shade of green.
+
 # 4.4.0 2026-11-05
 
 JSONL viewer:
