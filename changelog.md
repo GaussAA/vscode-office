@@ -1,5 +1,39 @@
 # Change log
 
+# 4.4.0 2026-11-05
+
+JSONL viewer:
+
+- Open large logs: the file is read in windows instead of being loaded whole, so indexing a
+  500 MB log costs one chunk of memory plus the line index.
+- One line is exactly one of four things (empty / invalid / too large / value); the detail
+  pane and the directory now agree on that, instead of deciding separately.
+- The entry tree is bounded and decides its own wrapping; entries above 500 nodes stay
+  single-line so the virtual list keeps working.
+- "… N more keys" is translated.
+- Search streams progress, can be cancelled, and a newer search stops the previous one.
+
+Parquet viewer:
+
+- `LIST`/`MAP`/`STRUCT` columns are no longer offered for editing, and a `LIST<STRING>` column
+  now shows the structure icon instead of the string icon (the two used to disagree).
+
+Excel:
+
+- Fix Find & Replace: replacing a match never modified the cell.
+
+EPUB:
+
+- Fix reader theming when exactly one document is rendered.
+
+HTTP client:
+
+- Fix decoding of responses that declare `utf-16be` (they threw instead of decoding).
+
+Git history:
+
+- Fix the macOS git detection branch that could never fire when `xcode-select` was missing.
+
 # 4.2.2 2026-10-15
 
 Markdown Editor:
