@@ -187,7 +187,6 @@ export class GitHistoryPanel {
         panel.webview.options = {
             ...panel.webview.options,
             enableScripts: true,
-            retainContextWhenHidden: true,
             localResourceRoots: GitHistoryPanel.getLocalResourceRoots(context),
         };
 

@@ -23,12 +23,12 @@ export interface GitCommit {
     readonly email: string;
     readonly date: number;
     readonly message: string;
-    readonly heads: ReadonlyArray<string>;
-    readonly tags: ReadonlyArray<GitCommitTag>;
-    readonly remotes: ReadonlyArray<GitCommitRemote>;
-    readonly stash: GitCommitStash | null;
+    readonly heads: string[];
+    readonly tags: GitCommitTag[];
+    readonly remotes: GitCommitRemote[];
+    stash: GitCommitStash | null;
     /** Whether the commit is reachable from the current HEAD (ancestor). */
-    readonly onCurrentBranch?: boolean;
+    onCurrentBranch?: boolean;
 }
 
 export type GitFileStatus = 'A' | 'M' | 'D' | 'R' | 'U';
@@ -53,7 +53,7 @@ export interface GitCommitDetails {
     readonly committerEmail: string;
     readonly committerDate: number;
     readonly body: string;
-    readonly fileChanges: ReadonlyArray<GitFileChange>;
+    fileChanges: ReadonlyArray<GitFileChange>;
 }
 
 export interface GitStash {
@@ -173,10 +173,10 @@ export interface GitRefRemote {
 }
 
 export interface GitRefData {
-    readonly head: string | null;
-    readonly heads: ReadonlyArray<GitRefHead>;
-    readonly tags: ReadonlyArray<GitRefTag>;
-    readonly remotes: ReadonlyArray<GitRefRemote>;
+    head: string | null;
+    readonly heads: GitRefHead[];
+    readonly tags: GitRefTag[];
+    readonly remotes: GitRefRemote[];
 }
 
 export interface GitExecutable {

@@ -147,8 +147,10 @@ export default function ToolbarTooltip({ content, children, wrap = false, pinOnC
             >
                 {cloneElement(children, {
                     ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
+                    // Suppress the native title bubble: the tooltip replaces it. `children` is a
+                    // generic element, so the props are narrowed to what this wrapper touches.
                     title: undefined,
-                })}
+                } as Partial<{ title?: string; 'aria-label'?: string }>)}
             </span>
             {visible && content && (() => {
                 const portalRoot = document.querySelector('.git-graph') ?? document.body;

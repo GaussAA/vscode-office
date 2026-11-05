@@ -1,90 +1,5 @@
 [
   {
-    "file": "src/gitHistory/provider/gitHistoryPanel.ts",
-    "code": "TS2353",
-    "message": "Object literal may only specify known properties, and 'gitHistorySettings' does not exist in type 'ViewOption'."
-  },
-  {
-    "file": "src/gitHistory/provider/gitHistoryPanel.ts",
-    "code": "TS2353",
-    "message": "Object literal may only specify known properties, and 'retainContextWhenHidden' does not exist in type 'WebviewOptions'."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2339",
-    "message": "Property 'push' does not exist on type 'readonly GitCommitRemote[]'."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2339",
-    "message": "Property 'push' does not exist on type 'readonly GitCommitTag[]'."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2339",
-    "message": "Property 'push' does not exist on type 'readonly GitRefHead[]'."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2339",
-    "message": "Property 'push' does not exist on type 'readonly GitRefRemote[]'."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2339",
-    "message": "Property 'push' does not exist on type 'readonly GitRefTag[]'."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2352",
-    "message": "Conversion of type 'GitCommit' to type '{ heads: string[]; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2540",
-    "message": "Cannot assign to 'fileChanges' because it is a read-only property."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2540",
-    "message": "Cannot assign to 'fileChanges' because it is a read-only property."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2540",
-    "message": "Cannot assign to 'head' because it is a read-only property."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2540",
-    "message": "Cannot assign to 'onCurrentBranch' because it is a read-only property."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2540",
-    "message": "Cannot assign to 'onCurrentBranch' because it is a read-only property."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2540",
-    "message": "Cannot assign to 'onCurrentBranch' because it is a read-only property."
-  },
-  {
-    "file": "src/gitHistory/service/commitService.ts",
-    "code": "TS2540",
-    "message": "Cannot assign to 'stash' because it is a read-only property."
-  },
-  {
-    "file": "src/gitHistory/service/findGit.ts",
-    "code": "TS2367",
-    "message": "This comparison appears to be unintentional because the types 'string' and 'number' have no overlap."
-  },
-  {
-    "file": "src/gitHistory/service/findGit.ts",
-    "code": "TS2769",
-    "message": "No overload matches this call."
-  },
-  {
     "file": "src/provider/http/providers/customVariableDiagnosticsProvider.ts",
     "code": "TS2769",
     "message": "No overload matches this call."
@@ -198,11 +113,6 @@
     "file": "src/react/view/epub/epubConfig.ts",
     "code": "TS2488",
     "message": "Type 'Contents' must have a '[Symbol.iterator]()' method that returns an iterator."
-  },
-  {
-    "file": "src/react/view/gitHistory/components/ToolbarTooltip.tsx",
-    "code": "TS2769",
-    "message": "No overload matches this call."
   },
   {
     "file": "src/react/view/xmind/xmindParser.ts",

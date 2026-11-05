@@ -33,7 +33,10 @@ function findGitOnDarwin(): Promise<GitExecutable> {
             if (gitPath !== '/usr/bin/git') {
                 getGitExecutable(gitPath).then(resolve, reject);
             } else {
-                exec('xcode-select -p', (xcodeErr: NodeJS.ErrnoException | null) => {
+                exec('xcode-select -p', xcodeErr => {
+                    // exec's error carries `code?: number`; annotating it as ErrnoException
+                    // (whose `code` is a string) made this comparison impossible and broke
+                    // the overload resolution above it.
                     if (xcodeErr?.code === 2) reject();
                     else getGitExecutable(gitPath).then(resolve, reject);
                 });
