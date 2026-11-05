@@ -236,6 +236,24 @@ const scenarios = [
             return `${state.count} at ${state.range}, ${state.hits} highlighted cell(s)`
         },
     },    {
+        name: 'upstream-viewers-smoke',
+        async run({ page, base }) {
+            // React routes only: html/pdf are provider-served static pages and markdown has its own editor bundle.
+            const routes = ['image', 'svg', 'excel', 'zip', 'word', 'ppt', 'font', 'epub', 'icns', 'psd', 'xmind', 'webUnsupported']
+            const failures = []
+            for (const route of routes) {
+                page.clearExceptions()
+                await page.navigate(`${base}/harness-route?route=${route}`)
+                await page.sleep(900)
+                const mounted = await page.evaluate(`!!document.querySelector('#root')?.children.length`)
+                const errors = page.exceptions()
+                if (!mounted) failures.push(`${route}: nothing mounted`)
+                if (errors.length) failures.push(`${route}: ${errors[0].split('\n')[0]}`)
+            }
+            expect(failures.length === 0, failures.join(' | '))
+            return `${routes.length} routes mounted without uncaught errors`
+        },
+    },    {
         name: 'parquet-prefetch',
         async run({ page, base, stats }) {
             await openParquet(page, base, '?mixed=1')
@@ -299,5 +317,9 @@ main().catch(error => {
     console.error(error instanceof Error ? error.message : error)
     process.exit(1)
 })
+
+
+
+
 
 

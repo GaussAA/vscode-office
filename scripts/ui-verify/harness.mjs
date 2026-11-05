@@ -209,6 +209,33 @@ function serveParquet(req, res, file, stats, supportRange) {
     res.end(data)
 }
 
+/**
+ * Smoke bridge for the upstream viewers: answer `init` with an empty file so the view
+ * mounts. It is not a rendering test — it catches import-time and mount-time crashes
+ * introduced by fork-wide changes (entry, provider, shared utils).
+ */
+function smokeStub(route) {
+    const name = { excel: 'smoke.xlsx', word: 'smoke.docx', ppt: 'smoke.pptx', pdf: 'smoke.pdf', archive: 'smoke.zip', image: 'smoke.png', html: 'smoke.html', markdown: 'smoke.md', font: 'smoke.ttf', svg: 'smoke.svg', mermaid: 'smoke.mmd' }[route] ?? 'smoke.bin'
+    return `<script>
+(function () {
+  const api = {
+    postMessage(msg) {
+      if (!msg || msg.type !== 'init') return;
+      setTimeout(function () {
+        const content = ${JSON.stringify(name)} === 'smoke.ttf'
+          ? { fileName: 'smoke.ttf', path: '/codicon.ttf', readOnly: true }
+          : { fileName: ${JSON.stringify(name)}, path: '/${name}', buffer: [], content: '', readOnly: true };
+        window.postMessage({ type: 'open', content: content }, '*');
+      }, 60);
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`
+}
+
 export function startHarness(fixtures, port = 0) {
     if (!existsSync(join(WEBVIEW_ROOT, 'index.html'))) {
         throw new Error('out/webview/index.html is missing — run `pnpm build` first')
@@ -227,15 +254,27 @@ export function startHarness(fixtures, port = 0) {
             return
         }
 
-        if (path === '/harness' || path === '/harness-parquet') {
-            const route = path === '/harness-parquet' ? 'parquet' : 'jsonl'
+        if (path === '/harness' || path === '/harness-parquet' || path === '/harness-route') {
+            const route = path === '/harness-parquet'
+                ? 'parquet'
+                : path === '/harness-route' ? (url.searchParams.get('route') ?? 'html') : 'jsonl'
             const theme = url.searchParams.get('theme') === 'light' ? LIGHT : DARK
-            const stub = route === 'parquet' ? parquetStub() : jsonlStub(entries)
+            const stub = path === '/harness-route'
+                ? smokeStub(url.searchParams.get('route') ?? 'html')
+                : route === 'parquet' ? parquetStub() : jsonlStub(entries)
             const html = indexHtml
                 .replace(/<meta id="office-configs"[^>]*>/, `<meta id="office-configs" data-config='${JSON.stringify({ route })}'>`)
                 .replace('<script type="module"', `<style>${theme}</style>\n${stub}\n<script type="module"`)
             res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
             res.end(html)
+            return
+        }
+
+        if (path === '/codicon.ttf') {
+            const font = join(repoRoot, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.ttf')
+            if (!existsSync(font)) { res.writeHead(404).end('missing font'); return }
+            res.writeHead(200, { 'content-type': 'font/ttf' })
+            res.end(readFileSync(font))
             return
         }
 
@@ -269,3 +308,5 @@ export function startHarness(fixtures, port = 0) {
         })
     })
 }
+
+

@@ -58,3 +58,19 @@ Rules that keep this suite useful:
 - Assert on **user-visible facts** (text, ranges, counts, computed heights), not internals.
 - One scenario per behaviour; name it after the fact it proves.
 - A scenario must fail for a real regression: no screenshot-only checks.
+
+## Route smoke vs. real scenarios
+
+`upstream-viewers-smoke` walks every **React** route (`image`, `svg`, `excel`, `zip`,
+`word`, `ppt`, `font`, `epub`, `icns`, `psd`, `xmind`, `webUnsupported`) with a minimal
+`open` payload and asserts that something mounted and nothing threw. Its job is to catch
+fork-wide breakage (entry, provider, shared utilities), **not** rendering correctness.
+
+Three viewers are not React routes and are therefore not in the smoke list:
+
+- `html` and `pdf` are served by the extension provider as standalone HTML documents
+  (`loadWorkspaceHtml` / `loadPdfViewer`), so there is no bundle to mount.
+- `markdown` ships its own Vditor-based editor bundle, not the `out/webview` entry.
+
+If you touch those paths, verify them manually in VS Code; extending the harness to cover
+them means faking their own host protocols, which is a separate piece of work.

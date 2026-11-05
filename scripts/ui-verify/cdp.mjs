@@ -99,8 +99,16 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
     const pending = new Map()
     let sequence = 0
 
+    // Uncaught page errors are evidence too: a view that throws while mounting is broken
+    // even if the DOM looks present.
+    const exceptions = []
     socket.addEventListener('message', event => {
         const message = JSON.parse(event.data)
+        if (message.method === 'Runtime.exceptionThrown') {
+            const details = message.params?.exceptionDetails
+            exceptions.push(details?.exception?.description ?? details?.text ?? 'unknown exception')
+            return
+        }
         const slot = pending.get(message.id)
         if (!slot) return
         pending.delete(message.id)
@@ -153,6 +161,8 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
         },
         sleep,
         child,
+        exceptions: () => [...exceptions],
+        clearExceptions: () => { exceptions.length = 0 },
         close: async () => {
             try { socket.close() } catch { /* already closed */ }
             try { child.kill() } catch { /* already gone */ }
@@ -174,6 +184,7 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
         },
     }
 }
+
 
 
 
