@@ -91,6 +91,19 @@ export function summarizeDecodedLine(line: number, decoded: DecodedLine): JsonlE
     return classify(line, decoded, true);
 }
 
+/**
+ * A window of text centred on the first match. Long JSONL lines hide their match
+ * hundreds of characters in, so the directory row shows the snippet instead of the
+ * line's head when a search is active.
+ */
+export function matchSnippet(text: string, needle: string, radius = 48): string | undefined {
+    const at = text.toLowerCase().indexOf(needle);
+    if (at < 0) return undefined;
+    const start = Math.max(0, at - radius);
+    const end = Math.min(text.length, at + needle.length + radius);
+    return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
+}
+
 function classify(line: number, decoded: DecodedLine, parse: boolean): JsonlEntrySummary {
     const { text, size } = decoded;
     const raw = truncate(text, JSONL_RAW_PREVIEW_CHARS);

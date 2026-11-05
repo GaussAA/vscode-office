@@ -7,19 +7,20 @@ import {
     buildJsonlEntry,
     buildJsonlIndex,
     buildJsonlSummaries,
+    matchSnippet,
     readJsonlLineText,
     summarizeDecodedLine,
     type JsonlIndex,
 } from '@/service/jsonlDocument';
 import {
     JSONL_CHUNK_SIZE,
-    JSONL_SEARCH_LIMIT,
+    JSONL_SEARCH_BATCH,
+    JSONL_SEARCH_MAX_MATCHES,
     type JsonlEntryPayload,
     type JsonlInfoPayload,
     type JsonlRangeRequest,
-    type JsonlSearchProgress,
+    type JsonlSearchBatch,
     type JsonlSearchRequest,
-    type JsonlSearchResult,
 } from '@/common/jsonlTypes';
 
 /** Lines scanned per event-loop turn while searching. */
@@ -100,16 +101,25 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
             const total = document.index.lineCount;
 
             if (!query) {
-                handler.emit('jsonlSearchResult', {
-                    requestId, query, entries: [], truncated: false, scanned: 0, matches: 0,
-                } satisfies JsonlSearchResult);
+                handler.emit('jsonlSearchBatch', {
+                    requestId, query, entries: [], scanned: 0, total, matches: 0, done: true, capped: false,
+                } satisfies JsonlSearchBatch);
                 return;
             }
 
             const needle = query.toLowerCase();
-            const entries: JsonlEntrySummary[] = [];
             let matches = 0;
             let scanned = 0;
+            let capped = false;
+            let pending: JsonlEntrySummary[] = [];
+
+            const flush = (done: boolean) => {
+                const batch: JsonlSearchBatch = {
+                    requestId, query, entries: pending, scanned, total, matches, done, capped,
+                };
+                pending = [];
+                handler.emit('jsonlSearchBatch', batch);
+            };
 
             const step = () => {
                 if (requestId !== latestSearchId) return;
@@ -118,35 +128,28 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
                     const decoded = readJsonlLineText(document.bytes, document.index, line);
                     if (!decoded.text.toLowerCase().includes(needle)) continue;
                     matches++;
-                    if (entries.length < JSONL_SEARCH_LIMIT) {
-                        entries.push(summarizeDecodedLine(line, decoded));
+                    pending.push({
+                        ...summarizeDecodedLine(line, decoded),
+                        snippet: matchSnippet(decoded.text, needle),
+                    });
+                    if (pending.length >= JSONL_SEARCH_BATCH) flush(false);
+                    if (matches >= JSONL_SEARCH_MAX_MATCHES) {
+                        capped = true;
+                        break;
                     }
                 }
                 scanned = end;
 
-                if (scanned < total && entries.length < JSONL_SEARCH_LIMIT) {
-                    const progress: JsonlSearchProgress = {
-                        requestId, scanned, total, matches,
-                    };
-                    handler.emit('jsonlSearchProgress', progress);
-                    setTimeout(step, 0);
+                if (capped || scanned >= total) {
+                    flush(true);
                     return;
                 }
-
-                const result: JsonlSearchResult = {
-                    requestId,
-                    query,
-                    entries,
-                    truncated: matches > entries.length,
-                    scanned,
-                    matches,
-                };
-                handler.emit('jsonlSearchResult', result);
+                flush(false);
+                setTimeout(step, 0);
             };
 
             setTimeout(step, 0);
         };
-
         handler
             .on('init', () => { void emitInfo(); })
             .on('jsonlReload', () => { void reload(); })
@@ -177,3 +180,5 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
         await ReactApp.view(webview, { route: 'jsonl' });
     }
 }
+
+

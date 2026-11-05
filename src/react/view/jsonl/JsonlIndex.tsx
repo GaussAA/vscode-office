@@ -3,7 +3,7 @@ import type { DataNode } from 'antd/es/tree';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { JsonlEntrySummary } from '../../../common/jsonlTypes.ts';
-import { ROW_HEIGHT, formatBytes } from './jsonlFormat.tsx';
+import { ROW_HEIGHT, formatBytes, highlightParts } from './jsonlFormat.tsx';
 
 interface Props {
     /** Ordered rows: a contiguous window in directory mode, the matches in search mode. */
@@ -16,6 +16,8 @@ interface Props {
     onNeedMore?: () => void;
     header?: ReactNode;
     emptyText?: string;
+    /** Active search term, used to highlight matches in each row. */
+    highlight?: string;
 }
 
 const PAGE_STEP = 10;
@@ -29,6 +31,7 @@ export default function JsonlIndex({
     onNeedMore,
     header,
     emptyText = 'No entries',
+    highlight,
 }: Props) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [height, setHeight] = useState(320);
@@ -76,6 +79,14 @@ export default function JsonlIndex({
         }
     }, [holder, selected, positionOf]);
 
+    const renderText = useCallback((entry: JsonlEntrySummary) => {
+        const text = entry.snippet ?? entry.raw;
+        return highlightParts(text, highlight).map((part, position) => (
+            part.hit
+                ? <mark key={position} className="jsonl-hit">{part.text}</mark>
+                : <span key={position}>{part.text}</span>
+        ));
+    }, [highlight]);
     const treeData = useMemo<DataNode[]>(() => {
         return items.map(entry => {
             const index = entry.index;
@@ -92,7 +103,7 @@ export default function JsonlIndex({
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
                         <span className="jsonl-chip jsonl-chip--error">invalid</span>
-                        <span className="jsonl-entry__raw jsonl-entry__raw--error">{entry.raw}</span>
+                        <span className="jsonl-entry__raw jsonl-entry__raw--error">{renderText(entry)}</span>
                     </span>
                 );
             } else if (entry.tooLarge) {
@@ -108,13 +119,13 @@ export default function JsonlIndex({
                     <span className="jsonl-entry">
                         <span className="jsonl-lineno">{index + 1}</span>
                         {entry.label !== undefined && <span className="jsonl-entry__label">{entry.label}</span>}
-                        <span className="jsonl-entry__raw">{entry.raw}</span>
+                        <span className="jsonl-entry__raw">{renderText(entry)}</span>
                     </span>
                 );
             }
             return { key: String(index), title, isLeaf: true };
         });
-    }, [items]);
+    }, [items, renderText]);
 
     const onKeyDown = useCallback((event: React.KeyboardEvent) => {
         const position = positionOf.get(selected) ?? 0;
@@ -158,3 +169,4 @@ export default function JsonlIndex({
         </div>
     );
 }
+

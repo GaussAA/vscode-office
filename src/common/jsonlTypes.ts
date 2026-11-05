@@ -51,6 +51,8 @@ export interface JsonlEntrySummary {
     raw: string;
     /** Derived identity, e.g. the value of the top-level `id` key. */
     label?: string;
+    /** Search-only: a window of text around the match, instead of the line's head. */
+    snippet?: string;
     empty?: boolean;
     /** Parse error message, when the line is not valid JSON. */
     error?: string;
@@ -78,27 +80,27 @@ export interface JsonlEntryPayload {
 
 /* ---------- search ---------- */
 
-/** Matches returned to the directory pane; more than this and the result is truncated. */
-export const JSONL_SEARCH_LIMIT = 500;
+/** Matches streamed to the directory pane per message. */
+export const JSONL_SEARCH_BATCH = 200;
+
+/** Hard stop for a single scan, so a broad query cannot exhaust memory. */
+export const JSONL_SEARCH_MAX_MATCHES = 10_000;
 
 export interface JsonlSearchRequest {
     requestId: number;
     query: string;
 }
 
-export interface JsonlSearchProgress {
+export interface JsonlSearchBatch {
     requestId: number;
+    query: string;
+    /** Matches found since the previous batch, not-yet-sent ones. */
+    entries: JsonlEntrySummary[];
     scanned: number;
     total: number;
     matches: number;
-}
-
-export interface JsonlSearchResult {
-    requestId: number;
-    query: string;
-    entries: JsonlEntrySummary[];
-    /** True when the scan stopped early (limit reached) or more matches exist than returned. */
-    truncated: boolean;
-    scanned: number;
-    matches: number;
+    /** True on the final batch of a scan. */
+    done: boolean;
+    /** True when the scan stopped because JSONL_SEARCH_MAX_MATCHES was reached. */
+    capped: boolean;
 }

@@ -8,8 +8,7 @@ import {
     type JsonlEntryPayload,
     type JsonlEntrySummary,
     type JsonlInfoPayload,
-    type JsonlSearchProgress,
-    type JsonlSearchResult,
+    type JsonlSearchBatch,
 } from '../../../common/jsonlTypes.ts';
 import { handler } from '../../util/vscode.ts';
 import {
@@ -30,6 +29,14 @@ interface PersistedState {
     left: number;
     selected: number;
     mode: DetailMode;
+}
+
+interface SearchMeta {
+    matches: number;
+    scanned: number;
+    total: number;
+    done: boolean;
+    capped: boolean;
 }
 
 function loadPersisted(cacheId: string): PersistedState | null {
@@ -70,8 +77,8 @@ export default function JsonlViewer() {
 
     const [query, setQuery] = useState('');
     const [searching, setSearching] = useState(false);
-    const [searchResult, setSearchResult] = useState<JsonlSearchResult | null>(null);
-    const [searchProgress, setSearchProgress] = useState<JsonlSearchProgress | null>(null);
+    const [searchEntries, setSearchEntries] = useState<JsonlEntrySummary[]>([]);
+    const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
 
     const infoRef = useRef<JsonlInfoPayload | null>(null);
     const selectedRef = useRef(0);
@@ -79,6 +86,7 @@ export default function JsonlViewer() {
     const requestKind = useRef<'initial' | 'append'>('initial');
     const searchSeq = useRef(0);
     const searchTimer = useRef<number | undefined>(undefined);
+    const searchAutoSelected = useRef(false);
     const pendingJump = useRef<number | null>(null);
 
     useEffect(() => { selectedRef.current = selected; }, [selected]);
@@ -108,6 +116,17 @@ export default function JsonlViewer() {
         requestRange(begin, begin + JSONL_CHUNK_SIZE);
     }, [requestRange]);
 
+    const startSearch = useCallback((text: string) => {
+        const trimmed = text.trim();
+        const requestId = ++searchSeq.current;
+        searchAutoSelected.current = false;
+        setSearchEntries([]);
+        setSearchMeta(null);
+        if (!trimmed) return;
+        setSearching(true);
+        handler.emit('jsonlSearch', { requestId, query: trimmed });
+    }, []);
+
     useEffect(() => {
         handler.on('jsonlInfo', (payload: JsonlInfoPayload) => {
             const previous = infoRef.current;
@@ -124,9 +143,9 @@ export default function JsonlViewer() {
                 }
                 target = restored?.selected ?? 0;
                 setQuery('');
-                setSearchResult(null);
                 setSearching(false);
-                setSearchProgress(null);
+                setSearchEntries([]);
+                setSearchMeta(null);
                 searchSeq.current++;
             }
             target = Math.max(0, Math.min(payload.lineCount - 1, target));
@@ -138,12 +157,7 @@ export default function JsonlViewer() {
 
             // the file changed under us: re-run an active search against the new bytes
             const activeQuery = queryRef.current.trim();
-            if (activeQuery) {
-                const requestId = ++searchSeq.current;
-                setSearching(true);
-                setSearchProgress(null);
-                handler.emit('jsonlSearch', { requestId, query: activeQuery });
-            }
+            if (activeQuery) startSearch(activeQuery);
         });
 
         handler.on('jsonlEntries', (payload: JsonlEntriesPayload) => {
@@ -167,33 +181,37 @@ export default function JsonlViewer() {
             setDetailLoading(false);
         });
 
-        handler.on('jsonlSearchProgress', (progress: JsonlSearchProgress) => {
-            if (progress.requestId !== searchSeq.current) return;
-            setSearchProgress(progress);
-        });
-
-        handler.on('jsonlSearchResult', (result: JsonlSearchResult) => {
-            if (result.requestId !== searchSeq.current) return;
-            setSearching(false);
-            setSearchProgress(null);
-            setSearchResult(result.query ? result : null);
-            if (result.query && result.entries.length) {
-                const currentIsMatch = result.entries.some(entry => entry.index === selectedRef.current);
-                if (!currentIsMatch) selectEntry(result.entries[0].index);
+        handler.on('jsonlSearchBatch', (batch: JsonlSearchBatch) => {
+            if (batch.requestId !== searchSeq.current) return;
+            if (batch.entries.length) {
+                setSearchEntries(prev => [...prev, ...batch.entries]);
+                if (!searchAutoSelected.current) {
+                    searchAutoSelected.current = true;
+                    const first = batch.entries[0];
+                    if (first) selectEntry(first.index);
+                }
             }
+            setSearchMeta({
+                matches: batch.matches,
+                scanned: batch.scanned,
+                total: batch.total,
+                done: batch.done,
+                capped: batch.capped,
+            });
+            if (batch.done) setSearching(false);
         });
 
         handler.emit('init');
-    }, [recenter, requestEntry, selectEntry]);
+    }, [recenter, requestEntry, selectEntry, startSearch]);
 
-    // search: debounce, cancel stale scans, and restore the directory when cleared
+    // search: debounce typing, and restore the directory when cleared
     useEffect(() => {
         window.clearTimeout(searchTimer.current);
         const trimmed = query.trim();
         if (!trimmed) {
             setSearching(false);
-            setSearchProgress(null);
-            setSearchResult(null);
+            setSearchEntries([]);
+            setSearchMeta(null);
             if (info) {
                 const target = pendingJump.current ?? selectedRef.current;
                 pendingJump.current = null;
@@ -201,14 +219,9 @@ export default function JsonlViewer() {
             }
             return;
         }
-        setSearching(true);
-        setSearchProgress(null);
-        const requestId = ++searchSeq.current;
-        searchTimer.current = window.setTimeout(() => {
-            handler.emit('jsonlSearch', { requestId, query: trimmed });
-        }, SEARCH_DEBOUNCE_MS);
+        searchTimer.current = window.setTimeout(() => startSearch(trimmed), SEARCH_DEBOUNCE_MS);
         return () => window.clearTimeout(searchTimer.current);
-    }, [query, info, recenter]);
+    }, [query, info, recenter, startSearch]);
 
     useEffect(() => {
         if (!info) return;
@@ -221,17 +234,18 @@ export default function JsonlViewer() {
         requestRange(loaded.end, Math.min(info.lineCount, loaded.end + JSONL_CHUNK_SIZE));
     }, [info, loaded.end, chunkLoading, requestRange]);
 
-    const searchActive = searchResult !== null || searching;
+    const searchActive = query.trim().length > 0;
 
-    const items = useMemo<JsonlEntrySummary[]>(() => {
-        if (searchResult) return searchResult.entries;
+    const directoryItems = useMemo<JsonlEntrySummary[]>(() => {
         const list: JsonlEntrySummary[] = [];
         for (let index = loaded.start; index < loaded.end; index++) {
             const entry = entries.get(index);
             if (entry) list.push(entry);
         }
         return list;
-    }, [searchResult, entries, loaded]);
+    }, [entries, loaded]);
+
+    const items = searchActive ? searchEntries : directoryItems;
 
     const jump = useCallback(() => {
         if (!info || jumpValue == null) return;
@@ -248,27 +262,26 @@ export default function JsonlViewer() {
     }, [info, jumpValue, loaded, query, recenter, requestEntry, selectEntry]);
 
     const banner = useMemo(() => {
-        if (!query.trim()) return undefined;
-        if (searching) {
-            const percent = searchProgress && searchProgress.total > 0
-                ? Math.round((searchProgress.scanned / searchProgress.total) * 100)
+        if (!searchActive) return undefined;
+        if (searching || (searchMeta && !searchMeta.done)) {
+            const percent = searchMeta && searchMeta.total > 0
+                ? Math.round((searchMeta.scanned / searchMeta.total) * 100)
                 : 0;
             return (
                 <div className="jsonl-index__banner">
-                    Searching… {percent}%
-                    {searchProgress ? ` · ${searchProgress.matches} matches` : ''}
+                    Searching… {percent}% · {searchMeta?.matches ?? 0} matches
                 </div>
             );
         }
-        if (!searchResult) return undefined;
+        if (!searchMeta) return undefined;
         return (
             <div className="jsonl-index__banner">
-                {searchResult.matches === 0
+                {searchMeta.matches === 0
                     ? 'No matches'
-                    : `${searchResult.matches} match${searchResult.matches === 1 ? '' : 'es'}${searchResult.truncated ? ` · showing first ${searchResult.entries.length}` : ''}`}
+                    : `${searchMeta.matches} match${searchMeta.matches === 1 ? '' : 'es'}${searchMeta.capped ? ' · stopped at 10,000' : ''}`}
             </div>
         );
-    }, [query, searching, searchProgress, searchResult]);
+    }, [searchActive, searching, searchMeta]);
 
     const themeTokens = useMemo(() => ({
         colorBgContainer: 'transparent',
@@ -339,6 +352,7 @@ export default function JsonlViewer() {
                             onSelect={selectEntry}
                             onNeedMore={searchActive ? undefined : onNeedMore}
                             header={banner}
+                            highlight={searchActive ? query.trim() : undefined}
                             emptyText={
                                 searchActive
                                     ? (searching ? 'Searching…' : 'No matches')
