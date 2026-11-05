@@ -12,11 +12,11 @@ import SponsorBar from '../components/SponsorBar.tsx';
 import {
     formatCellValue,
     PARQUET_PAGE_SIZE,
-    isColumnEditable,
     openParquetFile,
     parseCellInput,
     readParquetRows,
     writeParquetBuffer,
+    type ColumnCategory,
     type ParquetColumnInfo,
     type ParquetFileInfo,
 } from './parquetParser.ts';
@@ -50,8 +50,6 @@ function highlightCell(text: string, needle: string) {
 }
 const PARQUET_VSCODE_THEME_KEY = 'parquet-vscode-theme';
 
-type ColumnIconKind = 'bool' | 'numeric' | 'string' | 'datetime' | 'structure' | 'field';
-
 function loadParquetVscodeTheme(): boolean {
     const state = vscodeApi?.getState?.() as { parquetVscodeTheme?: boolean } | undefined;
     if (state?.parquetVscodeTheme !== undefined) {
@@ -76,23 +74,15 @@ function saveParquetVscodeTheme(vscodeTheme: boolean) {
     }
 }
 
-function resolveColumnIcon(type: string): { icon: string; kind: ColumnIconKind } {
-    const upper = `${type}`.toUpperCase();
-    if (upper.includes('BOOL')) return { icon: 'codicon-symbol-boolean', kind: 'bool' };
-    if (upper.includes('INT') || upper.includes('FLOAT') || upper.includes('DOUBLE') || upper.includes('DECIMAL') || upper.includes('NUM')) {
-        return { icon: 'codicon-symbol-numeric', kind: 'numeric' };
-    }
-    if (upper.includes('STRING') || upper.includes('BYTE') || upper.includes('UTF8')) {
-        return { icon: 'codicon-symbol-string', kind: 'string' };
-    }
-    if (upper.includes('TIME') || upper.includes('DATE')) {
-        return { icon: 'codicon-symbol-event', kind: 'datetime' };
-    }
-    if (upper.includes('JSON') || upper.includes('STRUCT') || upper.includes('MAP') || upper.includes('LIST')) {
-        return { icon: 'codicon-symbol-structure', kind: 'structure' };
-    }
-    return { icon: 'codicon-symbol-field', kind: 'field' };
-}
+/** Icon per category. The category itself is decided once, in parquetParser.categorizeType. */
+const COLUMN_ICONS: Record<ColumnCategory, string> = {
+    bool: 'codicon-symbol-boolean',
+    numeric: 'codicon-symbol-numeric',
+    string: 'codicon-symbol-string',
+    datetime: 'codicon-symbol-event',
+    structure: 'codicon-symbol-structure',
+    field: 'codicon-symbol-field',
+};
 
 type TableRow = Record<string, unknown> & { key: string };
 
@@ -217,7 +207,7 @@ function ParquetViewer() {
     }, [message, modal]);
 
     const startEdit = useCallback((rowIndex: number, column: ParquetColumnInfo, value: unknown) => {
-        if (sessionRef.current?.readOnly || !isColumnEditable(column.type)) return;
+        if (sessionRef.current?.readOnly || !column.editable) return;
         setEditingRow(rowIndex);
         setEditingColumn(column.name);
         setEditValue(formatCellValue(value));
@@ -438,7 +428,7 @@ function ParquetViewer() {
             },
         ];
         for (const column of fileInfo.columns) {
-            const kind = resolveColumnIcon(column.type).kind;
+            const kind = column.category;
             cols.push({
                 title: column.name,
                 dataIndex: column.name,
@@ -465,7 +455,7 @@ function ParquetViewer() {
                             />
                         );
                     }
-                    const cellKind = resolveColumnIcon(column.type).kind;
+                    const cellKind = column.category;
                     const isNull = value === null || value === undefined;
                     const edited = editedCells.has(`${rowIndex}:${column.name}`);
                     const classes = [
@@ -473,7 +463,7 @@ function ParquetViewer() {
                         `parquet-viewer__cell--${cellKind}`,
                         isNull ? 'parquet-viewer__cell--null' : '',
                         edited ? 'parquet-viewer__cell--edited' : '',
-                        !readOnly && isColumnEditable(column.type) ? 'parquet-viewer__cell--editable' : '',
+                        !readOnly && column.editable ? 'parquet-viewer__cell--editable' : '',
                     ].filter(Boolean).join(' ');
                     return (
                         <span
@@ -563,7 +553,8 @@ function ParquetViewer() {
                         )}
                         <div className="parquet-viewer__list">
                             {fileInfo?.columns.map((column) => {
-                                const { icon, kind } = resolveColumnIcon(column.type);
+                                const icon = COLUMN_ICONS[column.category];
+                                const kind = column.category;
                                 return (
                                 <div key={column.name} className="parquet-viewer__list-item">
                                     <span className={`codicon parquet-viewer__list-icon parquet-viewer__list-icon--${kind} ${icon}`} />

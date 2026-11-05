@@ -12,9 +12,40 @@ import { parquetWriteBuffer, type BasicType, type ColumnSource } from 'hyparquet
 // Fork addition: decode ZSTD/GZIP/BROTLI/LZ4 columns (upstream shipped SNAPPY only).
 import { compressors } from 'hyparquet-compressors';
 
+export type ColumnCategory = 'bool' | 'numeric' | 'string' | 'datetime' | 'structure' | 'field';
+
+/**
+ * The only place a parquet type string is decoded.
+ *
+ * The viewer needs three answers about a column — which icon and alignment it gets, whether a
+ * cell may be edited, and how typed input is parsed back. Each used to do its own
+ * `type.includes(...)` scan, in a different order, so a new logical type had to be taught to
+ * three functions and the answers could disagree (a `LIST<STRING>` looked like a string).
+ */
+export function categorizeType(type: string): ColumnCategory {
+    const upper = `${type}`.toUpperCase();
+    if (upper.includes('BOOL')) return 'bool';
+    if (upper.includes('JSON') || upper.includes('STRUCT') || upper.includes('MAP') || upper.includes('LIST')) {
+        return 'structure';
+    }
+    if (upper.includes('TIMESTAMP') || upper.includes('DATE') || upper.includes('TIME')) return 'datetime';
+    if (upper.includes('INT') || upper.includes('FLOAT') || upper.includes('DOUBLE')
+        || upper.includes('DECIMAL') || upper.includes('NUM')) {
+        return 'numeric';
+    }
+    if (upper.includes('STRING') || upper.includes('UTF8') || upper.includes('BYTE') || upper.includes('CHAR')) {
+        return 'string';
+    }
+    return 'field';
+}
+
 export interface ParquetColumnInfo {
     name: string;
+    /** Raw schema type, shown next to the name and used to parse typed input. */
     type: string;
+    /** Derived once, so the icon, alignment and editability cannot disagree. */
+    category: ColumnCategory;
+    editable: boolean;
 }
 
 export interface ParquetFileInfo {
@@ -73,9 +104,13 @@ export async function openParquetFile(source: ArrayBuffer | AsyncBuffer): Promis
     const columns: ParquetColumnInfo[] = [];
     for (const name of columnNames) {
         const element = findLeafElement(schemaTree, name.split('.'));
+        const type = element ? formatSchemaType(element) : 'UNKNOWN';
+        const category = categorizeType(type);
         columns.push({
             name,
-            type: element ? formatSchemaType(element) : 'UNKNOWN',
+            type,
+            category,
+            editable: category !== 'structure',
         });
     }
     return {
@@ -193,29 +228,27 @@ export function writeParquetBuffer(columns: ParquetColumnInfo[], rows: Record<st
 }
 
 export function isColumnEditable(type: string): boolean {
-    const upper = `${type}`.toUpperCase();
-    if (upper.includes('STRUCT') || upper.includes('MAP') || upper.includes('LIST')) {
-        return false;
-    }
-    return true;
+    return categorizeType(type) !== 'structure';
 }
 
 export function parseCellInput(text: string, type: string): unknown {
     const trimmed = text.trim();
     if (!trimmed) return null;
-    const upper = `${type}`.toUpperCase();
-    if (upper.includes('BOOL')) {
+    const category = categorizeType(type);
+
+    if (category === 'bool') {
         if (/^(true|1|yes)$/i.test(trimmed)) return true;
         if (/^(false|0|no)$/i.test(trimmed)) return false;
         return trimmed;
     }
-    if (upper.includes('INT') || upper.includes('FLOAT') || upper.includes('DOUBLE') || upper.includes('DECIMAL') || upper.includes('NUM')) {
+    if (category === 'numeric') {
         const number = Number(trimmed);
         if (isNaN(number)) return trimmed;
-        if (upper.includes('INT') && !upper.includes('INTERVAL')) return Math.trunc(number);
+        // INTERVAL also matches the numeric family but carries a fractional value.
+        if (upper(type).includes('INT') && !upper(type).includes('INTERVAL')) return Math.trunc(number);
         return number;
     }
-    if (upper.includes('JSON') || trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    if (category === 'structure' || trimmed.startsWith('{') || trimmed.startsWith('[')) {
         try {
             return JSON.parse(trimmed);
         } catch {
@@ -224,6 +257,8 @@ export function parseCellInput(text: string, type: string): unknown {
     }
     return trimmed;
 }
+
+const upper = (type: string) => `${type}`.toUpperCase();
 
 export function formatCellValue(value: unknown): string {
     if (value == null) {
