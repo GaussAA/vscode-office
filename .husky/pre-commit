@@ -5,7 +5,12 @@
 # mergeable with it. Write fork code in upstream style instead.
 pnpm exec lint-staged
 
-# typecheck / test 尚未接入：上游没有 typecheck 脚本，也没有测试脚本。
-# 等接上后在此追加，例如：
+# Unit tests: ~2s (esbuild bundles three modules, then node --test). They guard the
+# parser edge cases that DOM assertions cannot see, e.g. the countNodes 500/501
+# off-by-one that shipped once.
+pnpm test
+
+# Typecheck is still missing on purpose: upstream's tsconfig pairs
+# resolveJsonModule with moduleResolution "classic", so `tsc --noEmit` fails before
+# it checks a single file. Fix that first, then uncomment:
 #   pnpm exec tsc --noEmit
-#   pnpm test
