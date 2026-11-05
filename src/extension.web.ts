@@ -3,6 +3,7 @@
  * Desktop-only: HTTP, Git History, clipboard paste, Java decompile, archive viewer.
  */
 import * as vscode from 'vscode';
+import { customEditorOptions } from '@/common/customEditorOptions';
 import { Global } from './common/global';
 import { FileUtil } from './common/fileUtil';
 import { setExtensionHostContext } from './common/extensionHost';
@@ -26,7 +27,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	activateYaml(context);
 	activateXml(context);
 
-	const viewOption = { webviewOptions: { retainContextWhenHidden: true } };
+	const viewOption = customEditorOptions;
 	const markdownService = new MarkdownService(context);
 	const markdownEditorProvider = new MarkdownEditorProvider(context, { isWeb: true });
 	const viewerInstance = new OfficeViewerProvider(context);

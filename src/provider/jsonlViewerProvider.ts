@@ -1,3 +1,4 @@
+import type { CustomEditorOptions } from '@/common/customEditorOptions';
 import * as vscode from 'vscode';
 import { Handler } from '@/common/handler';
 import { ReactApp } from '@/common/reactApp';
@@ -34,7 +35,7 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
 
     constructor(private context: vscode.ExtensionContext) { }
 
-    bindCustomEditor(viewOption: { webviewOptions: vscode.WebviewPanelOptions }) {
+    bindCustomEditor(viewOption: CustomEditorOptions) {
         return vscode.window.registerCustomEditorProvider('chaowu21.jsonlViewer', this, viewOption);
     }
 

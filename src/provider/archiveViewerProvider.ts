@@ -1,3 +1,4 @@
+import type { CustomEditorOptions } from '@/common/customEditorOptions';
 import { ReactApp } from '@/common/reactApp';
 import { getFileSuffix } from '@/common/fileSuffix';
 import { Handler } from '@/common/handler';
@@ -17,7 +18,7 @@ export class ArchiveViewerProvider implements vscode.CustomReadonlyEditorProvide
 
 	constructor(private context: vscode.ExtensionContext) { }
 
-	bindCustomEditor(viewOption: { webviewOptions: vscode.WebviewPanelOptions }) {
+	bindCustomEditor(viewOption: CustomEditorOptions) {
 		return vscode.window.registerCustomEditorProvider('chaowu21.archiveViewer', this, viewOption);
 	}
 

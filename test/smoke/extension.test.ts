@@ -144,6 +144,42 @@ describe('html preview', () => {
 	})
 })
 
+describe('multiple editors per document', () => {
+	afterEach(async () => {
+		await closeAllEditors()
+	})
+
+	// Without `supportsMultipleEditorsPerDocument` the second open is refused or lands in
+	// the default text editor, so "two groups, both ours" is the observable difference.
+	it('shows the same file in two editor groups', async () => {
+		const viewType = 'chaowu21.jsonlViewer'
+		const uri = vscode.Uri.joinPath(workspaceRoot(), 'sample.jsonl')
+
+		await vscode.commands.executeCommand('vscode.openWith', uri, viewType, vscode.ViewColumn.One)
+		await vscode.commands.executeCommand('vscode.openWith', uri, viewType, vscode.ViewColumn.Two)
+
+		const deadline = Date.now() + 30000
+		while (Date.now() < deadline) {
+			const columns = new Set<number>()
+			for (const group of vscode.window.tabGroups.all) {
+				for (const tab of group.tabs) {
+					const input = tab.input
+					if (
+						input instanceof vscode.TabInputCustom &&
+						input.viewType === viewType &&
+						input.uri.toString() === uri.toString()
+					) {
+						columns.add(group.viewColumn ?? -1)
+					}
+				}
+			}
+			if (columns.size >= 2) return
+			await new Promise(resolve => setTimeout(resolve, 100))
+		}
+		throw new Error(`expected two editor groups showing ${viewType}; tabs: ${describeTabs()}`)
+	})
+})
+
 describe('custom editors', () => {
 	afterEach(async () => {
 		await closeAllEditors()

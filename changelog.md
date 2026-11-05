@@ -17,6 +17,11 @@ HTML preview:
   with the panel hosting it and cannot reach the extension host's message bridge.
 - Reload on edit still works; the frame is re-fed rather than re-created.
 
+Custom editors:
+
+- The same file can be opened in two editor groups at once. Previously the second open was
+  refused and left you with a single viewer.
+
 # 4.4.1 2026-11-05
 
 Parquet viewer:

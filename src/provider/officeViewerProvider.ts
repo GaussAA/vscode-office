@@ -1,3 +1,4 @@
+import type { CustomEditorOptions } from '@/common/customEditorOptions';
 import { ReactApp } from '@/common/reactApp';
 import { getFileSuffix } from '@/common/fileSuffix';
 import * as vscode from 'vscode';
@@ -16,7 +17,7 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
 
 	constructor(private context: vscode.ExtensionContext) { }
 
-	bindCustomEditors(viewOption: { webviewOptions: vscode.WebviewPanelOptions }) {
+	bindCustomEditors(viewOption: CustomEditorOptions) {
 		return [
 			vscode.window.registerCustomEditorProvider('chaowu21.officeViewer', this, viewOption),
 			vscode.window.registerCustomEditorProvider('chaowu21.htmlViewer', this, viewOption),

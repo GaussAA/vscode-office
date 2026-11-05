@@ -1,3 +1,4 @@
+import type { CustomEditorOptions } from '@/common/customEditorOptions';
 import { getExtensionResourceRoots } from '@/common/extensionResource';
 import { handleClass } from '@/provider/handlers/classHandler';
 import * as vscode from 'vscode';
@@ -9,7 +10,7 @@ export class ClassViewerProvider implements vscode.CustomReadonlyEditorProvider 
 
 	constructor(private context: vscode.ExtensionContext) { }
 
-	bindCustomEditor(viewOption: { webviewOptions: vscode.WebviewPanelOptions }) {
+	bindCustomEditor(viewOption: CustomEditorOptions) {
 		return vscode.window.registerCustomEditorProvider('chaowu21.classViewer', this, viewOption);
 	}
 

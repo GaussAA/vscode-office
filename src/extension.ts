@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { customEditorOptions } from '@/common/customEditorOptions';
 import { Global } from './common/global';
 import { JavaDecompilerProvider } from './provider/javaDecompilerProvider';
 import { MarkdownEditorProvider } from './provider/markdownEditorProvider';
@@ -31,7 +32,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	// today (activation happens on startup) and becomes a real bug the moment activation
 	// turns lazy. The integration smoke layer asserts the invariant.
 	await activateGitHistory(context);
-	const viewOption = { webviewOptions: { retainContextWhenHidden: true } };
+	const viewOption = customEditorOptions;
 	FileUtil.init(context)
 	ReactApp.init(context)
 	const markdownService = new MarkdownService(context);

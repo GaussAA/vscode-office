@@ -1,3 +1,4 @@
+import type { CustomEditorOptions } from '@/common/customEditorOptions';
 import { basename } from 'path';
 import { ReactApp } from '@/common/reactApp';
 import { getExtensionResourceRoots } from '@/common/extensionResource';
@@ -18,7 +19,7 @@ export class WebUnsupportedViewerProvider implements vscode.CustomReadonlyEditor
 
 	constructor(private context: vscode.ExtensionContext) { }
 
-	bindCustomEditors(viewOption: { webviewOptions: vscode.WebviewPanelOptions }) {
+	bindCustomEditors(viewOption: CustomEditorOptions) {
 		const disposables: vscode.Disposable[] = [];
 		for (const viewType of WEB_UNSUPPORTED_VIEW_TYPES) {
 			disposables.push(vscode.window.registerCustomEditorProvider(viewType, this, viewOption));
