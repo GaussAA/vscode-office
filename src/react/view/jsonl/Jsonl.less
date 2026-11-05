@@ -177,11 +177,12 @@ body:has(.jsonl-viewer) {
     }
 
     .ant-tree-treenode {
+        position: relative;
         display: flex;
         align-items: center;
         width: 100%;
-        padding: 0;
-        padding-right: 8px;
+        /* leaves a fixed gutter on the left for line numbers */
+        padding: 0 8px 0 46px;
     }
 
     .ant-tree-indent,
@@ -190,6 +191,9 @@ body:has(.jsonl-viewer) {
     }
 
     .ant-tree-node-content-wrapper {
+        /* antd sets `position: relative`, which would make the line number's
+           containing block the content box instead of the row's left gutter. */
+        position: static;
         flex: 1 1 auto;
         min-width: 0;
         height: var(--jl-row-height);
@@ -211,9 +215,10 @@ body:has(.jsonl-viewer) {
     .ant-tree-node-selected .jsonl-row,
     .ant-tree-node-selected .jsonl-key,
     .ant-tree-node-selected .jsonl-val,
-    .ant-tree-node-selected .jsonl-gutter,
+    .ant-tree-node-selected .jsonl-lineno,
     .ant-tree-node-selected .jsonl-raw,
-    .ant-tree-node-selected .jsonl-colon {
+    .ant-tree-node-selected .jsonl-colon,
+    .ant-tree-node-selected .jsonl-chip {
         color: var(--jl-active-fg) !important;
     }
 
@@ -230,12 +235,26 @@ body:has(.jsonl-viewer) {
         font-size: 10px;
     }
 
+    /* indent guides, VS Code explorer style */
+
     .ant-tree-indent {
         align-self: stretch;
+        display: flex;
     }
 
     .ant-tree-indent-unit {
-        width: 18px;
+        position: relative;
+        width: 16px;
+        height: var(--jl-row-height);
+    }
+
+    .ant-tree-indent-unit::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        border-left: 1px solid var(--vscode-tree-indentGuidesStroke, color-mix(in srgb, var(--jl-fg) 16%, transparent));
     }
 }
 
@@ -253,33 +272,41 @@ body:has(.jsonl-viewer) {
 }
 
 .jsonl-lineno {
-    flex: 0 0 auto;
-    margin-left: auto;
-    padding-left: 12px;
+    /* fixed gutter at the far left of the row; the tree keeps its own indent */
+    position: absolute;
+    left: 0;
+    width: 40px;
+    padding-right: 8px;
+    text-align: right;
+    font-size: 11px;
+    line-height: var(--jl-row-height);
     color: var(--jl-gutter);
     font-variant-numeric: tabular-nums;
     user-select: none;
-    opacity: 0.75;
+    pointer-events: none;
+    opacity: 0.8;
 }
 
 .jsonl-chip {
     flex: 0 0 auto;
-    padding: 0 5px;
+    padding: 0 4px;
     border-radius: 3px;
+    border: 1px solid color-mix(in srgb, var(--jl-fg) 14%, transparent);
     font-size: 10px;
-    line-height: 15px;
+    line-height: 14px;
     text-transform: lowercase;
-    background: var(--jl-chip-bg);
     color: var(--jl-muted);
 }
 
 .jsonl-chip--error {
-    background: color-mix(in srgb, var(--jl-error) 20%, transparent);
+    background: color-mix(in srgb, var(--jl-error) 18%, transparent);
+    border-color: color-mix(in srgb, var(--jl-error) 35%, transparent);
     color: var(--jl-error);
 }
 
 .jsonl-chip--warn {
-    background: color-mix(in srgb, var(--jl-warn) 20%, transparent);
+    background: color-mix(in srgb, var(--jl-warn) 18%, transparent);
+    border-color: color-mix(in srgb, var(--jl-warn) 35%, transparent);
     color: var(--jl-warn);
 }
 
@@ -298,7 +325,8 @@ body:has(.jsonl-viewer) {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--jl-muted);
+    color: var(--jl-fg);
+    opacity: 0.88;
 }
 
 .jsonl-kv {
