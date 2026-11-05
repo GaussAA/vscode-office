@@ -1,14 +1,49 @@
 import { spawnSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { readdirSync, statSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import chokidar from 'chokidar'
 import type { Plugin } from 'vite'
 
 const cwd = process.cwd()
 const vditorDir = resolve(cwd, 'vditor')
 const viteBin = resolve(cwd, 'node_modules/vite/bin/vite.js')
+const vditorArtifact = resolve(vditorDir, 'dist', 'index.min.js')
 
 const DEBOUNCE_MS = 500
 const COOLDOWN_MS = 2000
+
+function newestMtime(dir: string): number {
+  let newest = 0
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      newest = Math.max(newest, newestMtime(full))
+    } else {
+      newest = Math.max(newest, statSync(full).mtimeMs)
+    }
+  }
+  return newest
+}
+
+/**
+ * `vditor/` is its own workspace package with its own dependencies and its own Vite build.
+ * Rebuilding it on every `pnpm build` costs a few seconds for output that has not changed,
+ * so the production path skips it when the artifact is newer than every source file.
+ * `OFFICE_FORCE_VDITOR_BUILD=1` overrides the check.
+ */
+function vditorNeedsBuild(): boolean {
+  if (process.env.OFFICE_FORCE_VDITOR_BUILD === '1') return true
+  try {
+    const artifactAt = statSync(vditorArtifact).mtimeMs
+    const newestSource = Math.max(
+      newestMtime(resolve(vditorDir, 'src')),
+      statSync(resolve(vditorDir, 'vite.config.ts')).mtimeMs,
+    )
+    return newestSource > artifactAt
+  } catch {
+    return true
+  }
+}
 
 function runVditorBuild(production: boolean) {
   const result = spawnSync(
@@ -92,6 +127,10 @@ export function vditorProdBuildPlugin(): Plugin {
     name: 'vditor-prod-build',
     apply: 'build',
     closeBundle() {
+      if (!vditorNeedsBuild()) {
+        console.log('vditor: dist is newer than src, skipping rebuild')
+        return
+      }
       runVditorBuild(true)
     },
   }
