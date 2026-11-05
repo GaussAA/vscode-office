@@ -1,0 +1,60 @@
+# UI verification
+
+`pnpm verify:ui` runs the built webviews in headless Chrome, asserts the DOM, and writes
+screenshots to `.ui-verify/shots/`. It exists because the webviews only run inside a
+`postMessage` bridge, so "looks right in the code" is not evidence — every change to a
+viewer should be checked here before it ships.
+
+## How it works
+
+```
+scripts/ui-verify/
+├── runner.mjs    scenarios + assertions + CLI
+├── harness.mjs   HTTP server: built HTML from out/webview + fake VS Code bridge + parquet bytes
+├── cdp.mjs       minimal Chrome DevTools Protocol driver (no puppeteer)
+├── fixtures.mjs  generates mixed/big parquet with hyparquet-writer, uses committed zstd sample
+└── fixtures/zstd.parquet
+```
+
+The fake bridge posts the same messages the extension host does (`jsonlInfo`,
+`jsonlEntries`, `jsonlSearchBatch`, `jsonlEntryData`, `open`), so the real React bundles
+run unchanged. Parquet fixtures are served with `Range` support and every request is
+counted in `/stats` — that counter is how lazy loading and the next-page prefetch are
+asserted (`0` new range reads when paging forward).
+
+## Commands
+
+```bash
+pnpm build            # required: the harness serves out/webview
+pnpm verify:ui        # assert only
+pnpm verify:ui -- --docs   # also refresh docs/screenshots
+pnpm verify:ui -- --filter=parquet
+pnpm verify:ui -- --headed # watch it run
+```
+
+Chrome or Edge is auto-detected; set `CHROME_PATH` to override. Node >= 22 is required
+(global `WebSocket`). No network access is needed: the 4 KB ZSTD sample is committed and
+the other fixtures are generated locally.
+
+## Adding a scenario
+
+Append to `scenarios` in `runner.mjs`:
+
+```js
+{
+    name: 'viewer-what-it-proves',
+    docs: 'optional-screenshot-name.png',   // copied to docs/screenshots with --docs
+    async run({ page, base, stats }) {
+        await openParquet(page, base, '?mixed=1')
+        const state = json(await page.evaluate(`JSON.stringify({ /* read DOM */ })`))
+        expect(state.range === '1–50 of 300', `unexpected range: ${state.range}`)
+        return 'one line of evidence for the summary table'
+    },
+}
+```
+
+Rules that keep this suite useful:
+
+- Assert on **user-visible facts** (text, ranges, counts, computed heights), not internals.
+- One scenario per behaviour; name it after the fact it proves.
+- A scenario must fail for a real regression: no screenshot-only checks.

@@ -16,6 +16,10 @@ issue 与 spec 以本地 markdown 记在 `.scratch/<feature-slug>/` 下，无远
 
 默认五词：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。见 `docs/agents/triage-labels.md`。
 
+### UI verification
+
+webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-verify.md。
+
 ### Domain docs
 
 单 context：根目录 `GLOSSARY.md` + `docs/adr/`。见 `docs/agents/domain.md`。
@@ -41,4 +45,5 @@ issue 与 spec 以本地 markdown 记在 `.scratch/<feature-slug>/` 下，无远
 pnpm install     # 依赖（pnpm，不是 npm）
 pnpm build       # vite 构建到 out/
 pnpm run package # vsce 打包 vsix（需先 build）
+pnpm verify:ui   # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
 ```

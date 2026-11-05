@@ -24,3 +24,7 @@ Thumbs.db
 package-lock.json
 bun.lock
 yarn.lock
+
+# ui verification output
+.ui-verify/
+
