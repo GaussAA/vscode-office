@@ -54,11 +54,12 @@ pnpm run package      # 打 vsix（@vscode/vsce 已是 devDependency；需先 bu
 pnpm lint             # oxlint 整个 src；0 problem 才通过（--deny-warnings）
 pnpm typecheck        # tsc 覆盖整个 src（含 webview）；基线现在是空的 = 零错误
 pnpm typecheck:update # 重写基线 —— 审 diff，它只应变小
+pnpm typecheck:self-test # 注入一个已知类型错误，断言闸门真的会红（升级 TS 后必跑）
 pnpm test             # node:test 单测（先 esbuild 打包纯逻辑模块）
 pnpm test:smoke       # 集成 smoke：真实 VS Code（stable）里验证激活与 custom editor 路由（需先 build）
 pnpm test:smoke:min   # 同上，但跑在 engines.vscode 的下限上 —— 下限只有被执行过才算数
-pnpm check:baseline   # 断言 engines / @types/vscode / @types/node 三者自洽
-pnpm check            # lint + baseline + typecheck + test（pre-commit 跑这个）
+pnpm check:baseline   # 断言 engines / @types / 运行时依赖的 engines.node 三者与宿主自洽
+pnpm check            # lint + baseline + typecheck + typecheck:self-test + test（pre-commit 跑这个）
 pnpm check:full       # check + build + test:smoke + verify:ui（CI 跑这个）
 pnpm verify:ui        # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
 ```
