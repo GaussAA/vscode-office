@@ -42,7 +42,7 @@ function keysUsedByExtension() {
       keys.add(match[1]);
     }
   }
-  return [...keys].sort();
+  return [...keys].sort((a, b) => a.localeCompare(b));
 }
 
 test("l10n: package.json points the host at the bundle folder", () => {

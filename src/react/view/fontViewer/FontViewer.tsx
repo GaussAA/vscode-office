@@ -17,7 +17,7 @@ import {
  * https://github.com/mathew-kurian/CharacterMap
  */
 export default function FontViewer() {
-  const [font, setFont] = useState<FontInfo["font"] | null>(null);
+  const [font, setFont] = useState<FontInfo["font"]>(null);
   const [search, setSearch] = useState("");
   const fontInfoRef = useRef<FontInfo | null>(null);
   const [glyph, setGlyph] = useState<any>(null);

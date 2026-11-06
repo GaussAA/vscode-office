@@ -51,7 +51,7 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 pnpm install          # 依赖（pnpm，不是 npm）
 pnpm build            # 构建到 out/（vite + esbuild 多步）
 pnpm run package      # 打 vsix（@vscode/vsce 已是 devDependency；需先 build）
-pnpm lint             # oxlint 整个 src；0 problem 才通过（--deny-warnings）
+pnpm lint             # oxlint --type-aware 整个 src + test；0 problem 才通过（--deny-warnings）
 pnpm typecheck        # tsc 覆盖整个 src（含 webview）；基线现在是空的 = 零错误
 pnpm typecheck:update # 重写基线 —— 审 diff，它只应变小
 pnpm typecheck:self-test # 注入一个已知类型错误，断言闸门真的会红（升级 TS 后必跑）

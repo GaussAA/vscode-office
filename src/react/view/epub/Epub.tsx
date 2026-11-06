@@ -166,9 +166,9 @@ export default function Epub() {
     }
     wheelNavLockRef.current = now;
     if (e.deltaY > 0) {
-      rendition.next();
+      void rendition.next();
     } else if (e.deltaY < 0) {
-      rendition.prev();
+      void rendition.prev();
     }
   }, []);
 
@@ -252,9 +252,9 @@ export default function Epub() {
       rendition.on("relocated", onRelocated);
       rendition.on("keyup", (event: KeyboardEvent) => {
         if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-          rendition.prev();
+          void rendition.prev();
         } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-          rendition.next();
+          void rendition.next();
         }
       });
       rendition.on("click", (event: MouseEvent) => {
@@ -351,11 +351,11 @@ export default function Epub() {
   );
 
   const goPrev = useCallback(() => {
-    renditionRef.current?.prev();
+    void renditionRef.current?.prev();
   }, []);
 
   const goNext = useCallback(() => {
-    renditionRef.current?.next();
+    void renditionRef.current?.next();
   }, []);
 
   const goToHref = useCallback((href: string) => {
@@ -363,7 +363,7 @@ export default function Epub() {
   }, []);
 
   const goToCfi = useCallback((cfi: string) => {
-    renditionRef.current?.display(cfi);
+    void renditionRef.current?.display(cfi);
   }, []);
 
   const goToLocation = useCallback((value: number) => {
@@ -376,7 +376,7 @@ export default function Epub() {
     // unknown; both shapes have to be tolerated.
     const cfi = book.locations.cfiFromLocation(value) as string | number;
     if (cfi && cfi !== -1) {
-      rendition.display(String(cfi));
+      void rendition.display(String(cfi));
     }
   }, []);
 
@@ -438,7 +438,7 @@ export default function Epub() {
   useEffect(() => {
     handler
       .on("open", (payload) => {
-        loadDocument(payload);
+        void loadDocument(payload);
       })
       .emit("init");
     return () => destroyBook();
@@ -453,7 +453,7 @@ export default function Epub() {
       return;
     }
     const controller = new AbortController();
-    buildTocPageMap(book, toc).then((pageMap) => {
+    void buildTocPageMap(book, toc).then((pageMap) => {
       if (!controller.signal.aborted && Object.keys(pageMap).length > 0) {
         setTocPageByHref(pageMap);
       }
@@ -560,7 +560,7 @@ export default function Epub() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
-                        runSearch();
+                        void runSearch();
                       }
                     }}
                   />

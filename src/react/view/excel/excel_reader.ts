@@ -20,6 +20,7 @@ import {
   readWorksheetProtection,
 } from "./excel_protection";
 import type { CellData, SheetData } from "./x-spreadsheet/index";
+import { toDisplayText } from "@/common/displayText";
 
 type RowMap = NonNullable<SheetData["rows"]>;
 
@@ -137,7 +138,7 @@ const formatCellText = (cell: ExcelJS.Cell) => {
   if (cell.value instanceof Date) {
     return cell.value.toISOString().slice(0, 10);
   }
-  return String(cell.value);
+  return toDisplayText(cell.value);
 };
 
 const readFreezeFromWorksheet = (worksheet: ExcelJS.Worksheet): string | undefined => {

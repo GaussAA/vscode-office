@@ -127,7 +127,7 @@ test("search: a newer scan cancels the old one instead of finishing it", async (
     batchSize: 1,
     onBatch: (batch) => firstBatches.push(batch),
     // One turn per macrotask, so the scan is genuinely mid-flight when we cancel.
-    schedule: (run) => setTimeout(run, 0),
+    schedule: (run) => setTimeout(() => run(), 0),
   });
 
   await tick();

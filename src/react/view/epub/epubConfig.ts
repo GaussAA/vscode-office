@@ -462,7 +462,8 @@ export async function buildTocPageMap(
 
   for (const group of bySection.values()) {
     try {
-      await group.section.load(book.load.bind(book));
+      // epubjs types `load` as void; it resolves once the section is parsed.
+      await (group.section.load(book.load.bind(book)) as unknown as Promise<void>);
       const doc = group.section.document;
       if (!doc) {
         continue;
@@ -491,7 +492,8 @@ export interface SearchHit {
 export async function searchEpubBook(book: Book, query: string, limit = 200): Promise<SearchHit[]> {
   const hits: SearchHit[] = [];
   for (const item of spineSectionList(book)) {
-    await item.load(book.load.bind(book));
+    // Same as above: the declared return type is wrong, the runtime value is a promise.
+    await (item.load(book.load.bind(book)) as unknown as Promise<void>);
     // `find` is typed as returning Elements, but epubjs returns match records.
     const results = item.find(query) as unknown as Array<{ cfi: string; excerpt: string }>;
     item.unload();

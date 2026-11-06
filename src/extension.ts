@@ -45,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext) {
       switchCsvEditor(uri);
     }),
     vscode.commands.registerCommand("GaussAA.office.markdown.paste", () => {
-      markdownService.loadClipboardImage();
+      void markdownService.loadClipboardImage();
     }),
     vscode.commands.registerCommand("GaussAA.office.html.preview", (uri) =>
       HtmlService.previewHtml(uri, context),

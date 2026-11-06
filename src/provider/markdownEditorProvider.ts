@@ -231,7 +231,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           "Material Dark",
         ];
         if (validThemes.includes(theme)) {
-          Global.updateConfig("codeMirrorTheme", theme === "default" ? "Auto" : theme);
+          void Global.updateConfig("codeMirrorTheme", theme === "default" ? "Auto" : theme);
         }
       })
       .on("editorTheme", (theme: string) => {
@@ -248,7 +248,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           "Dracula",
         ];
         if (validThemes.includes(theme)) {
-          Global.updateConfig("editorTheme", theme);
+          void Global.updateConfig("editorTheme", theme);
         }
       })
       .on("mermaidTheme", (theme: string) => {
@@ -264,12 +264,12 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           "Nord",
         ];
         if (validThemes.includes(theme)) {
-          Global.updateConfig("mermaidTheme", theme);
+          void Global.updateConfig("mermaidTheme", theme);
         }
       })
       .on("editMode", (mode: string) => {
         if (mode === "wysiwyg" || mode === "ir") {
-          Global.updateConfig("editMode", mode);
+          void Global.updateConfig("editMode", mode);
         }
       })
       .on("img", async (payload) => {
@@ -314,7 +314,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       })
       .on("export", (option) => {
         vscode.commands.executeCommand("workbench.action.files.save");
-        new MarkdownService(this.context).exportMarkdown(uri, option);
+        void new MarkdownService(this.context).exportMarkdown(uri, option);
       })
       .on("developerTool", () => {
         vscode.commands.executeCommand("workbench.action.toggleDevTools");

@@ -201,7 +201,7 @@ export default function XmindViewer() {
   useEffect(() => {
     handler
       .on("open", (payload) => {
-        loadXmind(payload);
+        void loadXmind(payload);
       })
       .on("saveDone", () => {
         setSaving(false);

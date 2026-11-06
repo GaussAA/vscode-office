@@ -552,7 +552,7 @@
     "package": "vsce package --no-dependencies",
     "publish": "vsce publish --no-dependencies && ovsx publish --no-dependencies",
     "vscode:prepublish": "pnpm run build",
-    "lint": "oxlint src --deny-warnings",
+    "lint": "oxlint --type-aware src test --deny-warnings",
     "lint:fix": "oxlint src --fix",
     "typecheck": "node scripts/typecheck.mjs",
     "typecheck:update": "node scripts/typecheck.mjs --update",
@@ -590,6 +590,7 @@
     "ovsx": "^1.3.0",
     "oxfmt": "^0.76.0",
     "oxlint": "1.91.0",
+    "oxlint-tsgolint": "^7.0.2005",
     "typescript": "7.0.2",
     "vite": "^8.0.16",
     "vite-plugin-static-copy": "^4.1.1"

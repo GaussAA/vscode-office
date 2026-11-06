@@ -6,6 +6,8 @@
  * bundling React. It now returns plain data; rendering is one adapter in `JsonlDetail`.
  */
 
+import { toDisplayText } from "@/common/displayText";
+
 export type PathSeg = string | number;
 
 export const ROW_HEIGHT = 24;
@@ -54,7 +56,7 @@ export function preview(value: unknown): string {
     return text.length > 120 ? `${text.slice(0, 120)}…` : text;
   }
   if (typeof value === "bigint") return `${value}n`;
-  return String(value);
+  return toDisplayText(value);
 }
 
 export function formatBytes(size: number): string {

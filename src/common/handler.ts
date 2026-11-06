@@ -19,7 +19,7 @@ export class Handler {
     return this.isEnd === true;
   }
 
-  on(event: string, callback: (content: any) => any | Promise<any>): this {
+  on(event: string, callback: (content: any) => unknown): this {
     if (event != "init") {
       const listens = this.eventEmitter.listeners(event);
       if (listens.length >= 1) {

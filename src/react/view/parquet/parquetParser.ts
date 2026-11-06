@@ -11,6 +11,7 @@ import { getPhysicalColumns } from "hyparquet/src/schema.js";
 import { parquetWriteBuffer, type BasicType, type ColumnSource } from "hyparquet-writer";
 // Fork addition: decode ZSTD/GZIP/BROTLI/LZ4 columns (upstream shipped SNAPPY only).
 import { compressors } from "hyparquet-compressors";
+import { toDisplayText } from "@/common/displayText";
 
 export type ColumnCategory = "bool" | "numeric" | "string" | "datetime" | "structure" | "field";
 
@@ -208,7 +209,7 @@ function normalizeParquetValue(value: unknown, type: BasicType): unknown {
       if (value instanceof Date) return value.toISOString();
       return JSON.stringify(value);
     }
-    return String(value);
+    return toDisplayText(value);
   }
   if (type == "BOOLEAN") return Boolean(value);
   if (type == "TIMESTAMP") {
@@ -224,7 +225,7 @@ function normalizeParquetValue(value: unknown, type: BasicType): unknown {
     const number = Number(value);
     return isNaN(number) ? null : number;
   }
-  return String(value);
+  return toDisplayText(value);
 }
 
 export function writeParquetBuffer(
@@ -280,17 +281,5 @@ export function parseCellInput(text: string, type: string): unknown {
 const upper = (type: string) => `${type}`.toUpperCase();
 
 export function formatCellValue(value: unknown): string {
-  if (value == null) {
-    return "";
-  }
-  if (typeof value === "bigint") {
-    return value.toString();
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
-  return String(value);
+  return toDisplayText(value);
 }

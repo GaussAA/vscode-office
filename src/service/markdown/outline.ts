@@ -103,7 +103,7 @@ function getDirectChildElementsByTag(element: any, tagName: string, HTMLElement:
     .filter((child: any) => child.rawTagName === tagName);
 }
 
-function findDirectChildByTag(element: any, tagName: string, HTMLElement: any): any | null {
+function findDirectChildByTag(element: any, tagName: string, HTMLElement: any): any {
   return getDirectChildElementsByTag(element, tagName, HTMLElement)[0] ?? null;
 }
 
@@ -119,7 +119,7 @@ async function creatOutlines(doc: PdfDoc, dictArray: OutlineDict[]): Promise<voi
     dict: OutlineDict,
     parentRefer: PdfDictRef,
     outlineRefer: PdfDictRef,
-    nextOrPrev: PdfDictRef | null,
+    nextOrPrev: PdfDictRef,
     childRefs: PdfDictRef[] | null,
   ) => {
     const map = new Map();

@@ -17,6 +17,7 @@ const outdir = join(root, "out", "unit-tests");
 mkdirSync(outdir, { recursive: true });
 
 const entries = {
+  displayText: "src/common/displayText.ts",
   jsonlDocument: "src/service/jsonlDocument.ts",
   jsonlFile: "src/service/jsonlFile.ts",
   jsonlSession: "src/service/jsonlSession.ts",

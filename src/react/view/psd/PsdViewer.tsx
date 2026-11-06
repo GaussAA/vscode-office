@@ -86,7 +86,7 @@ export default function PsdViewer() {
   useEffect(() => {
     handler
       .on("open", (payload) => {
-        loadPsd(payload);
+        void loadPsd(payload);
       })
       .emit("init");
   }, [loadPsd]);

@@ -10,6 +10,7 @@ import {
   YAMLMap,
 } from "yaml";
 import { DocumentSymbol, Position, Range, SymbolKind, TextDocument } from "vscode";
+import { toDisplayText } from "@/common/displayText";
 
 export interface YamlAliasRef {
   source: string;
@@ -55,12 +56,9 @@ function keyName(key: Pair["key"]): string {
     return "<null>";
   }
   if (isScalar(key)) {
-    return String(key.value ?? "");
+    return toDisplayText(key.value);
   }
-  if (typeof key === "string" || typeof key === "number") {
-    return String(key);
-  }
-  return String(key);
+  return toDisplayText(key);
 }
 
 function pairKeyRange(document: TextDocument, pair: Pair): Range | undefined {
@@ -93,7 +91,7 @@ function getMapDisplayName(map: YAMLMap): string {
         continue;
       }
       if (isScalar(pair.value) && pair.value.value != null) {
-        return String(pair.value.value);
+        return toDisplayText(pair.value.value);
       }
     }
   }

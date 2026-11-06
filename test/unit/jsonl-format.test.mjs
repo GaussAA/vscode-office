@@ -7,7 +7,7 @@ import {
   countNodes,
   makePathKey,
 } from "../../out/unit-tests/jsonlFormat.mjs";
-import { MAX_HIGHLIGHT_RUNS, highlightRuns } from "../../out/unit-tests/highlight.mjs";
+import { highlightRuns } from "../../out/unit-tests/highlight.mjs";
 
 const objectOfSize = (size) =>
   Object.fromEntries(Array.from({ length: size }, (_, index) => [`key_${index}`, index]));

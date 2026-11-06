@@ -126,7 +126,7 @@ export class GitExecutor {
           env: process.env,
         },
       );
-      resolveSpawnOutput(child).then(([code, signal, stdout, stderr, error]) => {
+      void resolveSpawnOutput(child).then(([code, signal, stdout, stderr, error]) => {
         if (error) return reject(getErrorMessage(error, stdout, stderr));
         if (signal) return reject(`Git process killed by signal ${signal}`);
         if (code !== 0) {

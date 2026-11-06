@@ -254,7 +254,7 @@ export default function PowerPoint() {
   useEffect(() => {
     handler
       .on("open", (payload) => {
-        loadPresentation(payload);
+        void loadPresentation(payload);
       })
       .emit("init");
 
@@ -292,7 +292,7 @@ export default function PowerPoint() {
       return;
     }
     requestAnimationFrame(() => {
-      rerenderSlide();
+      void rerenderSlide();
     });
   }, [loading, slideCount, rerenderSlide]);
 
@@ -307,7 +307,7 @@ export default function PowerPoint() {
     const observer = new ResizeObserver(() => {
       clearTimeout(timer.id);
       timer.id = setTimeout(() => {
-        rerenderSlide();
+        void rerenderSlide();
       }, 100);
     });
     observer.observe(el);

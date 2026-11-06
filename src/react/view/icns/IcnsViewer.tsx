@@ -41,7 +41,7 @@ export default function IcnsViewer() {
   useEffect(() => {
     handler
       .on("open", (payload) => {
-        loadIcns(payload);
+        void loadIcns(payload);
       })
       .emit("init");
   }, [loadIcns]);

@@ -462,8 +462,8 @@ export class Spreadsheet {
   }
 
   getSelection(): { ri: number; ci: number; sheetIndex: number } {
-    const { ri = 0, ci = 0 } = this.data.selector ?? {};
-    return { ri, ci, sheetIndex: this.getActiveSheetIndex() };
+    const selector = this.data.selector;
+    return { ri: selector?.ri ?? 0, ci: selector?.ci ?? 0, sheetIndex: this.getActiveSheetIndex() };
   }
 
   autoFitColumns(sheetIndex = this.getActiveSheetIndex()): this {

@@ -14,17 +14,20 @@ status: accepted
 
 按此逐条判决：
 
-| 决定                              | 判决                     | 依据                                                                                                                                                                                                                          |
-| --------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Prettier → **`oxfmt`**            | 上                       | `vite@8.3.6` 自己的 `package.json` 就是 `"lint": "oxlint src", "format": "oxfmt"`；Less/CSS/JSON/YAML/Markdown 原生支持，默认读 `.prettierignore`，`--migrate=prettier` 一次性迁移。仍是 0.x、无 semver 承诺 —— 记在案        |
-| **`oxlint --type-aware`**         | 上，但**只能当加法信号** | oxlint-tsgolint 实现了 61 条 typescript-eslint 类型感知规则里的 59 条，且不依赖 `typescript` 包。但 oxc 自己的版本页把它列在 _Features Not Subject to Semver_，`--type-check` 标着 experimental —— **不许它替代 `typecheck`** |
-| 手搓 esbuild 测试打包 → **`tsx`** | 上                       | 实测：`tsx --test` 能从 `tsconfig.json` 的 `paths` 解析 `@/`，`node:test` 的 `.ts` 测试直接跑绿。Node 24 原生剥离被否决（9 个 `enum`、26 处 parameter properties、100 个 `@/` 别名，且 Node 完全忽略 `tsconfig`）             |
-| 手搓 CDP → **`puppeteer-core`**   | 上                       | 它**本来就是运行时依赖**（`html-export.js` 用它导出 PDF），`@puppeteer/browsers` 还带着 `computeSystemExecutablePath()`。而 `cdp.mjs` 的文件头写着「不引入 puppeteer 因为仓库不需要 Chrome」—— 这句话从第一天就是假的         |
-| `typecheck.mjs` 的正则解析 → 换掉 | **换不掉，给它加自证**   | TS 7 没有 JSON 诊断（`tsc --json` → `TS5023`），唯一结构化出口是 `typescript/unstable/sync`，明确标 unstable。既然被迫解析文本，就用 `--self-test` 注入一个已知类型错误并断言闸门变红                                         |
+| 决定                              | 判决                   | 依据                                                                                                                                                                                                                                                             |
+| --------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prettier → **`oxfmt`**            | 上                     | `vite@8.3.6` 自己的 `package.json` 就是 `"lint": "oxlint src", "format": "oxfmt"`；Less/CSS/JSON/YAML/Markdown 原生支持，默认读 `.prettierignore`，`--migrate=prettier` 一次性迁移。仍是 0.x、无 semver 承诺 —— 记在案                                           |
+| **`oxlint --type-aware`**         | 上（已进 `pnpm lint`） | oxlint-tsgolint 实现了 61 条 typescript-eslint 类型感知规则里的 59 条，且不依赖 `typescript` 包。首轮跑出 50 条发现，全部修完后接进闸门 —— 不做基线，理由同 `typecheck`。它仍被列在 _Features Not Subject to Semver_，所以**只作加法信号，不许替代 `typecheck`** |
+| 手搓 esbuild 测试打包 → **`tsx`** | 上                     | 实测：`tsx --test` 能从 `tsconfig.json` 的 `paths` 解析 `@/`，`node:test` 的 `.ts` 测试直接跑绿。Node 24 原生剥离被否决（9 个 `enum`、26 处 parameter properties、100 个 `@/` 别名，且 Node 完全忽略 `tsconfig`）                                                |
+| 手搓 CDP → **`puppeteer-core`**   | 上                     | 它**本来就是运行时依赖**（`html-export.js` 用它导出 PDF），`@puppeteer/browsers` 还带着 `computeSystemExecutablePath()`。而 `cdp.mjs` 的文件头写着「不引入 puppeteer 因为仓库不需要 Chrome」—— 这句话从第一天就是假的                                            |
+| `typecheck.mjs` 的正则解析 → 换掉 | **换不掉，给它加自证** | TS 7 没有 JSON 诊断（`tsc --json` → `TS5023`），唯一结构化出口是 `typescript/unstable/sync`，明确标 unstable。既然被迫解析文本，就用 `--self-test` 注入一个已知类型错误并断言闸门变红                                                                            |
 
 同时补两个**闸门盲区** —— 这是比换工具更重要的一半：
 
 - **`src/**/*.js`**：`tsconfig.json` 的 `include` 只有 `src/**/*.ts` 与 `*.tsx`，`oxlint` 的 `ignorePatterns` 又把 `src/**/*.js` 整段排除（当年排除的理由是「那底下是 vendored 代码」）。但里面有 **8 个属于我们自己的手写模块**（`markdown-pdf.js`、`html-export.js`、`outline.js`、`yamlProperties.js`、`ext/markdown-it-*.js` ×4，43.6 KB），加上 `resource/markdown/` 的 6 个 webview 脚本（27.6 KB）。mermaid 12 把 `parse()` 改成异步、让 `try/catch` 从此永不命中的那次静默回归，正好落在这个洞里。修法：属于我们的转成 `.ts`，真正 vendored 的继续排除。
+
+**`oxlint --type-aware` 首轮 50 条的处置**（已完成）：9 条 `no-base-to-string` 是**真 bug** —— `String(value)` 在 `unknown` 上会把对象渲染成 `[object Object]`，抽出 `src/common/displayText.ts` 的 `toDisplayText()` 统一收口（含循环引用与 Date 的处理），配 5 条单测；24 条 `no-floating-promises` 全部落在事件处理器与 effect 里，加 `void` 并保持仓库既有写法；其余是 `await` 非 Promise、多余的类型联合、无用的默认值、无用的 `void`、测试里的隐式 eval 与缺 `sort` 比较器，逐条修掉。**没有建基线。**
+
 - **`test/`**：`oxlint` 只扫 `src`，`tsconfig` 只收 `src`。也就是说**用来看守一切的 14 个测试文件本身没有任何东西看守**。修法：测试随 `tsx` 迁移一起改成 `.ts`，并把 `test/**/*.ts` 加进两处覆盖面。
 
 ## Considered Options

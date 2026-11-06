@@ -52,7 +52,7 @@ export const DEFAULT_GRAPH_GRID = {
 interface GitCommitInput {
   hash: string;
   parents: ReadonlyArray<string>;
-  stash: unknown | null;
+  stash: unknown;
   onCurrentBranch?: boolean;
 }
 

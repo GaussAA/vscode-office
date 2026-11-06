@@ -150,7 +150,7 @@ export class CommitService {
       repo,
       showRemoteBranches,
       showStashes,
-      hideRemotes = [],
+      hideRemotes,
       branches,
       maxCommits,
       showTags,

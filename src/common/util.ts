@@ -48,7 +48,7 @@ export class Util {
     const no = i18n("ext.common.no");
     const res = await vscode.window.showQuickPick([yes, no], options);
     if (res === yes && callback) {
-      await callback();
+      callback();
       return true;
     }
     return res === yes;

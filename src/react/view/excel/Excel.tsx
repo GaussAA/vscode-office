@@ -184,7 +184,7 @@ function ExcelViewer() {
     const spreadSheet = spreadSheetRef.current;
     if (!spreadSheet) return;
     if (readOnlyRef.current) {
-      await handleSaveAs();
+      handleSaveAs();
       return;
     }
 
@@ -301,7 +301,7 @@ function ExcelViewer() {
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
         e.preventDefault();
         if (readOnlyRef.current) {
-          void handleSaveAs();
+          handleSaveAs();
         } else {
           void handleSave();
         }
@@ -384,7 +384,7 @@ function ExcelViewer() {
         spreadSheet.on("save", () => void handleSave());
       }
       spreadSheet.on("save-as", () => {
-        void handleSaveAs();
+        handleSaveAs();
       });
       spreadSheet.on("edit-in-vscode", () => {
         handler.emit("editInVSCode", true);

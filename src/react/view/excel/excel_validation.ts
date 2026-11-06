@@ -1,5 +1,6 @@
 import type * as ExcelJS from "@cweijan/exceljs";
 import { expr2xy, xy2expr } from "./x-spreadsheet/core/alphabet";
+import { toDisplayText } from "@/common/displayText";
 
 export interface SpreadsheetValidationItem {
   refs: string[];
@@ -93,7 +94,7 @@ const EXCEL_TO_SS_OPERATOR: Record<string, string> = {
 
 function parseListFormula(raw: unknown): string {
   if (raw == null) return "";
-  let text = String(raw).trim();
+  let text = toDisplayText(raw).trim();
   if (
     (text.startsWith('"') && text.endsWith('"')) ||
     (text.startsWith("'") && text.endsWith("'"))
