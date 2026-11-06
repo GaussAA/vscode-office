@@ -24,7 +24,6 @@ bun.lock
 yarn.lock
 pnpm-lock.yaml
 pnpm-workspace.yaml
-!package.nls*.json
 scripts/**
 .ui-verify/**
 
@@ -35,3 +34,11 @@ CLAUDE.md
 GLOSSARY.md
 .github/**
 *.vsix
+
+# Dev scaffolding: never loaded at runtime, and shipping it only pads the download.
+.husky/**
+.lintstagedrc
+.oxlintrc.json
+.prettierignore
+.vscode-test.mjs
+index.html
