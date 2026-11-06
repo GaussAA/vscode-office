@@ -46,6 +46,19 @@ for (const [name, entry] of Object.entries(entries)) {
   });
 }
 
+// The PDF outline injector is only reachable through the export path, and it dynamic-imports
+// pdf-lib (~720 KB) — keep that external and test the module on its own.
+await build({
+  entryPoints: [join(root, "src/service/markdown/outline.ts")],
+  outfile: join(outdir, "outline.mjs"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node20",
+  external: ["@cantoo/pdf-lib", "node-html-parser"],
+  logLevel: "warning",
+});
+
 // The markdown **export** path is extension-host code that imports `vscode`. Aliasing a stub
 // in lets `node:test` cover the whole plugin chain (front-matter, wikilinks, callouts, mark,
 // task lists, anchors, toc, katex, plantuml, mermaid) — which is where a silent regression

@@ -2,7 +2,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { pathToFileURL } = require("url");
-const { createOutline } = require("./outline");
+const { createOutline } = require("./outline.ts");
 const isDev = process.argv.indexOf("--type=extensionHost") >= 0;
 
 export async function exportHtml(exportFilePath, data) {
