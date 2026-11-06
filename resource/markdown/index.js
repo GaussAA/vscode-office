@@ -1,4 +1,4 @@
-import { getToolbar, bindShortcut, createContextMenu, setAIAvailable } from "./util.js";
+import { getToolbar, bindShortcut, createContextMenu } from "./util.js";
 import {
   observeWorkspaceAbsoluteImages,
   createMarkdownValueReader,
@@ -114,14 +114,7 @@ handler
       onTelemetry(event, properties) {
         handler.emit("telemetry", { event, properties });
       },
-      ai: {
-        onPolish(markdown, apply, options) {
-          handler.emit("aiPolish", { markdown, options });
-        },
-        onCancelPolish() {
-          handler.emit("aiPolishCancel");
-        },
-      },
+
       preview: {
         math: {
           macros: markdown?.math?.macros ?? {},
@@ -182,22 +175,7 @@ handler
             editor.scrollToBlock(fragment);
           }
         });
-        handler.emit("queryAIAvailable");
-        handler.on("aiAvailable", (available) => {
-          setAIAvailable(available, editor);
-          if (available) {
-            handler.emit("queryVSCodeModels");
-          }
-        });
-        handler.on("vscodeModels", (models) => {
-          editor.setVSCodeModels(models);
-        });
-        handler.on("aiPolishChunk", (chunk) => {
-          editor.streamAIChunk(chunk);
-        });
-        handler.on("aiPolishEnd", () => {
-          editor.endAIStream();
-        });
+
         editor.restoreDocumentSession(true, !!shouldRestoreFocus);
         if (pendingFragment) {
           editor.scrollToBlock(pendingFragment);

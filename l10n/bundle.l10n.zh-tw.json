@@ -19,11 +19,6 @@
   "ext.markdown.wikilinkNotFound": "找不到雙鏈目標：{0}",
   "ext.markdown.linkFileNotFound": "檔案不存在：{0}",
   "ext.markdown.linkOpenFailed": "無法開啟檔案 {0}：{1}",
-  "ext.markdown.aiRequiresVscode": "AI 功能需要 VS Code 1.90+ 並安裝語言模型擴充功能。",
-  "ext.markdown.noAiModel": "沒有可用的 AI 語言模型。請安裝語言模型擴充功能（如 GitHub Copilot）。",
-  "ext.markdown.aiPolishFailed": "AI 潤色失敗：{0}",
-  "ext.markdown.customAiUrlRequired": "自訂 AI：API URL 為必填項。",
-  "ext.markdown.customAiPolishFailed": "自訂 AI 潤色失敗：{0}",
   "ext.markdown.selectImage": "選擇圖片",
   "ext.markdown.statusBar": "行 {0} 字數 {1}"
 }

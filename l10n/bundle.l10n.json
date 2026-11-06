@@ -19,11 +19,6 @@
   "ext.markdown.wikilinkNotFound": "Wikilink target not found: {0}",
   "ext.markdown.linkFileNotFound": "File not found: {0}",
   "ext.markdown.linkOpenFailed": "Could not open file {0}: {1}",
-  "ext.markdown.aiRequiresVscode": "AI features require VS Code 1.90+ with a language model extension installed.",
-  "ext.markdown.noAiModel": "No AI language model available. Please install a language model extension (e.g. GitHub Copilot).",
-  "ext.markdown.aiPolishFailed": "AI Polish failed: {0}",
-  "ext.markdown.customAiUrlRequired": "Custom AI: API URL is required.",
-  "ext.markdown.customAiPolishFailed": "Custom AI Polish failed: {0}",
   "ext.markdown.selectImage": "Select Image",
   "ext.markdown.statusBar": "Line {0} Count {1}"
 }

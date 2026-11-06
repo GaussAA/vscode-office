@@ -369,6 +369,48 @@ const scenarios = [
     },
   },
   {
+    name: "markdown-editor",
+    async run({ page, base }) {
+      // The one viewer that is not a React route: `resource/markdown/index.html` plus the
+      // prebuilt vditor bundle. Nothing else covers it, so a change to how the host feeds it
+      // (which messages, which options, which context-menu items) had no gate at all.
+      await page.navigate(`${base}/resource/markdown/index.html`);
+      await page.evaluate(`(() => {
+        window.postMessage({
+          type: 'open',
+          content: {
+            content: '# Probe heading\\n\\nA paragraph with **bold** text.\\n',
+            rootPath: '/resource/markdown',
+            workspaceBaseUrl: '',
+            documentCacheId: 'probe',
+            shouldRestoreFocus: false,
+            fileName: 'probe.md',
+            config: {
+              language: 'en',
+              markdown: { math: { macros: {} } },
+              editMode: 'wysiwyg',
+              editorTheme: 'Auto',
+              codeMirrorTheme: 'Auto',
+              mermaidTheme: 'Auto',
+              preventMacOptionKey: false,
+            },
+          },
+        }, '*');
+      })()`);
+
+      const mounted = await page.waitFor(`!!document.querySelector('#vditor.vditor')`, 20000);
+      expect(mounted, "the editor never mounted");
+      const rendered = await page.waitFor(
+        `document.body.innerText.includes('Probe heading')`,
+        15000,
+      );
+      expect(rendered, "the probe markdown never rendered");
+      const aiEntry = await page.evaluate(`!!document.querySelector('[data-action="aiPolish"]')`);
+      expect(!aiEntry, "the removed AI Polish menu item is back");
+      return "vditor mounted, probe heading rendered, no AI entry";
+    },
+  },
+  {
     name: "upstream-viewers-smoke",
     async run({ page, base }) {
       // React routes only: html/pdf are provider-served static pages and markdown has its own editor bundle.

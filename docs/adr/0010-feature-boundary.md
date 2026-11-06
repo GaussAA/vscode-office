@@ -31,3 +31,4 @@ status: accepted
 - 扩展的自我描述收窄成「文档/格式预览器」：parquet、jsonl、office 文档、存档、字体、图片、Markdown、Git 历史。
 - 审计里把 `src/provider/yaml`（278 行）与 `src/provider/xml`（71 行）也标成了「语言服务 fork」—— **这是错的，保留它们**：两者注册的 document selector 是 `[{ language: 'yaml' | 'xml', scheme: '*' }]`，服务的是任意 YAML/XML 文件，不是 `.http` 的附属。它们的 `xmlFormat.ts`（577 字节的手写 XML 格式化器）另算，属于依赖替换批的候选。
 - 删除之后 `activationEvents` 里 `onLanguage:http` 消失，只剩 `workspaceContains:.git/HEAD` 与 `onWebviewPanel:office-git-history` 两条真正需要的。
+- **AI 的删除分两半，第二半还没做。** 扩展侧（`src/service/ai/`、provider 的 4 个 handler 与 4 个方法、webview 的菜单项与 `ai-i18n.js`、5 个 l10n 键）已全部移除，`ai` 选项与 `onPolish` 回调不再传给 vditor —— 也就是说**没有任何代码路径能把文档发出去**。但 `vditor/` 内部仍留着 `ui/aiDialog.ts`（36 KB）、`toolbar/AISettings.ts`（12.6 KB）与 `ts/ai/`：它们现在是惰性的（`mergedOptions.ai?.onPolish` 为空，对话框不会创建），且这份 fork 的 Markdown 编辑器此前没有任何自动化 DOM 覆盖。**先把覆盖面补上，再删**——本次顺手新增的 `markdown-editor` 场景就是那步的前置。

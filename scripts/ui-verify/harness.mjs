@@ -417,6 +417,29 @@ export function startHarness(fixtures, port = 0) {
       return;
     }
 
+    // The Markdown editor is not a React route: it is `resource/markdown/index.html` plus the
+    // prebuilt vditor bundle in `resource/markdown/dist`. Serving it needs the host's two
+    // placeholders filled in, which `Util.buildPath` does in production.
+    if (path === "/resource/markdown/index.html") {
+      const html = readFileSync(join(repoRoot, path), "utf8")
+        .replace("{{csp}}", buildWebviewCsp(`http://${req.headers.host}`))
+        .replace("{{baseUrl}}", "/resource/markdown");
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(html);
+      return;
+    }
+
+    if (path.startsWith("/resource/")) {
+      const asset = join(repoRoot, decodeURIComponent(path));
+      if (!existsSync(asset)) {
+        res.writeHead(404).end("not found");
+        return;
+      }
+      res.writeHead(200, { "content-type": MIME[extname(asset)] ?? "application/octet-stream" });
+      res.end(readFileSync(asset));
+      return;
+    }
+
     const file = join(WEBVIEW_ROOT, path.replace(/^\//, ""));
     if (!existsSync(file) || path.endsWith("/")) {
       res.writeHead(404).end("not found");

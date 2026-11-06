@@ -19,11 +19,6 @@
   "ext.markdown.wikilinkNotFound": "Cible du wikilink introuvable : {0}",
   "ext.markdown.linkFileNotFound": "Fichier introuvable : {0}",
   "ext.markdown.linkOpenFailed": "Impossible d’ouvrir le fichier {0} : {1}",
-  "ext.markdown.aiRequiresVscode": "Les fonctionnalités IA nécessitent VS Code 1.90+ avec une extension de modèle de langage installée.",
-  "ext.markdown.noAiModel": "Aucun modèle de langage IA disponible. Veuillez installer une extension de modèle de langage (par ex. GitHub Copilot).",
-  "ext.markdown.aiPolishFailed": "Échec de la correction IA : {0}",
-  "ext.markdown.customAiUrlRequired": "IA personnalisée : l'URL de l'API est requise.",
-  "ext.markdown.customAiPolishFailed": "Échec de la correction IA personnalisée : {0}",
   "ext.markdown.selectImage": "Sélectionner une image",
   "ext.markdown.statusBar": "Ligne {0} Caractères {1}"
 }
