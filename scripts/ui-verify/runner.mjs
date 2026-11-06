@@ -209,13 +209,15 @@ const scenarios = [
             expect(second.range === '51–100 of 300', `page 2 range: ${second.range}`)
 
             // A fresh document with the same localStorage: exactly what a tab switch does once
-            // the webview is allowed to be destroyed while kept hidden.
+            // the webview is allowed to be destroyed while kept hidden. Wait for the rows too:
+            // the pager text updates before the page's cells arrive, so asserting on the range
+            // alone races the table (this started failing on antd 6, whose render order differs).
             await page.navigate(`${base}/harness-parquet?mixed=1`)
             const restored = await page.waitFor(
-                `document.querySelector('.parquet-viewer__pager-info')?.innerText === '51–100 of 300'`, 15000)
+                `document.querySelector('.parquet-viewer__pager-info')?.innerText === '51–100 of 300'` +
+                ` && document.querySelector('.parquet-table tbody tr:nth-child(2) td')?.innerText === '51'`, 15000)
             const after = await pagerState(page)
-            expect(restored, `the page was not restored after a reload, got ${after.range}`)
-            expect(after.first === '51', `restored page starts at row ${after.first}`)
+            expect(restored, `page was not restored with its rows, got ${after.range} / row ${after.first}`)
             return `reloaded onto ${after.range}`
         },
     },
