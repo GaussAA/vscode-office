@@ -1,6 +1,9 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 0008-drop-web-extension-host.md
 ---
+
+> **后续**：Web 入口已在 [ADR-0008](0008-drop-web-extension-host.md) 中整体删除，本文的「保留但降级」不再成立；其中「因此不采用 ESM 入口」的理由随 web worker 宿主一起消失，ESM 变成「允许但暂不采用」。
 
 # Web 扩展降级为 best-effort，并因此不采用 ESM 入口
 

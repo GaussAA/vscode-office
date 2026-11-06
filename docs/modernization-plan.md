@@ -4,7 +4,9 @@
 
 Issues 已同步到 [GaussAA/vscode-office #5](https://github.com/GaussAA/vscode-office/issues/5)（tracking），T01–T19 对应 #6–#24，父子关系与 blocked-by 已用 GitHub 原生依赖记录。
 
-**已完成**：T01 的代码部分（#6，剩 Marketplace 后台配置与一次真实 tag 发布）、T02（#7）、T03（#8）、T04（#9）、T05 的沙箱部分（#10，全局 CSP 拆成 #25）、T06（#11）、T07（#12）、T10（#15）、T12（#17）。
+**第一轮全部完成**：T01 的代码部分（#6，剩 Marketplace 后台配置与一次真实 tag 发布）、T02–T08、T10–T20 的代码部分。`typecheck` 基线已清空，Web 版支持随后在第二轮被整体删除（[ADR-0008](adr/0008-drop-web-extension-host.md)）。
+
+**第二轮（D1–D13）** 见本文末尾「第二轮」一节：判据从「依赖是否过期」升级为「哪里有不得已的妥协」，并新增两块此前没人看的地方 —— 手搓实现与闸门盲区。
 
 ## 判据
 
@@ -63,3 +65,27 @@ Issues 已同步到 [GaussAA/vscode-office #5](https://github.com/GaussAA/vscode
 ## 不在本清单内
 
 见 [ADR-0004](adr/0004-web-extension-best-effort.md)：ESM 入口、ESLint 10、更换 bundler、`@vscode/webview-ui-toolkit`、替换 React。这些不需要逐个重新论证。
+
+## 第二轮：不得已的妥协项（D1–D13）
+
+第一轮问「依赖是否过期」；第二轮问「哪里我们明知有更好的做法却妥协了」。后者不出现在 `pnpm outdated` 里，只出现在三处：**平台承诺与现实不符**、**手搓了别人已经做好的东西**、**闸门覆盖不到的地方**。
+
+四份只读审计（手搓逻辑 vs 开源替代、vendored / 死代码、工具链现状、依赖健康度）的结论落成 13 条决定：
+
+| # | 决定 | 落点 |
+|---|---|---|
+| D1 | 平台下限 `^1.100` → `^1.125`（宿主 Node 20 → 24），闸门扩成「求交依赖的 `engines.node`」 | [ADR-0007](adr/0007-platform-floor-1-125.md) |
+| D2 | 删除 Web 扩展宿主与 `src/shims/` | [ADR-0008](adr/0008-drop-web-extension-host.md) |
+| D3 | `vditor/` 认领为 fork；Lute / Mermaid 预构建 blob 与 npm 对齐 | [ADR-0009](adr/0009-vendored-copy-vs-fork.md) |
+| D4 | `x-spreadsheet/` 认领为 fork，删 382 行内部死文件；换引擎另立 ADR | 同上 |
+| D5 | 删除 `.http` REST client 整个功能 | [ADR-0010](adr/0010-feature-boundary.md) |
+| D6 | gitHistory 换 `simple-git`；`vscode.git` API 定为仓库事实的正统来源 | 同上 |
+| D7 | 删除 AI polish | 同上 |
+| D8 | 五份语法与两个配色主题删除；图标主题重写成最小集 | 同上 |
+| D9 | `oxfmt`、`oxlint --type-aware`、`tsx`、`puppeteer-core`、typecheck `--self-test` | [ADR-0011](adr/0011-toolchain-oxc-and-gate-coverage.md) |
+| D10 | `src/` 一次性 reformat，配 `.git-blame-ignore-revs` | 同上 |
+| D11 | 依赖替换批（判据：18 个月内有发布 + 有 CI + 不是弃仓） | 每条独立提交 |
+| D12 | 8 个死文件 + 3 个一次性迁移 + 13 个零调用 `@deprecated` 别名 | 每条独立提交 |
+| D13 | 打包：剔除 183 KB dev 材料；合并 katex ×3 / mermaid ×2 / highlight.js ×2 | 每条独立提交 |
+
+新增词汇见 [GLOSSARY](../GLOSSARY.md)：**Vendored copy** 与 **Fork** 的区分（ADR-0009）、**Gate coverage**（ADR-0011）。

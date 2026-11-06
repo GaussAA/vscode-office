@@ -64,8 +64,20 @@ _Avoid_: match, span
 _Avoid_: whitelist（它曾经是白名单；现在只是一个已清空的棘轮）
 
 **Platform baseline（平台基线）**:
-扩展对外承诺的宿主下限，与它编译时实际使用的类型定义，构成的整体：`engines.vscode`、`@types/vscode`、`@types/node` 三者必须互相自洽。它回答的唯一问题是「我们敢用哪些 API」，不是三个可以各自漂移的版本号——一旦 `engines` 落后于 `@types`，编译通过就只是假象。
-_Avoid_: 引擎版本、最低支持版本（只提 `engines` 会掩盖另外两项）
+扩展对外承诺的宿主下限，与它编译时实际使用的类型定义，构成的整体：`engines.vscode`、`@types/vscode`、`@types/node` 三者必须互相自洽，**并且每一个运行时依赖自己声明的 `engines.node` 都必须被宿主 Node 满足**。它回答的唯一问题是「我们敢用哪些 API、敢依赖什么」，不是几个可以各自漂移的版本号——一旦 `engines` 落后于 `@types`，编译通过就只是假象；一旦某个依赖要求的 Node 高于宿主，那条功能在承诺的下限上根本跑不起来。
+_Avoid_: 引擎版本、最低支持版本（只提 `engines` 会掩盖另外几项）
+
+**Vendored copy（拷贝）**:
+几乎原样搬进仓库的第三方代码，我们只是它的宿主：我们的改动量**远小于**原项目。判据是增量比例，不是「有没有改动过」。处置是回到 npm，或者删掉。
+_Avoid_: 把它和 fork 一起叫「vendored」
+
+**Fork（分叉）**:
+我们已经在上面写了大量自己的代码、构成独立演进线的第三方项目的副本。判据是增量与原项目**同数量级**。处置是认领：登记进 `NOTICE.md`、当自己的代码维护、把「rebase 到上游」冻结为非目标。
+_Avoid_: 把 fork 叫「vendored」；也别拿「上游还在发版」当作「我们不用管」的理由
+
+**Gate coverage（闸门覆盖面）**:
+一组闸门（lint / typecheck / test / smoke / UI）各自实际读到的文件集合。它是显式清单，不是「大概都覆盖了」的直觉——`src/**/*.js` 与 `test/` 都曾经落在全部闸门之外，而一次真实的静默回归正好发生在那里面。
+_Avoid_: 把「闸门存在」等同于「代码被看守」
 
 **Upstream（上游）**:
 我们 fork 的来源仓库 `cweijan/vscode-office`。它是**只读参考资料**，不是合并来源：需要上游的修复时读它的 diff 自己重写（见 [ADR-0002](./docs/adr/0002-independent-evolution.md)）。
