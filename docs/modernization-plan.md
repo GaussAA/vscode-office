@@ -89,3 +89,17 @@ Issues 已同步到 [GaussAA/vscode-office #5](https://github.com/GaussAA/vscode
 | D13 | 打包：剔除 183 KB dev 材料；合并 katex ×3 / mermaid ×2 / highlight.js ×2                 | 每条独立提交                                            |
 
 新增词汇见 [GLOSSARY](../GLOSSARY.md)：**Vendored copy** 与 **Fork** 的区分（ADR-0009）、**Gate coverage**（ADR-0011）。
+
+### 进度（2026-11-06）
+
+D1–D8、D10、D12、D13a 已落地，D9 与 D11 走到一半：
+
+| 项                                | 状态   | 说明                                                                                                                                                                                                                      |
+| --------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1 D2 D3 D4 D5 D7 D8 D10 D12 D13a | 完成   | 见 git log                                                                                                                                                                                                                |
+| D9                                | 部分   | `oxfmt`（D10 一并）与 `typecheck --self-test`、`puppeteer-core` 已完成；`oxlint --type-aware` **未接入**——试跑后有 50 条发现（24 条 `no-floating-promises`），先修完再进 `check`，不做基线；`tsx` 待 `type: module` 就位  |
+| D11                               | 部分   | 已换 9 个：`codemirror`(删)、`node-unrar-js`(归类修正)、`pretty-bytes`、`utif2`、`chrome-launcher`、`date-format`、`pdf-lib`→`@cantoo/pdf-lib`、`markdown-it-checkbox`/`markdown-it-plantuml`/手抄 katex 插件 → `@mdit/*` |
+| D6                                | 未开始 | gitHistory 换 `simple-git`                                                                                                                                                                                                |
+| D13b                              | 未开始 | katex ×3 / mermaid ×2 / highlight.js ×2 合并，约 4.6 MB                                                                                                                                                                   |
+
+`src/` 里只剩两个非 vendored 的 `.js`：`markdown-pdf.js` 与 `html-export.js`。它们是 `type: module` 的最后一个前置条件（`x-spreadsheet/` 下的 ~100 个 `.js` 是 vendored CJS，保持原样）。
