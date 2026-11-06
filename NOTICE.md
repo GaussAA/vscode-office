@@ -56,18 +56,41 @@ Fork identity: `GaussAA.office-viewer-plus` (display name "Office Viewer Plus").
   fork can be installed next to the original instead of replacing it.
 - **Parquet viewer is `priority: default`**, so `.parquet` opens in the viewer directly.
 
-## Third-party code vendored in this repository
+## Third-party code in this repository
 
-Two MIT-licensed projects are copied into the tree rather than installed from npm. Their
-licenses require attribution, which this section provides. The copies are unmodified snapshots
-plus upstream Office Viewer's own patches; consult `git log` for the history of each path.
+Not all of it is installed from npm, and the two kinds are different things (see
+[docs/adr/0009](docs/adr/0009-vendored-copy-vs-fork.md)):
+
+- **Copy** — a project we host almost unchanged. Its delta against upstream is far smaller
+  than upstream itself. We owe attribution and nothing else.
+- **Fork** — a project we have written a lot of our own code into, so that it now evolves
+  independently. Upstream may have moved on; we owe attribution *and* maintenance.
+
+Licenses require attribution, which this section provides. Copyright remains with the
+original authors.
+
+### Copies
 
 | Path | Project | License | Upstream |
 | --- | --- | --- | --- |
-| `src/react/view/excel/x-spreadsheet/` | `x-data-spreadsheet` (patch applied upstream in `48b10e4`, "Migrate @antv/s2 to x-data-spreadsheet") | MIT | https://github.com/myliang/x-spreadsheet |
+| `resource/pdf/` | `pdf.js` 3.1.81 — a prebuilt `pdfjs-dist` web viewer plus `cmaps/` and `standard_fonts/` | Apache-2.0 | https://github.com/mozilla/pdf.js |
+| `icons/` (26 SVGs) + `theme/material-icons.json` | Derived from `vscode-material-icon-theme`, reduced to the file formats this extension opens | MIT | https://github.com/PKief/vscode-material-icon-theme |
+| `public/woff2_decompress_binding.js` | `woff2` compiled to JavaScript with Emscripten; decodes fonts for the font viewer | MIT | https://github.com/google/woff2 |
+| `resource/java-decompiler.jar` | `java-decompiler` — the IntelliJ Platform's Java decompiler, run headless by the `.class` viewer | Apache-2.0 | https://github.com/JetBrains/intellij-community |
 | `src/service/zip/pretty-bytes/` | `pretty-bytes` | MIT | https://github.com/sindresorhus/pretty-bytes |
 
-Copyright for each remains with its original authors.
+### Forks
+
+| Path | Project | License | Upstream | Our delta |
+| --- | --- | --- | --- | --- |
+| `vditor/` | `Vditor` — the Markdown editor the webview runs. Its own pnpm workspace package with its own build (`vite/vditorPlugin.ts`). Forked once by upstream Office Viewer (`vscode-ext-studio/vditor`), then heavily modified here | MIT | https://github.com/Vanessa219/vditor | ~+12k lines: CodeMirror 6 code blocks, wikilinks, editor theming, find bar, VS Code glue |
+| `src/react/view/excel/x-spreadsheet/` | `x-data-spreadsheet` — the spreadsheet engine behind the `.xlsx/.csv/.ods` viewer (patch applied upstream in `48b10e4`) | MIT | https://github.com/myliang/x-spreadsheet | ~+3.2k/−1k lines over 45 files: toolbar icons, hyperlink/formula bar/sheet images, clipboard, find |
+
+`vditor/src/js/` also carries prebuilt third-party runtimes that Vditor ships and loads at
+runtime rather than importing: **Lute** (the Go markdown engine, `lute.min.js` 3.5 MB),
+**Mermaid** (`mermaid.min.js` 3.3 MB), **KaTeX** (JS + fonts) and `plantuml-encoder`. They are
+inside the fork because Vditor's `cdn` loading model expects files next to the bundle; they are
+not built from this repository.
 
 ## Working with upstream
 
