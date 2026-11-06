@@ -4,6 +4,7 @@
   "description": "Fork of Office Viewer (cweijan/vscode-office) with ZSTD parquet support and a JSONL tree viewer.",
   "version": "4.4.1",
   "publisher": "chaowu21",
+  "license": "MIT",
   "icon": "image/logo.png",
   "engines": {
     "vscode": "^1.100.0"
@@ -827,6 +828,7 @@
     "test:smoke:min": "node scripts/smoke/build.mjs && vscode-test --label smoke-min",
     "check": "pnpm lint && node scripts/check-baseline.mjs && pnpm typecheck && pnpm test",
     "check:baseline": "node scripts/check-baseline.mjs",
+    "check:release": "node scripts/check-release.mjs",
     "check:full": "pnpm check && pnpm build && pnpm test:smoke && pnpm verify:ui",
     "verify:ui": "node scripts/ui-verify/runner.mjs",
     "verify:ui:docs": "node scripts/ui-verify/runner.mjs --docs",
