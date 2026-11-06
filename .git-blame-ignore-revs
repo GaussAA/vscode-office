@@ -1,0 +1,9 @@
+# Commits that should be skipped by `git blame`.
+#
+# GitHub honours this file automatically. Locally, opt in once:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# See https://git-scm.com/docs/git-blame#Documentation/git-blame.txt---ignore-revs-file
+
+# chore(format): Prettier → oxfmt，并把整个 src 一次性格式化
+292a0be
