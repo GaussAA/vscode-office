@@ -65,7 +65,7 @@ await build({
 // task lists, anchors, toc, katex, plantuml, mermaid) — which is where a silent regression
 // once hid. Heavy, lazily-required packages stay external so the bundle stays small.
 await build({
-  entryPoints: [join(root, "src/service/markdown/markdown-pdf.js")],
+  entryPoints: [join(root, "src/service/markdown/markdown-pdf.ts")],
   outfile: join(outdir, "markdownPdf.mjs"),
   bundle: true,
   platform: "node",
@@ -73,10 +73,16 @@ await build({
   target: "node20",
   alias: { "@": join(root, "src"), vscode: join(root, "test/support/vscode-stub.ts") },
   external: ["vscode-html-to-docx", "puppeteer-core", "highlight.js", "katex"],
-  // These modules call `require` at runtime (they are CommonJS with a couple of `export`s
-  // bolted on). ESM output has no `require`, so hand the bundle one built from its own URL.
+  // The exporter is bundled as CommonJS in the real build, so it uses `require` and
+  // `__dirname` — neither exists in this ESM test bundle. Provide both from `import.meta.url`.
   banner: {
-    js: "import { createRequire as __dshCreateRequire } from 'node:module';\nconst require = __dshCreateRequire(import.meta.url);",
+    js: [
+      "import { createRequire as __dshCreateRequire } from 'node:module';",
+      "import { fileURLToPath as __dshFileURLToPath } from 'node:url';",
+      "import { dirname as __dshDirname } from 'node:path';",
+      "const require = __dshCreateRequire(import.meta.url);",
+      "const __dirname = __dshDirname(__dshFileURLToPath(import.meta.url));",
+    ].join("\n"),
   },
   logLevel: "warning",
 });

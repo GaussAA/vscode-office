@@ -1,3 +1,4 @@
+import * as vscode from "vscode";
 import type { GitExecutor } from "./gitExecutor";
 import type {
   GitRemoteDetail,
@@ -267,7 +268,9 @@ export class GitActions {
 
   async openRemoteUrl(url: string): Promise<string | null> {
     try {
-      const vscode = await import("vscode");
+      // `await import("vscode")` cannot work here: the host injects the `vscode` module through
+      // CommonJS resolution, which Node's ESM loader does not go through. It rejected every
+      // time, and the rejection was returned to the UI as an error string.
       await vscode.env.openExternal(vscode.Uri.parse(url));
       return null;
     } catch (e) {

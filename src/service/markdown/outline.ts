@@ -8,6 +8,9 @@
  * to this file.
  */
 
+import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber } from "@cantoo/pdf-lib";
+import { HTMLElement, parse } from "node-html-parser";
+
 type PdfDoc = any;
 type PdfDictRef = any;
 
@@ -18,17 +21,7 @@ interface OutlineDict {
   child?: OutlineDict[];
 }
 
-/**
- * pdf-lib stays a dynamic import: it is ~720 KB and only the PDF export path needs it. The
- * module still loads lazily even though this file is imported at activation.
- */
-async function loadPdfLib() {
-  return await import("@cantoo/pdf-lib");
-}
-
 export async function createOutline(pdf: Uint8Array, html: string): Promise<Uint8Array> {
-  const { PDFDocument } = await loadPdfLib();
-  const { parse, HTMLElement } = await import("node-html-parser");
   const pdfDoc: PdfDoc = await PDFDocument.load(pdf);
   const root = parse(html);
 
@@ -113,7 +106,6 @@ function anchorToPdfDestKey(anchor: string): string {
 }
 
 async function creatOutlines(doc: PdfDoc, dictArray: OutlineDict[]): Promise<void> {
-  const { PDFDict, PDFHexString, PDFNumber, PDFName } = await loadPdfLib();
   const createOutlineItem = (
     pdfDoc: PdfDoc,
     dict: OutlineDict,

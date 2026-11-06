@@ -338,6 +338,9 @@ importers:
       '@puppeteer/browsers':
         specifier: ^3.2.6
         version: 3.2.6(yauzl@3.4.0)
+      '@types/mustache':
+        specifier: ^4.2.6
+        version: 4.2.6
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -2434,6 +2437,9 @@ packages:
 
   '@types/mocha@10.0.10':
     resolution: {integrity: sha512-xPyYSz1cMPnJQhl0CLMH68j3gprKZaTjG3s5Vi+fDgx+uhG9NOXwbVt52eFS8ECyXhyKcjDLCBEqBExKuiZb7Q==}
+
+  '@types/mustache@4.2.6':
+    resolution: {integrity: sha512-t+8/QWTAhOFlrF1IVZqKnMRJi84EgkIK5Kh0p2JV4OLywUvCwJPFxbJAl7XAow7DVIHsF+xW9f1MVzg0L6Szjw==}
 
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
@@ -6952,6 +6958,8 @@ snapshots:
   '@types/mdurl@2.0.0': {}
 
   '@types/mocha@10.0.10': {}
+
+  '@types/mustache@4.2.6': {}
 
   '@types/node@24.19.2':
     dependencies:

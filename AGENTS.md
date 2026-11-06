@@ -60,7 +60,7 @@ pnpm test:smoke       # 集成 smoke：真实 VS Code（stable）里验证激活
 pnpm test:smoke:min   # 同上，但跑在 engines.vscode 的下限上 —— 下限只有被执行过才算数
 pnpm check:baseline   # 断言 engines / @types / 运行时依赖的 engines.node 三者与宿主自洽
 pnpm check            # lint + baseline + typecheck + typecheck:self-test + test（pre-commit 跑这个）
-pnpm check:full       # check + build + test:smoke + verify:ui（CI 跑这个）
+pnpm check:full       # check + build + check-bundled-imports + test:smoke + verify:ui（CI 跑这个）
 pnpm verify:ui        # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
 ```
 

@@ -563,7 +563,7 @@
     "check": "pnpm format:check && pnpm lint && node scripts/check-baseline.mjs && pnpm typecheck && pnpm typecheck:self-test && pnpm test",
     "check:baseline": "node scripts/check-baseline.mjs",
     "check:release": "node scripts/check-release.mjs",
-    "check:full": "pnpm check && pnpm build && pnpm test:smoke && pnpm verify:ui",
+    "check:full": "pnpm check && pnpm build && node scripts/check-bundled-imports.mjs && pnpm test:smoke && pnpm verify:ui",
     "verify:ui": "node scripts/ui-verify/runner.mjs",
     "verify:ui:docs": "node scripts/ui-verify/runner.mjs --docs",
     "prepare": "husky",
@@ -572,6 +572,7 @@
   },
   "devDependencies": {
     "@puppeteer/browsers": "^3.2.6",
+    "@types/mustache": "^4.2.6",
     "@types/node": "^24.19.2",
     "@types/opentype.js": "^1.3.10",
     "@types/react": "^19.2.17",
