@@ -20,6 +20,22 @@ pnpm run package           # 产出 office-viewer-plus-<version>.vsix
 `check:release` 会拦住"打出来才发现"的问题（比如图标不是 PNG、版本号带了 semver 预发布后缀）。
 产物在仓库根目录，`.gitignore` 已忽略 `.vsix`。
 
+## 一·五、GitHub Release（不需要任何账号配置）
+
+这是本仓库**已经在用**的发布方式：`v4.3.0` 就是把 vsix 挂在 GitHub Release 的附件里，
+用户用 `code --install-extension <vsix>` 安装。它不经过 Marketplace，因此不需要 publisher
+或任何 registry 的登录态，只需要仓库的 GitHub 权限。
+
+```bash
+gh release create v4.4.1 office-viewer-plus-4.4.1.vsix \
+  --repo GaussAA/vscode-office \
+  --title "Office Viewer Plus 4.4.1" \
+  --notes-file <notes.md>
+```
+
+tag 会触发 `Release` 工作流。因为 `PUBLISH_ENABLED` 还没打开（见 trusted-publishing.md 的 B3），
+它只跑闸门、打包、上传 artifact，不会去碰 registry，所以不会红。
+
 ## 二、发到 VS Code Marketplace（浏览器）
 
 1. 打开 <https://marketplace.visualstudio.com/manage>，用**属于 publisher `GaussAA` 的账号**登录。

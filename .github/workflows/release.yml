@@ -74,14 +74,23 @@ jobs:
           path: '*.vsix'
           if-no-files-found: error
 
-      # Guarded so a manual dispatch can package without publishing, and so a half-finished
-      # release can be completed on the registry that did not take the version.
+      # Publishing is behind a repository variable, not behind a tag alone. Trusted publishing
+      # needs a policy on the Marketplace and a trusted publisher on Open VSX, neither of which
+      # exists yet; without the switch every tag would go red *after* passing the gate, which
+      # makes a red X mean "not configured" instead of "something broke".
+      #
+      # Until it is configured, a tag runs the gate, packages, and uploads the artifact — which
+      # is exactly what a GitHub release needs. Set the variable with:
+      #   gh variable set PUBLISH_ENABLED --repo GaussAA/vscode-office --body true
+      #
+      # A manual dispatch can still publish (or finish a half-finished release) on its own,
+      # because a version number cannot be reused once one registry has taken it.
       - name: Publish to VS Code Marketplace (OIDC)
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_marketplace
+        if: (startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_ENABLED == 'true') || inputs.publish_marketplace
         run: pnpm exec vsce publish --no-dependencies --oidc --packagePath ./office-viewer-plus-*.vsix
 
       # `--trusted-publishing` fails rather than falling back to a PAT: if the Open VSX trusted
       # publisher is not registered yet, this step goes red instead of silently using a secret.
       - name: Publish to Open VSX (trusted publishing)
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_openvsx
+        if: (startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_ENABLED == 'true') || inputs.publish_openvsx
         run: pnpm exec ovsx publish --no-dependencies --trusted-publishing ./office-viewer-plus-*.vsix

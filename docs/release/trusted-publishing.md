@@ -90,6 +90,20 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 > **公开仓库**（我们）不需要注册码。私有仓库会在注册时给一个 7 天有效的一次性
 > `--registrationCode`，首次发布时通过 `OVSX_REGISTRATION_CODE` 传入；后续不再需要。
 
+## B3. 打开自动发布的开关
+
+配置完成前，工作流的两个发布步骤是**关着的**：tag 只会跑闸门、打包、上传 artifact，不会去
+碰任何 registry。这样 tag 不会因为"还没配置"而变红 —— 红色只代表真的出问题。
+
+两个 registry 都配置好之后，开这个开关，tag 才会自动发布：
+
+```bash
+gh variable set PUBLISH_ENABLED --repo GaussAA/vscode-office --body true
+```
+
+想临时关掉就把变量删掉（`gh variable delete PUBLISH_ENABLED --repo GaussAA/vscode-office`）。
+`workflow_dispatch` 的两个输入不受这个开关约束 —— 补发某一次失败的那一半时仍然可以直接勾选。
+
 ## C. 首次真实发布
 
 ### C1. 本地预检
