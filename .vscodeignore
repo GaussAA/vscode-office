@@ -1,41 +1,45 @@
+# Everything here is never loaded at runtime. `pnpm check-release` and `vsce` both read this
+# file, so an entry for a path that does not exist is a claim nobody is checking -- keep it
+# to real files.
+
 .vscode/**
 .vscode-test/**
-out/test/**
-src/**
-vditor/**
 .idea/
+.github/**
+
+# Sources, tests and build inputs: `out/` holds the only thing the extension host loads.
+src/**
 test/**
-packages/**
+out/test/**
 template/**
-.gitignore
-vsc-extension-quickstart.md
 **/tsconfig.json
-**/.eslintrc.json
 **/*.map
 **/*.ts
+
+# Two pnpm workspace packages and the scripts that build them.
 node_modules/
 vditor/
-build.js
-public/
-lib.js
-vite/
-backlog.md
-bun.lock
-yarn.lock
 pnpm-lock.yaml
 pnpm-workspace.yaml
+vite/
 scripts/**
-.ui-verify/**
+public/**
 
-# agent-facing docs and screenshots -- not part of the product
+# Lockfiles of other package managers, if a contributor has one lying around.
+.gitignore
+package-lock.json
+bun.lock
+yarn.lock
+
+# Agent-facing docs, screenshots and release material.
 docs/**
+.ui-verify/**
 AGENTS.md
 CLAUDE.md
 GLOSSARY.md
-.github/**
 *.vsix
 
-# Dev scaffolding: never loaded at runtime, and shipping it only pads the download.
+# Dev scaffolding: formatter/linter config, the smoke runner's config, the Vite dev page.
 .husky/**
 .lintstagedrc
 .oxlintrc.json
