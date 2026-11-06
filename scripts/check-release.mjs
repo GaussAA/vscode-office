@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -28,14 +28,37 @@ if (!/^\d+\.\d+\.\d+$/.test(manifest.version ?? '')) {
 if (!manifest.repository?.url) fail('package.json has no "repository.url"; the Marketplace page links break')
 if (!manifest.license) fail('package.json has no "license" field')
 
+/**
+ * Case-sensitive existence check. `existsSync` is not enough: this script runs on Windows in
+ * development and on Linux in CI, and the two disagree about `changelog.md` vs `CHANGELOG.md`.
+ * Checking the directory listing makes the local run say what CI will say. (It did not, once:
+ * the lowercase file passed here and failed the release workflow on the tag.)
+ */
+function existsExact(relativePath) {
+    const segments = relativePath.split('/')
+    let current = root
+    for (const segment of segments) {
+        let entries
+        try {
+            entries = readdirSync(current)
+        } catch {
+            return false
+        }
+        if (!entries.includes(segment)) return false
+        current = join(current, segment)
+    }
+    return true
+}
+
 for (const file of ['README.md', 'LICENSE', 'CHANGELOG.md']) {
-    if (!existsSync(join(root, file))) fail(`${file} is missing; vsce packages without it but the listing looks broken`)
+    // vsce looks these up by exact name and only `CHANGELOG.md` reaches the Marketplace tab.
+    if (!existsExact(file)) fail(`${file} is missing; vsce packages without it but the listing looks broken`)
 }
 
 const icon = manifest.icon
 if (!icon) {
     fail('package.json has no "icon"')
-} else if (!existsSync(join(root, icon))) {
+} else if (!existsExact(icon)) {
     fail(`icon "${icon}" does not exist`)
 } else if (!icon.toLowerCase().endsWith('.png')) {
     fail(`icon "${icon}" must be a PNG; the Marketplace rejects SVG icons`)
@@ -44,7 +67,7 @@ if (!icon) {
 }
 
 // `vscode.l10n` resolves `l10n/bundle.l10n*.json` from the packaged extension.
-if (!existsSync(join(root, 'l10n', 'bundle.l10n.json'))) fail('l10n/bundle.l10n.json is missing')
+if (!existsExact('l10n/bundle.l10n.json')) fail('l10n/bundle.l10n.json is missing')
 if (manifest.l10n !== './l10n') fail('package.json "l10n" must point at "./l10n"')
 
 const workflow = read(join('.github', 'workflows', 'release.yml'))
