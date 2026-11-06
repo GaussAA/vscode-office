@@ -1,7 +1,7 @@
 import { adjustImgPath } from "@/common/fileUtil";
 import { Output } from "@/common/Output";
 import { spawn } from 'child_process';
-import chromeFinder from 'chrome-finder';
+import { getChromePath } from 'chrome-launcher';
 import * as fileTypeModule from 'file-type';
 
 /**
@@ -118,7 +118,10 @@ export class MarkdownService {
             }
         }
         try {
-            const chromePath = chromeFinder();
+            // `chrome-launcher` is the maintained answer to "where is Chrome installed on this
+            // OS" (Google's own, used by Lighthouse). It throws when it finds nothing, which is
+            // exactly the failure this branch already handles.
+            const chromePath = getChromePath();
             console.debug(`using chrome path is ${chromePath}`)
             return chromePath;
         } catch (e) {

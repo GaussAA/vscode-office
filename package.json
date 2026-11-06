@@ -609,7 +609,7 @@
     "antd": "^6.7.0",
     "axios": "^1.18.1",
     "buffer": "^6.0.3",
-    "chrome-finder": "^1.0.7",
+    "chrome-launcher": "^1.2.2",
     "date-format": "^4.0.14",
     "epubjs": "^0.3.93",
     "file-type": "^19.6.0",
