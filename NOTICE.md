@@ -77,7 +77,8 @@ original authors.
 | `icons/` (26 SVGs) + `theme/material-icons.json` | Derived from `vscode-material-icon-theme`, reduced to the file formats this extension opens | MIT | https://github.com/PKief/vscode-material-icon-theme |
 | `public/woff2_decompress_binding.js` | `woff2` compiled to JavaScript with Emscripten; decodes fonts for the font viewer | MIT | https://github.com/google/woff2 |
 | `resource/java-decompiler.jar` | `java-decompiler` — the IntelliJ Platform's Java decompiler, run headless by the `.class` viewer | Apache-2.0 | https://github.com/JetBrains/intellij-community |
-| `src/service/zip/pretty-bytes/` | `pretty-bytes` | MIT | https://github.com/sindresorhus/pretty-bytes |
+
+(`pretty-bytes` used to be copied in; it is now the npm dependency it always was.)
 
 ### Forks
 

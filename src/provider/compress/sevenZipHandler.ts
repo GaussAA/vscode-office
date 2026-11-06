@@ -2,7 +2,7 @@ import { Output } from '@/common/Output';
 import { Handler } from '@/common/handler';
 import { assertSafeArchiveEntryPaths, planExtractTarget, resolveContainedPath, revealExtractResult } from '@/service/compress/archiveUtils';
 import { buildFileTree } from '@/service/compress/fileTree';
-import prettyBytes from '@/service/zip/pretty-bytes';
+import prettyBytes from 'pretty-bytes';
 import iconv from 'iconv-lite';
 import { mkdirSync } from 'fs';
 import { basename, dirname, parse, relative, sep } from 'path';

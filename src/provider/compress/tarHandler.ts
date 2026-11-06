@@ -3,7 +3,7 @@ import { Handler } from '@/common/handler';
 import { planExtractTarget, resolveContainedPath, revealExtractResult } from '@/service/compress/archiveUtils';
 import { buildFileTree } from '@/service/compress/fileTree';
 import { extractTarEntries, formatTarModifyTime, listTarEntries } from '@/service/compress/tarUtils';
-import prettyBytes from '@/service/zip/pretty-bytes';
+import prettyBytes from 'pretty-bytes';
 import { mkdirSync } from 'fs';
 import { basename } from 'path';
 import { i18n } from '@/common/global';

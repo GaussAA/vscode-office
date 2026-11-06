@@ -12,7 +12,7 @@ import iconv from 'iconv-lite';
 import format from 'date-format';
 import { mkdirSync, writeFileSync } from 'fs';
 import { basename, resolve } from 'path';
-import prettyBytes from './pretty-bytes';
+import prettyBytes from 'pretty-bytes';
 import { detectZipFilenameEncoding } from './zipEncoding';
 import { resolveContainedPath, unwrapCrx } from '@/service/compress/archiveUtils';
 

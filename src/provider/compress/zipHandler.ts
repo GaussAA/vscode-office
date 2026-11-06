@@ -5,7 +5,7 @@ import { Handler } from "@/common/handler";
 import { isZipPasswordError } from '@/service/compress/passwordUtils';
 import { parseJarInfo } from '@/service/compress/jarInfo';
 import { planExtractTarget, resolveContainedPath, revealExtractResult } from '@/service/compress/archiveUtils';
-import prettyBytes from "@/service/zip/pretty-bytes";
+import prettyBytes from 'pretty-bytes';
 import { ZipArchive } from "@/service/zip/zipArchive";
 import { mkdirSync, writeFileSync } from "fs";
 import { basename, resolve } from "path";

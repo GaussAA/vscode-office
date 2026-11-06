@@ -301,6 +301,9 @@ importers:
       pptxviewjs:
         specifier: ^1.1.9
         version: 1.1.9(chart.js@4.6.1)(jszip@3.10.2)
+      pretty-bytes:
+        specifier: ^7.2.0
+        version: 7.2.0
       puppeteer-core:
         specifier: ^25.1.0
         version: 25.16.0(yauzl@3.4.0)
@@ -4068,6 +4071,10 @@ packages:
     resolution: {integrity: sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA==}
     engines: {node: '>=14'}
     hasBin: true
+
+  pretty-bytes@7.2.0:
+    resolution: {integrity: sha512-T2kroepGB5DRVbkN/nOpW03+VRWqdtJhZNuCW3wYk3chdPjgi4GcTBOaxWfHq1MIM0ypidxsSWbQaAiRpxnXmg==}
+    engines: {node: '>=20'}
 
   probe-image-size@7.5.0:
     resolution: {integrity: sha512-ietdx4XPgmnzHRZOq1/KtcnsBkL4bRsBe+Szj5Tuq1/KPqDG42OspG1IhJb7vz6Z9pSzhp0J6UPnw6hujJTWoQ==}
@@ -8502,6 +8509,8 @@ snapshots:
       jszip: 3.10.2
 
   prettier@3.9.10: {}
+
+  pretty-bytes@7.2.0: {}
 
   probe-image-size@7.5.0(supports-color@8.1.1):
     dependencies:

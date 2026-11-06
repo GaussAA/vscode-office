@@ -2,7 +2,7 @@ import { Output } from "@/common/Output";
 import { Handler } from "@/common/handler";
 import { buildFileTree } from '@/service/compress/fileTree';
 import { planExtractTarget, resolveContainedPath, revealExtractResult } from '@/service/compress/archiveUtils';
-import prettyBytes from "@/service/zip/pretty-bytes";
+import prettyBytes from 'pretty-bytes';
 import { mkdirSync, writeFileSync } from "fs";
 import { createExtractorFromData, UnrarError } from "node-unrar-js";
 import { basename, resolve } from "path";
