@@ -13,10 +13,6 @@ export default {
         officeViewer: 'Просмотр Office',
         editInVscode: 'Редактировать в VS Code',
     },
-    webUnsupported: {
-        title: 'Предпросмотр недоступен в Web',
-        desc: 'Этот тип файла нельзя просмотреть в VS Code для Web. Откройте его в настольной версии VS Code.',
-    },
     compress: {
         passwordRequired: 'Требуется пароль',
         passwordDesc: 'Этот архив защищён паролем. Введите пароль для {action}.',

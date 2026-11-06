@@ -5,10 +5,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Registration has six touch points and nothing used to check that they agree, so four
- * drifts shipped unnoticed: a contributed viewType with no provider on web, a provider
- * registered for a viewType nobody contributes, a React route missing from the smoke list,
- * and a duplicated file pattern. These tests turn that silence into a red build.
+ * Registration has several touch points and nothing used to check that they agree, so
+ * drifts shipped unnoticed: a provider registered for a viewType nobody contributes, a
+ * React route missing from the smoke list, and a duplicated file pattern. These tests turn
+ * that silence into a red build.
  */
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -77,18 +77,6 @@ test('every registered provider is contributed', () => {
     const contributed = new Set(pkg.contributes.customEditors.map(editor => editor.viewType))
     const invisible = [...providerTypes].filter(type => !contributed.has(type))
     assert.deepEqual(invisible, [], 'a registered viewType nobody contributes is unreachable from the UI')
-})
-
-test('every contributed editor is reachable on the web host', () => {
-    const pkg = JSON.parse(read('package.json'))
-    const contributed = pkg.contributes.customEditors.map(editor => editor.viewType)
-    const web = registeredBy('src/extension.web.ts')
-    const unreachable = contributed.filter(type => !web.has(type))
-    assert.deepEqual(
-        unreachable,
-        [],
-        'on vscode.dev these would be a contribution with no provider: register them or add them to WEB_UNSUPPORTED_VIEW_TYPES',
-    )
 })
 
 test('no viewType declares the same file pattern twice', () => {

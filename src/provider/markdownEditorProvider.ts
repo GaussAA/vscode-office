@@ -23,10 +23,6 @@ import { MarkdownDocumentSync } from '@/service/markdown/documentSync';
 import { openLinkedFile } from '@/service/markdown/linkedFile';
 import { buildWebviewCsp } from '@/common/webviewCsp';
 
-export interface MarkdownEditorProviderOptions {
-    isWeb?: boolean;
-}
-
 const MARKDOWN_SYNC_CONFIG_KEYS = [
     'preventMacOptionKey',
     'editMode',
@@ -49,7 +45,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     private aiCancellationSource: vscode.CancellationTokenSource | null = null;
 
     constructor(
-        private context: vscode.ExtensionContext, private options: MarkdownEditorProviderOptions = {}
+        private context: vscode.ExtensionContext
     ) {
         this.countStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
         this.purgeLegacyGlobalState();
@@ -471,7 +467,6 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
                 },
             },
             language: vscode.env.language,
-            isWeb: this.options.isWeb,
             isDev: this.context.extensionMode === vscode.ExtensionMode.Development,
         };
     }

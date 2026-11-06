@@ -21,7 +21,6 @@ const PsdViewer = lazy(() => import('./view/psd/PsdViewer.tsx'))
 const XmindViewer = lazy(() => import('./view/xmind/XmindViewer.tsx'))
 const Parquet = lazy(() => import('./view/parquet/Parquet.tsx'))
 const Jsonl = lazy(() => import('./view/jsonl/Jsonl.tsx'))
-const WebUnsupported = lazy(() => import('./view/WebUnsupported.tsx'))
 
 const defaultStyles = document.getElementById('_defaultStyles')
 if (defaultStyles?.parentNode) defaultStyles.parentNode.removeChild(defaultStyles)
@@ -59,8 +58,6 @@ export default function App() {
       return <Jsonl />
     case 'gitHistory':
       return <GitHistory />
-    case 'webUnsupported':
-      return <WebUnsupported />
     default:
       return <>{$t('common.officeViewer')}</>
   }

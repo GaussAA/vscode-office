@@ -13,10 +13,6 @@ export default {
         officeViewer: 'Office 檢視器',
         editInVscode: '在 VS Code 中編輯',
     },
-    webUnsupported: {
-        title: '無法在 Web 環境預覽',
-        desc: '此檔案類型目前不支援在 VS Code Web（瀏覽器）中預覽，請在桌面版 VS Code 中開啟。',
-    },
     compress: {
         passwordRequired: '需要密碼',
         passwordDesc: '此壓縮檔受密碼保護。請輸入密碼以{action}。',

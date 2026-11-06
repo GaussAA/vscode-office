@@ -13,10 +13,6 @@ export default {
         officeViewer: 'Office Viewer',
         editInVscode: 'VS Code で編集',
     },
-    webUnsupported: {
-        title: 'Web ではプレビューできません',
-        desc: 'このファイル形式は VS Code for the Web ではプレビューできません。デスクトップ版 VS Code で開いてください。',
-    },
     compress: {
         passwordRequired: 'パスワードが必要です',
         passwordDesc: 'このアーカイブはパスワードで保護されています。{action}するにはパスワードを入力してください。',

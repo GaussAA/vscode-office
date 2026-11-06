@@ -53,7 +53,6 @@
   ],
   "main": "./out/extension.js",
   "l10n": "./l10n",
-  "browser": "./out/extension.web.js",
   "contributes": {
     "themes": [
       {
@@ -206,14 +205,12 @@
       {
         "command": "GaussAA.vscode-office.save-response-body",
         "title": "Save Response",
-        "icon": "$(save)",
-        "enablement": "!office.extensionHost.web"
+        "icon": "$(save)"
       },
       {
         "command": "GaussAA.vscode-office.copy-response-body",
         "title": "Copy Response",
-        "icon": "$(copy)",
-        "enablement": "!office.extensionHost.web"
+        "icon": "$(copy)"
       },
       {
         "command": "GaussAA.office.markdown.switch",
@@ -227,8 +224,7 @@
       },
       {
         "command": "GaussAA.office.markdown.paste",
-        "title": "Enhance paste in markdown",
-        "enablement": "!office.extensionHost.web"
+        "title": "Enhance paste in markdown"
       },
       {
         "command": "GaussAA.office.html.preview",
@@ -237,20 +233,17 @@
       {
         "command": "GaussAA.office.gitHistory.view",
         "title": "View Git History",
-        "icon": "$(history)",
-        "enablement": "!office.extensionHost.web"
+        "icon": "$(history)"
       },
       {
         "command": "GaussAA.office.gitHistory.viewFileHistory",
         "title": "Git: View File History",
-        "icon": "$(git-commit)",
-        "enablement": "!office.extensionHost.web"
+        "icon": "$(git-commit)"
       },
       {
         "command": "GaussAA.office.gitHistory.quickSync",
         "title": "Git: Quick Sync",
-        "icon": "$(sync)",
-        "enablement": "!office.extensionHost.web"
+        "icon": "$(sync)"
       }
     ],
     "keybindings": [
@@ -258,7 +251,7 @@
         "command": "GaussAA.office.markdown.paste",
         "key": "ctrl+v",
         "mac": "cmd+v",
-        "when": "editorTextFocus && resourceLangId == markdown && !office.extensionHost.web"
+        "when": "editorTextFocus && resourceLangId == markdown"
       },
       {
         "command": "GaussAA.office.html.preview",
@@ -275,7 +268,7 @@
         "command": "GaussAA.vscode-office.request",
         "key": "ctrl+enter",
         "mac": "cmd+enter",
-        "when": "editorTextFocus && editorLangId == 'http' && !office.extensionHost.web"
+        "when": "editorTextFocus && editorLangId == 'http'"
       }
     ],
     "menus": {
@@ -283,32 +276,32 @@
         {
           "command": "GaussAA.office.gitHistory.view",
           "group": "navigation",
-          "when": "scmProvider == git && !office.extensionHost.web"
+          "when": "scmProvider == git"
         },
         {
           "command": "GaussAA.office.gitHistory.quickSync",
           "group": "navigation",
-          "when": "scmProvider == git && config.vscode-office.gitHistory.quickSyncButton && !office.extensionHost.web"
+          "when": "scmProvider == git && config.vscode-office.gitHistory.quickSyncButton"
         }
       ],
       "scm/repository": [
         {
           "command": "GaussAA.office.gitHistory.view",
           "group": "navigation",
-          "when": "scmProvider == git && !office.extensionHost.web"
+          "when": "scmProvider == git"
         }
       ],
       "scm/resourceState/context": [
         {
           "command": "GaussAA.office.gitHistory.viewFileHistory",
-          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && !office.extensionHost.web"
+          "when": "config.git.enabled && gitOpenRepositoryCount != 0"
         }
       ],
       "editor/title": [
         {
           "command": "GaussAA.office.gitHistory.viewFileHistory",
           "group": "navigation@4",
-          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file && !office.extensionHost.web"
+          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file"
         },
         {
           "command": "GaussAA.office.markdown.switch",
@@ -335,7 +328,7 @@
         {
           "command": "GaussAA.office.gitHistory.viewFileHistory",
           "group": "git",
-          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file && !office.extensionHost.web"
+          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file"
         },
         {
           "command": "GaussAA.office.html.preview",
@@ -345,19 +338,19 @@
         {
           "command": "GaussAA.vscode-office.save-response-body",
           "group": "http@2",
-          "when": "editorTextFocus && resourceScheme == rest-client-response && !office.extensionHost.web"
+          "when": "editorTextFocus && resourceScheme == rest-client-response"
         },
         {
           "command": "GaussAA.vscode-office.copy-response-body",
           "group": "http@4",
-          "when": "editorTextFocus && resourceScheme == rest-client-response && !office.extensionHost.web"
+          "when": "editorTextFocus && resourceScheme == rest-client-response"
         }
       ],
       "explorer/context": [
         {
           "command": "GaussAA.office.gitHistory.viewFileHistory",
           "group": "git",
-          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file && !office.extensionHost.web"
+          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file"
         }
       ]
     },
@@ -814,7 +807,6 @@
   },
   "scripts": {
     "dev": "vite --mode=development",
-    "dev:web": "node scripts/dev-web.mjs",
     "build": "vite build --mode=production",
     "package": "vsce package --no-dependencies",
     "publish": "vsce publish --no-dependencies && ovsx publish --no-dependencies",

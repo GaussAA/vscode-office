@@ -13,10 +13,6 @@ export default {
         officeViewer: 'Office Viewer',
         editInVscode: 'In VS Code bearbeiten',
     },
-    webUnsupported: {
-        title: 'Vorschau im Web nicht verfügbar',
-        desc: 'Dieser Dateityp kann in VS Code für das Web nicht in der Vorschau angezeigt werden. Bitte öffnen Sie ihn in der Desktop-Version von VS Code.',
-    },
     compress: {
         passwordRequired: 'Passwort erforderlich',
         passwordDesc: 'Dieses Archiv ist passwortgeschützt. Geben Sie das Passwort ein, um {action}.',

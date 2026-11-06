@@ -13,10 +13,6 @@ export default {
         officeViewer: 'Visualizador do Office',
         editInVscode: 'Editar no VS Code',
     },
-    webUnsupported: {
-        title: 'Visualização não disponível na Web',
-        desc: 'Este tipo de arquivo não pode ser visualizado no VS Code para a Web. Abra-o no VS Code para desktop.',
-    },
     compress: {
         passwordRequired: 'Senha necessária',
         passwordDesc: 'Este arquivo está protegido por senha. Digite a senha para {action}.',

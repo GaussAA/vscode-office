@@ -6,8 +6,8 @@ import * as fileTypeModule from 'file-type';
 
 /**
  * file-type v19 ships two entries: the `node` one (which exports this) and the `core` one
- * (which TypeScript resolves and which does not declare it). The web build uses
- * src/shims/file-type.ts, so the call is valid on every host.
+ * (which TypeScript resolves and which does not declare it). The cast below is what makes
+ * the call type-check against the `core` entry.
  */
 const fileTypeFromFile = (fileTypeModule as unknown as {
     fileTypeFromFile?: (path: string) => Promise<{ ext?: string } | undefined>;

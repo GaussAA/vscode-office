@@ -87,10 +87,7 @@ html {
 
 .vditor-context-menu__item:disabled,
 .vditor-context-menu__item:disabled:hover,
-.vditor-context-menu__item:disabled:focus-visible,
-body.is-web .vditor-context-menu__item--desktop-only,
-body.is-web .vditor-context-menu__item--desktop-only:hover,
-body.is-web .vditor-context-menu__item--desktop-only:focus-visible {
+.vditor-context-menu__item:disabled:focus-visible {
     opacity: 0.4;
     cursor: not-allowed;
     background: transparent;

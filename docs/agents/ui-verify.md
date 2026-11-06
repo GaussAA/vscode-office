@@ -66,7 +66,7 @@ Rules that keep this suite useful:
 ## Route smoke vs. real scenarios
 
 `upstream-viewers-smoke` walks every **React** route (`image`, `svg`, `excel`, `zip`,
-`word`, `ppt`, `font`, `epub`, `icns`, `psd`, `xmind`, `gitHistory`, `webUnsupported`)
+`word`, `ppt`, `font`, `epub`, `icns`, `psd`, `xmind`, `gitHistory`)
 with a minimal `open` payload and asserts that something mounted and nothing threw. Its job
 is to catch fork-wide breakage (entry, provider, shared utilities), **not** rendering
 correctness.

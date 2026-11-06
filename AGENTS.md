@@ -37,7 +37,7 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 
 重排本身不划算，不是因为对上游有承诺；要偏离布局先写 ADR。
 
-- `src/extension.ts` / `src/extension.web.ts` —— 入口，注册全部 custom editors
+- `src/extension.ts` —— 唯一入口，注册全部 custom editors
 - `src/provider/` —— 每个 viewer 一个 `CustomReadonlyEditorProvider`
 - `src/react/view/<viewer>/` —— webview 内的 React 视图。解析器与组件分文件（如 `parquet/parquetParser.ts` + `parquet/Parquet.tsx`）
 - `src/service/` —— 跨视图服务（如 `officeViewType.ts`、`csvService.ts`）

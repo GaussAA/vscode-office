@@ -1,6 +1,5 @@
 import { env, type ExtensionContext } from 'vscode';
 import { Output } from '@/common/Output';
-import { isWebExtensionHost } from '@/common/extensionHost';
 import { existsSync } from 'fs';
 import { rm } from 'fs/promises';
 import { homedir } from 'os';
@@ -47,9 +46,6 @@ function resolveWebStorageDir(): string {
 
 /** 一次性清理旧版 webview 遗留的 WebStorage 缓存 */
 export async function autoClearCacheStorage(context: ExtensionContext) {
-	if (isWebExtensionHost()) {
-		return;
-	}
 	if (context.globalState.get<boolean>(WEB_STORAGE_CLEARED_KEY)) {
 		return;
 	}

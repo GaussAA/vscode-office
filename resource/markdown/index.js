@@ -7,12 +7,9 @@ handler.on("open", async (md) => {
   const { content, rootPath, workspaceBaseUrl, documentCacheId, pendingFragment, shouldRestoreFocus, config, fileName } = md;
   window.__officeMarkdownFileName = fileName || 'Note';
   const {
-    language, isWeb, isDev, markdown,
+    language, isDev, markdown,
     editMode, editorTheme, codeMirrorTheme, mermaidTheme
   } = config;
-  if (isWeb) {
-    document.body.classList.add('is-web')
-  }
   let editor;
   const getMarkdownValue = createMarkdownValueReader(() => editor, workspaceBaseUrl);
   editor = new Vditor('vditor', {

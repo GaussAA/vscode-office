@@ -185,7 +185,7 @@ export const createContextMenu = (editor) => {
     }
     menu.addEventListener('click', e => {
         const item = e.target.closest('[data-action]')
-        if (!item || (item.classList.contains('vditor-context-menu__item--desktop-only') && document.body.classList.contains('is-web'))) return
+        if (!item) return
         closeMenu()
         const action = item.dataset.action
         switch (action) {

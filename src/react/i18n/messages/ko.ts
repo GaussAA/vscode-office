@@ -13,10 +13,6 @@ export default {
         officeViewer: 'Office 뷰어',
         editInVscode: 'VS Code에서 편집',
     },
-    webUnsupported: {
-        title: '웹에서는 미리보기를 사용할 수 없음',
-        desc: '이 파일 형식은 VS Code for the Web에서 미리볼 수 없습니다. 데스크톱 VS Code에서 열어 주세요.',
-    },
     compress: {
         passwordRequired: '비밀번호 필요',
         passwordDesc: '이 아카이브는 비밀번호로 보호되어 있습니다. {action}하려면 비밀번호를 입력하세요.',
