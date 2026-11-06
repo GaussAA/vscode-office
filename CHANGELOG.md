@@ -15,7 +15,9 @@ Removed:
 - **AI Polish.** The "AI Polish" action in the Markdown editor's context menu — and the
   OpenAI/Anthropic/Gemini/custom-HTTP streaming client behind it — is removed. It sent the
   document body to an endpoint chosen in the webview, and `package.json` never declared it.
-  Nothing in the extension can reach the network for you any more.
+  The editor's own AI dialog, review panel, toolbar entry, prompt/model storage and 238
+  translations are gone with it, so nothing in the extension can reach the network for you any
+  more — there is no dormant code path left to re-enable.
 - **Syntax and colour themes.** The five bundled syntax themes (`Office Dark/Light`, `One Dark
   Pro`, …) and the two colour themes are removed; the icon theme is down to 26 icons from 1,263.
   VS Code's theme support covers this better, and the icon set was 6 MB of files for a

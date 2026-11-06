@@ -79,7 +79,15 @@ async function openJsonl(page, base, theme = "dark") {
   const ready = await page.waitFor(
     `!!document.querySelector('.jsonl-index__tree .ant-tree-treenode')`,
   );
-  expect(ready, "JSONL directory did not render");
+  if (!ready) {
+    // A bare "did not render" tells a flake investigation nothing. Say what the page shows.
+    const diagnostic = await page.evaluate(`JSON.stringify({
+      url: location.href,
+      bodyText: (document.body?.innerText ?? "").slice(0, 160).replace(/\\s+/g, " "),
+      tree: document.querySelectorAll(".jsonl-index__tree").length,
+    })`);
+    expect(false, `JSONL directory did not render: ${diagnostic}`);
+  }
 }
 
 async function jumpJsonl(page, entry) {
@@ -556,10 +564,16 @@ async function main() {
         }
         results.push({ name: scenario.name, ok: true, detail, ms: Date.now() - started });
       } catch (error) {
+        // Page-level exceptions are the single most useful thing when a scenario times out,
+        // and they were being collected but never reported.
+        const pageErrors = unexpected(browser.exceptions()).slice(0, 2);
+        const detail = pageErrors.length
+          ? `${error.message} | page errors: ${pageErrors.join(" ; ")}`
+          : error.message;
         results.push({
           name: scenario.name,
           ok: false,
-          detail: error.message,
+          detail,
           ms: Date.now() - started,
         });
         failures++;

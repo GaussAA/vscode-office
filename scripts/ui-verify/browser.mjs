@@ -96,7 +96,11 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
     screenshot: async (file) => {
       await page.screenshot({ path: file });
     },
-    waitFor: async (expression, timeoutMs = 8000) => {
+    // 15s, not 8s: the suite runs right after a full VS Code smoke run, and on a loaded
+    // machine the antd tree occasionally took >8s to mount (one observed 30s scenario during
+    // which every wait was cut short). The diagnostics below are what makes a real hang
+    // distinguishable from a slow machine.
+    waitFor: async (expression, timeoutMs = 15000) => {
       const started = Date.now();
       const deadline = started + timeoutMs;
       while (Date.now() < deadline) {
