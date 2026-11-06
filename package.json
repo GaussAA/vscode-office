@@ -51,6 +51,7 @@
     "onLanguage:http"
   ],
   "main": "./out/extension.js",
+  "l10n": "./l10n",
   "browser": "./out/extension.web.js",
   "contributes": {
     "themes": [

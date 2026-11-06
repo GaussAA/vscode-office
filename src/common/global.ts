@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { ExtensionContext } from 'vscode';
-import { initI18n, localize } from './vscode-nls-i18n';
 
 const prefix = 'vscode-office';
 
@@ -8,8 +7,17 @@ export function language() {
     return vscode.env.language;
 }
 
+/**
+ * Extension-host message lookup. Backed by `vscode.l10n`, which reads
+ * `l10n/bundle.l10n.<locale>.json` (see `"l10n"` in package.json) and falls back to the key
+ * itself. It replaced a hand-rolled loader that read `package.nls.*.json` at runtime — files
+ * that share a name with VS Code's manifest-localization convention but were never used for
+ * it, since no `%key%` appears in package.json.
+ *
+ * The webview has its own i18n (`src/react/i18n`): `vscode.l10n` only covers the host.
+ */
 export function i18n(key: string, ...args: string[]) {
-    return localize(key, ...args);
+    return vscode.l10n.t(key, ...args);
 }
 
 export class Global {
@@ -17,7 +25,6 @@ export class Global {
 
     public static async init(context: ExtensionContext) {
         Global.context = context;
-        await initI18n(context);
     }
 
     /**
