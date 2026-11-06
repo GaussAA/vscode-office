@@ -51,6 +51,7 @@
     "onWebviewPanel:office-git-history"
   ],
   "main": "./out/extension.js",
+  "type": "module",
   "l10n": "./l10n",
   "contributes": {
     "iconThemes": [

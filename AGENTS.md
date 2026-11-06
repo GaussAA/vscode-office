@@ -41,7 +41,7 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 - `src/provider/` —— 每个 viewer 一个 `CustomReadonlyEditorProvider`
 - `src/react/view/<viewer>/` —— webview 内的 React 视图。解析器与组件分文件（如 `parquet/parquetParser.ts` + `parquet/Parquet.tsx`）
 - `src/service/` —— 跨视图服务（如 `officeViewType.ts`、`csvService.ts`）
-- `vite.config.ts` + `build.ts` —— 构建，产出 `out/`；webview 每个视图一个 Vite 入口
+- `vite.config.ts` + `build.ts` —— 构建，产出 `out/`；webview 每个视图一个 Vite 入口。根是 `"type": "module"`，但 `build.ts` 会给 `out/` 生成一个 `{"type":"commonjs"}` 的 `package.json` —— 扩展宿主跑的是 CJS（见 ADR-0012），不要删它
 - `vditor/` —— vendored 的 Markdown 编辑器，**独立的 pnpm workspace 包**，有自己的 `dependencies` 和自己的 Vite 构建。它的依赖不写在根 manifest 里；根 `pnpm outdated` / Dependabot 看不到它们在用它
 - `package.json` 的 `contributes.customEditors` —— viewer 与文件模式的唯一登记处
 
