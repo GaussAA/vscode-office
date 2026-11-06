@@ -1,6 +1,54 @@
 # Change log
 
-# Unreleased
+# 5.0.0 2026-11-06
+
+A modernization release: three features removed, the platform floor raised to VS Code 1.125
+(host Node 24), and the build/test toolchain replaced. Read the **Removed** section before
+upgrading — 5.0.0 deletes things that worked in 4.x.
+
+Removed:
+
+- **The HTTP client.** `.http` / `.rest` request sending is gone, along with its custom editor,
+  completion/linting providers and the request-runner. It was a separate feature that happened
+  to ship in the same extension, it duplicates what REST Client does better, and it was the only
+  reason the extension had a language-service stack of its own.
+- **AI Polish.** The "AI Polish" action in the Markdown editor's context menu — and the
+  OpenAI/Anthropic/Gemini/custom-HTTP streaming client behind it — is removed. It sent the
+  document body to an endpoint chosen in the webview, and `package.json` never declared it.
+  Nothing in the extension can reach the network for you any more.
+- **Syntax and colour themes.** The five bundled syntax themes (`Office Dark/Light`, `One Dark
+  Pro`, …) and the two colour themes are removed; the icon theme is down to 26 icons from 1,263.
+  VS Code's theme support covers this better, and the icon set was 6 MB of files for a
+  document-preview extension. If you selected one of these themes, VS Code falls back to its
+  default after the upgrade.
+- **Web extension host support.** `browser` entry point, the `src/shims/` compatibility layer
+  and the `--target web` build are gone. The extension is desktop-only; VS Code will no longer
+  try to install a web build that could not run most viewers anyway.
+
+Platform:
+
+- **VS Code 1.125 or newer is required** (was 1.100). That is the host running Node 24, which
+  every runtime dependency now has to support — `pnpm check:baseline` fails the build if any
+  `engines.node` range is not satisfied by the host Node, so the floor cannot drift silently.
+
+Fixed:
+
+- **"Open remote URL" in Git History never worked.** It did `await import("vscode")`, which
+  cannot resolve from an extension bundle (the host injects `vscode` through CommonJS only), so
+  every click rejected and the error was shown as text. A new build-time check now fails on any
+  bare dynamic `import()` that the packaged layout cannot resolve.
+
+Toolchain (no behaviour change, listed for anyone bisecting):
+
+- Prettier → `oxfmt`; ESLint → `oxlint --type-aware` (both fail the build, neither has a
+  baseline). Tests run through `tsx` against the TypeScript sources directly instead of an
+  esbuild bundle step. UI verification drives `puppeteer-core`, which was already a runtime
+  dependency, instead of a hand-written DevTools-protocol client.
+- Dependency swaps: `pdf-lib` → `@cantoo/pdf-lib`, `markdown-it-checkbox`/`markdown-it-plantuml`
+  and a hand-copied KaTeX plugin → the `@mdit/plugin-*` family, `pretty-bytes`/`utif2`/
+  `chrome-launcher`/`date-format` → maintained equivalents or six lines of local code.
+- The repository is now an ES module tree with a CommonJS `out/`. `out/extension.js` went from
+  6.55 MB to 1.62 MB after removing a mermaid import that only validated and discarded.
 
 Security:
 
@@ -14,7 +62,7 @@ Activation:
 
 - The extension no longer activates on every VS Code start. It now wakes up when a viewer
   is opened, when the workspace looks like a git repository (`.git/HEAD`), when a git
-  history panel needs restoring, or when an `.http` file is opened. Two consequences worth
+  history panel needs restoring. Two consequences worth
   knowing: the `Git` status-bar entry appears once the extension has activated rather than
   at startup, and in a non-git workspace nothing loads until you open a file.
 

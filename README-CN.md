@@ -15,7 +15,6 @@
 - 字体: `.ttf`、`.otf`、`.woff`、`.woff2`
 - Markdown: `.md`、`.markdown`
 - HTML: `.html`、`.htm`
-- HTTP 请求: `.http`、`.rest`
 - Java: `.class`（反编译）
 - 压缩文件: `.zip`、`.jar`、`.vsix`、`.rar`、`.7z`、`.tar`、`.tar.gz`、`.tgz`、`.apk`
 
@@ -115,9 +114,8 @@ Office Viewer 内置完整的 Git 历史工作区，让你无需离开 VS Code �
 
 - HTML: 编辑时按下 `Ctrl+Shift+V` 可实时预览
 - YAML: 支持文档大纲与锚点导航（别名引用可跳转到定义）
-- 图标主题: 内置 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 部分图标，并提供 **Office Material Icon Theme** 与 **One Dark Modern** 配色主题
+- 图标主题: 26 个 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 图标。两个配色主题与五套额外语法主题已在 5.0.0 移除，见 [CHANGELOG.md](CHANGELOG.md)
 - Excel: 支持预览和保存 `.xlsx`、`.xls`、`.xlsm`、`.csv`、`.ods` 等文件
-- HTTP: 在 `.http`、`.rest` 文件中发送请求（集成自 [REST Client](https://github.com/Huachao/vscode-restclient)，并修复了本地请求的已知问题）；按 `Ctrl+Enter` / `⌘ Enter` 发送
 - Java: 打开 `.class` 文件可反编译并查看源码
 
 ## Sponsor
@@ -130,8 +128,8 @@ Office Viewer 内置完整的 Git 历史工作区，让你无需离开 VS Code �
 
 ### 环境要求
 
-- [Node.js](https://nodejs.org/) 18+
-- [VS Code](https://code.visualstudio.com/) 1.64+
+- [Node.js](https://nodejs.org/) 24+（VS Code 1.125 的宿主运行时）
+- [VS Code](https://code.visualstudio.com/) 1.125+
 
 ### 快速开始
 

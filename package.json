@@ -2,7 +2,7 @@
   "name": "office-viewer-plus",
   "displayName": "Office Viewer Plus",
   "description": "Fork of Office Viewer (cweijan/vscode-office) with ZSTD parquet support and a JSONL tree viewer.",
-  "version": "4.4.1",
+  "version": "5.0.0",
   "publisher": "GaussAA",
   "license": "MIT",
   "icon": "image/logo.png",

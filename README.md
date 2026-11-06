@@ -15,7 +15,6 @@ This extension lets you preview and edit common office and design files directly
 - Font: `.ttf`, `.otf`, `.woff`, `.woff2`
 - Markdown: `.md`, `.markdown`
 - HTML: `.html`, `.htm`
-- HTTP request: `.http`, `.rest`
 - Java: `.class` (decompiler)
 - Compressed files: `.zip`, `.jar`, `.vsix`, `.rar`, `.7z`, `.tar`, `.tar.gz`, `.tgz`, `.apk`
 
@@ -135,9 +134,8 @@ Shortcuts: Based on [shortcut.md](shortcut.md), plus:
 
 - HTML: live preview while editing; press `Ctrl+Shift+V` to open the live view
 - YAML: document outline and anchor navigation (Go to Definition for alias references)
-- Icon theme: includes a subset of [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons, plus **Office Material Icon Theme** and **One Dark Modern** color themes
+- Icon theme: 26 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons. The two bundled color themes and the five extra syntax themes were removed in 5.0.0 — see [CHANGELOG.md](CHANGELOG.md)
 - Excel: preview and save `.xlsx`, `.xls`, `.xlsm`, `.csv`, and `.ods` files
-- HTTP: send requests from `.http` and `.rest` files (integrated from [REST Client](https://github.com/Huachao/vscode-restclient) with fixes for local request issues); press `Ctrl+Enter` / `⌘ Enter` to send
 - Java: decompile and view `.class` files
 
 ## Sponsor
@@ -150,8 +148,8 @@ Database Client for Visual Studio Code, supporting the management of **MySQL/Mar
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 18+
-- [VS Code](https://code.visualstudio.com/) 1.64+
+- [Node.js](https://nodejs.org/) 24+ (the host runtime of VS Code 1.125)
+- [VS Code](https://code.visualstudio.com/) 1.125+
 
 ### Getting started
 
