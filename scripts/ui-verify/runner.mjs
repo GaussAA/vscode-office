@@ -9,7 +9,7 @@
  */
 import { copyFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchBrowser } from './cdp.mjs'
+import { launchBrowser } from './browser.mjs'
 import { createFixtures, repoRoot } from './fixtures.mjs'
 import { startHarness } from './harness.mjs'
 
@@ -28,6 +28,19 @@ function expect(condition, message) {
 }
 
 const json = value => JSON.parse(value)
+
+/**
+ * The one expected CSP refusal, filtered on both channels the browser can report it on.
+ *
+ * epubjs ships a `globalThis` polyfill that probes with `new Function("return this")`; our
+ * policy has no `'unsafe-eval'`, so the probe is refused — inside a try/catch, and it falls
+ * back to `window`. Chrome surfaces the refusal as an uncaught `EvalError` *and* as a console
+ * error, depending on the driver, so a single predicate covers `exceptions()` and
+ * `violations()`. Everything else stays fatal: allow-listing this one reason is strictly
+ * better than weakening the policy for every viewer, which the probe does not need.
+ */
+const expectedProbe = /evaluating a string as JavaScript/i
+const unexpected = list => list.filter(text => !expectedProbe.test(text))
 
 async function openJsonl(page, base, theme = 'dark') {
     await page.navigate(`${base}/harness?theme=${theme}`)
@@ -332,7 +345,7 @@ const scenarios = [
                 // Poll instead of sleeping: the excel/epub chunks are ~1 MB and mount slower on
                 // a loaded machine than any fixed delay we would pick (this used to flake).
                 const mounted = await page.waitFor(`!!document.querySelector('#root')?.children.length`, 6000)
-                const errors = page.exceptions()
+                const errors = unexpected(page.exceptions())
                 if (!mounted) failures.push(`${route}: nothing mounted`)
                 if (errors.length) failures.push(`${route}: ${errors[0].split('\n')[0]}`)
             }
@@ -398,17 +411,7 @@ async function main() {
             browser.clearViolations()
             try {
                 const detail = await scenario.run(context)
-                // A viewer that trips the policy must fail here: the page still looks fine when
-                // a rule blocks a stylesheet or a frame, so the only evidence is this log.
-                //
-                // One violation is expected and harmless: epubjs ships a `globalThis` polyfill
-                // that probes with `new Function("return this")` inside a try/catch and falls
-                // back to `window`. CSP reports the probe whether or not the caller handles it,
-                // so an `EvalError` from eval-as-JavaScript is filtered out — everything else
-                // stays fatal. Allow-listing this is strictly better than adding 'unsafe-eval'
-                // to the policy for every viewer, which the probe does not need.
-                const expectedProbe = /EvalError: Evaluating a string as JavaScript/
-                const violations = browser.violations().filter(text => !expectedProbe.test(text))
+                const violations = unexpected(browser.violations())
                 expect(violations.length === 0, `CSP violation: ${violations[0] ?? ''}`)
                 await browser.screenshot(join(shotsDir, `${scenario.name}.png`))
                 if (refreshDocs && scenario.docs) {

@@ -8,11 +8,35 @@
  */
 import { randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { extname, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { build } from 'esbuild'
 import { repoRoot } from './fixtures.mjs'
 
 const WEBVIEW_ROOT = join(repoRoot, 'out', 'webview')
+
+/**
+ * The policy this harness enforces must be the policy the extension ships, or the negative
+ * verification is theatre: editing `src/common/webviewCsp.ts` has to change this run.
+ *
+ * `scripts/ui-verify/` is plain `.mjs` executed by Node, and the real builder is TypeScript,
+ * so bundle it once at startup rather than keeping a second copy of the directive list here.
+ * It used to be a copy — which meant "remove 'unsafe-inline' and the suite turns red" was
+ * only ever true by accident.
+ */
+const cspModulePath = join(tmpdir(), `ovp-webview-csp-${process.pid}-${Date.now()}.mjs`)
+await build({
+    entryPoints: [join(repoRoot, 'src', 'common', 'webviewCsp.ts')],
+    outfile: cspModulePath,
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    logLevel: 'silent',
+})
+const { buildWebviewCsp } = await import(pathToFileURL(cspModulePath).href)
+rmSync(cspModulePath, { force: true })
 
 const MIME = {
     '.js': 'text/javascript',
@@ -273,23 +297,12 @@ export function startHarness(fixtures, port = 0) {
             const stub = path === '/harness-route'
                 ? smokeStub(url.searchParams.get('route') ?? 'html')
                 : route === 'parquet' ? parquetStub() : jsonlStub(entries)
-            // The real policy is built by `src/common/webviewCsp.ts` from `webview.cspSource`.
-            // Here the origin is this server, and the injected stub needs a nonce because it is
-            // inline. Same directives otherwise, so a viewer that violates the production
-            // policy — an inline style, an eval, a frame — breaks this run too.
+            // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
+            // nonce: the injected stub is inline, and production has no inline script at all.
             const origin = `http://${req.headers.host}`
             const nonce = randomBytes(16).toString('base64')
-            const csp = [
-                `default-src 'none'`,
-                `script-src ${origin} 'nonce-${nonce}' 'wasm-unsafe-eval'`,
-                `style-src ${origin} 'unsafe-inline'`,
-                `img-src ${origin} data: blob:`,
-                `font-src ${origin} data:`,
-                `media-src ${origin} data: blob:`,
-                `frame-src ${origin} data: blob:`,
-                `connect-src ${origin} data: blob:`,
-                `worker-src ${origin} blob:`,
-            ].join('; ')
+            const csp = buildWebviewCsp(origin)
+                .replace(`script-src ${origin} `, `script-src ${origin} 'nonce-${nonce}' `)
             const html = indexHtml
                 .replace(/<meta id="office-configs"[^>]*>/, `<meta id="office-configs" data-config='${JSON.stringify({ route })}'>`)
                 .replace('{{csp}}', csp)

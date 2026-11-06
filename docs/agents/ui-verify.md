@@ -11,7 +11,7 @@ viewer should be checked here before it ships.
 scripts/ui-verify/
 ├── runner.mjs    scenarios + assertions + CLI
 ├── harness.mjs   HTTP server: built HTML from out/webview + fake VS Code bridge + parquet bytes
-├── cdp.mjs       minimal Chrome DevTools Protocol driver (no puppeteer)
+├── browser.mjs   Puppeteer driver (puppeteer-core + @puppeteer/browsers) + a CDP session for CSP logs
 ├── fixtures.mjs  generates mixed/big parquet with hyparquet-writer, uses committed zstd sample
 └── fixtures/zstd.parquet
 ```

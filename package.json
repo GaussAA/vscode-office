@@ -569,6 +569,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
+    "@puppeteer/browsers": "^3.2.6",
     "@types/node": "^24.19.2",
     "@types/opentype.js": "^1.3.10",
     "@types/react": "^19.2.17",
