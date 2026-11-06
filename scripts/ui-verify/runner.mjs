@@ -1,22 +1,54 @@
 /**
  * UI verification: build the app, serve it with fake VS Code bridges, drive headless
- * Chrome through CDP, assert the DOM, and write screenshots.
+ * Chrome through Puppeteer, assert the DOM, and write screenshots.
  *
- *   node scripts/ui-verify/runner.mjs            # assert only
- *   node scripts/ui-verify/runner.mjs --docs     # also refresh docs/screenshots
- *   node scripts/ui-verify/runner.mjs --filter=parquet
- *   node scripts/ui-verify/runner.mjs --headed   # watch it run
+ *   node scripts/ui-verify/runner.mjs                  # assert only
+ *   node scripts/ui-verify/runner.mjs --docs           # also refresh docs/screenshots
+ *   node scripts/ui-verify/runner.mjs --filter=parquet # only matching scenarios
+ *   node scripts/ui-verify/runner.mjs --headed         # watch it run
+ *
+ * Through pnpm the flags need the separator: `pnpm verify:ui -- --filter=parquet`.
  */
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { launchBrowser } from "./browser.mjs";
 import { createFixtures, repoRoot } from "./fixtures.mjs";
 import { startHarness } from "./harness.mjs";
 
-const args = process.argv.slice(2);
-const filter = args.find((arg) => arg.startsWith("--filter="))?.slice("--filter=".length);
-const refreshDocs = args.includes("--docs");
-const headed = args.includes("--headed");
+const rawArgs = process.argv.slice(2);
+let filter;
+let refreshDocs = false;
+let headed = false;
+const unknownArgs = [];
+
+for (let index = 0; index < rawArgs.length; index++) {
+  const arg = rawArgs[index];
+  if (arg.startsWith("--filter=")) {
+    filter = arg.slice("--filter=".length);
+  } else if (arg === "--filter") {
+    filter = rawArgs[++index];
+  } else if (arg === "--docs") {
+    refreshDocs = true;
+  } else if (arg === "--headed") {
+    headed = true;
+  } else {
+    unknownArgs.push(arg);
+  }
+}
+
+// An ignored argument used to mean a full green run that looked like a filtered one. Never
+// silently accept something we did not understand.
+if (unknownArgs.length > 0) {
+  console.error(`unknown argument(s): ${unknownArgs.join(" ")}`);
+  console.error("usage: runner.mjs [--docs] [--headed] [--filter=<substring>]");
+  process.exitCode = 1;
+  process.exit();
+}
+if (filter === undefined && rawArgs.includes("--filter")) {
+  console.error("--filter needs a value, e.g. --filter=parquet");
+  process.exitCode = 1;
+  process.exit();
+}
 
 const shotsDir = join(repoRoot, ".ui-verify", "shots");
 const docsDir = join(repoRoot, "docs", "screenshots");
@@ -531,6 +563,13 @@ async function main() {
           ms: Date.now() - started,
         });
         failures++;
+        // Keep the screen even when the scenario failed — a red run is exactly when the
+        // screenshot is worth looking at.
+        try {
+          await browser.screenshot(join(shotsDir, `${scenario.name}.FAILED.png`));
+        } catch {
+          // a page that cannot be captured is part of the failure, not a new one
+        }
       }
     }
   } finally {
@@ -545,10 +584,30 @@ async function main() {
     );
   }
   console.log(`\n${results.length - failures}/${results.length} scenarios passed`);
-  process.exit(failures === 0 ? 0 : 1);
+
+  // A summary *after* the count keeps the failing names in the tail of the output, and the
+  // JSON file keeps the whole run when the terminal output is truncated or lost.
+  if (failures > 0) {
+    console.log("\nFailed:");
+    for (const result of results) {
+      if (!result.ok) console.log(`  ${result.name}: ${result.detail}`);
+    }
+  }
+  try {
+    mkdirSync(join(repoRoot, ".ui-verify"), { recursive: true });
+    writeFileSync(
+      join(repoRoot, ".ui-verify", "last-run.json"),
+      `${JSON.stringify({ at: new Date().toISOString(), passed: results.length - failures, total: results.length, results }, null, 2)}\n`,
+    );
+  } catch {
+    // reporting is a convenience; never turn a reporting failure into a red gate
+  }
+
+  // `process.exit()` would truncate piped stdout on Windows and could swallow the lines above.
+  process.exitCode = failures === 0 ? 0 : 1;
 }
 
 main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
+  process.exitCode = 1;
 });

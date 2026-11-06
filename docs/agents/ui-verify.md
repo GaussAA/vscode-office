@@ -27,8 +27,8 @@ asserted (`0` new range reads when paging forward).
 ```bash
 pnpm build            # required: the harness serves out/webview
 pnpm verify:ui        # assert only
-pnpm verify:ui -- --docs   # also refresh docs/screenshots
-pnpm verify:ui -- --filter=parquet
+pnpm verify:ui -- --docs              # also refresh docs/screenshots
+pnpm verify:ui -- --filter=parquet    # only matching scenarios (through pnpm, keep the `--`)
 pnpm verify:ui -- --headed # watch it run
 ```
 

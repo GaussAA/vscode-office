@@ -97,11 +97,17 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
       await page.screenshot({ path: file });
     },
     waitFor: async (expression, timeoutMs = 8000) => {
-      const deadline = Date.now() + timeoutMs;
+      const started = Date.now();
+      const deadline = started + timeoutMs;
       while (Date.now() < deadline) {
         if (await page.evaluate(expression)) return true;
         await sleep(120);
       }
+      // The caller's assertion message says *what* did not happen; this line says *which*
+      // expression and for how long. Without it a flake leaves no trace of the wait itself.
+      console.warn(
+        `[ui-verify] waitFor timed out after ${Date.now() - started}ms: ${expression.replace(/\s+/g, " ").slice(0, 160)}`,
+      );
       return false;
     },
     sleep,
