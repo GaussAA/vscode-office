@@ -4,14 +4,14 @@ import { handleClass } from '@/provider/handlers/classHandler';
 import * as vscode from 'vscode';
 
 /**
- * Desktop-only Java decompiler custom editor (`chaowu21.classViewer`).
+ * Desktop-only Java decompiler custom editor (`GaussAA.classViewer`).
  */
 export class ClassViewerProvider implements vscode.CustomReadonlyEditorProvider {
 
 	constructor(private context: vscode.ExtensionContext) { }
 
 	bindCustomEditor(viewOption: CustomEditorOptions) {
-		return vscode.window.registerCustomEditorProvider('chaowu21.classViewer', this, viewOption);
+		return vscode.window.registerCustomEditorProvider('GaussAA.classViewer', this, viewOption);
 	}
 
 	openCustomDocument(uri: vscode.Uri): vscode.CustomDocument {

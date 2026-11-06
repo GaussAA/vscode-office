@@ -19,10 +19,10 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
 
 	bindCustomEditors(viewOption: CustomEditorOptions) {
 		return [
-			vscode.window.registerCustomEditorProvider('chaowu21.officeViewer', this, viewOption),
-			vscode.window.registerCustomEditorProvider('chaowu21.htmlViewer', this, viewOption),
-			vscode.window.registerCustomEditorProvider('chaowu21.imageViewer', this, viewOption),
-			vscode.window.registerCustomEditorProvider('chaowu21.parquetViewer', this, viewOption),
+			vscode.window.registerCustomEditorProvider('GaussAA.officeViewer', this, viewOption),
+			vscode.window.registerCustomEditorProvider('GaussAA.htmlViewer', this, viewOption),
+			vscode.window.registerCustomEditorProvider('GaussAA.imageViewer', this, viewOption),
+			vscode.window.registerCustomEditorProvider('GaussAA.parquetViewer', this, viewOption),
 		];
 	}
 

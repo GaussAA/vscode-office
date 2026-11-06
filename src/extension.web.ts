@@ -34,10 +34,10 @@ export async function activate(context: vscode.ExtensionContext) {
 	const webUnsupportedViewer = new WebUnsupportedViewerProvider(context);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('chaowu21.office.markdown.switch', (uri) => { markdownService.switchEditor(uri); }),
-		vscode.commands.registerCommand('chaowu21.office.csv.switch', (uri) => { switchCsvEditor(uri); }),
-		vscode.commands.registerCommand('chaowu21.office.html.preview', (uri) => HtmlService.previewHtml(uri, context)),
-		vscode.window.registerCustomEditorProvider('chaowu21.markdownViewer', markdownEditorProvider, viewOption),
+		vscode.commands.registerCommand('GaussAA.office.markdown.switch', (uri) => { markdownService.switchEditor(uri); }),
+		vscode.commands.registerCommand('GaussAA.office.csv.switch', (uri) => { switchCsvEditor(uri); }),
+		vscode.commands.registerCommand('GaussAA.office.html.preview', (uri) => HtmlService.previewHtml(uri, context)),
+		vscode.window.registerCustomEditorProvider('GaussAA.markdownViewer', markdownEditorProvider, viewOption),
 		...webUnsupportedViewer.bindCustomEditors(viewOption),
 		...viewerInstance.bindCustomEditors(viewOption),
 	);

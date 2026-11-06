@@ -4,7 +4,7 @@ This project is a fork of [Office Viewer](https://github.com/cweijan/vscode-offi
 Weijan Chen (@cweijan), licensed under the MIT License. The original copyright notice is
 preserved in [LICENSE](./LICENSE).
 
-Fork identity: `chaowu21.office-viewer-plus` (display name "Office Viewer Plus").
+Fork identity: `GaussAA.office-viewer-plus` (display name "Office Viewer Plus").
 
 ## What this fork changed
 

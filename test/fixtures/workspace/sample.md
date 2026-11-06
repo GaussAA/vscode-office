@@ -1,6 +1,6 @@
 # Smoke fixture
 
-Opened by the integration smoke tests through `chaowu21.markdownViewer`.
+Opened by the integration smoke tests through `GaussAA.markdownViewer`.
 
 - one
 - two

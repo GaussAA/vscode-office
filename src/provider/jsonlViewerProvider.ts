@@ -36,7 +36,7 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
     constructor(private context: vscode.ExtensionContext) { }
 
     bindCustomEditor(viewOption: CustomEditorOptions) {
-        return vscode.window.registerCustomEditorProvider('chaowu21.jsonlViewer', this, viewOption);
+        return vscode.window.registerCustomEditorProvider('GaussAA.jsonlViewer', this, viewOption);
     }
 
     async openCustomDocument(uri: vscode.Uri): Promise<JsonlDocument> {

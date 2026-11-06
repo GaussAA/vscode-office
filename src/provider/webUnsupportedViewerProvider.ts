@@ -6,9 +6,9 @@ import * as vscode from 'vscode';
 
 /** Existing package.json viewTypes that are desktop-only; on web show the unsupported screen instead. */
 const WEB_UNSUPPORTED_VIEW_TYPES = [
-	'chaowu21.archiveViewer',
-	'chaowu21.classViewer',
-	'chaowu21.jsonlViewer',
+	'GaussAA.archiveViewer',
+	'GaussAA.classViewer',
+	'GaussAA.jsonlViewer',
 ] as const;
 
 /**

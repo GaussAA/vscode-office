@@ -3,7 +3,7 @@
   "displayName": "Office Viewer Plus",
   "description": "Fork of Office Viewer (cweijan/vscode-office) with ZSTD parquet support and a JSONL tree viewer.",
   "version": "4.4.1",
-  "publisher": "chaowu21",
+  "publisher": "GaussAA",
   "license": "MIT",
   "icon": "image/logo.png",
   "engines": {
@@ -204,50 +204,50 @@
     ],
     "commands": [
       {
-        "command": "chaowu21.vscode-office.save-response-body",
+        "command": "GaussAA.vscode-office.save-response-body",
         "title": "Save Response",
         "icon": "$(save)",
         "enablement": "!office.extensionHost.web"
       },
       {
-        "command": "chaowu21.vscode-office.copy-response-body",
+        "command": "GaussAA.vscode-office.copy-response-body",
         "title": "Copy Response",
         "icon": "$(copy)",
         "enablement": "!office.extensionHost.web"
       },
       {
-        "command": "chaowu21.office.markdown.switch",
+        "command": "GaussAA.office.markdown.switch",
         "title": "Switch markdown editor",
         "icon": "$(edit)"
       },
       {
-        "command": "chaowu21.office.csv.switch",
+        "command": "GaussAA.office.csv.switch",
         "title": "Switch CSV editor",
         "icon": "$(edit)"
       },
       {
-        "command": "chaowu21.office.markdown.paste",
+        "command": "GaussAA.office.markdown.paste",
         "title": "Enhance paste in markdown",
         "enablement": "!office.extensionHost.web"
       },
       {
-        "command": "chaowu21.office.html.preview",
+        "command": "GaussAA.office.html.preview",
         "title": "Preview HTML"
       },
       {
-        "command": "chaowu21.office.gitHistory.view",
+        "command": "GaussAA.office.gitHistory.view",
         "title": "View Git History",
         "icon": "$(history)",
         "enablement": "!office.extensionHost.web"
       },
       {
-        "command": "chaowu21.office.gitHistory.viewFileHistory",
+        "command": "GaussAA.office.gitHistory.viewFileHistory",
         "title": "Git: View File History",
         "icon": "$(git-commit)",
         "enablement": "!office.extensionHost.web"
       },
       {
-        "command": "chaowu21.office.gitHistory.quickSync",
+        "command": "GaussAA.office.gitHistory.quickSync",
         "title": "Git: Quick Sync",
         "icon": "$(sync)",
         "enablement": "!office.extensionHost.web"
@@ -255,24 +255,24 @@
     ],
     "keybindings": [
       {
-        "command": "chaowu21.office.markdown.paste",
+        "command": "GaussAA.office.markdown.paste",
         "key": "ctrl+v",
         "mac": "cmd+v",
         "when": "editorTextFocus && resourceLangId == markdown && !office.extensionHost.web"
       },
       {
-        "command": "chaowu21.office.html.preview",
+        "command": "GaussAA.office.html.preview",
         "key": "ctrl+shift+v",
         "when": "editorTextFocus && editorLangId == html"
       },
       {
-        "command": "chaowu21.office.markdown.switch",
+        "command": "GaussAA.office.markdown.switch",
         "key": "ctrl+alt+e",
         "mac": "ctrl+cmd+e",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
-        "command": "chaowu21.vscode-office.request",
+        "command": "GaussAA.vscode-office.request",
         "key": "ctrl+enter",
         "mac": "cmd+enter",
         "when": "editorTextFocus && editorLangId == 'http' && !office.extensionHost.web"
@@ -281,81 +281,81 @@
     "menus": {
       "scm/title": [
         {
-          "command": "chaowu21.office.gitHistory.view",
+          "command": "GaussAA.office.gitHistory.view",
           "group": "navigation",
           "when": "scmProvider == git && !office.extensionHost.web"
         },
         {
-          "command": "chaowu21.office.gitHistory.quickSync",
+          "command": "GaussAA.office.gitHistory.quickSync",
           "group": "navigation",
           "when": "scmProvider == git && config.vscode-office.gitHistory.quickSyncButton && !office.extensionHost.web"
         }
       ],
       "scm/repository": [
         {
-          "command": "chaowu21.office.gitHistory.view",
+          "command": "GaussAA.office.gitHistory.view",
           "group": "navigation",
           "when": "scmProvider == git && !office.extensionHost.web"
         }
       ],
       "scm/resourceState/context": [
         {
-          "command": "chaowu21.office.gitHistory.viewFileHistory",
+          "command": "GaussAA.office.gitHistory.viewFileHistory",
           "when": "config.git.enabled && gitOpenRepositoryCount != 0 && !office.extensionHost.web"
         }
       ],
       "editor/title": [
         {
-          "command": "chaowu21.office.gitHistory.viewFileHistory",
+          "command": "GaussAA.office.gitHistory.viewFileHistory",
           "group": "navigation@4",
           "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file && !office.extensionHost.web"
         },
         {
-          "command": "chaowu21.office.markdown.switch",
+          "command": "GaussAA.office.markdown.switch",
           "when": "resourceExtname == '.md'",
           "group": "navigation@-2"
         },
         {
-          "command": "chaowu21.office.csv.switch",
+          "command": "GaussAA.office.csv.switch",
           "when": "resourceExtname == '.csv' || resourceExtname == '.tsv'",
           "group": "navigation@-2"
         },
         {
           "when": "editorTextFocus && resourceScheme == rest-client-response",
-          "command": "chaowu21.vscode-office.copy-response-body",
+          "command": "GaussAA.vscode-office.copy-response-body",
           "group": "navigation@0"
         },
         {
           "when": "editorTextFocus && resourceScheme == rest-client-response",
-          "command": "chaowu21.vscode-office.save-response-body",
+          "command": "GaussAA.vscode-office.save-response-body",
           "group": "navigation@2"
         }
       ],
       "editor/context": [
         {
-          "command": "chaowu21.office.gitHistory.viewFileHistory",
+          "command": "GaussAA.office.gitHistory.viewFileHistory",
           "group": "git",
           "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file && !office.extensionHost.web"
         },
         {
-          "command": "chaowu21.office.html.preview",
+          "command": "GaussAA.office.html.preview",
           "group": "navigation@1",
           "when": "editorTextFocus && editorLangId == html"
         },
         {
-          "command": "chaowu21.vscode-office.save-response-body",
+          "command": "GaussAA.vscode-office.save-response-body",
           "group": "http@2",
           "when": "editorTextFocus && resourceScheme == rest-client-response && !office.extensionHost.web"
         },
         {
-          "command": "chaowu21.vscode-office.copy-response-body",
+          "command": "GaussAA.vscode-office.copy-response-body",
           "group": "http@4",
           "when": "editorTextFocus && resourceScheme == rest-client-response && !office.extensionHost.web"
         }
       ],
       "explorer/context": [
         {
-          "command": "chaowu21.office.gitHistory.viewFileHistory",
+          "command": "GaussAA.office.gitHistory.viewFileHistory",
           "group": "git",
           "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file && !office.extensionHost.web"
         }
@@ -363,7 +363,7 @@
     },
     "customEditors": [
       {
-        "viewType": "chaowu21.officeViewer",
+        "viewType": "GaussAA.officeViewer",
         "displayName": "Office Viewer",
         "selector": [
           {
@@ -453,7 +453,7 @@
         ]
       },
       {
-        "viewType": "chaowu21.archiveViewer",
+        "viewType": "GaussAA.archiveViewer",
         "displayName": "Archive Viewer",
         "selector": [
           {
@@ -489,7 +489,7 @@
         ]
       },
       {
-        "viewType": "chaowu21.imageViewer",
+        "viewType": "GaussAA.imageViewer",
         "displayName": "Image Preview (Office Viewer)",
         "priority": "option",
         "selector": [
@@ -529,7 +529,7 @@
         ]
       },
       {
-        "viewType": "chaowu21.markdownViewer",
+        "viewType": "GaussAA.markdownViewer",
         "displayName": "Markdown Editor",
         "selector": [
           {
@@ -553,7 +553,7 @@
         ]
       },
       {
-        "viewType": "chaowu21.htmlViewer",
+        "viewType": "GaussAA.htmlViewer",
         "displayName": "Html Viewer",
         "priority": "option",
         "selector": [
@@ -569,7 +569,7 @@
         ]
       },
       {
-        "viewType": "chaowu21.parquetViewer",
+        "viewType": "GaussAA.parquetViewer",
         "displayName": "Parquet Viewer",
         "priority": "default",
         "selector": [
@@ -579,7 +579,7 @@
         ]
       },
       {
-        "viewType": "chaowu21.classViewer",
+        "viewType": "GaussAA.classViewer",
         "displayName": "Java Decompiler",
         "selector": [
           {
@@ -588,7 +588,7 @@
         ]
       },
       {
-        "viewType": "chaowu21.jsonlViewer",
+        "viewType": "GaussAA.jsonlViewer",
         "displayName": "JSONL Viewer",
         "priority": "default",
         "selector": [

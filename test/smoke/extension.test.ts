@@ -17,7 +17,7 @@ import * as path from 'node:path'
 import * as vscode from 'vscode'
 import { parquetWriteBuffer } from 'hyparquet-writer'
 
-const EXTENSION_ID = 'chaowu21.office-viewer-plus'
+const EXTENSION_ID = 'GaussAA.office-viewer-plus'
 
 function workspaceRoot(): vscode.Uri {
 	const folder = vscode.workspace.workspaceFolders?.[0]
@@ -124,7 +124,7 @@ describe('html preview', () => {
 	// could not do here anyway.
 	it('opens its own webview panel for a file', async () => {
 		const uri = vscode.Uri.joinPath(workspaceRoot(), 'sample.html')
-		await vscode.commands.executeCommand('chaowu21.office.html.preview', uri)
+		await vscode.commands.executeCommand('GaussAA.office.html.preview', uri)
 
 		const deadline = Date.now() + 30000
 		while (Date.now() < deadline) {
@@ -152,7 +152,7 @@ describe('multiple editors per document', () => {
 	// Without `supportsMultipleEditorsPerDocument` the second open is refused or lands in
 	// the default text editor, so "two groups, both ours" is the observable difference.
 	it('shows the same file in two editor groups', async () => {
-		const viewType = 'chaowu21.jsonlViewer'
+		const viewType = 'GaussAA.jsonlViewer'
 		const uri = vscode.Uri.joinPath(workspaceRoot(), 'sample.jsonl')
 
 		await vscode.commands.executeCommand('vscode.openWith', uri, viewType, vscode.ViewColumn.One)
@@ -187,23 +187,23 @@ describe('custom editors', () => {
 
 	const cases: Array<{ viewType: string; fixture: () => Promise<vscode.Uri> }> = [
 		{
-			viewType: 'chaowu21.markdownViewer',
+			viewType: 'GaussAA.markdownViewer',
 			fixture: async () => vscode.Uri.joinPath(workspaceRoot(), 'sample.md'),
 		},
 		{
-			viewType: 'chaowu21.htmlViewer',
+			viewType: 'GaussAA.htmlViewer',
 			fixture: async () => vscode.Uri.joinPath(workspaceRoot(), 'sample.html'),
 		},
 		{
-			viewType: 'chaowu21.officeViewer',
+			viewType: 'GaussAA.officeViewer',
 			fixture: async () => vscode.Uri.joinPath(workspaceRoot(), 'sample.csv'),
 		},
 		{
-			viewType: 'chaowu21.jsonlViewer',
+			viewType: 'GaussAA.jsonlViewer',
 			fixture: async () => vscode.Uri.joinPath(workspaceRoot(), 'sample.jsonl'),
 		},
 		{
-			viewType: 'chaowu21.parquetViewer',
+			viewType: 'GaussAA.parquetViewer',
 			fixture: parquetFixture,
 		},
 	]

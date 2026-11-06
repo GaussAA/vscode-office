@@ -22,7 +22,7 @@ This extension lets you preview and edit common office and design files directly
 ## This fork: Office Viewer Plus
 
 This repository is a fork of [cweijan/vscode-office](https://github.com/cweijan/vscode-office)
-(MIT, see [NOTICE.md](NOTICE.md)). It builds as `chaowu21.office-viewer-plus` and installs
+(MIT, see [NOTICE.md](NOTICE.md)). It builds as `GaussAA.office-viewer-plus` and installs
 alongside the original, so everything above still works. The fork adds:
 
 ### Parquet: the files upstream cannot open

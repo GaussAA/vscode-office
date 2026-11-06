@@ -13,14 +13,14 @@ export class HttpCodeLensProvider implements CodeLensProvider {
             const sendCmd: Command = {
                 arguments: [document, range],
                 title: '$(run) Send',
-                command: 'chaowu21.vscode-office.request'
+                command: 'GaussAA.vscode-office.request'
             };
             blocks.push(new CodeLens(range, sendCmd));
 
             const curlCmd: Command = {
                 arguments: [document, range],
                 title: 'Copy as cURL',
-                command: 'chaowu21.vscode-office.copy-request-as-curl'
+                command: 'GaussAA.vscode-office.copy-request-as-curl'
             };
             blocks.push(new CodeLens(range, curlCmd));
         }

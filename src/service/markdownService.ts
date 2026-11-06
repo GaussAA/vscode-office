@@ -251,7 +251,7 @@ export class MarkdownService {
         const editor = vscode.window.activeTextEditor;
         const target = uri ?? editor?.document.uri;
         if (!target) return;
-        const type = editor ? 'chaowu21.markdownViewer' : 'default';
+        const type = editor ? 'GaussAA.markdownViewer' : 'default';
         vscode.commands.executeCommand('vscode.openWith', target, type);
     }
 

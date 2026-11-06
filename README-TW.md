@@ -22,7 +22,7 @@
 ## 本儲存庫：Office Viewer Plus（fork）
 
 本儲存庫 fork 自 [cweijan/vscode-office](https://github.com/cweijan/vscode-office)（MIT，見
-[NOTICE.md](NOTICE.md)），以 `chaowu21.office-viewer-plus` 發布，可與原版並存安裝。上述功能
+[NOTICE.md](NOTICE.md)），以 `GaussAA.office-viewer-plus` 發布，可與原版並存安裝。上述功能
 全部保留，此外還增加了：
 
 ### Parquet：上游打不開的壓縮檔案

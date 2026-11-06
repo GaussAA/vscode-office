@@ -4,7 +4,7 @@
 
 ## 这是什么
 
-[cweijan/vscode-office](https://github.com/cweijan/vscode-office)（Office Viewer）的 fork，MIT。我们在上游基础上继续开发：补 zstd 压缩的 parquet、新增 JSONL 树视图。身份是 `chaowu21.office-viewer-plus`，与原版可共存。理由与后果见 [docs/adr/0001-fork-office-viewer.md](./docs/adr/0001-fork-office-viewer.md)。
+[cweijan/vscode-office](https://github.com/cweijan/vscode-office)（Office Viewer）的 fork，MIT。我们在上游基础上继续开发：补 zstd 压缩的 parquet、新增 JSONL 树视图。身份是 `GaussAA.office-viewer-plus`，与原版可共存。理由与后果见 [docs/adr/0001-fork-office-viewer.md](./docs/adr/0001-fork-office-viewer.md)。
 
 ## Agent skills
 

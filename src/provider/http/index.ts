@@ -53,9 +53,9 @@ export async function activateHttp(context: ExtensionContext): Promise<void> {
     context.subscriptions.push(
         requestController,
         codeSnippetController,
-        commands.registerCommand('chaowu21.vscode-office.request', (_document: TextDocument, range: Range) => requestController.run(range)),
-        commands.registerCommand('chaowu21.vscode-office.copy-request-as-curl', (document: TextDocument, range: Range) => codeSnippetController.copyAsCurl(document, range)),
-        commands.registerCommand('chaowu21.vscode-office._openDocumentLink', args => {
+        commands.registerCommand('GaussAA.vscode-office.request', (_document: TextDocument, range: Range) => requestController.run(range)),
+        commands.registerCommand('GaussAA.vscode-office.copy-request-as-curl', (document: TextDocument, range: Range) => codeSnippetController.copyAsCurl(document, range)),
+        commands.registerCommand('GaussAA.vscode-office._openDocumentLink', args => {
             workspace.openTextDocument(Uri.parse(args.path)).then(window.showTextDocument, error => {
                 window.showErrorMessage(error.message);
             });

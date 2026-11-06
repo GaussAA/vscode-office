@@ -183,10 +183,10 @@ export async function activateGitHistory(context: vscode.ExtensionContext): Prom
         await repoDiscovery.discover();
     } catch {
         context.subscriptions.push(
-            vscode.commands.registerCommand('chaowu21.office.gitHistory.view', () => {
+            vscode.commands.registerCommand('GaussAA.office.gitHistory.view', () => {
                 vscode.window.showErrorMessage(i18n('ext.git.unableToFindGit'));
             }),
-            vscode.commands.registerCommand('chaowu21.office.gitHistory.viewFileHistory', () => {
+            vscode.commands.registerCommand('GaussAA.office.gitHistory.viewFileHistory', () => {
                 vscode.window.showErrorMessage(i18n('ext.git.unableToFindGit'));
             })
         );
@@ -194,18 +194,18 @@ export async function activateGitHistory(context: vscode.ExtensionContext): Prom
     }
 
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
-    statusBarItem.command = 'chaowu21.office.gitHistory.view';
+    statusBarItem.command = 'GaussAA.office.gitHistory.view';
     statusBarItem.text = '$(git-commit) Git';
     statusBarItem.tooltip = i18n('ext.git.statusBarTooltip');
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('chaowu21.office.gitHistory.view', async (arg?: unknown) => {
+        vscode.commands.registerCommand('GaussAA.office.gitHistory.view', async (arg?: unknown) => {
             const panelContext = buildPanelContextFromCommandArg(arg);
             await openGitHistory(context, panelContext);
         }),
-        vscode.commands.registerCommand('chaowu21.office.gitHistory.viewFileHistory', async (arg?: unknown) => {
+        vscode.commands.registerCommand('GaussAA.office.gitHistory.viewFileHistory', async (arg?: unknown) => {
             const fromArg = buildPanelContextFromCommandArg(arg);
             const fileUri = resolveFileUri(arg as vscode.Uri | undefined) ?? fromArg.fileUri;
             if (!fileUri) {
@@ -214,7 +214,7 @@ export async function activateGitHistory(context: vscode.ExtensionContext): Prom
             }
             await openGitHistory(context, mergePanelContext({ fileUri }, fromArg));
         }),
-        vscode.commands.registerCommand('chaowu21.office.gitHistory.quickSync', async () => {
+        vscode.commands.registerCommand('GaussAA.office.gitHistory.quickSync', async () => {
             await runQuickSyncCommand();
         }),
         vscode.window.registerWebviewPanelSerializer(

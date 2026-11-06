@@ -10,10 +10,10 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 
 | 事实 | 怎么查的 | 结论 |
 |---|---|---|
-| Marketplace 上没有 `chaowu21.office-viewer-plus` | Gallery `extensionquery` API，`filterType: 7` | 未发布过 |
+| Marketplace 上没有 `GaussAA.office-viewer-plus` | Gallery `extensionquery` API，`filterType: 7` | 未发布过 |
 | 同一个查询能查到上游 `cweijan.vscode-office` v4.2.3 | 同上 | 说明查询本身有效，上一条的"查不到"是有意义的 |
-| Open VSX 上没有 `chaowu21/office-viewer-plus` | `GET https://open-vsx.org/api/chaowu21/office-viewer-plus` | 404 |
-| Open VSX 没有 `chaowu21` 命名空间 | `GET https://open-vsx.org/api/namespace/chaowu21` | 404 |
+| Open VSX 上没有 `GaussAA/office-viewer-plus` | `GET https://open-vsx.org/api/GaussAA/office-viewer-plus` | 404 |
+| Open VSX 没有 `GaussAA` 命名空间 | `GET https://open-vsx.org/api/namespace/GaussAA` | 404 |
 | 仓库里没有任何发布用 secret | `gh secret list` | 空（符合设计：两边都不存 secret） |
 | 仓库是**公开**的 | `gh repo view` | 公开 —— Open VSX 的私有仓库注册码流程用不上 |
 
@@ -22,15 +22,15 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 
 ## A. VS Code Marketplace（OIDC 受信发布）
 
-### A1. 确认 publisher `chaowu21` 存在
+### A1. 确认 publisher `GaussAA` 存在
 
 打开 <https://marketplace.visualstudio.com/manage>，用发布扩展的 Microsoft 账号登录。
 
-- 左侧能看到 `chaowu21` → 直接进入 A2。
-- 看不到 → 点 **Create publisher**，**ID 必须是 `chaowu21`**（与 `package.json` 的
+- 左侧能看到 `GaussAA` → 直接进入 A2。
+- 看不到 → 点 **Create publisher**，**ID 必须是 `GaussAA`**（与 `package.json` 的
   `publisher` 一致，创建后不可改），Name 可以随便填一个展示名。
 
-**验证**：刷新后左侧列表出现 `chaowu21`。
+**验证**：刷新后左侧列表出现 `GaussAA`。
 
 ### A2. 创建受信发布策略
 
@@ -60,23 +60,23 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 
 ### B1. 建命名空间并拿到所有权
 
-`ovsx` 用 `package.json` 的 `publisher` 作为命名空间，所以命名空间必须叫 `chaowu21`。
+`ovsx` 用 `package.json` 的 `publisher` 作为命名空间，所以命名空间必须叫 `GaussAA`。
 
 1. 用 Eclipse 账号登录 <https://open-vsx.org>。
 2. 用访问令牌创建命名空间（令牌在 <https://open-vsx.org/user-settings/tokens>）：
 
    ```bash
-   npx ovsx create-namespace chaowu21 --pat <token>
+   npx ovsx create-namespace GaussAA --pat <token>
    ```
 
 3. **主张所有权**。只建命名空间不会给你独占发布权——按
    [Namespace Access](https://github.com/eclipse/openvsx/wiki/Namespace-Access) 的流程提出主张。
 
-**验证**：`curl -s https://open-vsx.org/api/namespace/chaowu21` 不再返回 404。
+**验证**：`curl -s https://open-vsx.org/api/namespace/GaussAA` 不再返回 404。
 
 ### B2. 注册受信发布者
 
-打开 <https://open-vsx.org/user-settings/trusted-publishers>，为命名空间 `chaowu21` 注册：
+打开 <https://open-vsx.org/user-settings/trusted-publishers>，为命名空间 `GaussAA` 注册：
 
 - **仓库**：`GaussAA/vscode-office`
 - **工作流**：`release.yml`
@@ -116,10 +116,10 @@ Marketplace（`vsce publish --oidc`）→ Open VSX（`ovsx publish --trusted-pub
 # 应该返回一个 hit，版本是 4.4.2
 curl -s -X POST 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' \
   -H 'Accept: application/json;api-version=7.2-preview.1' -H 'Content-Type: application/json' \
-  --data '{"filters":[{"criteria":[{"filterType":7,"value":"chaowu21.office-viewer-plus"}],"pageNumber":1,"pageSize":1}],"assetTypes":[],"flags":914}'
+  --data '{"filters":[{"criteria":[{"filterType":7,"value":"GaussAA.office-viewer-plus"}],"pageNumber":1,"pageSize":1}],"assetTypes":[],"flags":914}'
 
 # 应该返回 200 和版本号
-curl -s https://open-vsx.org/api/chaowu21/office-viewer-plus | head -c 200
+curl -s https://open-vsx.org/api/GaussAA/office-viewer-plus | head -c 200
 ```
 
 ## D. 一半成功怎么办

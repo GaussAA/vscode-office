@@ -19,7 +19,7 @@ export class ArchiveViewerProvider implements vscode.CustomReadonlyEditorProvide
 	constructor(private context: vscode.ExtensionContext) { }
 
 	bindCustomEditor(viewOption: CustomEditorOptions) {
-		return vscode.window.registerCustomEditorProvider('chaowu21.archiveViewer', this, viewOption);
+		return vscode.window.registerCustomEditorProvider('GaussAA.archiveViewer', this, viewOption);
 	}
 
 	public openCustomDocument(uri: vscode.Uri, _openContext: vscode.CustomDocumentOpenContext, _token: vscode.CancellationToken): vscode.CustomDocument {
