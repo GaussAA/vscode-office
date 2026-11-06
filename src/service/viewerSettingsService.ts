@@ -4,15 +4,12 @@ import * as vscode from "vscode";
 import { broadcastToMarkdownWebviews } from "@/service/markdown/blockScroll";
 
 const CONFIG_FILE_NAME = ".vscode-office-viewer.json";
-const AI_PROMPTS_KEY = "aiPrompts";
-const AI_MODELS_KEY = "aiModels";
-const JSON_ARRAY_GLOBAL_KEYS = [AI_PROMPTS_KEY, AI_MODELS_KEY] as const;
+const JSON_ARRAY_GLOBAL_KEYS: readonly string[] = [];
 
 export type ViewerSettingsPayload = Record<string, unknown>;
 
 export type VditorViewerSettings = {
   globalSettings: Record<string, unknown>;
-  aiPreferences?: Record<string, string>;
 };
 
 const serializeGlobalSettingsForFile = (
@@ -49,7 +46,6 @@ export const serializeViewerSettingsForFile = (
   settings: VditorViewerSettings,
 ): ViewerSettingsPayload => ({
   globalSettings: serializeGlobalSettingsForFile(settings.globalSettings ?? {}),
-  aiPreferences: settings.aiPreferences ?? {},
 });
 
 export const deserializeViewerSettingsFromFile = (
@@ -62,7 +58,6 @@ export const deserializeViewerSettingsFromFile = (
     globalSettings: deserializeGlobalSettingsForVditor(
       payload.globalSettings as Record<string, unknown> | undefined,
     ),
-    aiPreferences: (payload.aiPreferences as Record<string, string> | undefined) ?? {},
   };
 };
 

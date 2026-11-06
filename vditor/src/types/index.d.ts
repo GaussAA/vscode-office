@@ -485,7 +485,6 @@ interface IAIPolishOptions {
 
 type ViewerSettingsExport = {
     globalSettings: Record<string, boolean | number | string | undefined>;
-    aiPreferences: Record<string, string>;
 };
 
 interface IOptions {
