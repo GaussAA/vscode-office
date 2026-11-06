@@ -8,7 +8,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const isProd = process.argv.indexOf("--mode=production") >= 0;
 
-const dependencies = ["vscode-html-to-docx", "highlight.js", "pdf-lib", "katex", "puppeteer-core"];
+const dependencies = [
+  "vscode-html-to-docx",
+  "highlight.js",
+  "@cantoo/pdf-lib",
+  "katex",
+  "puppeteer-core",
+];
 
 function createDesktopAssetCopyPlugins(shouldWatch: boolean) {
   return [

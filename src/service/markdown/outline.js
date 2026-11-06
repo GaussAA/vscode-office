@@ -1,5 +1,5 @@
 export const createOutline = async (pdf, html) => {
-  const { PDFDocument } = require("pdf-lib");
+  const { PDFDocument } = require("@cantoo/pdf-lib");
   const pdfDoc = await PDFDocument.load(pdf);
   const { parse, HTMLElement } = require("node-html-parser");
   const root = parse(html);
@@ -39,7 +39,7 @@ function inflateDict(array, dict, HTMLElement) {
 }
 
 function extractDict(pdfDoc) {
-  const { PDFDict } = require("pdf-lib");
+  const { PDFDict } = require("@cantoo/pdf-lib");
   const dict = {};
   for (const obj of pdfDoc.context.indirectObjects.entries()) {
     if (obj[1] && obj[1] instanceof PDFDict) {
@@ -82,7 +82,7 @@ function anchorToPdfDestKey(anchor) {
 }
 
 async function creatOutlines(doc, dictArray) {
-  const { PDFDict, PDFHexString, PDFNumber, PDFName } = require("pdf-lib");
+  const { PDFDict, PDFHexString, PDFNumber, PDFName } = require("@cantoo/pdf-lib");
   const createOutlineItem = (doc, dict, parentRefer, outlineRefer, nextOrPrev, childRefs) => {
     const map = new Map();
     map.set(PDFName.Title, PDFHexString.fromText(dict.title));
