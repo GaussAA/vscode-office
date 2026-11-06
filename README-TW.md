@@ -4,6 +4,10 @@
 
 ## 介紹
 
+> **從 4.x 升級？** 5.0.0 是破壞性版本：`.http` client、AI Polish、內建主題都已移除，且要求
+> VS Code 1.125+。先讀 [docs/upgrading-to-5.md](docs/upgrading-to-5.md) —— 兩分鐘看完，逐條列出
+> 你需要做什麼（通常什麼都不用做）。
+
 本擴充功能支援在 VS Code 中預覽以下常見的辦公檔案格式：
 
 - Excel: `.xls`、`.xlsx`、`.xlsm`、`.csv`、`.ods`

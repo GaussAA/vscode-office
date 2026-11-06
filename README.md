@@ -20,6 +20,11 @@ This extension lets you preview and edit common office and design files directly
 
 ## This fork: Office Viewer Plus
 
+> **Upgrading from 4.x?** 5.0.0 is a breaking release: the `.http` client, AI Polish and the
+> bundled themes are gone, and VS Code 1.125+ is now required. Read
+> [docs/upgrading-to-5.md](docs/upgrading-to-5.md) first — two minutes, and it lists exactly what
+> you need to do (usually nothing).
+
 This repository is a fork of [cweijan/vscode-office](https://github.com/cweijan/vscode-office)
 (MIT, see [NOTICE.md](NOTICE.md)). It builds as `GaussAA.office-viewer-plus` and installs
 alongside the original, so everything above still works. The fork adds:

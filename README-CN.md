@@ -20,6 +20,10 @@
 
 ## 本仓库：Office Viewer Plus（fork）
 
+> **从 4.x 升级？** 5.0.0 是破坏性版本：`.http` client、AI Polish、内置主题都已移除，且要求
+> VS Code 1.125+。先读 [docs/upgrading-to-5.md](docs/upgrading-to-5.md) —— 两分钟看完，逐条列出
+> 你需要做什么（通常什么都不用做）。
+
 本仓库 fork 自 [cweijan/vscode-office](https://github.com/cweijan/vscode-office)（MIT，见
 [NOTICE.md](NOTICE.md)），以 `GaussAA.office-viewer-plus` 发布，可与原版并存安装。上面的功能
 全部保留，此外还增加了：
