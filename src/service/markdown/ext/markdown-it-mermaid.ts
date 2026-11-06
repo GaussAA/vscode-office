@@ -1,6 +1,23 @@
 import mermaid from "mermaid";
+import MarkdownIt from "markdown-it";
 
-const mermaidChart = (code) => {
+type MarkdownItInstance = InstanceType<typeof MarkdownIt>;
+
+interface PreferenceStore {
+  get(key: string): string | undefined;
+}
+
+/**
+ * `mermaid.loadPreferences` is a Vditor-era extension of the mermaid API: the editor calls it
+ * when a user changes the diagram theme, and it expects the current values back.
+ */
+type MermaidWithPreferences = typeof mermaid & {
+  loadPreferences?: (store: PreferenceStore) => Record<string, string>;
+};
+
+const mermaidRuntime = mermaid as MermaidWithPreferences;
+
+const mermaidChart = (code: string): string => {
   // mermaid 12 made `parse()` asynchronous. A Markdown-It fence rule has to return a string
   // synchronously, so the result can no longer gate the output: the old `try { parse } catch`
   // would never fire and a bad diagram became an unhandled rejection. Validate for the sake
@@ -14,9 +31,9 @@ const mermaidChart = (code) => {
   return `<div class="mermaid">${code}</div>`;
 };
 
-const MermaidPlugin = (md) => {
-  md.mermaid = mermaid;
-  mermaid.loadPreferences = (preferenceStore) => {
+const MermaidPlugin = (md: MarkdownItInstance): void => {
+  (md as MarkdownItInstance & { mermaid?: typeof mermaid }).mermaid = mermaid;
+  mermaidRuntime.loadPreferences = (preferenceStore) => {
     let mermaidTheme = preferenceStore.get("mermaid-theme");
     if (mermaidTheme === undefined) {
       mermaidTheme = "default";
@@ -25,27 +42,31 @@ const MermaidPlugin = (md) => {
     if (ganttAxisFormat === undefined) {
       ganttAxisFormat = "%Y-%m-%d";
     }
-    mermaid.initialize({
+    // `axisFormatter` was removed from mermaid's Gantt config in v10; the object is built
+    // dynamically so the field survives for older runtimes that still read it.
+    const config: Record<string, unknown> = {
       theme: mermaidTheme,
       gantt: {
         axisFormatter: [
           [
             ganttAxisFormat,
-            (d) => {
+            (d: Date) => {
               return d.getDay() === 1;
             },
           ],
         ],
       },
-    });
+    };
+    mermaid.initialize(config as never);
     return {
       "mermaid-theme": mermaidTheme,
       "gantt-axis-format": ganttAxisFormat,
     };
   };
 
-  const temp = md.renderer.rules.fence.bind(md.renderer.rules);
-  md.renderer.rules.fence = (tokens, idx, options, env, slf) => {
+  const rules = md.renderer.rules;
+  const defaultFence = rules.fence!;
+  rules.fence = (tokens, idx, options, env, slf) => {
     const token = tokens[idx];
     const code = token.content.trim();
     if (token.info === "mermaid") {
@@ -59,7 +80,7 @@ const MermaidPlugin = (md) => {
     ) {
       return mermaidChart(code);
     }
-    return temp(tokens, idx, options, env, slf);
+    return defaultFence(tokens, idx, options, env, slf);
   };
 };
 

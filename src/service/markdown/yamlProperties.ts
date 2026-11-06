@@ -1,5 +1,23 @@
-function trimYamlScalar(val) {
-  val = val.trim();
+/**
+ * Front-matter → properties panel.
+ *
+ * This is a **line-based** YAML reader, not a YAML parser: it understands `key: value`, a
+ * `- item` block list directly under a key, and `[a, b]` inline lists. Nested maps, block
+ * scalars, anchors and multi-line strings are out of scope, and a comma inside an inline list
+ * item splits it. That is deliberate — it runs on every render of every document, and the
+ * panel only ever displays flattened scalars.
+ */
+
+export type YamlPropertyType = "text" | "tags" | "aliases" | "date" | "boolean" | "number" | "list";
+
+export interface YamlProperty {
+  key: string;
+  type: YamlPropertyType;
+  values: string[];
+}
+
+function trimYamlScalar(rawValue: string): string {
+  const val = rawValue.trim();
   if (val.length >= 2) {
     const first = val[0];
     const last = val[val.length - 1];
@@ -13,7 +31,7 @@ function trimYamlScalar(val) {
   return val;
 }
 
-function inferYamlPropertyType(key) {
+function inferYamlPropertyType(key: string): YamlPropertyType {
   const lower = key.trim().toLowerCase();
   switch (lower) {
     case "tags":
@@ -41,11 +59,11 @@ function inferYamlPropertyType(key) {
   }
 }
 
-function isYamlBooleanTrue(val) {
+function isYamlBooleanTrue(val: string): boolean {
   return String(val).trim().toLowerCase() === "true";
 }
 
-function yamlPropertyIcon(propType) {
+function yamlPropertyIcon(propType: YamlPropertyType): string {
   switch (propType) {
     case "tags":
       return "tag";
@@ -64,14 +82,14 @@ function yamlPropertyIcon(propType) {
   }
 }
 
-function parseYamlProperties(content) {
-  content = content.trim();
+export function parseYamlProperties(rawContent: string): YamlProperty[] {
+  const content = rawContent.trim();
   if (!content) {
     return [];
   }
 
   const lines = content.split("\n");
-  const props = [];
+  const props: YamlProperty[] = [];
   let listKey = "";
 
   for (const line of lines) {
@@ -85,9 +103,9 @@ function parseYamlProperties(content) {
       if (!item) {
         continue;
       }
-      for (let i = props.length - 1; i >= 0; i--) {
-        if (props[i].key === listKey) {
-          props[i].values.push(item);
+      for (let index = props.length - 1; index >= 0; index--) {
+        if (props[index].key === listKey) {
+          props[index].values.push(item);
           break;
         }
       }
@@ -123,7 +141,7 @@ function parseYamlProperties(content) {
         props.push({ key, type: propType, values: [] });
         continue;
       }
-      const values = [];
+      const values: string[] = [];
       for (const part of inner.split(",")) {
         const item = trimYamlScalar(part.trim());
         if (item) {
@@ -144,7 +162,7 @@ function parseYamlProperties(content) {
   return props;
 }
 
-function renderPropertyValues(prop, escapeHtml) {
+function renderPropertyValues(prop: YamlProperty, escapeHtml: (value: string) => string): string {
   if (!prop.values.length) {
     return '<span class="vditor-properties__empty">—</span>';
   }
@@ -152,11 +170,11 @@ function renderPropertyValues(prop, escapeHtml) {
   switch (prop.type) {
     case "tags": {
       let html = "";
-      for (let i = 0; i < prop.values.length; i++) {
-        if (i > 0) {
+      for (let index = 0; index < prop.values.length; index++) {
+        if (index > 0) {
           html += " ";
         }
-        let tag = prop.values[i];
+        let tag = prop.values[index];
         if (!tag.startsWith("#")) {
           tag = `#${tag}`;
         }
@@ -166,11 +184,11 @@ function renderPropertyValues(prop, escapeHtml) {
     }
     case "aliases": {
       let html = "";
-      for (let i = 0; i < prop.values.length; i++) {
-        if (i > 0) {
+      for (let index = 0; index < prop.values.length; index++) {
+        if (index > 0) {
           html += " ";
         }
-        const alias = prop.values[i];
+        const alias = prop.values[index];
         html += `<span class="obsidian-wikilink" data-href="${escapeHtml(alias)}">${escapeHtml(alias)}</span>`;
       }
       return html;
@@ -195,7 +213,7 @@ function renderPropertyValues(prop, escapeHtml) {
   }
 }
 
-function valueClassName(propType) {
+function valueClassName(propType: YamlPropertyType): string {
   switch (propType) {
     case "tags":
       return " vditor-properties__value--tags";
@@ -210,7 +228,10 @@ function valueClassName(propType) {
   }
 }
 
-function renderPropertiesPanel(properties, escapeHtml) {
+export function renderPropertiesPanel(
+  properties: YamlProperty[],
+  escapeHtml: (value: string) => string,
+): string {
   if (!properties.length) {
     return "";
   }
@@ -236,8 +257,3 @@ function renderPropertiesPanel(properties, escapeHtml) {
   html += "</div></div></div>";
   return html;
 }
-
-module.exports = {
-  parseYamlProperties,
-  renderPropertiesPanel,
-};

@@ -1,18 +1,20 @@
+import { katex as markdownItKatex } from "@mdit/plugin-katex";
+import { plantuml as markdownItPlantuml } from "@mdit/plugin-plantuml";
+import { tasklist as markdownItCheckbox } from "@mdit/plugin-tasklist";
 const fs = require("fs");
 const path = require("path");
 const url = require("url");
 const URI = require("vscode").Uri;
 const markdownIt = require("markdown-it");
-const markdownItCheckbox = require("markdown-it-checkbox");
-const markdownItKatex = require("./ext/markdown-it-katex");
+
 const markdownItMermaid = require("./ext/markdown-it-mermaid").default;
-const markdownItPlantuml = require("markdown-it-plantuml");
+
 const markdownItToc = require("markdown-it-toc-done-right");
 const markdownItAnchor = require("markdown-it-anchor");
 const markdownItObsidianCallouts = require("markdown-it-obsidian-callouts");
 const markdownItMark = require("markdown-it-mark");
-const markdownItObsidian = require("./ext/markdown-it-obsidian");
-const markdownItFrontMatterExport = require("./ext/markdown-it-front-matter");
+const markdownItObsidian = require("./ext/markdown-it-obsidian").default;
+const markdownItFrontMatterExport = require("./ext/markdown-it-front-matter").default;
 const { parse } = require("node-html-parser");
 const { exportByType } = require("./html-export");
 

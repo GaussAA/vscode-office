@@ -199,6 +199,15 @@ importers:
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.5
+      '@mdit/plugin-katex':
+        specifier: ^1.1.5
+        version: 1.1.5(markdown-it@15.0.3)
+      '@mdit/plugin-plantuml':
+        specifier: ^2.0.4
+        version: 2.0.4(markdown-it@15.0.3)
+      '@mdit/plugin-tasklist':
+        specifier: ^1.2.0
+        version: 1.2.0(markdown-it@15.0.3)
       '@mind-elixir/import-xmind':
         specifier: ^1.0.8
         version: 1.0.8
@@ -259,9 +268,6 @@ importers:
       markdown-it-anchor:
         specifier: ^10.0.0
         version: 10.0.0(@types/markdown-it@14.2.0)(markdown-it@15.0.3)
-      markdown-it-checkbox:
-        specifier: ^1.1.0
-        version: 1.1.0
       markdown-it-front-matter:
         specifier: ^0.2.4
         version: 0.2.4
@@ -271,9 +277,6 @@ importers:
       markdown-it-obsidian-callouts:
         specifier: ^0.3.4
         version: 0.3.5(markdown-it@15.0.3)
-      markdown-it-plantuml:
-        specifier: ^1.4.1
-        version: 1.4.1
       markdown-it-toc-done-right:
         specifier: ^4.2.0
         version: 4.2.0
@@ -1077,6 +1080,60 @@ packages:
 
   '@marijn/find-cluster-break@1.0.4':
     resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
+
+  '@mdit/helper@1.2.0':
+    resolution: {integrity: sha512-+Lh3nitlVclyxjD0LnOKPCyogVqL1W416FKOYjJSGDVlVKq9/jasQNOsUbjAvRwc+imgnFq1lsnat4q69UibIg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      markdown-it: ^15.0.3
+    peerDependenciesMeta:
+      markdown-it:
+        optional: true
+
+  '@mdit/plugin-katex@1.1.5':
+    resolution: {integrity: sha512-hOiLKXL0rhLg1myXIk7YQPa7OeyhUniZSHPcIjx4pi8i/5to04zxaxnfcncp87vCB86zqUlCrHV2eratz5C2+A==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      markdown-it: ^15.0.3
+    peerDependenciesMeta:
+      markdown-it:
+        optional: true
+
+  '@mdit/plugin-plantuml@2.0.4':
+    resolution: {integrity: sha512-cnf43aSNTeFjk9s5PD4623tqWkRP7OsTJY3wNtczVCJGeypF2CvAotmR7WVPoRxIOHyi2nLFwmvI3qISlYMWgQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      markdown-it: ^15.0.3
+    peerDependenciesMeta:
+      markdown-it:
+        optional: true
+
+  '@mdit/plugin-tasklist@1.2.0':
+    resolution: {integrity: sha512-i6E8Cm5UQ6wvn/8s85LcNA1cKpO/m3pxGMGJaxTI3klHgOtfMTSMUqLKHCEZjrnm/jGL/X2pcOybROGPeFXnZQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      markdown-it: ^15.0.3
+    peerDependenciesMeta:
+      markdown-it:
+        optional: true
+
+  '@mdit/plugin-tex@1.2.0':
+    resolution: {integrity: sha512-nVoipJc/zKZnQeDYh/tIB81Xw9RVZTQtoqKO69OTso0FyV7wzxvg/qZ/8qq5P7mvz6ArNVWGC0ozpRxmO/ufIg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      markdown-it: ^15.0.3
+    peerDependenciesMeta:
+      markdown-it:
+        optional: true
+
+  '@mdit/plugin-uml@2.0.4':
+    resolution: {integrity: sha512-EFWkFSi5qk9fIhoaANmRURayqF7Us3QdGlPaKYy9jkMcFBYSLpojuRgDJ/vUdANRlVOKStcMDehZZY6+6tWf5Q==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      markdown-it: ^15.0.3
+    peerDependenciesMeta:
+      markdown-it:
+        optional: true
 
   '@mermaid-js/parser@2.0.1':
     resolution: {integrity: sha512-j37dj/h6p6pots1L7pLPPNuABEEu9WP4OYg9pW1g+nYG331j0+3canE9OagtYdytYvdSAMG+2fKU5cxep6LgjA==}
@@ -3888,9 +3945,6 @@ packages:
       '@types/markdown-it': '*'
       markdown-it: '*'
 
-  markdown-it-checkbox@1.1.0:
-    resolution: {integrity: sha512-NkZVjnXo5G+cLNdi7DPZxICypBuxFE9F8sx3YGMZn+Cfizr8EZ/1TFUKl7ZnefF6cr1aFHbnQ5iA3rc4cp7EyA==}
-
   markdown-it-front-matter@0.2.4:
     resolution: {integrity: sha512-25GUs0yjS2hLl8zAemVndeEzThB1p42yxuDEKbd4JlL3jiz+jsm6e56Ya8B0VREOkNxLYB4TTwaoPJ3ElMmW+w==}
 
@@ -3901,9 +3955,6 @@ packages:
     resolution: {integrity: sha512-LIMOVzhfaSmMXPv0NbN3BJoD6yE10fte0YH+fB27icHOW8yq3uhFeYIhiEBr2sKsfSP5r6KVfARR06VQtUJoCw==}
     peerDependencies:
       markdown-it: ^14.0.0
-
-  markdown-it-plantuml@1.4.1:
-    resolution: {integrity: sha512-13KgnZaGYTHBp4iUmGofzZSBz+Zj6cyqfR0SXUIc9wgWTto5Xhn7NjaXYxY0z7uBeTUMlc9LMQq5uP4OM5xCHg==}
 
   markdown-it-toc-done-right@4.2.0:
     resolution: {integrity: sha512-UB/IbzjWazwTlNAX0pvWNlJS8NKsOQ4syrXZQ/C72j+jirrsjVRT627lCaylrKJFBQWfRsPmIVQie8x38DEhAQ==}
@@ -5738,6 +5789,43 @@ snapshots:
       '@lezer/lr': 1.4.12
 
   '@marijn/find-cluster-break@1.0.4': {}
+
+  '@mdit/helper@1.2.0(markdown-it@15.0.3)':
+    optionalDependencies:
+      markdown-it: 15.0.3
+
+  '@mdit/plugin-katex@1.1.5(markdown-it@15.0.3)':
+    dependencies:
+      '@mdit/helper': 1.2.0(markdown-it@15.0.3)
+      '@mdit/plugin-tex': 1.2.0(markdown-it@15.0.3)
+      katex: 0.19.1
+    optionalDependencies:
+      markdown-it: 15.0.3
+
+  '@mdit/plugin-plantuml@2.0.4(markdown-it@15.0.3)':
+    dependencies:
+      '@mdit/helper': 1.2.0(markdown-it@15.0.3)
+      '@mdit/plugin-uml': 2.0.4(markdown-it@15.0.3)
+    optionalDependencies:
+      markdown-it: 15.0.3
+
+  '@mdit/plugin-tasklist@1.2.0(markdown-it@15.0.3)':
+    dependencies:
+      '@mdit/helper': 1.2.0(markdown-it@15.0.3)
+    optionalDependencies:
+      markdown-it: 15.0.3
+
+  '@mdit/plugin-tex@1.2.0(markdown-it@15.0.3)':
+    dependencies:
+      '@mdit/helper': 1.2.0(markdown-it@15.0.3)
+    optionalDependencies:
+      markdown-it: 15.0.3
+
+  '@mdit/plugin-uml@2.0.4(markdown-it@15.0.3)':
+    dependencies:
+      '@mdit/helper': 1.2.0(markdown-it@15.0.3)
+    optionalDependencies:
+      markdown-it: 15.0.3
 
   '@mermaid-js/parser@2.0.1':
     dependencies:
@@ -8415,10 +8503,6 @@ snapshots:
       '@types/markdown-it': 14.2.0
       markdown-it: 15.0.3
 
-  markdown-it-checkbox@1.1.0:
-    dependencies:
-      underscore: 1.13.8
-
   markdown-it-front-matter@0.2.4: {}
 
   markdown-it-mark@4.0.0: {}
@@ -8426,8 +8510,6 @@ snapshots:
   markdown-it-obsidian-callouts@0.3.5(markdown-it@15.0.3):
     dependencies:
       markdown-it: 15.0.3
-
-  markdown-it-plantuml@1.4.1: {}
 
   markdown-it-toc-done-right@4.2.0: {}
 

@@ -1,4 +1,22 @@
-function isTagChar(code) {
+import type MarkdownIt from "markdown-it";
+
+type MarkdownItInstance = InstanceType<typeof MarkdownIt>;
+
+/** Derived from markdown-it itself, so the inline-state shape cannot drift from the library. */
+type InlineRule = Parameters<MarkdownItInstance["inline"]["ruler"]["before"]>[2];
+type StateInline = Parameters<InlineRule>[0];
+
+interface WikiLinkMatch {
+  raw: string;
+  end: number;
+}
+
+interface WikiLinkTarget {
+  dest: string;
+  alias: string;
+}
+
+function isTagChar(code: number): boolean {
   return (
     (code >= 0x61 && code <= 0x7a) ||
     (code >= 0x41 && code <= 0x5a) ||
@@ -9,7 +27,7 @@ function isTagChar(code) {
   );
 }
 
-function parseWikiLink(raw) {
+function parseWikiLink(raw: string): WikiLinkTarget {
   const pipe = raw.indexOf("|");
   if (pipe >= 0) {
     return {
@@ -20,7 +38,7 @@ function parseWikiLink(raw) {
   return { dest: raw.trim(), alias: "" };
 }
 
-function readWikiLink(state, embed) {
+function readWikiLink(state: StateInline, embed: boolean): WikiLinkMatch | null {
   const marker = embed ? "![" : "[";
   const start = state.pos;
   if (
@@ -30,7 +48,7 @@ function readWikiLink(state, embed) {
     return null;
   }
 
-  let pos = start + marker.length + 1;
+  const pos = start + marker.length + 1;
   const close = state.src.indexOf("]]", pos);
   if (close < 0) {
     return null;
@@ -44,7 +62,7 @@ function readWikiLink(state, embed) {
   return { raw, end: close + 2 };
 }
 
-function wikiLinkPlugin(md, embed) {
+function wikiLinkPlugin(md: MarkdownItInstance, embed: boolean): void {
   const tokenType = embed ? "wikilink_embed" : "wikilink";
   const className = embed ? "obsidian-wikilink-embed" : "obsidian-wikilink";
 
@@ -70,7 +88,7 @@ function wikiLinkPlugin(md, embed) {
   md.renderer.rules[tokenType] = (tokens, idx) => {
     const token = tokens[idx];
     const display = md.utils.escapeHtml(token.content);
-    const dest = md.utils.escapeHtml(token.meta.dest);
+    const dest = md.utils.escapeHtml((token.meta as unknown as WikiLinkTarget).dest);
     if (embed) {
       return `<span class="${className}" data-href="${dest}">${display}</span>`;
     }
@@ -78,7 +96,7 @@ function wikiLinkPlugin(md, embed) {
   };
 }
 
-function obsidianTagPlugin(md) {
+function obsidianTagPlugin(md: MarkdownItInstance): void {
   md.inline.ruler.before("emphasis", "obsidian_tag", (state, silent) => {
     const max = state.posMax;
     if (state.src.charCodeAt(state.pos) !== 0x23) {
@@ -112,8 +130,8 @@ function obsidianTagPlugin(md) {
   };
 }
 
-module.exports = function markdownItObsidian(md) {
+export default function markdownItObsidian(md: MarkdownItInstance): void {
   wikiLinkPlugin(md, true);
   wikiLinkPlugin(md, false);
   obsidianTagPlugin(md);
-};
+}
