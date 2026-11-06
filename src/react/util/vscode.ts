@@ -1,6 +1,6 @@
-const vscode = window['acquireVsCodeApi']?.();
+const vscode = (window as any)['acquireVsCodeApi']?.();
 export { vscode as vscodeApi };
-const postMessage = (message) => { if (vscode) { vscode.postMessage(message) } }
+const postMessage = (message: unknown) => { if (vscode) { vscode.postMessage(message) } }
 
 const DARK_MODE_KEY = 'office-dark-mode';
 
@@ -31,8 +31,8 @@ export function applyDarkMode(dark: boolean) {
     saveDarkMode(dark);
 }
 
-const events = {}
-function receive({ data }) {
+const events: Record<string, (content: any) => void> = {}
+function receive({ data }: MessageEvent) {
     if (!data)
         return;
     if (events[data.type]) {
@@ -49,7 +49,7 @@ window.addEventListener('keydown', e => {
 
 const getVscodeEvent = () => {
     return {
-        on(event: string, data) {
+        on(event: string, data: (content: any) => void) {
             events[event] = data
             return this;
         },
@@ -60,7 +60,7 @@ const getVscodeEvent = () => {
 }
 export const handler = getVscodeEvent();
 
-export function isCompose(e) {
+export function isCompose(e: KeyboardEvent) {
     return e.metaKey || e.ctrlKey;
 }
 

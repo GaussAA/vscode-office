@@ -19,12 +19,12 @@ async function loadFontAsBuffer(source: string | OfficeOpenPayload): Promise<Arr
         fontBuffer = fetch(path).then(f => f.arrayBuffer());
     }
     if (path.includes('woff2')) {
-        const loadScript = (src) => new Promise((onload) => document.documentElement.append(
+        const loadScript = (src: string) => new Promise((onload) => document.documentElement.append(
             Object.assign(document.createElement('script'), { src, onload })
         ));
         return loadScript('woff2_decompress_binding.js')
-            .then(() => new Promise((done) => window['Module'] = { onRuntimeInitialized: done }))
-            .then(async () => window['Module'].decompress(await fontBuffer))
+            .then(() => new Promise((done) => (window as any)['Module'] = { onRuntimeInitialized: done }))
+            .then(async () => (window as any)['Module'].decompress(await fontBuffer))
             .then(buffer => Uint8Array.from(buffer).buffer)
     }
     return fontBuffer;
@@ -83,15 +83,15 @@ function renderGlyph(
     path.draw(ctx);
 }
 
-export function renderGlyphItem(fontInfo: FontInfo, canvas: HTMLCanvasElement, glyphIndex) {
+export function renderGlyphItem(fontInfo: FontInfo, canvas: HTMLCanvasElement, glyphIndex: string | number) {
     renderGlyph(fontInfo, canvas, glyphIndex, cellWidth, cellHeight);
 }
 
-export function renderGlyphPreview(fontInfo: FontInfo, canvas: HTMLCanvasElement, glyphIndex) {
+export function renderGlyphPreview(fontInfo: FontInfo, canvas: HTMLCanvasElement, glyphIndex: string | number) {
     renderGlyph(fontInfo, canvas, glyphIndex, 180, 120, 12);
 }
 
-export function formatUnicode(unicode) {
+export function formatUnicode(unicode: string | number) {
     unicode = unicode.toString(16);
     if (unicode.length > 4) {
         return ("000000" + unicode.toUpperCase()).substr(-6)

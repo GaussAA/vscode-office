@@ -24,19 +24,19 @@ interface IRestClientSettings {
 }
 
 export class RestClientSettings implements IRestClientSettings {
-    public followRedirect: boolean;
-    public defaultHeaders: RequestHeaders;
-    public environmentVariables: { [key: string]: { [key: string]: string } };
-    public previewOption: PreviewOption;
-    public previewColumn: ViewColumn;
-    public formParamEncodingStrategy: FormParamEncodingStrategy;
-    public addRequestBodyLineIndentationAroundBrackets: boolean;
-    public decodeEscapedUnicodeCharacters: boolean;
-    public logLevel: LogLevel;
-    public enableCustomVariableReferencesCodeLens: boolean;
+    public followRedirect!: boolean;
+    public defaultHeaders!: RequestHeaders;
+    public environmentVariables!: { [key: string]: { [key: string]: string } };
+    public previewOption!: PreviewOption;
+    public previewColumn!: ViewColumn;
+    public formParamEncodingStrategy!: FormParamEncodingStrategy;
+    public addRequestBodyLineIndentationAroundBrackets!: boolean;
+    public decodeEscapedUnicodeCharacters!: boolean;
+    public logLevel!: LogLevel;
+    public enableCustomVariableReferencesCodeLens!: boolean;
 
     private readonly brackets: CharacterPair[] = [['{', '}'], ['[', ']'], ['<', '>']];
-    private static _instance: RestClientSettings;
+    private static _instance: RestClientSettings | undefined;
 
     public static get Instance(): RestClientSettings {
         if (!this._instance) {

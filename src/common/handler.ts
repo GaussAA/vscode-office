@@ -5,7 +5,7 @@ import { Output } from "./Output";
 
 export class Handler {
 
-    private isEnd: boolean;
+    private isEnd = false;
     constructor(public panel: WebviewPanel, private eventEmitter: SimpleEventEmitter) { }
 
     /**
@@ -29,7 +29,7 @@ export class Handler {
                 await callback(content)
             } catch (error) {
                 Output.debug(error)
-                vscode.window.showErrorMessage(error.message)
+                vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error))
             }
         })
         return this;

@@ -15,11 +15,11 @@ export async function checkLinkedFile(uri: vscode.Uri): Promise<LinkOpenError | 
     try {
         await vscode.workspace.fs.stat(uri.with({ query: '', fragment: '' }));
     } catch (error) {
-        if (error.code === 'FileNotFound') {
+        if (error instanceof Error && (error as { code?: string }).code === 'FileNotFound') {
             return linkedFileNotFound(uri.fsPath);
         }
         const name = uri.path.split('/').pop() || uri.path;
-        return { error: 'openFailed', message: i18n('ext.markdown.linkOpenFailed', name, error.message) };
+        return { error: 'openFailed', message: i18n('ext.markdown.linkOpenFailed', name, error instanceof Error ? error.message : String(error)) };
     }
 }
 

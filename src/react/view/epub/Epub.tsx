@@ -170,7 +170,7 @@ export default function Epub() {
     }, []);
 
     const bindWheel = useCallback((rendition: Rendition) => {
-        rendition.hooks.content.register(contents => {
+        rendition.hooks.content.register((contents: any) => {
             applyEpubTheme(rendition, settingsRef.current, appRef.current);
             const doc = contents.document;
             if (doc) {

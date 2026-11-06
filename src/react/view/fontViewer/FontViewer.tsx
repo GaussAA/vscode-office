@@ -71,7 +71,7 @@ export default function FontViewer() {
 
     useEffect(() => {
         if (!glyph || !previewRef.current || !fontInfoRef.current) return
-        renderGlyphPreview(fontInfoRef.current, previewRef.current, selectedKey)
+        renderGlyphPreview(fontInfoRef.current, previewRef.current, selectedKey ?? 0)
     }, [glyph, selectedKey])
 
     return (

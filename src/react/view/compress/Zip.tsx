@@ -172,7 +172,7 @@ function ZipViewer() {
                             folderMap={info.folderMap}
                             rootFiles={info.files}
                             currentDir={currentDir}
-                            onClickFolder={changeFiles}
+                            onClickFolder={(entryName) => changeFiles(entryName ?? '')}
                         />
                     </div>
                     <Sponsor dark={dark} variant="sidebar" />

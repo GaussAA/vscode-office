@@ -178,13 +178,17 @@ export class JsonlSession {
 
         schedule(() => { void stepOnce() })
 
+        // `this` inside the returned object's getter is the object itself, not the session —
+        // the getter used to read `this.active` and therefore always saw undefined. The arrow
+        // below keeps the session's `this` while still being safe to read from the getter.
+        const isDone = () => this.active !== token
         return {
             cancel: () => {
                 if (this.active === token) this.active = null
                 settle()
             },
             get done() {
-                return this.active !== token
+                return isDone()
             },
             finished,
         }

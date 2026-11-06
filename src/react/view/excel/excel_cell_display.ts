@@ -23,6 +23,6 @@ export function displayCellText(
     if (cell.numFmt && cell.numFmtFormat === style.format && value !== '' && Number.isFinite(Number(value))) {
         try { return SSF.format(cell.numFmt, Number(value)); } catch { /* Use viewer format below. */ }
     }
-    const formatter = style.format ? formatm[style.format] : undefined;
+    const formatter = style.format ? (formatm as Record<string, any>)[style.format] : undefined;
     return formatter ? formatter.render(value) : value;
 }

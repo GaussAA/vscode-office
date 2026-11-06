@@ -19,9 +19,10 @@
 		"allowSyntheticDefaultImports": true,
 		"allowImportingTsExtensions": true,
 		"skipLibCheck": true,
+		"allowJs": true,
+		"checkJs": false,
 		"noEmit": true,
-		"strict": false,
-		"strictNullChecks": true,
+		"strict": true,
 		"experimentalDecorators": true,
 		"useDefineForClassFields": true
 	},
