@@ -6,8 +6,8 @@ import {
   buildEntryModel,
   countNodes,
   makePathKey,
-} from "../../out/unit-tests/jsonlFormat.mjs";
-import { highlightRuns } from "../../out/unit-tests/highlight.mjs";
+} from "@/react/view/jsonl/jsonlFormat";
+import { highlightRuns } from "@/react/common/highlight";
 
 const objectOfSize = (size) =>
   Object.fromEntries(Array.from({ length: size }, (_, index) => [`key_${index}`, index]));

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { convertMarkdownToHtml } from "../../out/unit-tests/markdownPdf.mjs";
+import { convertMarkdownToHtml } from "@/service/markdown/markdown-pdf";
 
 /**
  * The Markdown **export** path (`Export PDF` / `Export HTML` / `Export Docx`) is extension-host

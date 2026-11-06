@@ -9,7 +9,6 @@ import markdownItObsidianCallouts from "markdown-it-obsidian-callouts";
 import markdownItToc from "markdown-it-toc-done-right";
 import mustache from "mustache";
 import { parse } from "node-html-parser";
-import { Uri } from "vscode";
 import { toDisplayText } from "@/common/displayText";
 import { katex as markdownItKatex } from "@mdit/plugin-katex";
 import { plantuml as markdownItPlantuml } from "@mdit/plugin-plantuml";
@@ -39,21 +38,23 @@ export interface MarkdownExportConfig {
 export interface ConvertMarkdownOptions {
   markdownFilePath: string;
   config: MarkdownExportConfig;
+  /** Absolute path of the installed extension (`ExtensionContext.extensionPath`). */
+  extensionRoot: string;
   outputFileType?: string;
 }
 
-/**
- * `__dirname` is the bundled `out/` directory at runtime: esbuild emits CommonJS for the
- * extension host, so all the relative paths below resolve against the installed extension.
- */
-const moduleDir = __dirname;
-
-async function convertMarkdown(inputMarkdownFile: string, config: MarkdownExportConfig) {
+async function convertMarkdown(
+  inputMarkdownFile: string,
+  config: MarkdownExportConfig,
+  extensionRoot: string,
+) {
   const type = config.type;
-  const uri = Uri.file(inputMarkdownFile);
+  // Only `fsPath` is ever used (for the document title), so this path needs no `vscode` at all —
+  // which is what lets the export chain be unit-tested without a host stub.
+  const uri = { fsPath: inputMarkdownFile };
   const text = fs.readFileSync(inputMarkdownFile).toString();
   const content = convertMarkdownToHtml(inputMarkdownFile, type, text, config);
-  const html = mergeHtml(content, uri, type);
+  const html = mergeHtml(content, uri, type, extensionRoot);
 
   // insert mermaid script
   let outputHtml = html;
@@ -61,7 +62,7 @@ async function convertMarkdown(inputMarkdownFile: string, config: MarkdownExport
   const containsMermaid = root.querySelector(".mermaid") != null;
   if (containsMermaid) {
     const mermaidScript = `
-    <script src="${getMermaidScriptSrc(type)}"></script>
+    <script src="${getMermaidScriptSrc(type, extensionRoot)}"></script>
     <script>mermaid.initialize({startOnLoad:true});</script>
     `;
     outputHtml = appendHtmlToBody(outputHtml, mermaidScript);
@@ -70,21 +71,12 @@ async function convertMarkdown(inputMarkdownFile: string, config: MarkdownExport
   await exportByType(inputMarkdownFile, outputHtml, type, config);
 }
 
-function getMermaidScriptSrc(type: string): string {
+function getMermaidScriptSrc(type: string, extensionRoot: string): string {
   if (type === "html") {
     return `https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js`;
   }
   return pathToFileURL(
-    path.resolve(
-      moduleDir,
-      "..",
-      "resource",
-      "markdown",
-      "dist",
-      "js",
-      "mermaid",
-      "mermaid.min.js",
-    ),
+    path.resolve(extensionRoot, "resource", "markdown", "dist", "js", "mermaid", "mermaid.min.js"),
   ).href;
 }
 
@@ -190,11 +182,16 @@ export function convertMarkdownToHtml(
 /*
  * make html
  */
-function mergeHtml(content: string, uri: { fsPath: string }, type: string): string {
+function mergeHtml(
+  content: string,
+  uri: { fsPath: string },
+  type: string,
+  extensionRoot: string,
+): string {
   try {
     const title = path.basename(uri.fsPath);
-    const style = readStyles(type);
-    const templatePath = path.join(moduleDir, "template", "template.html");
+    const style = readStyles(type, extensionRoot);
+    const templatePath = path.join(extensionRoot, "out", "template", "template.html");
     return mustache.render(readFile(templatePath), { title, style, content });
   } catch (error) {
     showErrorMessage("makeHtml()", error);
@@ -300,12 +297,11 @@ function resolveCssUrls(css: string, basePath: string, type: string): string {
   });
 }
 
-function readStyles(type: string): string {
+function readStyles(type: string, extensionRoot: string): string {
   try {
-    const basePath = path.join(moduleDir, "styles");
+    const basePath = path.join(extensionRoot, "out", "styles");
     const katexPath = path.resolve(
-      moduleDir,
-      "..",
+      extensionRoot,
       "resource",
       "markdown",
       "dist",
@@ -335,5 +331,5 @@ export const convertMd = async (options: ConvertMarkdownOptions): Promise<void> 
   const config = options.config;
   options.outputFileType = config.type[0];
   console.log(`[pretty-md-pdf] Converting markdown file: ${options.markdownFilePath}`);
-  await convertMarkdown(path.resolve(options.markdownFilePath), config);
+  await convertMarkdown(path.resolve(options.markdownFilePath), config, options.extensionRoot);
 };

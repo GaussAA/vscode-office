@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { JsonlFile, memoryByteSource } from "../../out/unit-tests/jsonlFile.mjs";
-import { JsonlSession } from "../../out/unit-tests/jsonlSession.mjs";
+import { JsonlFile, memoryByteSource } from "@/service/jsonlFile";
+import { JsonlSession } from "@/service/jsonlSession";
 
 /** Build a session over literal JSONL text. */
 async function makeSession(lines) {

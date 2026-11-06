@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildWebviewCsp } from "../../out/unit-tests/webviewCsp.mjs";
+import { buildWebviewCsp } from "@/common/webviewCsp";
 
 /**
  * Every webview renders under this policy. It is asserted here rather than only exercised in a

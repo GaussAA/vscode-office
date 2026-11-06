@@ -7,7 +7,7 @@ import {
   deriveLabel,
   matchSnippet,
   readJsonlLineText,
-} from "../../out/unit-tests/jsonlDocument.mjs";
+} from "@/service/jsonlDocument";
 
 const encoder = new TextEncoder();
 

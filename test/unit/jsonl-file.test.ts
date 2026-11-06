@@ -3,13 +3,13 @@ import test from "node:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildJsonlIndex } from "../../out/unit-tests/jsonlDocument.mjs";
+import { buildJsonlIndex } from "@/service/jsonlDocument";
 import {
   JsonlFile,
   buildJsonlIndexFrom,
   fileByteSource,
   memoryByteSource,
-} from "../../out/unit-tests/jsonlFile.mjs";
+} from "@/service/jsonlFile";
 
 const encode = (text) => new TextEncoder().encode(text);
 

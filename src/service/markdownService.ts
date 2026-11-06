@@ -43,7 +43,11 @@ export class MarkdownService {
         // html导出速度快, 无需等待
         vscode.window.showInformationMessage(i18n("ext.markdown.exportStart", type));
       }
-      await convertMd({ markdownFilePath: uri.fsPath, config: this.getConfig(option) });
+      await convertMd({
+        markdownFilePath: uri.fsPath,
+        config: this.getConfig(option),
+        extensionRoot: this.context.extensionPath,
+      });
       vscode.window.showInformationMessage(i18n("ext.markdown.exportSuccess", type));
     } catch (error) {
       Output.log(error);

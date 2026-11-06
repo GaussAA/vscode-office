@@ -3,9 +3,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createJsonlHandlers } from "../../out/unit-tests/jsonlHandlers.mjs";
-import { JsonlFile, fileByteSource } from "../../out/unit-tests/jsonlFile.mjs";
-import { JsonlSession } from "../../out/unit-tests/jsonlSession.mjs";
+import { createJsonlHandlers } from "@/provider/jsonlHandlers";
+import { JsonlFile, fileByteSource } from "@/service/jsonlFile";
+import { JsonlSession } from "@/service/jsonlSession";
 
 const lines = (count) =>
   Array.from({ length: count }, (_, i) => JSON.stringify({ id: i, msg: `row ${i}` })).join("\n");

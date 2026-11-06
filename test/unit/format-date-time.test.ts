@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatDateTime } from "../../out/unit-tests/formatDateTime.mjs";
+import { formatDateTime } from "@/common/formatDateTime";
 
 /**
  * Archive listings show a fixed, sortable `yyyy-MM-dd hh:mm:ss` in local time. This replaced

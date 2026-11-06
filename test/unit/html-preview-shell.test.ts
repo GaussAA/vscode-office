@@ -4,7 +4,7 @@ import {
   PREVIEW_CONTENT_TYPE,
   PREVIEW_READY_TYPE,
   buildHtmlPreviewShell,
-} from "../../out/unit-tests/htmlPreviewShell.mjs";
+} from "@/service/htmlPreviewShell";
 
 /**
  * The HTML preview renders documents we did not write. It used to assign the file

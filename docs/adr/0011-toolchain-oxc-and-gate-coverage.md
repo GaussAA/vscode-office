@@ -40,4 +40,19 @@ status: accepted
 
 - `src/` 会经历**一次全量 reformat**（`oxfmt` 的 `printWidth` 默认 100，而仓库现在是 4 空格/单引号的上游风格）。那一个 commit 用 `.git-blame-ignore-revs` 挡在 blame 之外，并单独提交。
 - 「闸门覆盖什么」从隐式约定变成显式清单：`src/**/*.{ts,tsx}` + 我们自己的 `.js`（转 `.ts` 后）+ `test/**/*.ts`。今后新增代码的默认位置就在覆盖面内。
-- `pnpm test` 从「先 esbuild 打包再跑 `out/`」变成「直接 `node --import tsx --test test/unit/*.test.ts`」，`scripts/unit-tests/build.mjs` 删除。
+- `pnpm test` 从「先 esbuild 打包再跑 `out/`」变成「直接 `tsx --test "test/unit/*.test.ts"`」，`scripts/unit-tests/build.mjs` 与 `test/support/vscode-stub.ts` 一并删除。
+
+## 事后记录（D9a 落地时）
+
+`tsx` 能用的真正前提不是装个包，而是**两个结构问题**：
+
+1. **`.ts` 得真的是 ESM** —— 否则 tsx 按 CJS 处理，默认导出多包一层。这是 ADR-0012 那一步。
+2. **测试要导入的模块不能依赖 `vscode`** —— 先前靠 esbuild 的 `alias` 顶替。追下去发现
+   `markdown-pdf.ts` 只是拿 `Uri.file()` 取 `fsPath` 当标题，而这个模块真正需要的目录
+   （`out/template`、`out/styles`、`resource/markdown/...`）本来就应该由调用方给。
+   把 `__dirname` 换成显式传入的 `extensionRoot`（来自 `ExtensionContext.extensionPath`），
+   `vscode` 依赖和 `__dirname` 一起消失，测试也就再不需要 stub 了。
+
+`out/unit-tests/` 那层预打包也随之删除：140 条测试现在直接导入 `src/**/*.ts`。
+`test/unit/*.test.ts` 仍不进 `tsconfig` 的 `include`（进去会带出 131 条 `noImplicitAny`），
+所以 `typecheck` 不覆盖它们 —— 这与之前的 `.mjs` 状态一致，属于已知的下一步，不是回退。

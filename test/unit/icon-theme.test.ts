@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  buildIconMaps,
-  resolveFileIcon,
-  resolveFolderIcon,
-} from "../../out/unit-tests/iconTheme.mjs";
+import { buildIconMaps, resolveFileIcon, resolveFolderIcon } from "@/service/icon/iconTheme";
 
 /**
  * `theme/material-icons.json` is read at activation time and turned into the icon maps the

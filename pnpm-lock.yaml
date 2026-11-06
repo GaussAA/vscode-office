@@ -361,7 +361,7 @@ importers:
         version: 1.125.0
       '@vitejs/plugin-react':
         specifier: ^6.0.2
-        version: 6.2.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(yaml@2.9.1))
+        version: 6.2.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(tsx@4.23.15)(yaml@2.9.1))
       '@vscode/test-cli':
         specifier: ^0.0.15
         version: 0.0.15
@@ -398,15 +398,18 @@ importers:
       oxlint-tsgolint:
         specifier: ^7.0.2005
         version: 7.0.2005
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vite:
         specifier: ^8.0.16
-        version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(yaml@2.9.1)
+        version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(tsx@4.23.15)(yaml@2.9.1)
       vite-plugin-static-copy:
         specifier: ^4.1.1
-        version: 4.1.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(yaml@2.9.1))
+        version: 4.1.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(tsx@4.23.15)(yaml@2.9.1))
 
   vditor:
     dependencies:
@@ -4721,6 +4724,11 @@ packages:
   tslib@2.9.1:
     resolution: {integrity: sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA==}
 
+  tsx@4.23.15:
+    resolution: {integrity: sha512-Yiex1Ovn8z2xPpOWckIiysV1SSyRMY9BkLF++q0yKiDxCqRhosKfMg3janKkiLBwZ5c/YryloKwGZcrEmtwxKw==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
+
   tunnel@0.0.6:
     resolution: {integrity: sha512-1h/Lnq9yajKY2PEbBadPXj3VxsDDu844OnaAo52UVmIzIvwwtBPIuNvkjuzBlTWpfJyUbG3ez0KSBibQkj4ojg==}
     engines: {node: '>=0.6.11 <=0.7.0 || >=0.7.3'}
@@ -7057,10 +7065,10 @@ snapshots:
       d3-selection: 3.0.1
       d3-transition: 3.0.2(d3-selection@3.0.1)
 
-  '@vitejs/plugin-react@6.2.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(yaml@2.9.1))':
+  '@vitejs/plugin-react@6.2.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(tsx@4.23.15)(yaml@2.9.1))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
-      vite: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(yaml@2.9.1)
+      vite: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(tsx@4.23.15)(yaml@2.9.1)
 
   '@vscode/codicons@0.0.45': {}
 
@@ -9345,6 +9353,12 @@ snapshots:
 
   tslib@2.9.1: {}
 
+  tsx@4.23.15:
+    dependencies:
+      esbuild: 0.28.2
+    optionalDependencies:
+      fsevents: 2.3.3
+
   tunnel@0.0.6: {}
 
   type@2.7.3: {}
@@ -9434,15 +9448,15 @@ snapshots:
       x-is-array: 0.1.0
       x-is-string: 0.1.0
 
-  vite-plugin-static-copy@4.1.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(yaml@2.9.1)):
+  vite-plugin-static-copy@4.1.1(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:
       chokidar: 3.6.0
       p-map: 7.1.1
       picocolors: 1.1.1
       tinyglobby: 0.2.17
-      vite: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(yaml@2.9.1)
+      vite: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(tsx@4.23.15)(yaml@2.9.1)
 
-  vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(yaml@2.9.1):
+  vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(less@4.9.1(supports-color@8.1.1))(tsx@4.23.15)(yaml@2.9.1):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -9454,6 +9468,7 @@ snapshots:
       esbuild: 0.28.2
       fsevents: 2.3.3
       less: 4.9.1(supports-color@8.1.1)
+      tsx: 4.23.15
       yaml: 2.9.1
 
   vscode-html-to-docx@1.1.3:

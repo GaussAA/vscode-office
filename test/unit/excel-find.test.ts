@@ -4,7 +4,7 @@ import {
   findAllInSheets,
   replaceAllInSheets,
   replaceCellText,
-} from "../../out/unit-tests/excelFind.mjs";
+} from "@/react/view/excel/excel_find";
 
 /**
  * The vendored spreadsheet's `SheetData` is loosely typed, so these tests use the shape the

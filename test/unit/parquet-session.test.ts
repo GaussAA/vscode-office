@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ParquetSession } from "../../out/unit-tests/parquetSession.mjs";
+import { ParquetSession } from "@/react/view/parquet/parquetSession";
 
 /**
  * A fake row reader shaped like the real one: `readRows(start, end)` returns objects.

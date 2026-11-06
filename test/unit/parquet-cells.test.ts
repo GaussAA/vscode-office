@@ -5,7 +5,7 @@ import {
   formatCellValue,
   isColumnEditable,
   parseCellInput,
-} from "../../out/unit-tests/parquetParser.mjs";
+} from "@/react/view/parquet/parquetParser";
 
 test("categorizeType: one decode for the icon, the alignment and editability", () => {
   const cases = {

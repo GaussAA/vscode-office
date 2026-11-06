@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument } from "@cantoo/pdf-lib";
-import { createOutline } from "../../out/unit-tests/outline.mjs";
+import { createOutline } from "@/service/markdown/outline";
 
 /**
  * `createOutline` is only reachable through the PDF export path, which needs Chromium — so

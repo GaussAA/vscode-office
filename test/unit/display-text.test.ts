@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { toDisplayText } from "../../out/unit-tests/displayText.mjs";
+import { toDisplayText } from "@/common/displayText";
 
 /**
  * `toDisplayText` replaced nine `String(value)` calls that `oxlint --type-aware`

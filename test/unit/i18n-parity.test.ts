@@ -3,7 +3,16 @@ import test from "node:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import * as catalog from "../../out/unit-tests/i18nCatalog.mjs";
+import en from "@/react/i18n/messages/en";
+import zhCn from "@/react/i18n/messages/zh-cn";
+import zhTw from "@/react/i18n/messages/zh-tw";
+import ja from "@/react/i18n/messages/ja";
+import de from "@/react/i18n/messages/de";
+import fr from "@/react/i18n/messages/fr";
+import es from "@/react/i18n/messages/es";
+import ptBr from "@/react/i18n/messages/pt-br";
+import ko from "@/react/i18n/messages/ko";
+import ru from "@/react/i18n/messages/ru";
 
 /**
  * The message catalog is the one place a user-visible string is allowed to live, and there
@@ -16,16 +25,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
 
 const LOCALES = {
-  en: catalog.en,
-  "zh-cn": catalog.zhCn,
-  "zh-tw": catalog.zhTw,
-  ja: catalog.ja,
-  de: catalog.de,
-  fr: catalog.fr,
-  es: catalog.es,
-  "pt-br": catalog.ptBr,
-  ko: catalog.ko,
-  ru: catalog.ru,
+  en,
+  "zh-cn": zhCn,
+  "zh-tw": zhTw,
+  ja,
+  de,
+  fr,
+  es,
+  "pt-br": ptBr,
+  ko,
+  ru,
 };
 
 /**
