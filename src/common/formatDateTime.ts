@@ -6,11 +6,11 @@
  * `formatToParts` gymnastics and locale-dependent separators, and the listing wants a
  * *fixed*, sortable, locale-independent string, so it is spelled out here instead.
  */
-const pad = (value: number): string => String(value).padStart(2, '0');
+const pad = (value: number): string => String(value).padStart(2, "0");
 
 export function formatDateTime(date: Date): string {
-    return (
-        `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-        ` ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-    );
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    ` ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
 }

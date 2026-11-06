@@ -1,28 +1,24 @@
 /* global window */
-import { h } from './element';
-import {
-  bind,
-  mouseMoveUp,
-  createEventEmitter,
-} from './event';
-import Resizer from './resizer';
-import Scrollbar from './scrollbar';
-import Selector from './selector';
-import Editor from './editor';
-import Print from './print';
-import ContextMenu from './contextmenu';
-import Table from './table';
-import Toolbar from './toolbar/index';
-import FormulaBar from './formula_bar';
-import ModalValidation from './modal_validation';
-import ModalHyperlink from './modal_hyperlink';
-import SortFilter from './sort_filter';
-import SheetImages from './sheet_images';
-import { xtoast } from './message';
-import { cssPrefix } from '../config';
-import { formulaMenuItems } from '../core/formula';
-import { CellRange } from '../core/cell_range';
-import { expr2xy, xy2expr } from '../core/alphabet';
+import { h } from "./element";
+import { bind, mouseMoveUp, createEventEmitter } from "./event";
+import Resizer from "./resizer";
+import Scrollbar from "./scrollbar";
+import Selector from "./selector";
+import Editor from "./editor";
+import Print from "./print";
+import ContextMenu from "./contextmenu";
+import Table from "./table";
+import Toolbar from "./toolbar/index";
+import FormulaBar from "./formula_bar";
+import ModalValidation from "./modal_validation";
+import ModalHyperlink from "./modal_hyperlink";
+import SortFilter from "./sort_filter";
+import SheetImages from "./sheet_images";
+import { xtoast } from "./message";
+import { cssPrefix } from "../config";
+import { formulaMenuItems } from "../core/formula";
+import { CellRange } from "../core/cell_range";
+import { expr2xy, xy2expr } from "../core/alphabet";
 
 const SCROLL_EXPAND_THRESHOLD = 40;
 const HYPERLINK_CLICK_THRESHOLD = 5;
@@ -125,7 +121,9 @@ function nativeScrollMove() {
   const { data, table, selector, overlayerEl } = this;
   const { left, top } = overlayerEl.scroll();
   let changed = false;
-  const markChanged = () => { changed = true; };
+  const markChanged = () => {
+    changed = true;
+  };
   data.scrollx(left, markChanged);
   data.scrolly(top, markChanged);
   this.horizontalScrollbar.move({ left: data.scroll.x });
@@ -166,12 +164,8 @@ function overlayerMousezoom(evt) {
 }
 
 function scrollbarMove() {
-  const {
-    data, verticalScrollbar, horizontalScrollbar,
-  } = this;
-  const {
-    l, t, left, top, width, height,
-  } = data.getSelectedRect();
+  const { data, verticalScrollbar, horizontalScrollbar } = this;
+  const { l, t, left, top, width, height } = data.getSelectedRect();
   const tableOffset = this.getTableOffset();
   // console.log(',l:', l, ', left:', left, ', tOffset.left:', tableOffset.width);
   if (Math.abs(left) + width > tableOffset.width) {
@@ -194,20 +188,17 @@ function scrollbarMove() {
 }
 
 function selectorSet(multiple, ri, ci, indexesUpdated = true, moving = false) {
-  const {
-    table, selector, toolbar, data,
-    contextMenu,
-  } = this;
+  const { table, selector, toolbar, data, contextMenu } = this;
   const cell = data.getCell(ri, ci);
   if (multiple) {
     selector.setEnd(ri, ci, moving);
-    this.trigger('cells-selected', cell, selector.range);
+    this.trigger("cells-selected", cell, selector.range);
   } else {
     // trigger click event
     selector.set(ri, ci, indexesUpdated);
-    this.trigger('cell-selected', cell, ri, ci);
+    this.trigger("cell-selected", cell, ri, ci);
   }
-  contextMenu.setMode((ri === -1 || ci === -1) ? 'row-col' : 'range');
+  contextMenu.setMode(ri === -1 || ci === -1 ? "row-col" : "range");
   this.formulaBar.update();
   toolbar.reset();
   table.render();
@@ -215,9 +206,9 @@ function selectorSet(multiple, ri, ci, indexesUpdated = true, moving = false) {
 
 function cellHasSelectionContent(cell) {
   if (!cell) return false;
-  return ['text', 'value', 'formula'].some((key) => {
+  return ["text", "value", "formula"].some((key) => {
     const value = cell[key];
-    return value !== undefined && value !== null && `${value}` !== '';
+    return value !== undefined && value !== null && `${value}` !== "";
   });
 }
 
@@ -237,9 +228,7 @@ function colHasSelectionContent(data, ci, sri, eri) {
 
 function findParentSelectionRange(data) {
   const { range } = data.selector;
-  let {
-    sri, sci, eri, eci,
-  } = range;
+  let { sri, sci, eri, eci } = range;
   const maxRi = data.rows.len - 1;
   const maxCi = data.cols.len - 1;
   sri = Math.max(0, sri);
@@ -273,19 +262,16 @@ function findParentSelectionRange(data) {
 }
 
 function selectorSetRange(cellRange) {
-  const {
-    table, selector, toolbar, data,
-    contextMenu,
-  } = this;
+  const { table, selector, toolbar, data, contextMenu } = this;
   const cell = data.getCell(cellRange.sri, cellRange.sci);
   selector.set(cellRange.sri, cellRange.sci);
   if (cellRange.multiple()) {
     selector.setEnd(cellRange.eri, cellRange.eci, false);
-    this.trigger('cells-selected', cell, selector.range);
+    this.trigger("cells-selected", cell, selector.range);
   } else {
-    this.trigger('cell-selected', cell, cellRange.sri, cellRange.sci);
+    this.trigger("cell-selected", cell, cellRange.sri, cellRange.sci);
   }
-  contextMenu.setMode('range');
+  contextMenu.setMode("range");
   this.formulaBar.update();
   toolbar.reset();
   table.render();
@@ -312,19 +298,19 @@ function rangeToFormulaReference(range) {
 }
 
 function normalizeFormulaRef(ref) {
-  return ref.replace(/\$/g, '').toUpperCase();
+  return ref.replace(/\$/g, "").toUpperCase();
 }
 
 function parseFormulaReference(text) {
-  if (!/^=/.test(text || '')) return null;
-  const refRegex = /\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?/ig;
+  if (!/^=/.test(text || "")) return null;
+  const refRegex = /\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?/gi;
   const match = refRegex.exec(text);
   if (!match) return null;
-  const [startRef, endRef = startRef] = match[0].split(':').map(normalizeFormulaRef);
+  const [startRef, endRef = startRef] = match[0].split(":").map(normalizeFormulaRef);
   try {
     const [sci, sri] = expr2xy(startRef);
     const [eci, eri] = expr2xy(endRef);
-    if ([sri, sci, eri, eci].some(v => Number.isNaN(v) || v < 0)) return null;
+    if ([sri, sci, eri, eci].some((v) => Number.isNaN(v) || v < 0)) return null;
     return {
       range: new CellRange(
         Math.min(sri, eri),
@@ -341,10 +327,10 @@ function parseFormulaReference(text) {
 }
 
 function formulaCursorPosition(text) {
-  if (!/^=/.test(text || '')) return null;
+  if (!/^=/.test(text || "")) return null;
   const parsed = parseFormulaReference(text);
   if (parsed) return parsed.textEnd;
-  const openIndex = text.indexOf('(');
+  const openIndex = text.indexOf("(");
   if (openIndex >= 0) return openIndex + 1;
   return null;
 }
@@ -356,7 +342,7 @@ function updateFormulaReferenceSelection(sheet) {
 
 function finishFormulaReferenceSelection(sheet) {
   sheet.formulaEditTarget = null;
-  sheet.selector.el.removeClass('formula-reference-mode');
+  sheet.selector.el.removeClass("formula-reference-mode");
   sheet.editor.setFormulaTargetActive(false);
 }
 
@@ -374,7 +360,7 @@ function cancelCellEdit(sheet) {
   const target = snapshot || sheet.formulaEditTarget;
   if (!target) return false;
   if (snapshot) {
-    data.setCellText(snapshot.ri, snapshot.ci, snapshot.text, 'input');
+    data.setCellText(snapshot.ri, snapshot.ci, snapshot.text, "input");
   }
   finishFormulaReferenceSelection(sheet);
   clearEditSnapshot(sheet);
@@ -393,7 +379,7 @@ function restoreFormulaReferenceSelection(sheet, targetRi, targetCi, formulaText
   data.selector.setIndexes(range.sri, range.sci);
   selector.set(range.sri, range.sci);
   selector.setEnd(range.eri, range.eci, false);
-  selector.el.addClass('formula-reference-mode');
+  selector.el.addClass("formula-reference-mode");
   editor.setFormulaTargetActive(true);
   editor.setFormulaReferenceRange(textStart, textEnd);
   editor.setCursorPosition(textEnd);
@@ -404,9 +390,7 @@ function restoreFormulaReferenceSelection(sheet, targetRi, targetCi, formulaText
 // multiple: boolean
 // direction: left | right | up | down | row-first | row-last | col-first | col-last
 function selectorMove(multiple, direction) {
-  const {
-    selector, data,
-  } = this;
+  const { selector, data } = this;
   const { rows, cols } = data;
   let [ri, ci] = selector.indexes;
   const { eri, eci } = selector.range;
@@ -414,23 +398,23 @@ function selectorMove(multiple, direction) {
     [ri, ci] = selector.moveIndexes;
   }
   // console.log('selector.move:', ri, ci);
-  if (direction === 'left') {
+  if (direction === "left") {
     if (ci > 0) ci -= 1;
-  } else if (direction === 'right') {
+  } else if (direction === "right") {
     if (eci !== ci) ci = eci;
     if (ci < cols.len - 1) ci += 1;
-  } else if (direction === 'up') {
+  } else if (direction === "up") {
     if (ri > 0) ri -= 1;
-  } else if (direction === 'down') {
+  } else if (direction === "down") {
     if (eri !== ri) ri = eri;
     if (ri < rows.len - 1) ri += 1;
-  } else if (direction === 'row-first') {
+  } else if (direction === "row-first") {
     ci = 0;
-  } else if (direction === 'row-last') {
+  } else if (direction === "row-last") {
     ci = cols.len - 1;
-  } else if (direction === 'col-first') {
+  } else if (direction === "col-first") {
     ri = 0;
-  } else if (direction === 'col-last') {
+  } else if (direction === "col-last") {
     ri = rows.len - 1;
   }
   if (multiple) {
@@ -454,22 +438,20 @@ function overlayerMousemove(evt) {
   if (evt.buttons !== 0) return;
   if (evt.target.className === `${cssPrefix}-resizer-hover`) return;
   const { offsetX, offsetY } = overlayerOffset(this, evt);
-  const {
-    rowResizer, colResizer, tableEl, data,
-  } = this;
+  const { rowResizer, colResizer, tableEl, data } = this;
   const { rows, cols } = data;
   const cRect = data.getCellRectByXY(offsetX, offsetY);
   if (offsetX > cols.indexWidth && offsetY > rows.height) {
     rowResizer.hide();
     colResizer.hide();
     if (cRect.ri >= 0 && cRect.ci >= 0 && data.getHyperlink(cRect.ri, cRect.ci)) {
-      this.overlayerEl.el.style.cursor = 'pointer';
+      this.overlayerEl.el.style.cursor = "pointer";
     } else {
-      this.overlayerEl.el.style.cursor = '';
+      this.overlayerEl.el.style.cursor = "";
     }
     return;
   }
-  this.overlayerEl.el.style.cursor = '';
+  this.overlayerEl.el.style.cursor = "";
   const tRect = tableEl.box();
   if (cRect.ri >= 0 && cRect.ci === -1) {
     cRect.width = cols.indexWidth;
@@ -519,9 +501,7 @@ function horizontalScrollbarSet() {
 }
 
 function sheetFreeze() {
-  const {
-    selector, data, editor,
-  } = this;
+  const { selector, data, editor } = this;
   const [ri, ci] = data.freeze;
   if (ri > 0 || ci > 0) {
     const fwidth = data.freezeTotalWidth();
@@ -536,27 +516,18 @@ function sheetImagesUpdate() {
 }
 
 function sheetReset() {
-  const {
-    tableEl,
-    overlayerEl,
-    overlayerCEl,
-    table,
-    toolbar,
-    selector,
-    sheetImages,
-    el,
-  } = this;
+  const { tableEl, overlayerEl, overlayerCEl, table, toolbar, selector, sheetImages, el } = this;
   const tOffset = this.getTableOffset();
   const vRect = this.getRect();
   tableEl.attr(vRect);
   overlayerEl.offset(vRect);
   overlayerCEl.offset(tOffset);
-  el.css('width', `${vRect.width}px`);
+  el.css("width", `${vRect.width}px`);
   verticalScrollbarSet.call(this);
   horizontalScrollbarSet.call(this);
   sheetFreeze.call(this);
   table.render();
-  this.sheetImages.setEditable(this.data.settings.mode !== 'read');
+  this.sheetImages.setEditable(this.data.settings.mode !== "read");
   this.sheetImages.reset(this.data);
   toolbar.reset();
   selector.reset();
@@ -570,7 +541,7 @@ function clearClipboard() {
 
 function copy(evt) {
   const { data, selector } = this;
-  if (data.settings.mode === 'read') return;
+  if (data.settings.mode === "read") return;
   data.copy();
   data.copyToSystemClipboard(evt);
   selector.showClipboard();
@@ -578,40 +549,40 @@ function copy(evt) {
 
 function cut() {
   const { data, selector } = this;
-  if (data.settings.mode === 'read') return;
+  if (data.settings.mode === "read") return;
   data.cut();
   selector.showClipboard();
 }
 
 function paste(what, evt) {
   const { data } = this;
-  if (data.settings.mode === 'read') return;
+  if (data.settings.mode === "read") return;
   if (data.clipboard.isClear()) {
     if (evt) {
-      const html = what === 'all' ? evt.clipboardData.getData('text/html') : '';
+      const html = what === "all" ? evt.clipboardData.getData("text/html") : "";
       if (html && this.data.pasteFromHtml(html)) {
         sheetReset.call(this);
         return;
       }
-      const cdata = evt.clipboardData.getData('text/plain');
+      const cdata = evt.clipboardData.getData("text/plain");
       this.data.pasteFromText(cdata);
       sheetReset.call(this);
       return;
     }
     const resetSheet = () => sheetReset.call(this);
     const eventTrigger = (rows) => {
-      this.trigger('pasted-clipboard', rows);
+      this.trigger("pasted-clipboard", rows);
     };
     data.pasteFromSystemClipboard(resetSheet, eventTrigger);
-  } else if (data.paste(what, msg => xtoast('Tip', msg))) {
+  } else if (data.paste(what, (msg) => xtoast("Tip", msg))) {
     sheetReset.call(this);
   } else if (evt) {
-    const html = what === 'all' ? evt.clipboardData.getData('text/html') : '';
+    const html = what === "all" ? evt.clipboardData.getData("text/html") : "";
     if (html && this.data.pasteFromHtml(html)) {
       sheetReset.call(this);
       return;
     }
-    const cdata = evt.clipboardData.getData('text/plain');
+    const cdata = evt.clipboardData.getData("text/plain");
     this.data.pasteFromText(cdata);
     sheetReset.call(this);
   }
@@ -636,7 +607,7 @@ function autofilter() {
 function toolbarChangePaintformatPaste() {
   const { toolbar } = this;
   if (toolbar.paintformatActive()) {
-    paste.call(this, 'format');
+    paste.call(this, "format");
     clearClipboard.call(this);
     toolbar.paintformatToggle();
   }
@@ -652,9 +623,9 @@ function showRowHeaderDropIndicator(sheet, insertAt) {
   const rect = data.getRect(range);
   const tableOffset = sheet.getTableOffset();
   headerDropEl
-    .attr('data-axis', 'row')
-    .css('width', `${rect.width}px`)
-    .css('height', '2px')
+    .attr("data-axis", "row")
+    .css("width", `${rect.width}px`)
+    .css("height", "2px")
     .offset({
       left: tableOffset.left + rect.left,
       top: tableOffset.top + rect.top,
@@ -668,9 +639,9 @@ function showColHeaderDropIndicator(sheet, insertAt) {
   const rect = data.getRect(range);
   const tableOffset = sheet.getTableOffset();
   headerDropEl
-    .attr('data-axis', 'col')
-    .css('width', '2px')
-    .css('height', `${rect.height}px`)
+    .attr("data-axis", "col")
+    .css("width", "2px")
+    .css("height", `${rect.height}px`)
     .offset({
       left: tableOffset.left + rect.left,
       top: tableOffset.top + rect.top,
@@ -698,7 +669,7 @@ function resolveColInsertAt(data, offsetX, fallbackCi) {
 
 function beginHeaderRowDrag(sheet, evt, hitRi) {
   const { data, selector } = sheet;
-  if (data.settings.mode === 'read') return false;
+  if (data.settings.mode === "read") return false;
   let { sri, eri } = selector.range;
   if (hitRi < sri || hitRi > eri) {
     selectorSet.call(sheet, false, hitRi, -1);
@@ -710,27 +681,31 @@ function beginHeaderRowDrag(sheet, evt, hitRi) {
   let dragging = false;
   let insertAt = sri;
   const overRect = sheet.overlayerEl.el.getBoundingClientRect();
-  mouseMoveUp(window, (e) => {
-    if (!dragging && Math.abs(e.clientY - startY) > 4) dragging = true;
-    if (!dragging) return;
-    const offsetY = e.clientY - overRect.top;
-    insertAt = resolveRowInsertAt(data, offsetY, dragFrom.sri);
-    showRowHeaderDropIndicator(sheet, insertAt);
-  }, () => {
-    hideHeaderDropIndicator(sheet);
-    if (!dragging) {
-      selectorSet.call(sheet, false, hitRi, -1);
-      return;
-    }
-    data.moveRows(dragFrom.sri, dragFrom.eri, insertAt);
-    sheetReset.call(sheet);
-  });
+  mouseMoveUp(
+    window,
+    (e) => {
+      if (!dragging && Math.abs(e.clientY - startY) > 4) dragging = true;
+      if (!dragging) return;
+      const offsetY = e.clientY - overRect.top;
+      insertAt = resolveRowInsertAt(data, offsetY, dragFrom.sri);
+      showRowHeaderDropIndicator(sheet, insertAt);
+    },
+    () => {
+      hideHeaderDropIndicator(sheet);
+      if (!dragging) {
+        selectorSet.call(sheet, false, hitRi, -1);
+        return;
+      }
+      data.moveRows(dragFrom.sri, dragFrom.eri, insertAt);
+      sheetReset.call(sheet);
+    },
+  );
   return true;
 }
 
 function beginHeaderColDrag(sheet, evt, hitCi) {
   const { data, selector } = sheet;
-  if (data.settings.mode === 'read') return false;
+  if (data.settings.mode === "read") return false;
   let { sci, eci } = selector.range;
   if (hitCi < sci || hitCi > eci) {
     selectorSet.call(sheet, false, -1, hitCi);
@@ -742,38 +717,38 @@ function beginHeaderColDrag(sheet, evt, hitCi) {
   let dragging = false;
   let insertAt = sci;
   const overRect = sheet.overlayerEl.el.getBoundingClientRect();
-  mouseMoveUp(window, (e) => {
-    if (!dragging && Math.abs(e.clientX - startX) > 4) dragging = true;
-    if (!dragging) return;
-    const offsetX = e.clientX - overRect.left;
-    insertAt = resolveColInsertAt(data, offsetX, dragFrom.sci);
-    showColHeaderDropIndicator(sheet, insertAt);
-  }, () => {
-    hideHeaderDropIndicator(sheet);
-    if (!dragging) {
-      selectorSet.call(sheet, false, -1, hitCi);
-      return;
-    }
-    data.moveColumns(dragFrom.sci, dragFrom.eci, insertAt);
-    sheetReset.call(sheet);
-  });
+  mouseMoveUp(
+    window,
+    (e) => {
+      if (!dragging && Math.abs(e.clientX - startX) > 4) dragging = true;
+      if (!dragging) return;
+      const offsetX = e.clientX - overRect.left;
+      insertAt = resolveColInsertAt(data, offsetX, dragFrom.sci);
+      showColHeaderDropIndicator(sheet, insertAt);
+    },
+    () => {
+      hideHeaderDropIndicator(sheet);
+      if (!dragging) {
+        selectorSet.call(sheet, false, -1, hitCi);
+        return;
+      }
+      data.moveColumns(dragFrom.sci, dragFrom.eci, insertAt);
+      sheetReset.call(sheet);
+    },
+  );
   return true;
 }
 
 function overlayerMousedown(evt) {
   // console.log(':::::overlayer.mousedown:', evt.detail, evt.button, evt.buttons, evt.shiftKey);
   // console.log('evt.target.className:', evt.target.className);
-  const {
-    selector, data, table, sortFilter, sheetImages,
-  } = this;
+  const { selector, data, table, sortFilter, sheetImages } = this;
   // Cell selection must not keep / show floating image selection.
   if (sheetImages) sheetImages.clearSelection();
   const { offsetX, offsetY } = overlayerOffset(this, evt);
   const isAutofillEl = evt.target.className === `${cssPrefix}-selector-corner`;
   const cellRect = data.getCellRectByXY(offsetX, offsetY);
-  const {
-    left, top, width, height,
-  } = cellRect;
+  const { left, top, width, height } = cellRect;
   let { ri, ci } = cellRect;
   if (evt.target.className === `${cssPrefix}-resizer-hover`) return;
   if (ri === -1 && ci === -1) {
@@ -822,42 +797,49 @@ function overlayerMousedown(evt) {
     }
 
     // mouse move up
-    mouseMoveUp(window, (e) => {
-      const { overlayerEl } = this;
-      const overRect = overlayerEl.box();
-      const moveOffsetX = e.clientX - overRect.left;
-      const moveOffsetY = e.clientY - overRect.top;
-      ({ ri, ci } = data.getCellRectByXY(moveOffsetX, moveOffsetY));
-      if (isAutofillEl) {
-        selector.showAutofill(ri, ci);
-      } else if (e.buttons === 1 && !e.shiftKey) {
-        selectorSet.call(this, true, ri, ci, true, true);
-        updateFormulaReferenceSelection(this);
-      }
-    }, (e) => {
-      if (hyperlinkPress) {
-        const dx = e.clientX - hyperlinkPress.clientX;
-        const dy = e.clientY - hyperlinkPress.clientY;
-        if (Math.abs(dx) <= HYPERLINK_CLICK_THRESHOLD && Math.abs(dy) <= HYPERLINK_CLICK_THRESHOLD) {
-          const overRect = this.overlayerEl.box();
-          const endCell = data.getCellRectByXY(
-            e.clientX - overRect.left,
-            e.clientY - overRect.top,
-          );
-          if (endCell.ri === hyperlinkPress.ri && endCell.ci === hyperlinkPress.ci) {
-            this.trigger('open-link', hyperlinkPress.hl);
+    mouseMoveUp(
+      window,
+      (e) => {
+        const { overlayerEl } = this;
+        const overRect = overlayerEl.box();
+        const moveOffsetX = e.clientX - overRect.left;
+        const moveOffsetY = e.clientY - overRect.top;
+        ({ ri, ci } = data.getCellRectByXY(moveOffsetX, moveOffsetY));
+        if (isAutofillEl) {
+          selector.showAutofill(ri, ci);
+        } else if (e.buttons === 1 && !e.shiftKey) {
+          selectorSet.call(this, true, ri, ci, true, true);
+          updateFormulaReferenceSelection(this);
+        }
+      },
+      (e) => {
+        if (hyperlinkPress) {
+          const dx = e.clientX - hyperlinkPress.clientX;
+          const dy = e.clientY - hyperlinkPress.clientY;
+          if (
+            Math.abs(dx) <= HYPERLINK_CLICK_THRESHOLD &&
+            Math.abs(dy) <= HYPERLINK_CLICK_THRESHOLD
+          ) {
+            const overRect = this.overlayerEl.box();
+            const endCell = data.getCellRectByXY(
+              e.clientX - overRect.left,
+              e.clientY - overRect.top,
+            );
+            if (endCell.ri === hyperlinkPress.ri && endCell.ci === hyperlinkPress.ci) {
+              this.trigger("open-link", hyperlinkPress.hl);
+            }
+          }
+          hyperlinkPress = null;
+        }
+        if (isAutofillEl && selector.arange && data.settings.mode !== "read") {
+          if (data.autofill(selector.arange, "all", (msg) => xtoast("Tip", msg))) {
+            table.render();
           }
         }
-        hyperlinkPress = null;
-      }
-      if (isAutofillEl && selector.arange && data.settings.mode !== 'read') {
-        if (data.autofill(selector.arange, 'all', msg => xtoast('Tip', msg))) {
-          table.render();
-        }
-      }
-      selector.hideAutofill();
-      toolbarChangePaintformatPaste.call(this);
-    });
+        selector.hideAutofill();
+        toolbarChangePaintformatPaste.call(this);
+      },
+    );
   }
 
   if (!isAutofillEl && evt.buttons === 1) {
@@ -872,36 +854,34 @@ function overlayerMousedown(evt) {
 function editorSetOffset() {
   const { editor, data } = this;
   const sOffset = this.formulaEditTarget
-    ? data.getRect(new CellRange(
-      this.formulaEditTarget.ri,
-      this.formulaEditTarget.ci,
-      this.formulaEditTarget.ri,
-      this.formulaEditTarget.ci,
-    ))
+    ? data.getRect(
+        new CellRange(
+          this.formulaEditTarget.ri,
+          this.formulaEditTarget.ci,
+          this.formulaEditTarget.ri,
+          this.formulaEditTarget.ci,
+        ),
+      )
     : data.getSelectedRect();
   const tOffset = this.getTableOffset();
-  let sPosition = 'top';
+  let sPosition = "top";
   // console.log('sOffset:', sOffset, ':', tOffset);
   if (sOffset.top > tOffset.height / 2) {
-    sPosition = 'bottom';
+    sPosition = "bottom";
   }
   editor.setOffset(sOffset, sPosition);
 }
 
 function editorSet() {
   const { editor, data, selector } = this;
-  if (data.settings.mode === 'read') return;
+  if (data.settings.mode === "read") return;
   const { ri, ci } = data.selector;
   if (!data.canEditCell(ri, ci)) return;
   const cell = data.getSelectedCell();
-  const cellText = (cell && cell.text) || '';
+  const cellText = (cell && cell.text) || "";
   setEditSnapshot(this, ri, ci, cellText);
   editorSetOffset.call(this);
-  editor.setCell(
-    cell,
-    data.getSelectedValidator(),
-    data.getSelectedCellStyle(),
-  );
+  editor.setCell(cell, data.getSelectedValidator(), data.getSelectedCellStyle());
   clearClipboard.call(this);
   selector.hideArea();
   if (!restoreFormulaReferenceSelection(this, ri, ci, cellText)) {
@@ -943,9 +923,7 @@ function horizontalScrollbarMove(distance) {
 
 function rowResizerFinished(cRect, distance) {
   const { ri } = cRect;
-  const {
-    table, toolbar, selector, data,
-  } = this;
+  const { table, toolbar, selector, data } = this;
   const { sri, eri } = selector.range;
   if (ri >= sri && ri <= eri) {
     data.setRowsHeight(sri, eri, distance);
@@ -963,9 +941,7 @@ function rowResizerFinished(cRect, distance) {
 
 function colResizerFinished(cRect, distance) {
   const { ci } = cRect;
-  const {
-    table, toolbar, selector, data,
-  } = this;
+  const { table, toolbar, selector, data } = this;
   const { sci, eci } = selector.range;
   if (ci >= sci && ci <= eci) {
     data.setColsWidth(sci, eci, distance);
@@ -981,10 +957,10 @@ function colResizerFinished(cRect, distance) {
   sheetImagesUpdate.call(this);
 }
 
-function dataSetCellText(text, state = 'finished') {
+function dataSetCellText(text, state = "finished") {
   const { data, table } = this;
   // const [ri, ci] = selector.indexes;
-  if (data.settings.mode === 'read') return;
+  if (data.settings.mode === "read") return;
   const target = this.formulaEditTarget;
   const { ri, ci } = target || data.selector;
   if (target) {
@@ -992,49 +968,49 @@ function dataSetCellText(text, state = 'finished') {
   } else {
     data.setSelectedCellText(text, state);
   }
-  if (state === 'finished') {
+  if (state === "finished") {
     finishFormulaReferenceSelection(this);
     clearEditSnapshot(this);
   }
-  if (state === 'finished') {
+  if (state === "finished") {
     table.render();
     this.formulaBar.update(text);
     const err = data.getValidationError(ri, ci);
     if (err) {
-      this.trigger('validation-error', err);
+      this.trigger("validation-error", err);
     }
   } else {
     table.render();
     this.formulaBar.update(text);
-    this.trigger('cell-edited', text, ri, ci);
+    this.trigger("cell-edited", text, ri, ci);
   }
 }
 
 function insertDeleteRowColumn(type) {
   const { data } = this;
-  if (data.settings.mode === 'read') return;
-  if (type === 'insert-row') {
-    data.insert('row');
-  } else if (type === 'delete-row') {
-    data.delete('row');
-  } else if (type === 'insert-column') {
-    data.insert('column');
-  } else if (type === 'delete-column') {
-    data.delete('column');
-  } else if (type === 'delete-cell') {
+  if (data.settings.mode === "read") return;
+  if (type === "insert-row") {
+    data.insert("row");
+  } else if (type === "delete-row") {
+    data.delete("row");
+  } else if (type === "insert-column") {
+    data.insert("column");
+  } else if (type === "delete-column") {
+    data.delete("column");
+  } else if (type === "delete-cell") {
     data.deleteCell();
-  } else if (type === 'delete-cell-format') {
-    data.deleteCell('format');
-  } else if (type === 'delete-cell-text') {
-    data.deleteCell('text');
-  } else if (type === 'cell-printable') {
-    data.setSelectedCellAttr('printable', true);
-  } else if (type === 'cell-non-printable') {
-    data.setSelectedCellAttr('printable', false);
-  } else if (type === 'cell-editable') {
-    data.setSelectedCellAttr('editable', true);
-  } else if (type === 'cell-non-editable') {
-    data.setSelectedCellAttr('editable', false);
+  } else if (type === "delete-cell-format") {
+    data.deleteCell("format");
+  } else if (type === "delete-cell-text") {
+    data.deleteCell("text");
+  } else if (type === "cell-printable") {
+    data.setSelectedCellAttr("printable", true);
+  } else if (type === "cell-non-printable") {
+    data.setSelectedCellAttr("printable", false);
+  } else if (type === "cell-editable") {
+    data.setSelectedCellAttr("editable", true);
+  } else if (type === "cell-non-editable") {
+    data.setSelectedCellAttr("editable", false);
   }
   clearClipboard.call(this);
   sheetReset.call(this);
@@ -1045,69 +1021,74 @@ function beginFormulaReferenceInput(formulaName) {
   const { ri, ci } = data.selector;
   if (!data.canEditCell(ri, ci)) return;
   const oldCell = data.getSelectedCell();
-  const oldText = (oldCell && oldCell.text) || '';
+  const oldText = (oldCell && oldCell.text) || "";
   const formulaText = `=${formulaName}()`;
   this.formulaEditTarget = { ri, ci };
-  data.setCellText(ri, ci, formulaText, 'input');
+  data.setCellText(ri, ci, formulaText, "input");
   editorSet.call(this);
   setEditSnapshot(this, ri, ci, oldText);
   this.editor.setText(formulaText, formulaName.length + 2);
-  this.selector.el.addClass('formula-reference-mode');
+  this.selector.el.addClass("formula-reference-mode");
   this.editor.setFormulaTargetActive(true);
 }
 
 function toolbarChange(type, value) {
   const { data, toolbar, editor } = this;
-  if (type === 'save') {
-    if (data.settings.mode === 'read') {
-      this.trigger('save-as');
+  if (type === "save") {
+    if (data.settings.mode === "read") {
+      this.trigger("save-as");
       return;
     }
-    this.trigger('save');
+    this.trigger("save");
     return;
   }
-  if (type === 'save-as') {
-    this.trigger('save-as');
+  if (type === "save-as") {
+    this.trigger("save-as");
     return;
   }
-  if (type === 'edit-in-vscode') {
-    this.trigger('edit-in-vscode');
+  if (type === "edit-in-vscode") {
+    this.trigger("edit-in-vscode");
     return;
   }
-  if (type === 'find') {
-    this.trigger('find');
+  if (type === "find") {
+    this.trigger("find");
     return;
   }
-  if (type === 'undo') {
+  if (type === "undo") {
     this.undo();
-  } else if (type === 'redo') {
+  } else if (type === "redo") {
     this.redo();
-  } else if (type === 'print') {
+  } else if (type === "print") {
     this.print.preview();
-  } else if (type === 'paintformat') {
+  } else if (type === "paintformat") {
     if (value === true) copy.call(this);
     else clearClipboard.call(this);
-  } else if (type === 'clearformat') {
-    insertDeleteRowColumn.call(this, 'delete-cell-format');
-  } else if (type === 'link') {
+  } else if (type === "clearformat") {
+    insertDeleteRowColumn.call(this, "delete-cell-format");
+  } else if (type === "link") {
     // link
-  } else if (type === 'chart') {
+  } else if (type === "chart") {
     // chart
-  } else if (type === 'autofilter') {
+  } else if (type === "autofilter") {
     // filter
     autofilter.call(this);
-  } else if (type === 'freeze') {
+  } else if (type === "freeze") {
     if (value) {
       const [freezeRi, freezeCi] = freezeSplitFromSelector(data);
       this.freeze(freezeRi, freezeCi);
     } else {
       this.freeze(0, 0);
     }
-  } else if (type === 'formula' && !data.selector.multiple()) {
+  } else if (type === "formula" && !data.selector.multiple()) {
     beginFormulaReferenceInput.call(this, value);
   } else {
     data.setSelectedCellAttr(type, value);
-    if (type === 'font-name' || type === 'font-size' || type === 'font-bold' || type === 'font-italic') {
+    if (
+      type === "font-name" ||
+      type === "font-size" ||
+      type === "font-bold" ||
+      type === "font-italic"
+    ) {
       if (editor.cell) {
         editor.applyCellStyle(data.getSelectedCellStyle());
       }
@@ -1124,12 +1105,8 @@ function selectorIndexToFreezeSplit(index) {
 function freezeSplitFromSelector(data) {
   const { ri, ci, range } = data.selector;
   const { rows, cols } = data;
-  const isRowSelection = range.sri === range.eri
-    && range.sci === 0
-    && range.eci === cols.len - 1;
-  const isColSelection = range.sci === range.eci
-    && range.sri === 0
-    && range.eri === rows.len - 1;
+  const isRowSelection = range.sri === range.eri && range.sci === 0 && range.eci === cols.len - 1;
+  const isColSelection = range.sci === range.eci && range.sri === 0 && range.eri === rows.len - 1;
   const freezeRi = isColSelection ? 0 : selectorIndexToFreezeSplit(ri);
   const freezeCi = isRowSelection ? 0 : selectorIndexToFreezeSplit(ci);
   return [freezeRi, freezeCi];
@@ -1158,10 +1135,10 @@ function sheetInitEvents() {
   } = this;
   // overlayer
   overlayerEl
-    .on('mousemove', (evt) => {
+    .on("mousemove", (evt) => {
       overlayerMousemove.call(this, evt);
     })
-    .on('mousedown', (evt) => {
+    .on("mousedown", (evt) => {
       if (!isFormulaReferenceSelecting(this)) {
         editor.clear();
       }
@@ -1183,34 +1160,34 @@ function sheetInitEvents() {
         const { ri, ci } = cellRect;
         if (ri >= 0 && ci >= 0 && !this.data.canEditCell(ri, ci)) {
           selectorSet.call(this, false, ri, ci);
-          this.trigger('protected-cell-dblclick');
+          this.trigger("protected-cell-dblclick");
           return;
         }
         const validationError = this.data.getValidationError(ri, ci);
         if (validationError) {
           selectorSet.call(this, false, ri, ci);
-          this.trigger('validation-error', validationError);
+          this.trigger("validation-error", validationError);
         }
         editorSet.call(this);
       } else {
         overlayerMousedown.call(this, evt);
       }
     })
-    .on('wheel', (evt) => {
+    .on("wheel", (evt) => {
       overlayerMousescroll.call(this, evt);
     })
-    .on('mouseout', (evt) => {
+    .on("mouseout", (evt) => {
       const { offsetX, offsetY } = evt;
       if (offsetY <= 0) colResizer.hide();
       if (offsetX <= 0) rowResizer.hide();
     });
 
   selector.inputChange = (v) => {
-    dataSetCellText.call(this, v, 'input');
+    dataSetCellText.call(this, v, "input");
     editorSet.call(this);
   };
 
-  overlayerEl.on('scroll.stop', () => nativeScrollMove.call(this));
+  overlayerEl.on("scroll.stop", () => nativeScrollMove.call(this));
 
   // toolbar change
   toolbar.change = (type, value) => toolbarChange.call(this, type, value);
@@ -1227,10 +1204,10 @@ function sheetInitEvents() {
   };
   // resizer unhide callback
   rowResizer.unhideFn = (index) => {
-    unhideRowsOrCols.call(this, 'row', index);
+    unhideRowsOrCols.call(this, "row", index);
   };
   colResizer.unhideFn = (index) => {
-    unhideRowsOrCols.call(this, 'col', index);
+    unhideRowsOrCols.call(this, "col", index);
   };
   // scrollbar move callback
   verticalScrollbar.moveFn = (distance, evt) => {
@@ -1239,12 +1216,12 @@ function sheetInitEvents() {
   horizontalScrollbar.moveFn = (distance, evt) => {
     horizontalScrollbarMove.call(this, distance, evt);
   };
-  horizontalScrollbar.el.on('mousedown', () => {
+  horizontalScrollbar.el.on("mousedown", () => {
     this._horizontalScrollInteracting = true;
   });
   if (!this._horizontalScrollReleaseBound) {
     this._horizontalScrollReleaseBound = true;
-    bind(window, 'mouseup', () => {
+    bind(window, "mouseup", () => {
       if (!this._horizontalScrollInteracting) return;
       this._horizontalScrollInteracting = false;
       expandColsOnHorizontalRelease(this);
@@ -1252,7 +1229,7 @@ function sheetInitEvents() {
   }
   // editor
   editor.change = (state, itext) => {
-    if (state === 'cancel') {
+    if (state === "cancel") {
       cancelCellEdit(this);
       return;
     }
@@ -1260,18 +1237,18 @@ function sheetInitEvents() {
   };
   // modal validation
   modalValidation.change = (action, ...args) => {
-    if (action === 'save') {
+    if (action === "save") {
       this.data.addValidation(...args);
     } else {
       this.data.removeValidation();
     }
   };
   modalHyperlink.change = (action, ...args) => {
-    if (action === 'save') {
+    if (action === "save") {
       const [link, tooltip] = args;
       this.data.setSelectedHyperlink(link, tooltip);
       sheetReset.call(this);
-    } else if (action === 'remove') {
+    } else if (action === "remove") {
       this.data.removeSelectedHyperlink();
       sheetReset.call(this);
     }
@@ -1279,49 +1256,49 @@ function sheetInitEvents() {
   // contextmenu
   contextMenu.itemClick = (type) => {
     // console.log('type:', type);
-    if (type === 'validation') {
+    if (type === "validation") {
       modalValidation.setValue(this.data.getSelectedValidation());
-    } else if (type === 'hyperlink') {
+    } else if (type === "hyperlink") {
       modalHyperlink.setValue(this.data.getSelectedHyperlink());
-    } else if (type === 'copy') {
+    } else if (type === "copy") {
       copy.call(this);
-    } else if (type === 'cut') {
+    } else if (type === "cut") {
       cut.call(this);
-    } else if (type === 'paste') {
-      paste.call(this, 'all');
-    } else if (type === 'paste-value') {
-      paste.call(this, 'text');
-    } else if (type === 'paste-format') {
-      paste.call(this, 'format');
-    } else if (type === 'hide') {
+    } else if (type === "paste") {
+      paste.call(this, "all");
+    } else if (type === "paste-value") {
+      paste.call(this, "text");
+    } else if (type === "paste-format") {
+      paste.call(this, "format");
+    } else if (type === "hide") {
       hideRowsOrCols.call(this);
     } else {
       insertDeleteRowColumn.call(this, type);
     }
   };
 
-  bind(window, 'resize', () => {
+  bind(window, "resize", () => {
     this.reload();
   });
 
-  bind(window, 'click', (evt) => {
+  bind(window, "click", (evt) => {
     this.focusing = overlayerEl.contains(evt.target);
   });
 
-  bind(window, 'paste', (evt) => {
+  bind(window, "paste", (evt) => {
     if (!this.focusing) return;
     if (this.skipNextPaste) {
       this.skipNextPaste = false;
       evt.preventDefault();
       return;
     }
-    const mode = this.pasteTextOnly ? 'text' : 'all';
+    const mode = this.pasteTextOnly ? "text" : "all";
     this.pasteTextOnly = false;
     paste.call(this, mode, evt);
     evt.preventDefault();
   });
 
-  bind(window, 'copy', (evt) => {
+  bind(window, "copy", (evt) => {
     if (!this.focusing) return;
     if (this.editor.cell !== null) return;
     copy.call(this, evt);
@@ -1329,12 +1306,10 @@ function sheetInitEvents() {
   });
 
   // for selector
-  bind(window, 'keydown', (evt) => {
+  bind(window, "keydown", (evt) => {
     if (!this.focusing) return;
     const keyCode = evt.keyCode || evt.which;
-    const {
-      key, ctrlKey, shiftKey, metaKey, altKey,
-    } = evt;
+    const { key, ctrlKey, shiftKey, metaKey, altKey } = evt;
     if (ctrlKey && metaKey) return;
     // console.log('keydown.evt: ', keyCode);
     if (ctrlKey || metaKey) {
@@ -1364,13 +1339,13 @@ function sheetInitEvents() {
           if (altKey && !shiftKey) {
             // ctrl/cmd + alt + v：仅粘贴格式
             if (!this.data.clipboard.isClear()) {
-              paste.call(this, 'format');
+              paste.call(this, "format");
             }
             evt.preventDefault();
           } else if (shiftKey && !altKey) {
             // ctrl/cmd + shift + v：仅粘贴值（无格式）
             if (!this.data.clipboard.isClear()) {
-              paste.call(this, 'text');
+              paste.call(this, "text");
               this.skipNextPaste = true;
             } else {
               this.pasteTextOnly = true;
@@ -1399,52 +1374,54 @@ function sheetInitEvents() {
           clearClipboard.call(this);
           break;
         case 37: // left
-          selectorMove.call(this, shiftKey, 'left');
+          selectorMove.call(this, shiftKey, "left");
           evt.preventDefault();
           break;
         case 38: // up
-          selectorMove.call(this, shiftKey, 'up');
+          selectorMove.call(this, shiftKey, "up");
           evt.preventDefault();
           break;
         case 39: // right
-          selectorMove.call(this, shiftKey, 'right');
+          selectorMove.call(this, shiftKey, "right");
           evt.preventDefault();
           break;
         case 40: // down
-          selectorMove.call(this, shiftKey, 'down');
+          selectorMove.call(this, shiftKey, "down");
           evt.preventDefault();
           break;
         case 9: // tab
           editor.clear();
           // shift + tab => move left
           // tab => move right
-          selectorMove.call(this, false, shiftKey ? 'left' : 'right');
+          selectorMove.call(this, false, shiftKey ? "left" : "right");
           evt.preventDefault();
           break;
         case 13: // enter
           editor.clear();
           // shift + enter => move up
           // enter => move down
-          selectorMove.call(this, false, shiftKey ? 'up' : 'down');
+          selectorMove.call(this, false, shiftKey ? "up" : "down");
           evt.preventDefault();
           break;
         case 8: // backspace
-          insertDeleteRowColumn.call(this, 'delete-cell-text');
+          insertDeleteRowColumn.call(this, "delete-cell-text");
           evt.preventDefault();
           break;
         default:
           break;
       }
 
-      if (key === 'Delete') {
-        insertDeleteRowColumn.call(this, 'delete-cell-text');
+      if (key === "Delete") {
+        insertDeleteRowColumn.call(this, "delete-cell-text");
         evt.preventDefault();
-      } else if (!altKey && ((keyCode >= 65 && keyCode <= 90)
-        || (keyCode >= 48 && keyCode <= 57)
-        || (keyCode >= 96 && keyCode <= 105)
-        || evt.key === '='
-      )) {
-        dataSetCellText.call(this, evt.key, 'input');
+      } else if (
+        !altKey &&
+        ((keyCode >= 65 && keyCode <= 90) ||
+          (keyCode >= 48 && keyCode <= 57) ||
+          (keyCode >= 96 && keyCode <= 105) ||
+          evt.key === "=")
+      ) {
+        dataSetCellText.call(this, evt.key, "input");
         editorSet.call(this);
       } else if (keyCode === 113) {
         // F2
@@ -1463,19 +1440,19 @@ export default class Sheet {
     this.formulaEditTarget = null;
     this.editSnapshot = null;
     const { view, showToolbar, showContextmenu } = data.settings;
-    this.el = h('div', `${cssPrefix}-sheet`);
+    this.el = h("div", `${cssPrefix}-sheet`);
     this.toolbar = new Toolbar(data, view.width, !showToolbar);
     this.formulaBar = new FormulaBar(
       data,
-      text => dataSetCellText.call(this, text, 'finished'),
-      text => dataSetCellText.call(this, text, 'input'),
+      (text) => dataSetCellText.call(this, text, "finished"),
+      (text) => dataSetCellText.call(this, text, "input"),
       (ri, ci) => this.scrollToCell(ri, ci),
     );
     this.print = new Print(data);
     targetEl.children(this.toolbar.el, this.formulaBar.el, this.el, this.print.el);
     this.data = data;
     // table
-    this.tableEl = h('canvas', `${cssPrefix}-table`);
+    this.tableEl = h("canvas", `${cssPrefix}-table`);
     // resizer
     this.rowResizer = new Resizer(false, data.rows.height);
     this.colResizer = new Resizer(true, data.cols.minWidth);
@@ -1483,11 +1460,7 @@ export default class Sheet {
     this.verticalScrollbar = new Scrollbar(true);
     this.horizontalScrollbar = new Scrollbar(false);
     // editor
-    this.editor = new Editor(
-      formulaMenuItems,
-      () => this.getTableOffset(),
-      data.rows.height,
-    );
+    this.editor = new Editor(formulaMenuItems, () => this.getTableOffset(), data.rows.height);
     // data validation
     this.modalValidation = new ModalValidation();
     this.modalHyperlink = new ModalHyperlink();
@@ -1497,24 +1470,23 @@ export default class Sheet {
     this.selector = new Selector(data);
     this.sheetImages = new SheetImages();
     this.sheetImages.setOnChange(() => {
-      this.trigger('change');
+      this.trigger("change");
     });
     this.sheetImages.setOnSelect(() => {
       this.editor.clear();
       this.selector.hide();
     });
-    this.overlayerCEl = h('div', `${cssPrefix}-overlayer-content`)
-      .children(
-        this.sheetImages.el,
-        this.editor.el,
-        this.selector.el,
-      );
-    this.scrollViewportEl = h('div', `${cssPrefix}-scroll-viewport`)
-      .children(this.overlayerCEl, this.headerDropEl = h('div', `${cssPrefix}-header-drop-indicator`).hide());
-    this.scrollContentEl = h('div', `${cssPrefix}-scroll-content`)
-      .child(this.scrollViewportEl);
-    this.overlayerEl = h('div', `${cssPrefix}-overlayer`)
-      .child(this.scrollContentEl);
+    this.overlayerCEl = h("div", `${cssPrefix}-overlayer-content`).children(
+      this.sheetImages.el,
+      this.editor.el,
+      this.selector.el,
+    );
+    this.scrollViewportEl = h("div", `${cssPrefix}-scroll-viewport`).children(
+      this.overlayerCEl,
+      (this.headerDropEl = h("div", `${cssPrefix}-header-drop-indicator`).hide()),
+    );
+    this.scrollContentEl = h("div", `${cssPrefix}-scroll-content`).child(this.scrollViewportEl);
+    this.overlayerEl = h("div", `${cssPrefix}-overlayer`).child(this.scrollContentEl);
     // sortFilter
     this.sortFilter = new SortFilter();
     // root element
@@ -1545,7 +1517,7 @@ export default class Sheet {
 
   trigger(eventName, ...args) {
     const { eventMap } = this;
-    if (eventName === 'change' && this.data.settings.mode !== 'read') {
+    if (eventName === "change" && this.data.settings.mode !== "read") {
       this.toolbar.setSaveEnabled(true);
     }
     eventMap.fire(eventName, args);
@@ -1564,7 +1536,7 @@ export default class Sheet {
     this.print.resetData(data);
     this.selector.resetData(data);
     this.table.resetData(data);
-    this.sheetImages.setEditable(data.settings.mode !== 'read');
+    this.sheetImages.setEditable(data.settings.mode !== "read");
     this.sheetImages.reset(data);
   }
 

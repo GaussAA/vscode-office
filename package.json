@@ -560,13 +560,15 @@
     "test": "node scripts/unit-tests/build.mjs && node --test \"test/unit/*.test.mjs\"",
     "test:smoke": "node scripts/smoke/build.mjs && vscode-test --label smoke-stable",
     "test:smoke:min": "node scripts/smoke/build.mjs && vscode-test --label smoke-min",
-    "check": "pnpm lint && node scripts/check-baseline.mjs && pnpm typecheck && pnpm typecheck:self-test && pnpm test",
+    "check": "pnpm format:check && pnpm lint && node scripts/check-baseline.mjs && pnpm typecheck && pnpm typecheck:self-test && pnpm test",
     "check:baseline": "node scripts/check-baseline.mjs",
     "check:release": "node scripts/check-release.mjs",
     "check:full": "pnpm check && pnpm build && pnpm test:smoke && pnpm verify:ui",
     "verify:ui": "node scripts/ui-verify/runner.mjs",
     "verify:ui:docs": "node scripts/ui-verify/runner.mjs --docs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
   },
   "devDependencies": {
     "@puppeteer/browsers": "^3.2.6",
@@ -585,10 +587,9 @@
     "esbuild-plugin-copy": "2.1.1",
     "husky": "^9.1.7",
     "less": "^4.2.0",
-    "lint-staged": "^17.6.0",
     "ovsx": "^1.3.0",
+    "oxfmt": "^0.76.0",
     "oxlint": "1.91.0",
-    "prettier": "^3.9.10",
     "typescript": "7.0.2",
     "vite": "^8.0.16",
     "vite-plugin-static-copy": "^4.1.1"

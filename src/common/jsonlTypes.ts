@@ -19,7 +19,16 @@ export const JSONL_MAX_LINE_BYTES = 512 * 1024;
 export const JSONL_CHUNK_SIZE = 500;
 
 /** Top-level keys tried, in order, when deriving a human-friendly label. */
-export const JSONL_LABEL_KEYS = ['id', '_id', 'uuid', 'key', 'name', 'title', 'ts', 'timestamp'] as const;
+export const JSONL_LABEL_KEYS = [
+  "id",
+  "_id",
+  "uuid",
+  "key",
+  "name",
+  "title",
+  "ts",
+  "timestamp",
+] as const;
 
 /** How many characters of the raw line are kept for previews. */
 export const JSONL_RAW_PREVIEW_CHARS = 400;
@@ -28,18 +37,18 @@ export const JSONL_RAW_PREVIEW_CHARS = 400;
 export const JSONL_MAX_TEXT_CHARS = 200_000;
 
 export interface JsonlInfoPayload {
-    fileName: string;
-    /** Stable identity for state persistence (scheme + uri). */
-    cacheId: string;
-    lineCount: number;
-    byteSize: number;
+  fileName: string;
+  /** Stable identity for state persistence (scheme + uri). */
+  cacheId: string;
+  lineCount: number;
+  byteSize: number;
 }
 
 export interface JsonlRangeRequest {
-    /** Echoed back on the reply, so the webview can drop a stale window. */
-    requestId: number;
-    start: number;
-    end: number;
+  /** Echoed back on the reply, so the webview can drop a stale window. */
+  requestId: number;
+  start: number;
+  end: number;
 }
 
 /**
@@ -51,52 +60,55 @@ export interface JsonlRangeRequest {
  * fall-through to the `else` branch.
  */
 interface JsonlEntryBase {
-    /** Zero-based line index. */
-    index: number;
-    /** Byte length of the line, excluding the newline. */
-    size: number;
-    /** Truncated raw text, for the directory preview. */
-    raw: string;
-    /** Search-only: a window of text around the match, instead of the line's head. */
-    snippet?: string;
+  /** Zero-based line index. */
+  index: number;
+  /** Byte length of the line, excluding the newline. */
+  size: number;
+  /** Truncated raw text, for the directory preview. */
+  raw: string;
+  /** Search-only: a window of text around the match, instead of the line's head. */
+  snippet?: string;
 }
 
 export type JsonlEntrySummary =
-    | (JsonlEntryBase & { kind: 'empty' })
-    | (JsonlEntryBase & { kind: 'invalid'; /** Parse error message. */ error: string })
-    | (JsonlEntryBase & { kind: 'too-large' })
-    | (JsonlEntryBase & { kind: 'value'; /** Derived identity, e.g. the top-level `id`. */ label?: string });
+  | (JsonlEntryBase & { kind: "empty" })
+  | (JsonlEntryBase & { kind: "invalid"; /** Parse error message. */ error: string })
+  | (JsonlEntryBase & { kind: "too-large" })
+  | (JsonlEntryBase & {
+      kind: "value";
+      /** Derived identity, e.g. the top-level `id`. */ label?: string;
+    });
 
 export interface JsonlEntriesPayload {
-    requestId: number;
-    start: number;
-    entries: JsonlEntrySummary[];
+  requestId: number;
+  start: number;
+  entries: JsonlEntrySummary[];
 }
 
 /** One entry request; `index` is the zero-based line number. */
 export interface JsonlEntryRequest {
-    requestId: number;
-    index: number;
+  requestId: number;
+  index: number;
 }
 
 /** Everything the detail pane needs for one entry: the summary plus its full text/value. */
 export type JsonlEntryDetail =
-    | (JsonlEntryBase & { kind: 'empty'; text: string })
-    | (JsonlEntryBase & { kind: 'invalid'; error: string; text: string })
-    | (JsonlEntryBase & { kind: 'too-large'; text: string })
-    | (JsonlEntryBase & {
-        kind: 'value'
-        label?: string
-        /** Parsed JSON, under the size cap. */
-        value: unknown
-        /** Full line text (capped), for the raw view. */
-        text: string
+  | (JsonlEntryBase & { kind: "empty"; text: string })
+  | (JsonlEntryBase & { kind: "invalid"; error: string; text: string })
+  | (JsonlEntryBase & { kind: "too-large"; text: string })
+  | (JsonlEntryBase & {
+      kind: "value";
+      label?: string;
+      /** Parsed JSON, under the size cap. */
+      value: unknown;
+      /** Full line text (capped), for the raw view. */
+      text: string;
     });
 
 export interface JsonlEntryPayload {
-    requestId: number;
-    index: number;
-    entry: JsonlEntryDetail;
+  requestId: number;
+  index: number;
+  entry: JsonlEntryDetail;
 }
 
 /* ---------- search ---------- */
@@ -108,8 +120,8 @@ export const JSONL_SEARCH_BATCH = 200;
 export const JSONL_SEARCH_MAX_MATCHES = 10_000;
 
 export interface JsonlSearchRequest {
-    requestId: number;
-    query: string;
+  requestId: number;
+  query: string;
 }
 
 /**
@@ -117,19 +129,19 @@ export interface JsonlSearchRequest {
  * next cancellation check — the webview can only ignore output, not stop the work.
  */
 export interface JsonlSearchCancel {
-    requestId: number;
+  requestId: number;
 }
 
 export interface JsonlSearchBatch {
-    requestId: number;
-    query: string;
-    /** Matches found since the previous batch, not-yet-sent ones. */
-    entries: JsonlEntrySummary[];
-    scanned: number;
-    total: number;
-    matches: number;
-    /** True on the final batch of a scan. */
-    done: boolean;
-    /** True when the scan stopped because JSONL_SEARCH_MAX_MATCHES was reached. */
-    capped: boolean;
+  requestId: number;
+  query: string;
+  /** Matches found since the previous batch, not-yet-sent ones. */
+  entries: JsonlEntrySummary[];
+  scanned: number;
+  total: number;
+  matches: number;
+  /** True on the final batch of a scan. */
+  done: boolean;
+  /** True when the scan stopped because JSONL_SEARCH_MAX_MATCHES was reached. */
+  capped: boolean;
 }

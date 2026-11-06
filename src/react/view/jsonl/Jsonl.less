@@ -1,536 +1,540 @@
-@import '../../common/highlight.less';
+@import "../../common/highlight.less";
 
 body:has(.jsonl-viewer) {
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
-    background: var(--vscode-editor-background, #1f1f1f);
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vscode-editor-background, #1f1f1f);
 }
 
 .jsonl-viewer {
-    --jl-bg: var(--vscode-editor-background, #1f1f1f);
-    --jl-toolbar-bg: var(--vscode-editorGroupHeader-tabsBackground, #181818);
-    --jl-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
-    --jl-fg: var(--vscode-foreground, #cccccc);
-    --jl-muted: var(--vscode-descriptionForeground, #9d9d9d);
-    --jl-gutter: var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground, #6e7681));
-    --jl-hover: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.28));
-    --jl-active-bg: var(--vscode-list-activeSelectionBackground, #04395e);
-    --jl-active-fg: var(--vscode-list-activeSelectionForeground, #ffffff);
-    --jl-error: var(--vscode-errorForeground, #f85149);
-    --jl-warn: var(--vscode-editorWarning-foreground, #cca700);
-    --jl-key: var(--vscode-symbolIcon-propertyForeground, var(--vscode-charts-purple, #b180d7));
-    --jl-string: var(--vscode-charts-green, #89d185);
-    --jl-number: var(--vscode-charts-blue, #3794ff);
-    --jl-boolean: var(--vscode-charts-red, #f14c4c);
-    --jl-null: var(--vscode-charts-orange, #d18616);
-    --jl-mono: var(--vscode-editor-font-family, Consolas, 'Cascadia Mono', monospace);
-    --jl-row-height: 24px;
+  --jl-bg: var(--vscode-editor-background, #1f1f1f);
+  --jl-toolbar-bg: var(--vscode-editorGroupHeader-tabsBackground, #181818);
+  --jl-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+  --jl-fg: var(--vscode-foreground, #cccccc);
+  --jl-muted: var(--vscode-descriptionForeground, #9d9d9d);
+  --jl-gutter: var(
+    --vscode-editorLineNumber-foreground,
+    var(--vscode-descriptionForeground, #6e7681)
+  );
+  --jl-hover: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.28));
+  --jl-active-bg: var(--vscode-list-activeSelectionBackground, #04395e);
+  --jl-active-fg: var(--vscode-list-activeSelectionForeground, #ffffff);
+  --jl-error: var(--vscode-errorForeground, #f85149);
+  --jl-warn: var(--vscode-editorWarning-foreground, #cca700);
+  --jl-key: var(--vscode-symbolIcon-propertyForeground, var(--vscode-charts-purple, #b180d7));
+  --jl-string: var(--vscode-charts-green, #89d185);
+  --jl-number: var(--vscode-charts-blue, #3794ff);
+  --jl-boolean: var(--vscode-charts-red, #f14c4c);
+  --jl-null: var(--vscode-charts-orange, #d18616);
+  --jl-mono: var(--vscode-editor-font-family, Consolas, "Cascadia Mono", monospace);
+  --jl-row-height: 24px;
 
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    min-height: 100vh;
-    background: var(--jl-bg);
-    color: var(--jl-fg);
-    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
-    font-size: var(--vscode-font-size, 13px);
-    overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 100vh;
+  background: var(--jl-bg);
+  color: var(--jl-fg);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  overflow: hidden;
 }
 
 /* ---------- toolbar ---------- */
 
 .jsonl-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    height: 34px;
-    padding: 0 8px 0 12px;
-    flex: 0 0 auto;
-    background: var(--jl-toolbar-bg);
-    border-bottom: 1px solid var(--jl-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 34px;
+  padding: 0 8px 0 12px;
+  flex: 0 0 auto;
+  background: var(--jl-toolbar-bg);
+  border-bottom: 1px solid var(--jl-border);
 }
 
 .jsonl-toolbar__left,
 .jsonl-toolbar__right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .jsonl-toolbar__left {
-    overflow: hidden;
+  overflow: hidden;
 }
 
 .jsonl-file-name {
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 40vw;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40vw;
 }
 
 .jsonl-meta {
-    font-size: 11px;
-    color: var(--jl-muted);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+  font-size: 11px;
+  color: var(--jl-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .jsonl-dot {
-    color: var(--jl-muted);
-    font-size: 11px;
+  color: var(--jl-muted);
+  font-size: 11px;
 }
 
 .jsonl-jump {
-    width: 92px;
+  width: 92px;
 }
 
 .jsonl-search {
-    width: 210px;
+  width: 210px;
 }
 
 /* antd controls inside a VS Code webview: flat and theme-correct */
 
 .jsonl-viewer .ant-btn {
-    background: transparent;
-    border-color: transparent;
-    color: var(--jl-fg);
-    box-shadow: none;
+  background: transparent;
+  border-color: transparent;
+  color: var(--jl-fg);
+  box-shadow: none;
 }
 
 .jsonl-viewer .ant-btn:not(:disabled):hover {
-    background: var(--jl-hover);
-    color: var(--jl-fg);
+  background: var(--jl-hover);
+  color: var(--jl-fg);
 }
 
 .jsonl-viewer .ant-btn:disabled {
-    color: var(--jl-muted);
-    opacity: 0.5;
+  color: var(--jl-muted);
+  opacity: 0.5;
 }
 
 .jsonl-viewer .ant-btn-default {
-    background: var(--vscode-button-secondaryBackground, transparent);
-    border-color: var(--jl-border);
+  background: var(--vscode-button-secondaryBackground, transparent);
+  border-color: var(--jl-border);
 }
 
 .jsonl-viewer .ant-input-number {
-    background: var(--vscode-input-background, rgba(128, 128, 128, 0.15));
-    border-color: var(--vscode-input-border, var(--jl-border));
+  background: var(--vscode-input-background, rgba(128, 128, 128, 0.15));
+  border-color: var(--vscode-input-border, var(--jl-border));
 }
 
 .jsonl-viewer .ant-input-number-input {
-    color: var(--vscode-input-foreground, var(--jl-fg));
-    font-size: 11px;
+  color: var(--vscode-input-foreground, var(--jl-fg));
+  font-size: 11px;
 }
 
 .jsonl-viewer .ant-segmented {
-    background: color-mix(in srgb, var(--jl-fg) 8%, transparent);
-    color: var(--jl-muted);
-    font-size: 11px;
+  background: color-mix(in srgb, var(--jl-fg) 8%, transparent);
+  color: var(--jl-muted);
+  font-size: 11px;
 }
 
 /* ---------- splitter ---------- */
 
 .jsonl-splitter {
-    flex: 1 1 auto;
-    min-height: 0;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .jsonl-splitter__panel {
-    overflow: hidden;
-    min-width: 0;
-    height: 100%;
+  overflow: hidden;
+  min-width: 0;
+  height: 100%;
 }
 
 .jsonl-splitter__panel > * {
-    height: 100%;
+  height: 100%;
 }
 
 /* ---------- shared tree resets ---------- */
 
 .jsonl-index__tree,
 .jsonl-detail__tree {
-    .ant-tree,
-    .ant-tree-list,
-    .ant-tree-list-holder,
-    .ant-tree-list-holder-inner {
-        background: transparent !important;
-        color: var(--jl-fg);
-    }
+  .ant-tree,
+  .ant-tree-list,
+  .ant-tree-list-holder,
+  .ant-tree-list-holder-inner {
+    background: transparent !important;
+    color: var(--jl-fg);
+  }
 
-    .ant-tree-list-holder {
-        scrollbar-color: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4)) transparent;
-    }
+  .ant-tree-list-holder {
+    scrollbar-color: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4)) transparent;
+  }
 
-    .ant-tree-treenode {
-        position: relative;
-        display: flex;
-        align-items: center;
-        width: 100%;
-        padding: 0 8px 0 4px;
-    }
+  .ant-tree-treenode {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0 8px 0 4px;
+  }
 
-    .ant-tree-node-content-wrapper {
-        /* antd sets `position: relative`; keep static so the absolute gutter
+  .ant-tree-node-content-wrapper {
+    /* antd sets `position: relative`; keep static so the absolute gutter
            line numbers resolve against the row instead of the content box. */
-        position: static;
-        flex: 1 1 auto;
-        min-width: 0;
-        height: var(--jl-row-height);
-        line-height: var(--jl-row-height);
-        padding: 0 6px 0 2px;
-        border-radius: 4px;
-        transition: none;
-        overflow: hidden;
-    }
+    position: static;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: var(--jl-row-height);
+    line-height: var(--jl-row-height);
+    padding: 0 6px 0 2px;
+    border-radius: 4px;
+    transition: none;
+    overflow: hidden;
+  }
 
-    .ant-tree-node-content-wrapper:hover {
-        background: var(--jl-hover);
-    }
+  .ant-tree-node-content-wrapper:hover {
+    background: var(--jl-hover);
+  }
 
-    .ant-tree-node-selected {
-        background: var(--jl-active-bg) !important;
-    }
+  .ant-tree-node-selected {
+    background: var(--jl-active-bg) !important;
+  }
 
-    .ant-tree-node-selected .jsonl-entry,
-    .ant-tree-node-selected .jsonl-kv,
-    .ant-tree-node-selected .jsonl-key,
-    .ant-tree-node-selected .jsonl-val,
-    .ant-tree-node-selected .jsonl-lineno,
-    .ant-tree-node-selected .jsonl-colon,
-    .ant-tree-node-selected .jsonl-chip,
-    .ant-tree-node-selected .jsonl-entry__raw,
-    .ant-tree-node-selected .jsonl-entry__label {
-        color: var(--jl-active-fg) !important;
-    }
+  .ant-tree-node-selected .jsonl-entry,
+  .ant-tree-node-selected .jsonl-kv,
+  .ant-tree-node-selected .jsonl-key,
+  .ant-tree-node-selected .jsonl-val,
+  .ant-tree-node-selected .jsonl-lineno,
+  .ant-tree-node-selected .jsonl-colon,
+  .ant-tree-node-selected .jsonl-chip,
+  .ant-tree-node-selected .jsonl-entry__raw,
+  .ant-tree-node-selected .jsonl-entry__label {
+    color: var(--jl-active-fg) !important;
+  }
 
-    .ant-tree-switcher {
-        width: 18px;
-        flex: 0 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--jl-muted);
-        line-height: var(--jl-row-height);
-    }
+  .ant-tree-switcher {
+    width: 18px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--jl-muted);
+    line-height: var(--jl-row-height);
+  }
 
-    .ant-tree-switcher .ant-tree-switcher-icon {
-        font-size: 10px;
-    }
+  .ant-tree-switcher .ant-tree-switcher-icon {
+    font-size: 10px;
+  }
 }
 
 /* ---------- left directory pane ---------- */
 
 .jsonl-index {
-    position: relative;
-    height: 100%;
-    overflow: hidden;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
 }
 
 .jsonl-index__banner {
-    display: flex;
-    align-items: center;
-    height: 26px;
-    padding: 0 12px;
-    flex: 0 0 auto;
-    font-size: 11px;
-    color: var(--jl-muted);
-    background: color-mix(in srgb, var(--jl-toolbar-bg) 55%, transparent);
-    border-bottom: 1px solid var(--jl-border);
-    font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 12px;
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--jl-muted);
+  background: color-mix(in srgb, var(--jl-toolbar-bg) 55%, transparent);
+  border-bottom: 1px solid var(--jl-border);
+  font-variant-numeric: tabular-nums;
 }
 
 .jsonl-index__tree {
-    height: 100%;
-    padding: 2px 0;
+  height: 100%;
+  padding: 2px 0;
 
-    .ant-tree-treenode {
-        /* fixed gutter on the left for the entry number */
-        padding-left: 46px;
-    }
+  .ant-tree-treenode {
+    /* fixed gutter on the left for the entry number */
+    padding-left: 46px;
+  }
 }
 
 .jsonl-entry {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: var(--jl-row-height);
-    min-width: 0;
-    font-family: var(--jl-mono);
-    font-size: var(--vscode-editor-font-size, 12.5px);
-    white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--jl-row-height);
+  min-width: 0;
+  font-family: var(--jl-mono);
+  font-size: var(--vscode-editor-font-size, 12.5px);
+  white-space: nowrap;
 }
 
 .jsonl-lineno {
-    position: absolute;
-    left: 0;
-    width: 40px;
-    padding-right: 8px;
-    text-align: right;
-    font-size: 11px;
-    line-height: var(--jl-row-height);
-    color: var(--jl-gutter);
-    font-variant-numeric: tabular-nums;
-    user-select: none;
-    pointer-events: none;
-    opacity: 0.8;
+  position: absolute;
+  left: 0;
+  width: 40px;
+  padding-right: 8px;
+  text-align: right;
+  font-size: 11px;
+  line-height: var(--jl-row-height);
+  color: var(--jl-gutter);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.8;
 }
 
 .jsonl-entry__label {
-    flex: 0 0 auto;
-    max-width: 36%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--jl-key);
-    font-weight: 600;
+  flex: 0 0 auto;
+  max-width: 36%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--jl-key);
+  font-weight: 600;
 }
 
 .jsonl-entry__raw {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--jl-muted);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--jl-muted);
 }
 
 .jsonl-entry__raw--error {
-    color: var(--jl-error);
+  color: var(--jl-error);
 }
 
 /* ---------- right detail pane ---------- */
 
 .jsonl-detail {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    outline: none;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  outline: none;
 }
 
 .jsonl-detail__header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 8px 0 12px;
-    flex: 0 0 auto;
-    border-bottom: 1px solid var(--jl-border);
-    background: color-mix(in srgb, var(--jl-toolbar-bg) 60%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px 0 12px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--jl-border);
+  background: color-mix(in srgb, var(--jl-toolbar-bg) 60%, transparent);
 }
 
 .jsonl-detail__index {
-    font-family: var(--jl-mono);
-    font-size: 11px;
-    color: var(--jl-gutter);
-    font-variant-numeric: tabular-nums;
-    min-width: 34px;
+  font-family: var(--jl-mono);
+  font-size: 11px;
+  color: var(--jl-gutter);
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
 }
 
 .jsonl-detail__spacer {
-    flex: 1 1 auto;
+  flex: 1 1 auto;
 }
 
 .jsonl-detail__body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .jsonl-detail__raw {
-    margin: 0;
-    padding: 8px 12px;
-    height: 100%;
-    overflow: auto;
-    font-family: var(--jl-mono);
-    font-size: var(--vscode-editor-font-size, 12.5px);
-    line-height: 1.55;
-    white-space: pre-wrap;
-    word-break: break-word;
-    color: var(--jl-fg);
+  margin: 0;
+  padding: 8px 12px;
+  height: 100%;
+  overflow: auto;
+  font-family: var(--jl-mono);
+  font-size: var(--vscode-editor-font-size, 12.5px);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--jl-fg);
 }
 
 .jsonl-detail__error {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
-    height: 100%;
-    overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  height: 100%;
+  overflow: auto;
 }
 
 .jsonl-detail__scalar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px;
-    font-family: var(--jl-mono);
-    font-size: var(--vscode-editor-font-size, 12.5px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  font-family: var(--jl-mono);
+  font-size: var(--vscode-editor-font-size, 12.5px);
 }
 
 .jsonl-detail__tree {
-    padding: 2px 0;
+  padding: 2px 0;
 
-    /* indent guides, VS Code explorer style */
-    .ant-tree-indent {
-        align-self: stretch;
-        display: flex;
-    }
+  /* indent guides, VS Code explorer style */
+  .ant-tree-indent {
+    align-self: stretch;
+    display: flex;
+  }
 
-    .ant-tree-indent-unit {
-        position: relative;
-        width: 16px;
-        height: var(--jl-row-height);
-    }
+  .ant-tree-indent-unit {
+    position: relative;
+    width: 16px;
+    height: var(--jl-row-height);
+  }
 
-    .ant-tree-indent-unit::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 50%;
-        border-left: 1px solid var(--vscode-tree-indentGuidesStroke, color-mix(in srgb, var(--jl-fg) 16%, transparent));
-    }
+  .ant-tree-indent-unit::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    border-left: 1px solid
+      var(--vscode-tree-indentGuidesStroke, color-mix(in srgb, var(--jl-fg) 16%, transparent));
+  }
 }
 
 /* ---------- shared bits ---------- */
 
 .jsonl-chip {
-    flex: 0 0 auto;
-    padding: 0 4px;
-    border-radius: 3px;
-    border: 1px solid color-mix(in srgb, var(--jl-fg) 14%, transparent);
-    font-size: 10px;
-    line-height: 14px;
-    text-transform: lowercase;
-    color: var(--jl-muted);
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--jl-fg) 14%, transparent);
+  font-size: 10px;
+  line-height: 14px;
+  text-transform: lowercase;
+  color: var(--jl-muted);
 }
 
 .jsonl-chip--error {
-    background: color-mix(in srgb, var(--jl-error) 18%, transparent);
-    border-color: color-mix(in srgb, var(--jl-error) 35%, transparent);
-    color: var(--jl-error);
+  background: color-mix(in srgb, var(--jl-error) 18%, transparent);
+  border-color: color-mix(in srgb, var(--jl-error) 35%, transparent);
+  color: var(--jl-error);
 }
 
 .jsonl-chip--warn {
-    background: color-mix(in srgb, var(--jl-warn) 18%, transparent);
-    border-color: color-mix(in srgb, var(--jl-warn) 35%, transparent);
-    color: var(--jl-warn);
+  background: color-mix(in srgb, var(--jl-warn) 18%, transparent);
+  border-color: color-mix(in srgb, var(--jl-warn) 35%, transparent);
+  color: var(--jl-warn);
 }
 
 .jsonl-type {
-    flex: 0 0 auto;
-    padding: 0 4px;
-    border-radius: 3px;
-    font-size: 10px;
-    line-height: 14px;
-    background: color-mix(in srgb, var(--jl-fg) 10%, transparent);
-    color: var(--jl-muted);
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 14px;
+  background: color-mix(in srgb, var(--jl-fg) 10%, transparent);
+  color: var(--jl-muted);
 }
 
 .jsonl-kv {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-    font-family: var(--jl-mono);
-    font-size: var(--vscode-editor-font-size, 12.5px);
-    white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-family: var(--jl-mono);
+  font-size: var(--vscode-editor-font-size, 12.5px);
+  white-space: nowrap;
 }
 
 .jsonl-key {
-    color: var(--jl-key);
+  color: var(--jl-key);
 }
 
 .jsonl-colon {
-    color: var(--jl-muted);
+  color: var(--jl-muted);
 }
 
 .jsonl-val {
-    overflow: hidden;
-    text-overflow: ellipsis;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .jsonl-val--string {
-    color: var(--jl-string);
+  color: var(--jl-string);
 }
 
 .jsonl-val--number,
 .jsonl-val--bigint {
-    color: var(--jl-number);
+  color: var(--jl-number);
 }
 
 .jsonl-val--boolean {
-    color: var(--jl-boolean);
+  color: var(--jl-boolean);
 }
 
 .jsonl-val--null {
-    color: var(--jl-null);
-    font-style: italic;
+  color: var(--jl-null);
+  font-style: italic;
 }
 
 .jsonl-val--object,
 .jsonl-val--array {
-    color: var(--jl-muted);
+  color: var(--jl-muted);
 }
 
 .jsonl-muted {
-    color: var(--jl-muted);
+  color: var(--jl-muted);
 }
 
 .jsonl-more {
-    color: var(--jl-muted);
-    font-style: italic;
-    font-family: var(--jl-mono);
-    font-size: 11px;
+  color: var(--jl-muted);
+  font-style: italic;
+  font-family: var(--jl-mono);
+  font-size: 11px;
 }
 
 .jsonl-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    min-height: 120px;
-    color: var(--jl-muted);
-    font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 120px;
+  color: var(--jl-muted);
+  font-size: 12px;
 }
 
 /* wrapping mode: variable row height, so the virtual list is off */
 .jsonl-detail__scroll {
-    height: 100%;
-    overflow: auto;
+  height: 100%;
+  overflow: auto;
 }
 
 .jsonl-detail__tree--wrap {
-    .ant-tree-treenode {
-        align-items: flex-start;
-    }
+  .ant-tree-treenode {
+    align-items: flex-start;
+  }
 
-    .ant-tree-node-content-wrapper {
-        display: block;
-        height: auto;
-        max-width: calc(100% - 28px);
-        line-height: 1.5;
-        padding: 2px 8px 2px 2px;
-    }
+  .ant-tree-node-content-wrapper {
+    display: block;
+    height: auto;
+    max-width: calc(100% - 28px);
+    line-height: 1.5;
+    padding: 2px 8px 2px 2px;
+  }
 
-    .ant-tree-switcher {
-        line-height: 1.5;
-        padding-top: 3px;
-    }
+  .ant-tree-switcher {
+    line-height: 1.5;
+    padding-top: 3px;
+  }
 }
 
 .jsonl-kv--wrap {
-    display: inline;
-    white-space: normal;
+  display: inline;
+  white-space: normal;
 }
 
 .jsonl-val--wrap {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

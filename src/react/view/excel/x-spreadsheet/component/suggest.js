@@ -1,10 +1,10 @@
-import { h } from './element';
-import { bindClickoutside, unbindClickoutside } from './event';
-import { cssPrefix } from '../config';
-import { formulaDisplayName } from '../core/formula';
+import { h } from "./element";
+import { bindClickoutside, unbindClickoutside } from "./event";
+import { cssPrefix } from "../config";
+import { formulaDisplayName } from "../core/formula";
 
 function isDividerItem(it) {
-  return typeof it === 'object' && it !== null && it.divider === true;
+  return typeof it === "object" && it !== null && it.divider === true;
 }
 
 function stripOrphanDividers(items) {
@@ -88,17 +88,16 @@ function inputKeydownHandler(evt) {
 }
 
 export default class Suggest {
-  constructor(items, itemClick, width = '200px') {
+  constructor(items, itemClick, width = "200px") {
     this.filterItems = [];
     this.items = items;
-    this.el = h('div', `${cssPrefix}-suggest`).css('width', width).hide();
+    this.el = h("div", `${cssPrefix}-suggest`).css("width", width).hide();
     this.itemClick = itemClick;
     this.itemIndex = -1;
   }
 
   setOffset(v) {
-    this.el.cssRemoveKeys('top', 'bottom')
-      .offset(v);
+    this.el.cssRemoveKeys("top", "bottom").offset(v);
   }
 
   hide() {
@@ -125,21 +124,18 @@ export default class Suggest {
     items = stripOrphanDividers(items);
     items = items.map((it) => {
       if (isDividerItem(it)) {
-        return h('div', `${cssPrefix}-item divider`);
+        return h("div", `${cssPrefix}-item divider`);
       }
-      let title = '';
-      if (typeof it === 'object' && it !== null && it.key) {
-        if (typeof it.title === 'function') {
+      let title = "";
+      if (typeof it === "object" && it !== null && it.key) {
+        if (typeof it.title === "function") {
           // formula-style item: key is the formula name, title() returns a description hint
           const hint = it.title();
           title = formulaDisplayName(it.key);
           if (hint) {
-            const item = h('div', `${cssPrefix}-item`)
-              .children(
-                h('span', '').child(title),
-                h('div', 'label').html(hint),
-              )
-              .on('click.stop', () => {
+            const item = h("div", `${cssPrefix}-item`)
+              .children(h("span", "").child(title), h("div", "label").html(hint))
+              .on("click.stop", () => {
                 this.itemClick(it);
                 this.hide();
               });
@@ -151,19 +147,19 @@ export default class Suggest {
         } else {
           title = formulaDisplayName(it.key);
         }
-      } else if (typeof it === 'object' && it !== null && it.title) {
-        title = typeof it.title === 'function' ? it.title() : it.title;
+      } else if (typeof it === "object" && it !== null && it.title) {
+        title = typeof it.title === "function" ? it.title() : it.title;
       } else {
         title = it;
       }
-      const item = h('div', `${cssPrefix}-item`)
+      const item = h("div", `${cssPrefix}-item`)
         .child(title)
-        .on('click.stop', () => {
+        .on("click.stop", () => {
           this.itemClick(it);
           this.hide();
         });
       if (it.label) {
-        item.child(h('div', 'label').html(it.label));
+        item.child(h("div", "label").html(it.label));
       }
       return item;
     });
@@ -173,11 +169,15 @@ export default class Suggest {
     }
     const { el } = this;
     // items[0].toggle();
-    el.html('').children(...items).show();
-    bindClickoutside(el.parent(), () => { this.hide(); });
+    el.html("")
+      .children(...items)
+      .show();
+    bindClickoutside(el.parent(), () => {
+      this.hide();
+    });
   }
 
   bindInputEvents(input) {
-    input.on('keydown', evt => inputKeydownHandler.call(this, evt));
+    input.on("keydown", (evt) => inputKeydownHandler.call(this, evt));
   }
 }

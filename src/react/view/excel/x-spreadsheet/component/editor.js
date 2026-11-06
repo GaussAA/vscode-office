@@ -1,10 +1,10 @@
 //* global window */
-import { h } from './element';
-import Suggest from './suggest';
-import Datepicker from './datepicker';
-import { cssPrefix } from '../config';
-import { getFontSizePxByPt } from '../core/font';
-import { resolveExcelCellBg, resolveExcelCellColor } from '../../theme';
+import { h } from "./element";
+import Suggest from "./suggest";
+import Datepicker from "./datepicker";
+import { cssPrefix } from "../config";
+import { getFontSizePxByPt } from "../core/font";
+import { resolveExcelCellBg, resolveExcelCellColor } from "../../theme";
 // import { mouseMoveUp } from '../event';
 
 const EDITOR_CELL_HORIZONTAL_PADDING = 20;
@@ -19,46 +19,44 @@ function applyTextareaLayout(editor, fontSizePt) {
   const sizePx = getFontSizePxByPt(fontSizePt ?? 11);
   const lineH = sizePx + 2;
   const contentHeight = height - EDITOR_AREA_BORDER_INSET;
-  textEl.css('box-sizing', 'border-box');
-  textEl.css('line-height', `${lineH}px`);
-  textEl.css('height', `${contentHeight}px`);
+  textEl.css("box-sizing", "border-box");
+  textEl.css("line-height", `${lineH}px`);
+  textEl.css("height", `${contentHeight}px`);
   const paddingTop = Math.max(0, Math.round((contentHeight - lineH) / 2));
-  textEl.css('padding-top', `${paddingTop}px`);
-  textEl.css('padding-bottom', '0');
+  textEl.css("padding-top", `${paddingTop}px`);
+  textEl.css("padding-bottom", "0");
 }
 
-function buildEditorFontCss(font, defaultFontName = 'Arial') {
+function buildEditorFontCss(font, defaultFontName = "Arial") {
   const sizePx = getFontSizePxByPt(font?.size ?? 11);
   const parts = [];
-  if (font?.italic) parts.push('italic');
-  if (font?.bold) parts.push('bold');
+  if (font?.italic) parts.push("italic");
+  if (font?.bold) parts.push("bold");
   parts.push(`${sizePx}px`);
   const name = (font?.name || defaultFontName).replace(/"/g, '\\"');
   parts.push(`"${name}"`);
-  return parts.join(' ');
+  return parts.join(" ");
 }
 
 function resetTextareaSize() {
-  const {
-    areaEl, areaOffset, suggest, suggestPosition, textEl,
-  } = this;
+  const { areaEl, areaOffset, suggest, suggestPosition, textEl } = this;
   if (!areaOffset) return;
 
   window.requestAnimationFrame(() => {
     if (!this.areaOffset || !suggest) return;
     const textarea = textEl.el;
-    const lineCount = textarea.value.split('\n').length;
+    const lineCount = textarea.value.split("\n").length;
     if (lineCount > 1) {
-      textEl.css('padding-top', '0');
+      textEl.css("padding-top", "0");
     } else {
       applyTextareaLayout(this, this.editorFontSizePt ?? 11);
     }
     if (textarea.scrollHeight > textarea.clientHeight + 1) {
-      textEl.css('padding-top', '0');
+      textEl.css("padding-top", "0");
     }
-    textEl.css('overflow-y', textarea.scrollHeight > textarea.clientHeight + 1 ? 'auto' : 'hidden');
+    textEl.css("overflow-y", textarea.scrollHeight > textarea.clientHeight + 1 ? "auto" : "hidden");
     const sOffset = { left: 0 };
-    sOffset[suggestPosition || 'top'] = areaEl.offset().height;
+    sOffset[suggestPosition || "top"] = areaEl.offset().height;
     suggest.setOffset(sOffset);
   });
 }
@@ -79,7 +77,7 @@ function keydownEventHandler(evt) {
   if (keyCode !== 13 && keyCode !== 9) evt.stopPropagation();
   if (keyCode === 27) {
     evt.preventDefault();
-    this.change('cancel', this.inputText);
+    this.change("cancel", this.inputText);
     return;
   }
   // macOS Option key inserts special symbols; allow Option+Enter for newline only
@@ -88,7 +86,7 @@ function keydownEventHandler(evt) {
     return;
   }
   if (keyCode === 13 && altKey) {
-    insertText.call(this, evt, '\n');
+    insertText.call(this, evt, "\n");
     evt.stopPropagation();
   }
   if (keyCode === 13 && !altKey) {
@@ -96,7 +94,7 @@ function keydownEventHandler(evt) {
     this.clear();
   }
   // 不知道为什么单元格事件被吞了, Windows上正常
-  if (evt.metaKey && navigator.userAgent.includes('Mac OS')) {
+  if (evt.metaKey && navigator.userAgent.includes("Mac OS")) {
     const newEvent = new evt.constructor(evt.type, evt);
     document.body.dispatchEvent(newEvent);
   }
@@ -109,16 +107,16 @@ function inputEventHandler(evt) {
   const { cell } = this;
   this.referenceRange = null;
   if (cell !== null) {
-    if (('editable' in cell && cell.editable === true) || (cell.editable === undefined)) {
+    if (("editable" in cell && cell.editable === true) || cell.editable === undefined) {
       this.inputText = v;
       if (validator) {
-        if (validator.type === 'list') {
+        if (validator.type === "list") {
           suggest.search(v);
         } else {
           suggest.hide();
         }
       } else {
-        const start = v.lastIndexOf('=');
+        const start = v.lastIndexOf("=");
         if (start !== -1) {
           suggest.search(v.substring(start + 1));
         } else {
@@ -127,20 +125,20 @@ function inputEventHandler(evt) {
       }
       textlineEl.html(v);
       resetTextareaSize.call(this);
-      this.change('input', v);
+      this.change("input", v);
     } else {
-      evt.target.value = cell.text || '';
+      evt.target.value = cell.text || "";
     }
   } else {
     this.inputText = v;
     if (validator) {
-      if (validator.type === 'list') {
+      if (validator.type === "list") {
         suggest.search(v);
       } else {
         suggest.hide();
       }
     } else {
-      const start = v.lastIndexOf('=');
+      const start = v.lastIndexOf("=");
       if (start !== -1) {
         suggest.search(v.substring(start + 1));
       } else {
@@ -149,7 +147,7 @@ function inputEventHandler(evt) {
     }
     textlineEl.html(v);
     resetTextareaSize.call(this);
-    this.change('input', v);
+    this.change("input", v);
   }
 }
 
@@ -174,17 +172,17 @@ function setText(text, position) {
 function suggestItemClick(it) {
   const { inputText, validator } = this;
   let position = 0;
-  if (validator && validator.type === 'list') {
+  if (validator && validator.type === "list") {
     this.inputText = it;
     position = this.inputText.length;
   } else {
-    const start = inputText.lastIndexOf('=');
+    const start = inputText.lastIndexOf("=");
     const sit = inputText.substring(0, start + 1);
     let eit = inputText.substring(start + 1);
-    if (eit.indexOf(')') !== -1) {
-      eit = eit.substring(eit.indexOf(')'));
+    if (eit.indexOf(")") !== -1) {
+      eit = eit.substring(eit.indexOf(")"));
     } else {
-      eit = '';
+      eit = "";
     }
     this.inputText = `${sit + it.key}(`;
     // console.log('inputText:', this.inputText);
@@ -229,28 +227,27 @@ export default class Editor {
       this.setText(dateFormat(d));
       this.clear();
     });
-    this.areaEl = h('div', `${cssPrefix}-editor-area`)
+    this.areaEl = h("div", `${cssPrefix}-editor-area`)
       .children(
-        this.textEl = h('textarea', '')
-          .on('input', evt => inputEventHandler.call(this, evt))
-          .on('paste.stop', () => { })
-          .on('keydown', evt => keydownEventHandler.call(this, evt)),
-        this.textlineEl = h('div', 'textline'),
+        (this.textEl = h("textarea", "")
+          .on("input", (evt) => inputEventHandler.call(this, evt))
+          .on("paste.stop", () => {})
+          .on("keydown", (evt) => keydownEventHandler.call(this, evt))),
+        (this.textlineEl = h("div", "textline")),
         this.suggest.el,
         this.datepicker.el,
       )
-      .on('mousemove.stop', () => { })
-      .on('mousedown.stop', () => { });
-    this.el = h('div', `${cssPrefix}-editor`)
-      .child(this.areaEl).hide();
+      .on("mousemove.stop", () => {})
+      .on("mousedown.stop", () => {});
+    this.el = h("div", `${cssPrefix}-editor`).child(this.areaEl).hide();
     this.suggest.bindInputEvents(this.textEl);
 
     this.areaOffset = null;
     this.freeze = { w: 0, h: 0 };
     this.cell = null;
-    this.inputText = '';
+    this.inputText = "";
     this.referenceRange = null;
-    this.change = () => { };
+    this.change = () => {};
   }
 
   setFreezeLengths(width, height) {
@@ -261,17 +258,17 @@ export default class Editor {
   clear() {
     // const { cell } = this;
     // const cellText = (cell && cell.text) || '';
-    if (this.inputText !== '') {
-      this.change('finished', this.inputText);
+    if (this.inputText !== "") {
+      this.change("finished", this.inputText);
     }
     this.cell = null;
     this.areaOffset = null;
-    this.inputText = '';
+    this.inputText = "";
     this.referenceRange = null;
     this.setFormulaTargetActive(false);
     this.el.hide();
-    this.textEl.val('');
-    this.textlineEl.html('');
+    this.textEl.val("");
+    this.textlineEl.html("");
     resetSuggestItems.call(this);
     this.datepicker.hide();
   }
@@ -279,26 +276,22 @@ export default class Editor {
   cancel() {
     this.cell = null;
     this.areaOffset = null;
-    this.inputText = '';
+    this.inputText = "";
     this.referenceRange = null;
     this.setFormulaTargetActive(false);
     this.el.hide();
-    this.textEl.val('');
-    this.textlineEl.html('');
+    this.textEl.val("");
+    this.textlineEl.html("");
     resetSuggestItems.call(this);
     this.datepicker.hide();
   }
 
-  setOffset(offset, suggestPosition = 'top') {
-    const {
-      textEl, areaEl, suggest, freeze, el,
-    } = this;
+  setOffset(offset, suggestPosition = "top") {
+    const { textEl, areaEl, suggest, freeze, el } = this;
     if (offset) {
       this.areaOffset = offset;
       this.suggestPosition = suggestPosition;
-      const {
-        left, top, width, height, l, t,
-      } = offset;
+      const { left, top, width, height, l, t } = offset;
       const elOffset = { left: 0, top: 0 };
       if (freeze.w > l && freeze.h > t) {
         //
@@ -312,11 +305,11 @@ export default class Editor {
       }
       el.offset(elOffset);
       areaEl.offset({ left: left - elOffset.left, top: top - elOffset.top, width });
-      areaEl.css('height', `${height}px`);
-      areaEl.css('min-height', `${height}px`);
-      areaEl.css('overflow', 'hidden');
+      areaEl.css("height", `${height}px`);
+      areaEl.css("min-height", `${height}px`);
+      areaEl.css("overflow", "hidden");
       textEl.offset({ width: width - EDITOR_CELL_HORIZONTAL_PADDING });
-      textEl.cssRemoveKeys('min-height');
+      textEl.cssRemoveKeys("min-height");
       applyTextareaLayout(this, 11);
       resetTextareaSize.call(this);
       suggest.hide();
@@ -330,7 +323,7 @@ export default class Editor {
     const { el, datepicker, suggest } = this;
     el.show();
     this.cell = cell;
-    const text = (cell && cell.text) || '';
+    const text = (cell && cell.text) || "";
     this.setText(text);
     if (cellStyle) {
       this.applyCellStyle(cellStyle);
@@ -339,15 +332,15 @@ export default class Editor {
     this.validator = validator;
     if (validator) {
       const { type } = validator;
-      if (type === 'date') {
+      if (type === "date") {
         datepicker.show();
         if (!/^\s*$/.test(text)) {
           datepicker.setValue(text);
         }
       }
-      if (type === 'list') {
+      if (type === "list") {
         suggest.setItems(validator.values());
-        suggest.search('');
+        suggest.search("");
       }
     }
   }
@@ -375,7 +368,7 @@ export default class Editor {
     const nextPosition = start + referenceText.length;
     this.referenceRange = { start, end: nextPosition };
     updateEditorText(this, nextText, nextPosition);
-    this.change('input', nextText);
+    this.change("input", nextText);
   }
 
   setFormulaReferenceRange(start, end) {
@@ -387,7 +380,7 @@ export default class Editor {
   }
 
   setFormulaTargetActive(active) {
-    this.el.active(active, 'formula-target-mode');
+    this.el.active(active, "formula-target-mode");
   }
 
   applyCellStyle(cellStyle) {
@@ -397,16 +390,16 @@ export default class Editor {
     if (font) {
       const fontCss = buildEditorFontCss(font);
       const lineHeight = `${getFontSizePxByPt(font.size ?? 11) + 2}px`;
-      textEl.css('font', fontCss);
-      textlineEl.css('font', fontCss);
-      textlineEl.css('line-height', lineHeight);
+      textEl.css("font", fontCss);
+      textlineEl.css("font", fontCss);
+      textlineEl.css("line-height", lineHeight);
       applyTextareaLayout(this, font.size ?? 11);
       resetTextareaSize.call(this);
     }
     const color = resolveExcelCellColor(cellStyle.color);
-    textEl.css('color', color);
-    textlineEl.css('color', color);
-    areaEl.css('background-color', resolveExcelCellBg(cellStyle.bgcolor));
-    textEl.css('background-color', 'transparent');
+    textEl.css("color", color);
+    textlineEl.css("color", color);
+    areaEl.css("background-color", resolveExcelCellBg(cellStyle.bgcolor));
+    textEl.css("background-color", "transparent");
   }
 }

@@ -1,6 +1,6 @@
-import { h } from './element';
-import { cssPrefix } from '../config';
-import { expr2xy, xy2expr } from '../core/alphabet';
+import { h } from "./element";
+import { cssPrefix } from "../config";
+import { expr2xy, xy2expr } from "../core/alphabet";
 
 export default class FormulaBar {
   constructor(data, onCommit, onInput, onNavigate) {
@@ -10,53 +10,52 @@ export default class FormulaBar {
     this.onNavigate = onNavigate;
     this.editing = false;
     this.changed = false;
-    this.originalValue = '';
+    this.originalValue = "";
 
-    this.nameEl = h('input', `${cssPrefix}-formula-bar-name`).attr({
-      type: 'text',
-      spellcheck: 'false',
-      autocomplete: 'off',
-      title: 'Go to cell',
-      'aria-label': 'Cell address',
+    this.nameEl = h("input", `${cssPrefix}-formula-bar-name`).attr({
+      type: "text",
+      spellcheck: "false",
+      autocomplete: "off",
+      title: "Go to cell",
+      "aria-label": "Cell address",
     });
-    this.inputEl = h('input', `${cssPrefix}-formula-bar-input`).attr({
-      type: 'text',
-      spellcheck: 'false',
-      autocomplete: 'off',
-      'aria-label': 'Cell content',
+    this.inputEl = h("input", `${cssPrefix}-formula-bar-input`).attr({
+      type: "text",
+      spellcheck: "false",
+      autocomplete: "off",
+      "aria-label": "Cell content",
     });
-    this.el = h('div', `${cssPrefix}-formula-bar`)
-      .children(this.nameEl, this.inputEl);
+    this.el = h("div", `${cssPrefix}-formula-bar`).children(this.nameEl, this.inputEl);
 
-    this.nameEl.on('focus', () => this.nameEl.el.select());
-    this.nameEl.on('keydown', (evt) => {
+    this.nameEl.on("focus", () => this.nameEl.el.select());
+    this.nameEl.on("keydown", (evt) => {
       evt.stopPropagation();
-      if (evt.key === 'Enter') {
+      if (evt.key === "Enter") {
         evt.preventDefault();
         this.nameEl.el.blur();
-      } else if (evt.key === 'Escape') {
+      } else if (evt.key === "Escape") {
         evt.preventDefault();
         this.updateAddress();
         this.nameEl.el.blur();
       }
     });
-    this.nameEl.on('blur', () => this.navigateToAddress());
+    this.nameEl.on("blur", () => this.navigateToAddress());
 
-    this.inputEl.on('focus', () => {
+    this.inputEl.on("focus", () => {
       this.editing = true;
       this.changed = false;
       this.originalValue = this.inputEl.val();
     });
-    this.inputEl.on('input', () => {
+    this.inputEl.on("input", () => {
       this.changed = true;
       this.onInput(this.inputEl.val());
     });
-    this.inputEl.on('keydown', (evt) => {
+    this.inputEl.on("keydown", (evt) => {
       evt.stopPropagation();
-      if (evt.key === 'Enter') {
+      if (evt.key === "Enter") {
         evt.preventDefault();
         this.inputEl.el.blur();
-      } else if (evt.key === 'Escape') {
+      } else if (evt.key === "Escape") {
         evt.preventDefault();
         this.inputEl.val(this.originalValue);
         if (this.changed) this.onInput(this.originalValue);
@@ -65,7 +64,7 @@ export default class FormulaBar {
         this.inputEl.el.blur();
       }
     });
-    this.inputEl.on('blur', () => {
+    this.inputEl.on("blur", () => {
       const nextValue = this.inputEl.val();
       const shouldCommit = this.editing && this.changed && nextValue !== this.originalValue;
       this.editing = false;
@@ -78,15 +77,15 @@ export default class FormulaBar {
 
   resetData(data) {
     this.data = data;
-    const readOnly = data.settings.mode === 'read';
-    this.inputEl.attr('readonly', readOnly ? 'readonly' : null);
-    if (!readOnly) this.inputEl.removeAttr('readonly');
+    const readOnly = data.settings.mode === "read";
+    this.inputEl.attr("readonly", readOnly ? "readonly" : null);
+    if (!readOnly) this.inputEl.removeAttr("readonly");
     this.update();
   }
 
   updateAddress() {
     const { ri, ci } = this.data.selector;
-    this.nameEl.val(ri >= 0 && ci >= 0 ? xy2expr(ci, ri) : '');
+    this.nameEl.val(ri >= 0 && ci >= 0 ? xy2expr(ci, ri) : "");
   }
 
   navigateToAddress() {
@@ -105,12 +104,12 @@ export default class FormulaBar {
 
   update(text) {
     const { ri, ci } = this.data.selector;
-    this.nameEl.val(ri >= 0 && ci >= 0 ? xy2expr(ci, ri) : '');
+    this.nameEl.val(ri >= 0 && ci >= 0 ? xy2expr(ci, ri) : "");
     if (!this.editing) {
       const cell = this.data.getSelectedCell();
-      this.inputEl.val(text !== undefined ? text : ((cell && cell.text) || ''));
+      this.inputEl.val(text !== undefined ? text : (cell && cell.text) || "");
     }
     const editable = ri >= 0 && ci >= 0 && this.data.canEditCell(ri, ci);
-    this.inputEl.disabled(!editable || this.data.settings.mode === 'read');
+    this.inputEl.disabled(!editable || this.data.settings.mode === "read");
   }
 }

@@ -12,14 +12,14 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 
 ## 已经查过的现状（2026-11-06）
 
-| 事实 | 怎么查的 | 结论 |
-|---|---|---|
-| Marketplace 上没有 `GaussAA.office-viewer-plus` | Gallery `extensionquery` API，`filterType: 7` | 未发布过 |
-| 同一个查询能查到上游 `cweijan.vscode-office` v4.2.3 | 同上 | 说明查询本身有效，上一条的"查不到"是有意义的 |
-| Open VSX 上没有 `GaussAA/office-viewer-plus` | `GET https://open-vsx.org/api/GaussAA/office-viewer-plus` | 404 |
-| Open VSX 没有 `GaussAA` 命名空间 | `GET https://open-vsx.org/api/namespace/GaussAA` | 404 |
-| 仓库里没有任何发布用 secret | `gh secret list` | 空（符合设计：两边都不存 secret） |
-| 仓库是**公开**的 | `gh repo view` | 公开 —— Open VSX 的私有仓库注册码流程用不上 |
+| 事实                                                | 怎么查的                                                  | 结论                                         |
+| --------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------- |
+| Marketplace 上没有 `GaussAA.office-viewer-plus`     | Gallery `extensionquery` API，`filterType: 7`             | 未发布过                                     |
+| 同一个查询能查到上游 `cweijan.vscode-office` v4.2.3 | 同上                                                      | 说明查询本身有效，上一条的"查不到"是有意义的 |
+| Open VSX 上没有 `GaussAA/office-viewer-plus`        | `GET https://open-vsx.org/api/GaussAA/office-viewer-plus` | 404                                          |
+| Open VSX 没有 `GaussAA` 命名空间                    | `GET https://open-vsx.org/api/namespace/GaussAA`          | 404                                          |
+| 仓库里没有任何发布用 secret                         | `gh secret list`                                          | 空（符合设计：两边都不存 secret）            |
+| 仓库是**公开**的                                    | `gh repo view`                                            | 公开 —— Open VSX 的私有仓库注册码流程用不上  |
 
 所以这不是"把已有的 PAT 发布改成 OIDC"，而是**两个仓库的首次发布**。这降低了风险：
 没有已存在的版本会被占用，首次失败也不会留下半个版本。
@@ -40,13 +40,13 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 
 在 publisher 页面 → **Trusted Publishing** → 展开 **Create**，填：
 
-| 字段 | 值 | 注意 |
-|---|---|---|
-| Policy name | `Release workflow` | 只是给人看的 |
-| Repository owner | `GaussAA` | 精确的 GitHub 登录名 |
-| Repository | `vscode-office` | 不带 owner |
-| Workflow | `release.yml` | `.github/workflows` 下的文件名 |
-| Environment | **留空** | 我们的 workflow 没有 `environment:`；填了就会对不上 |
+| 字段             | 值                 | 注意                                                |
+| ---------------- | ------------------ | --------------------------------------------------- |
+| Policy name      | `Release workflow` | 只是给人看的                                        |
+| Repository owner | `GaussAA`          | 精确的 GitHub 登录名                                |
+| Repository       | `vscode-office`    | 不带 owner                                          |
+| Workflow         | `release.yml`      | `.github/workflows` 下的文件名                      |
+| Environment      | **留空**           | 我们的 workflow 没有 `environment:`；填了就会对不上 |
 
 点 **Create**。
 
@@ -143,7 +143,7 @@ curl -s https://open-vsx.org/api/GaussAA/office-viewer-plus | head -c 200
 ## D. 一半成功怎么办
 
 版本号不能被复用，所以"Marketplace 成功、Open VSX 失败"之后重跑整个 job 会卡在 Marketplace
-的 *already exists*。为此 `workflow_dispatch` 提供了两个开关：
+的 _already exists_。为此 `workflow_dispatch` 提供了两个开关：
 
 **Actions → Release → Run workflow**，把 `publish_marketplace` 取消勾选、`publish_openvsx` 保持勾选，
 用**同一个 tag** 重跑。
@@ -156,17 +156,17 @@ curl -s https://open-vsx.org/api/GaussAA/office-viewer-plus | head -c 200
 
 ## E. 哪些是自动的，哪些只能人做
 
-| 项目 | 谁负责 |
-|---|---|
-| 图标是 PNG 且 ≥128px | `check:release` |
-| `version` 是 `major.minor.patch`（Marketplace 不接受 semver 预发布后缀） | `check:release` |
-| tag 与 `version` 一致 | `check:release` |
-| `README` / `LICENSE` / `CHANGELOG` 存在、`license` 字段存在 | `check:release` |
-| `l10n` 目录与 `package.json.l10n` | `check:release` |
+| 项目                                                                       | 谁负责          |
+| -------------------------------------------------------------------------- | --------------- |
+| 图标是 PNG 且 ≥128px                                                       | `check:release` |
+| `version` 是 `major.minor.patch`（Marketplace 不接受 semver 预发布后缀）   | `check:release` |
+| tag 与 `version` 一致                                                      | `check:release` |
+| `README` / `LICENSE` / `CHANGELOG` 存在、`license` 字段存在                | `check:release` |
+| `l10n` 目录与 `package.json.l10n`                                          | `check:release` |
 | 工作流有 `id-token: write`、`--oidc`、`--trusted-publishing`，且不引用 PAT | `check:release` |
-| **Marketplace 受信策略存在且字段匹配** | 人（A2） |
-| **Open VSX 命名空间存在、已主张所有权** | 人（B1） |
-| **Open VSX 受信发布者已注册** | 人（B2） |
+| **Marketplace 受信策略存在且字段匹配**                                     | 人（A2）        |
+| **Open VSX 命名空间存在、已主张所有权**                                    | 人（B1）        |
+| **Open VSX 受信发布者已注册**                                              | 人（B2）        |
 
 最后三项无法在仓库里验证——需要登录态。它们的失败信息分别是
 "trusted publishing policy not found"（Marketplace）和 "no matching trusted publisher"（Open VSX），
@@ -176,11 +176,11 @@ curl -s https://open-vsx.org/api/GaussAA/office-viewer-plus | head -c 200
 
 截止日期只影响**一条**路径，值得说清楚，免得把 2026-12-01 理解成"之后就不能发布了"。
 
-| 路径 | 2026-12-01 之后 |
-|---|---|
-| `vsce publish` + PAT（本地或 CI） | **失效** —— Marketplace 的认证就是 Azure DevOps，全局 PAT 退役 |
-| `vsce publish --oidc`（本仓库的 CI） | 可用，前提是 A2 配好 |
-| **手动上传 vsix** | **仍然可用** —— 浏览器会话，不涉及 PAT |
+| 路径                                 | 2026-12-01 之后                                                |
+| ------------------------------------ | -------------------------------------------------------------- |
+| `vsce publish` + PAT（本地或 CI）    | **失效** —— Marketplace 的认证就是 Azure DevOps，全局 PAT 退役 |
+| `vsce publish --oidc`（本仓库的 CI） | 可用，前提是 A2 配好                                           |
+| **手动上传 vsix**                    | **仍然可用** —— 浏览器会话，不涉及 PAT                         |
 
 手动上传的操作：本地 `pnpm run package`，打开
 <https://marketplace.visualstudio.com/manage>，在扩展页面选择上传 vsix。代价是每次发布都要人做，

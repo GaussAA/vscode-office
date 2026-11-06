@@ -64,28 +64,28 @@ Not all of it is installed from npm, and the two kinds are different things (see
 - **Copy** — a project we host almost unchanged. Its delta against upstream is far smaller
   than upstream itself. We owe attribution and nothing else.
 - **Fork** — a project we have written a lot of our own code into, so that it now evolves
-  independently. Upstream may have moved on; we owe attribution *and* maintenance.
+  independently. Upstream may have moved on; we owe attribution _and_ maintenance.
 
 Licenses require attribution, which this section provides. Copyright remains with the
 original authors.
 
 ### Copies
 
-| Path | Project | License | Upstream |
-| --- | --- | --- | --- |
-| `resource/pdf/` | `pdf.js` 3.1.81 — a prebuilt `pdfjs-dist` web viewer plus `cmaps/` and `standard_fonts/` | Apache-2.0 | https://github.com/mozilla/pdf.js |
-| `icons/` (26 SVGs) + `theme/material-icons.json` | Derived from `vscode-material-icon-theme`, reduced to the file formats this extension opens | MIT | https://github.com/PKief/vscode-material-icon-theme |
-| `public/woff2_decompress_binding.js` | `woff2` compiled to JavaScript with Emscripten; decodes fonts for the font viewer | MIT | https://github.com/google/woff2 |
-| `resource/java-decompiler.jar` | `java-decompiler` — the IntelliJ Platform's Java decompiler, run headless by the `.class` viewer | Apache-2.0 | https://github.com/JetBrains/intellij-community |
+| Path                                             | Project                                                                                          | License    | Upstream                                            |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------- |
+| `resource/pdf/`                                  | `pdf.js` 3.1.81 — a prebuilt `pdfjs-dist` web viewer plus `cmaps/` and `standard_fonts/`         | Apache-2.0 | https://github.com/mozilla/pdf.js                   |
+| `icons/` (26 SVGs) + `theme/material-icons.json` | Derived from `vscode-material-icon-theme`, reduced to the file formats this extension opens      | MIT        | https://github.com/PKief/vscode-material-icon-theme |
+| `public/woff2_decompress_binding.js`             | `woff2` compiled to JavaScript with Emscripten; decodes fonts for the font viewer                | MIT        | https://github.com/google/woff2                     |
+| `resource/java-decompiler.jar`                   | `java-decompiler` — the IntelliJ Platform's Java decompiler, run headless by the `.class` viewer | Apache-2.0 | https://github.com/JetBrains/intellij-community     |
 
 (`pretty-bytes` used to be copied in; it is now the npm dependency it always was.)
 
 ### Forks
 
-| Path | Project | License | Upstream | Our delta |
-| --- | --- | --- | --- | --- |
-| `vditor/` | `Vditor` — the Markdown editor the webview runs. Its own pnpm workspace package with its own build (`vite/vditorPlugin.ts`). Forked once by upstream Office Viewer (`vscode-ext-studio/vditor`), then heavily modified here | MIT | https://github.com/Vanessa219/vditor | ~+12k lines: CodeMirror 6 code blocks, wikilinks, editor theming, find bar, VS Code glue |
-| `src/react/view/excel/x-spreadsheet/` | `x-data-spreadsheet` — the spreadsheet engine behind the `.xlsx/.csv/.ods` viewer (patch applied upstream in `48b10e4`) | MIT | https://github.com/myliang/x-spreadsheet | ~+3.2k/−1k lines over 45 files: toolbar icons, hyperlink/formula bar/sheet images, clipboard, find |
+| Path                                  | Project                                                                                                                                                                                                                     | License | Upstream                                 | Our delta                                                                                          |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `vditor/`                             | `Vditor` — the Markdown editor the webview runs. Its own pnpm workspace package with its own build (`vite/vditorPlugin.ts`). Forked once by upstream Office Viewer (`vscode-ext-studio/vditor`), then heavily modified here | MIT     | https://github.com/Vanessa219/vditor     | ~+12k lines: CodeMirror 6 code blocks, wikilinks, editor theming, find bar, VS Code glue           |
+| `src/react/view/excel/x-spreadsheet/` | `x-data-spreadsheet` — the spreadsheet engine behind the `.xlsx/.csv/.ods` viewer (patch applied upstream in `48b10e4`)                                                                                                     | MIT     | https://github.com/myliang/x-spreadsheet | ~+3.2k/−1k lines over 45 files: toolbar icons, hyperlink/formula bar/sheet images, clipboard, find |
 
 `vditor/src/js/` also carries prebuilt third-party runtimes that Vditor ships and loads at
 runtime rather than importing: **Lute** (the Go markdown engine, `lute.min.js` 3.5 MB),
@@ -100,7 +100,3 @@ it, we read the diff and reimplement it rather than merging its history. Upstrea
 rewritten; the discipline that replaces "keep it mergeable" is "one change per commit, and each
 commit can be reverted on its own". See
 [docs/adr/0002-independent-evolution.md](./docs/adr/0002-independent-evolution.md).
-
-
-
-

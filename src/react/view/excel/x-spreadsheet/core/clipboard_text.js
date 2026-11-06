@@ -5,7 +5,7 @@ function needsTsvQuoting(text) {
 }
 
 function escapeTsvField(value) {
-  const text = value == null ? '' : String(value);
+  const text = value == null ? "" : String(value);
   if (!needsTsvQuoting(text)) return text;
   return `"${text.replace(/"/g, '""')}"`;
 }
@@ -18,9 +18,9 @@ export function formatTsvRows(rows) {
     for (let j = 0; j < row.length; j += 1) {
       cells.push(escapeTsvField(row[j]));
     }
-    lines.push(cells.join('\t'));
+    lines.push(cells.join("\t"));
   }
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 export function parseTsvRows(text) {
@@ -28,7 +28,7 @@ export function parseTsvRows(text) {
 
   const rows = [];
   let row = [];
-  let field = '';
+  let field = "";
   let inQuotes = false;
   let i = 0;
 
@@ -57,30 +57,30 @@ export function parseTsvRows(text) {
       continue;
     }
 
-    if (ch === '\t') {
+    if (ch === "\t") {
       row.push(field);
-      field = '';
+      field = "";
       i += 1;
       continue;
     }
 
-    if (ch === '\r') {
+    if (ch === "\r") {
       i += 1;
-      if (text[i] === '\n') i += 1;
+      if (text[i] === "\n") i += 1;
       row.push(field);
-      if (row.length > 1 || row[0] !== '' || rows.length > 0) {
+      if (row.length > 1 || row[0] !== "" || rows.length > 0) {
         rows.push(row);
       }
       row = [];
-      field = '';
+      field = "";
       continue;
     }
 
-    if (ch === '\n') {
+    if (ch === "\n") {
       row.push(field);
       rows.push(row);
       row = [];
-      field = '';
+      field = "";
       i += 1;
       continue;
     }
@@ -92,14 +92,14 @@ export function parseTsvRows(text) {
   if (inQuotes) {
     row.push(field);
     rows.push(row);
-  } else if (field !== '' || row.length > 0) {
+  } else if (field !== "" || row.length > 0) {
     row.push(field);
     rows.push(row);
   }
 
   if (rows.length > 0) {
     const last = rows[rows.length - 1];
-    if (last.length === 1 && last[0] === '' && text.endsWith('\n')) {
+    if (last.length === 1 && last[0] === "" && text.endsWith("\n")) {
       rows.pop();
     }
   }

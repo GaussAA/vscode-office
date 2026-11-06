@@ -1,6 +1,6 @@
 export {
-    getFileIconUrl,
-    getFolderIconUrl,
-    getIconFileName,
-    getFolderIconFileName,
-} from '../components/fileIcon';
+  getFileIconUrl,
+  getFolderIconUrl,
+  getIconFileName,
+  getFolderIconFileName,
+} from "../components/fileIcon";

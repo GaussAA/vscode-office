@@ -13,155 +13,155 @@ type WordColorMode = "light" | "adaptive";
 const WORD_COLOR_MODE_KEY = "office-word-color-mode";
 
 function loadWordColorMode(): WordColorMode {
-    const state = vscodeApi?.getState?.() as { wordColorMode?: WordColorMode } | undefined;
-    if (state?.wordColorMode === "light" || state?.wordColorMode === "adaptive") {
-        return state.wordColorMode;
+  const state = vscodeApi?.getState?.() as { wordColorMode?: WordColorMode } | undefined;
+  if (state?.wordColorMode === "light" || state?.wordColorMode === "adaptive") {
+    return state.wordColorMode;
+  }
+  try {
+    const saved = localStorage.getItem(WORD_COLOR_MODE_KEY);
+    if (saved === "light" || saved === "adaptive") {
+      return saved;
     }
-    try {
-        const saved = localStorage.getItem(WORD_COLOR_MODE_KEY);
-        if (saved === "light" || saved === "adaptive") {
-            return saved;
-        }
-    } catch { }
-    return "light";
+  } catch {}
+  return "light";
 }
 
 function saveWordColorMode(mode: WordColorMode) {
-    try {
-        localStorage.setItem(WORD_COLOR_MODE_KEY, mode);
-    } catch { }
-    if (vscodeApi?.setState) {
-        const prev = (vscodeApi.getState?.() ?? {}) as Record<string, unknown>;
-        vscodeApi.setState({ ...prev, wordColorMode: mode });
-    }
+  try {
+    localStorage.setItem(WORD_COLOR_MODE_KEY, mode);
+  } catch {}
+  if (vscodeApi?.setState) {
+    const prev = (vscodeApi.getState?.() ?? {}) as Record<string, unknown>;
+    vscodeApi.setState({ ...prev, wordColorMode: mode });
+  }
 }
 
 interface WordOpenPayload {
-    path?: string;
-    buffer?: number[];
-    error?: string;
-    readOnly?: boolean;
-    fileName?: string;
-    documentCacheId?: string;
-    nonce?: number;
+  path?: string;
+  buffer?: number[];
+  error?: string;
+  readOnly?: boolean;
+  fileName?: string;
+  documentCacheId?: string;
+  nonce?: number;
 }
 
 export default function Word() {
-    const editorRef = useRef<DocxEditorRef>(null);
-    const readOnlyRef = useRef(false);
-    const [colorMode, setColorMode] = useState<WordColorMode>(loadWordColorMode);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [readOnly, setReadOnly] = useState(false);
-    const [documentBuffer, setDocumentBuffer] = useState<ArrayBuffer | undefined>(undefined);
-    const [documentKey, setDocumentKey] = useState("");
-    const [fileName, setFileName] = useState("");
+  const editorRef = useRef<DocxEditorRef>(null);
+  const readOnlyRef = useRef(false);
+  const [colorMode, setColorMode] = useState<WordColorMode>(loadWordColorMode);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [readOnly, setReadOnly] = useState(false);
+  const [documentBuffer, setDocumentBuffer] = useState<ArrayBuffer | undefined>(undefined);
+  const [documentKey, setDocumentKey] = useState("");
+  const [fileName, setFileName] = useState("");
 
-    const adaptiveColorMode = colorMode === "adaptive";
+  const adaptiveColorMode = colorMode === "adaptive";
 
-    const toggleColorMode = () => {
-        setColorMode((prev) => {
-            const next: WordColorMode = prev === "adaptive" ? "light" : "adaptive";
-            saveWordColorMode(next);
-            return next;
-        });
+  const toggleColorMode = () => {
+    setColorMode((prev) => {
+      const next: WordColorMode = prev === "adaptive" ? "light" : "adaptive";
+      saveWordColorMode(next);
+      return next;
+    });
+  };
+
+  const emitSave = useCallback((buffer: ArrayBuffer) => {
+    handler.emit("save", Array.from(new Uint8Array(buffer)));
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    const buffer = await editorRef.current?.save();
+    if (!buffer) {
+      return;
+    }
+    emitSave(buffer);
+  }, [emitSave]);
+
+  const loadDocument = useCallback(async (payload: WordOpenPayload) => {
+    setLoading(true);
+    setError(null);
+    setDocumentBuffer(undefined);
+
+    try {
+      const fileReadOnly = payload.readOnly === true;
+      readOnlyRef.current = fileReadOnly;
+      setReadOnly(fileReadOnly);
+      setFileName(payload.fileName ?? "");
+      setDocumentKey(`${payload.documentCacheId ?? ""}-${payload.nonce ?? Date.now()}`);
+      const buffer = await loadOfficeBuffer(payload);
+      setDocumentBuffer(buffer);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load document");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    handler
+      .on("open", (payload: WordOpenPayload) => {
+        void loadDocument(payload);
+      })
+      .emit("init");
+  }, [loadDocument]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
+        e.preventDefault();
+        void handleSave();
+      }
     };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleSave]);
 
-    const emitSave = useCallback((buffer: ArrayBuffer) => {
-        handler.emit("save", Array.from(new Uint8Array(buffer)));
-    }, []);
-
-    const handleSave = useCallback(async () => {
-        const buffer = await editorRef.current?.save();
-        if (!buffer) {
-            return;
-        }
-        emitSave(buffer);
-    }, [emitSave]);
-
-    const loadDocument = useCallback(async (payload: WordOpenPayload) => {
-        setLoading(true);
-        setError(null);
-        setDocumentBuffer(undefined);
-
-        try {
-            const fileReadOnly = payload.readOnly === true;
-            readOnlyRef.current = fileReadOnly;
-            setReadOnly(fileReadOnly);
-            setFileName(payload.fileName ?? "");
-            setDocumentKey(`${payload.documentCacheId ?? ""}-${payload.nonce ?? Date.now()}`);
-            const buffer = await loadOfficeBuffer(payload);
-            setDocumentBuffer(buffer);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "Failed to load document");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        handler
-            .on("open", (payload: WordOpenPayload) => {
-                void loadDocument(payload);
-            })
-            .emit("init");
-    }, [loadDocument]);
-
-    useEffect(() => {
-        const onKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
-                e.preventDefault();
-                void handleSave();
-            }
-        };
-        window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
-    }, [handleSave]);
-
-    return (
-        <div className={`word-viewer${adaptiveColorMode ? " word-viewer--vscode-theme" : ""}`}>
-            <button
-                type="button"
-                className="dark-mode-toggle"
-                title={adaptiveColorMode ? "切换亮色" : "切换暗色（跟随 VS Code 主题）"}
-                aria-label={adaptiveColorMode ? "Switch to light mode" : "Switch to adaptive dark mode"}
-                onClick={toggleColorMode}
-            >
-                {adaptiveColorMode ? <SunOutlined /> : <MoonOutlined />}
-            </button>
-            <Spin spinning={loading} fullscreen />
-            {error && <Alert type="error" message={error} showIcon style={{ margin: 16 }} />}
-            {readOnly && !loading && !error && documentBuffer && (
-                <div className="word-readonly-banner">Read-only — edits will be saved to a new file</div>
-            )}
-            {documentBuffer && !loading && !error && (
-                <>
-                    <DocxEditor
-                        key={documentKey}
-                        ref={editorRef}
-                        className="word-editor"
-                        // The package owns the title bar, menu bar and toolbar. We used to
-                        // hand-build a chrome of one button; reusing theirs is the whole
-                        // point of the swap, and it is the part that stays maintained.
-                        chrome
-                        document={documentBuffer}
-                        title={fileName}
-                        mode={readOnly ? "view" : "edit"}
-                        colorMode="light"
-                        onChange={() => {
-                            if (!readOnlyRef.current) {
-                                handler.emit("change");
-                            }
-                        }}
-                        onSave={() => {
-                            void handleSave();
-                        }}
-                    />
-                    <footer className="word-sponsor-footer">
-                        <SponsorBar placement="right" />
-                    </footer>
-                </>
-            )}
-        </div>
-    );
+  return (
+    <div className={`word-viewer${adaptiveColorMode ? " word-viewer--vscode-theme" : ""}`}>
+      <button
+        type="button"
+        className="dark-mode-toggle"
+        title={adaptiveColorMode ? "切换亮色" : "切换暗色（跟随 VS Code 主题）"}
+        aria-label={adaptiveColorMode ? "Switch to light mode" : "Switch to adaptive dark mode"}
+        onClick={toggleColorMode}
+      >
+        {adaptiveColorMode ? <SunOutlined /> : <MoonOutlined />}
+      </button>
+      <Spin spinning={loading} fullscreen />
+      {error && <Alert type="error" message={error} showIcon style={{ margin: 16 }} />}
+      {readOnly && !loading && !error && documentBuffer && (
+        <div className="word-readonly-banner">Read-only — edits will be saved to a new file</div>
+      )}
+      {documentBuffer && !loading && !error && (
+        <>
+          <DocxEditor
+            key={documentKey}
+            ref={editorRef}
+            className="word-editor"
+            // The package owns the title bar, menu bar and toolbar. We used to
+            // hand-build a chrome of one button; reusing theirs is the whole
+            // point of the swap, and it is the part that stays maintained.
+            chrome
+            document={documentBuffer}
+            title={fileName}
+            mode={readOnly ? "view" : "edit"}
+            colorMode="light"
+            onChange={() => {
+              if (!readOnlyRef.current) {
+                handler.emit("change");
+              }
+            }}
+            onSave={() => {
+              void handleSave();
+            }}
+          />
+          <footer className="word-sponsor-footer">
+            <SponsorBar placement="right" />
+          </footer>
+        </>
+      )}
+    </div>
+  );
 }

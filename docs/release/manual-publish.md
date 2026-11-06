@@ -68,6 +68,7 @@ Open VSX 用**自己的**访问令牌，与 Azure DevOps 无关，**不受 2026-
 
    只建命名空间不给独占发布权，按
    [Namespace Access](https://github.com/eclipse/openvsx/wiki/Namespace-Access) 走完主张流程。
+
 3. 发布：
 
    ```bash

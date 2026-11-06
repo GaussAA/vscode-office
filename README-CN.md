@@ -91,10 +91,10 @@ Office Viewer 内置完整的 Git 历史工作区，让你无需离开 VS Code �
 
 ```json
 {
-    "workbench.editorAssociations": {
-        "*.md": "default",
-        "*.markdown": "default"
-    }
+  "workbench.editorAssociations": {
+    "*.md": "default",
+    "*.markdown": "default"
+  }
 }
 ```
 
@@ -172,8 +172,8 @@ Office Viewer 会收集**匿名使用数据**，用于了解各预览功能的�
 
 ### 收集内容
 
-| 事件 | 触发时机 | 属性 |
-|------|---------|------|
+| 事件        | 触发时机              | 属性                                                                                 |
+| ----------- | --------------------- | ------------------------------------------------------------------------------------ |
 | `view.open` | 打开自定义预览/编辑器 | `viewType`（如 `excel`、`markdown`、`pdf`）、`fileType`（仅扩展名，如 `xlsx`、`md`） |
 
 **不会**收集文件路径、文件名、URL、仓库名、请求内容或其他可识别个人身份的信息。
@@ -207,4 +207,3 @@ Office Viewer 会收集**匿名使用数据**，用于了解各预览功能的�
 - HTTP: [REST Client](https://github.com/Huachao/vscode-restclient)
 - Markdown: [Vanessa219/vditor](https://github.com/Vanessa219/vditor)
 - Material Icon theme: [PKief/vscode-material-icon-theme](https://github.com/PKief/vscode-material-icon-theme)
-

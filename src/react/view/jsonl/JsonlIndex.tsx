@@ -1,176 +1,202 @@
-import { Tree } from 'antd';
-import type { DataNode } from 'antd/es/tree';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import type { JsonlEntrySummary } from '../../../common/jsonlTypes.ts';
-import { ROW_HEIGHT, formatBytes } from './jsonlFormat.ts';
-import { highlightRuns } from '../../common/highlight.ts';
-import { $t } from '../../i18n/i18nConfig.ts';
+import { Tree } from "antd";
+import type { DataNode } from "antd/es/tree";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import type { JsonlEntrySummary } from "../../../common/jsonlTypes.ts";
+import { ROW_HEIGHT, formatBytes } from "./jsonlFormat.ts";
+import { highlightRuns } from "../../common/highlight.ts";
+import { $t } from "../../i18n/i18nConfig.ts";
 
 interface Props {
-    /** Ordered rows: a contiguous window in directory mode, the matches in search mode. */
-    items: JsonlEntrySummary[];
-    selected: number;
-    /** True while a chunk (or a search) is in flight. */
-    loading: boolean;
-    onSelect: (index: number) => void;
-    /** Undefined in search mode — there is nothing more to load. */
-    onNeedMore?: () => void;
-    header?: ReactNode;
-    emptyText?: string;
-    /** Active search term, used to highlight matches in each row. */
-    highlight?: string;
+  /** Ordered rows: a contiguous window in directory mode, the matches in search mode. */
+  items: JsonlEntrySummary[];
+  selected: number;
+  /** True while a chunk (or a search) is in flight. */
+  loading: boolean;
+  onSelect: (index: number) => void;
+  /** Undefined in search mode — there is nothing more to load. */
+  onNeedMore?: () => void;
+  header?: ReactNode;
+  emptyText?: string;
+  /** Active search term, used to highlight matches in each row. */
+  highlight?: string;
 }
 
 const PAGE_STEP = 10;
 
 /** Left pane: the directory of entries. One line = one row, never nested. */
 export default function JsonlIndex({
-    items,
-    selected,
-    loading,
-    onSelect,
-    onNeedMore,
-    header,
-    emptyText,
-    highlight,
+  items,
+  selected,
+  loading,
+  onSelect,
+  onNeedMore,
+  header,
+  emptyText,
+  highlight,
 }: Props) {
-    const containerRef = useRef<HTMLDivElement | null>(null);
-    const [height, setHeight] = useState(320);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [height, setHeight] = useState(320);
 
-    const holder = useCallback((): HTMLElement | null => {
-        return containerRef.current?.querySelector<HTMLElement>('.ant-tree-list-holder') ?? null;
-    }, []);
+  const holder = useCallback((): HTMLElement | null => {
+    return containerRef.current?.querySelector<HTMLElement>(".ant-tree-list-holder") ?? null;
+  }, []);
 
-    useEffect(() => {
-        const element = containerRef.current;
-        if (!element) return;
-        const observer = new ResizeObserver(() => setHeight(Math.max(120, element.clientHeight)));
-        observer.observe(element);
-        setHeight(Math.max(120, element.clientHeight));
-        return () => observer.disconnect();
-    }, []);
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => setHeight(Math.max(120, element.clientHeight)));
+    observer.observe(element);
+    setHeight(Math.max(120, element.clientHeight));
+    return () => observer.disconnect();
+  }, []);
 
-    useEffect(() => {
-        const element = holder();
-        if (!element || !onNeedMore) return;
-        const onScroll = () => {
-            const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
-            if (remaining < 400 && !loading) onNeedMore();
-        };
-        element.addEventListener('scroll', onScroll, { passive: true });
-        return () => element.removeEventListener('scroll', onScroll);
-    }, [holder, loading, onNeedMore]);
+  useEffect(() => {
+    const element = holder();
+    if (!element || !onNeedMore) return;
+    const onScroll = () => {
+      const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
+      if (remaining < 400 && !loading) onNeedMore();
+    };
+    element.addEventListener("scroll", onScroll, { passive: true });
+    return () => element.removeEventListener("scroll", onScroll);
+  }, [holder, loading, onNeedMore]);
 
-    const positionOf = useMemo(() => {
-        const map = new Map<number, number>();
-        items.forEach((entry, position) => map.set(entry.index, position));
-        return map;
-    }, [items]);
+  const positionOf = useMemo(() => {
+    const map = new Map<number, number>();
+    items.forEach((entry, position) => map.set(entry.index, position));
+    return map;
+  }, [items]);
 
-    // keep the selected entry visible
-    useEffect(() => {
-        const element = holder();
-        const position = positionOf.get(selected);
-        if (!element || position === undefined) return;
-        const top = position * ROW_HEIGHT;
-        const viewTop = element.scrollTop;
-        const viewBottom = viewTop + element.clientHeight;
-        if (top < viewTop || top + ROW_HEIGHT > viewBottom) {
-            element.scrollTop = Math.max(0, top - element.clientHeight / 2);
-        }
-    }, [holder, selected, positionOf]);
+  // keep the selected entry visible
+  useEffect(() => {
+    const element = holder();
+    const position = positionOf.get(selected);
+    if (!element || position === undefined) return;
+    const top = position * ROW_HEIGHT;
+    const viewTop = element.scrollTop;
+    const viewBottom = viewTop + element.clientHeight;
+    if (top < viewTop || top + ROW_HEIGHT > viewBottom) {
+      element.scrollTop = Math.max(0, top - element.clientHeight / 2);
+    }
+  }, [holder, selected, positionOf]);
 
-    const renderText = useCallback((entry: JsonlEntrySummary) => {
-        const text = entry.snippet ?? entry.raw;
-        return highlightRuns(text, highlight).map((part, position) => (
-            part.hit
-                ? <mark key={position} className="jsonl-hit">{part.text}</mark>
-                : <span key={position}>{part.text}</span>
-        ));
-    }, [highlight]);
-    const treeData = useMemo<DataNode[]>(() => {
-        return items.map(entry => {
-            const index = entry.index;
-            let title: ReactNode;
-            if (entry.kind === 'empty') {
-                title = (
-                    <span className="jsonl-entry">
-                        <span className="jsonl-lineno">{index + 1}</span>
-                        <span className="jsonl-type">{$t('jsonl.chipEmpty')}</span>
-                    </span>
-                );
-            } else if (entry.kind === 'invalid') {
-                title = (
-                    <span className="jsonl-entry">
-                        <span className="jsonl-lineno">{index + 1}</span>
-                        <span className="jsonl-chip jsonl-chip--error">{$t('jsonl.chipInvalid')}</span>
-                        <span className="jsonl-entry__raw jsonl-entry__raw--error" title={entry.raw}>{renderText(entry)}</span>
-                    </span>
-                );
-            } else if (entry.kind === 'too-large') {
-                title = (
-                    <span className="jsonl-entry">
-                        <span className="jsonl-lineno">{index + 1}</span>
-                        <span className="jsonl-chip jsonl-chip--warn">{$t('jsonl.chipTooLarge')}</span>
-                        <span className="jsonl-muted">{formatBytes(entry.size)}</span>
-                    </span>
-                );
-            } else {
-                title = (
-                    <span className="jsonl-entry">
-                        <span className="jsonl-lineno">{index + 1}</span>
-                        {entry.kind === 'value' && entry.label !== undefined
-                            && <span className="jsonl-entry__label">{entry.label}</span>}
-                        <span className="jsonl-entry__raw" title={entry.snippet ?? entry.raw}>{renderText(entry)}</span>
-                    </span>
-                );
-            }
-            return { key: String(index), title, isLeaf: true };
-        });
-    }, [items, renderText]);
-
-    const onKeyDown = useCallback((event: React.KeyboardEvent) => {
-        const position = positionOf.get(selected) ?? 0;
-        let nextPosition: number | null = null;
-        switch (event.key) {
-            case 'ArrowDown': nextPosition = position + 1; break;
-            case 'ArrowUp': nextPosition = position - 1; break;
-            case 'PageDown': nextPosition = position + PAGE_STEP; break;
-            case 'PageUp': nextPosition = position - PAGE_STEP; break;
-            case 'Home': nextPosition = 0; break;
-            case 'End': nextPosition = items.length - 1; break;
-            default: return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        const clamped = Math.max(0, Math.min(items.length - 1, nextPosition));
-        const next = items[clamped];
-        if (next && next.index !== selected) onSelect(next.index);
-    }, [items, positionOf, selected, onSelect]);
-
-    return (
-        <div className="jsonl-index" ref={containerRef} tabIndex={0} onKeyDown={onKeyDown}>
-            {header}
-            {items.length === 0 ? (
-                <div className="jsonl-empty">{emptyText ?? $t('jsonl.empty')}</div>
-            ) : (
-                <Tree
-                    className="jsonl-index__tree"
-                    treeData={treeData}
-                    selectedKeys={[String(selected)]}
-                    onSelect={keys => {
-                        const key = keys[0];
-                        if (key !== undefined) onSelect(Number(key));
-                    }}
-                    height={height - (header ? 26 : 0)}
-                    itemHeight={ROW_HEIGHT}
-                    virtual
-                    showIcon={false}
-                />
+  const renderText = useCallback(
+    (entry: JsonlEntrySummary) => {
+      const text = entry.snippet ?? entry.raw;
+      return highlightRuns(text, highlight).map((part, position) =>
+        part.hit ? (
+          <mark key={position} className="jsonl-hit">
+            {part.text}
+          </mark>
+        ) : (
+          <span key={position}>{part.text}</span>
+        ),
+      );
+    },
+    [highlight],
+  );
+  const treeData = useMemo<DataNode[]>(() => {
+    return items.map((entry) => {
+      const index = entry.index;
+      let title: ReactNode;
+      if (entry.kind === "empty") {
+        title = (
+          <span className="jsonl-entry">
+            <span className="jsonl-lineno">{index + 1}</span>
+            <span className="jsonl-type">{$t("jsonl.chipEmpty")}</span>
+          </span>
+        );
+      } else if (entry.kind === "invalid") {
+        title = (
+          <span className="jsonl-entry">
+            <span className="jsonl-lineno">{index + 1}</span>
+            <span className="jsonl-chip jsonl-chip--error">{$t("jsonl.chipInvalid")}</span>
+            <span className="jsonl-entry__raw jsonl-entry__raw--error" title={entry.raw}>
+              {renderText(entry)}
+            </span>
+          </span>
+        );
+      } else if (entry.kind === "too-large") {
+        title = (
+          <span className="jsonl-entry">
+            <span className="jsonl-lineno">{index + 1}</span>
+            <span className="jsonl-chip jsonl-chip--warn">{$t("jsonl.chipTooLarge")}</span>
+            <span className="jsonl-muted">{formatBytes(entry.size)}</span>
+          </span>
+        );
+      } else {
+        title = (
+          <span className="jsonl-entry">
+            <span className="jsonl-lineno">{index + 1}</span>
+            {entry.kind === "value" && entry.label !== undefined && (
+              <span className="jsonl-entry__label">{entry.label}</span>
             )}
-        </div>
-    );
+            <span className="jsonl-entry__raw" title={entry.snippet ?? entry.raw}>
+              {renderText(entry)}
+            </span>
+          </span>
+        );
+      }
+      return { key: String(index), title, isLeaf: true };
+    });
+  }, [items, renderText]);
+
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      const position = positionOf.get(selected) ?? 0;
+      let nextPosition: number | null = null;
+      switch (event.key) {
+        case "ArrowDown":
+          nextPosition = position + 1;
+          break;
+        case "ArrowUp":
+          nextPosition = position - 1;
+          break;
+        case "PageDown":
+          nextPosition = position + PAGE_STEP;
+          break;
+        case "PageUp":
+          nextPosition = position - PAGE_STEP;
+          break;
+        case "Home":
+          nextPosition = 0;
+          break;
+        case "End":
+          nextPosition = items.length - 1;
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const clamped = Math.max(0, Math.min(items.length - 1, nextPosition));
+      const next = items[clamped];
+      if (next && next.index !== selected) onSelect(next.index);
+    },
+    [items, positionOf, selected, onSelect],
+  );
+
+  return (
+    <div className="jsonl-index" ref={containerRef} tabIndex={0} onKeyDown={onKeyDown}>
+      {header}
+      {items.length === 0 ? (
+        <div className="jsonl-empty">{emptyText ?? $t("jsonl.empty")}</div>
+      ) : (
+        <Tree
+          className="jsonl-index__tree"
+          treeData={treeData}
+          selectedKeys={[String(selected)]}
+          onSelect={(keys) => {
+            const key = keys[0];
+            if (key !== undefined) onSelect(Number(key));
+          }}
+          height={height - (header ? 26 : 0)}
+          itemHeight={ROW_HEIGHT}
+          virtual
+          showIcon={false}
+        />
+      )}
+    </div>
+  );
 }
-
-

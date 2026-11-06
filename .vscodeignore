@@ -41,8 +41,8 @@ GLOSSARY.md
 
 # Dev scaffolding: formatter/linter config, the smoke runner's config, the Vite dev page.
 .husky/**
-.lintstagedrc
 .oxlintrc.json
-.prettierignore
+.oxfmtrc.json
 .vscode-test.mjs
 index.html
+.git-blame-ignore-revs

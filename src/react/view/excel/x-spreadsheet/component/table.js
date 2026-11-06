@@ -1,43 +1,39 @@
-import { stringAt } from '../core/alphabet';
-import { getFontSizePxByPt } from '../core/font';
-import { displayCellText } from '../../excel_cell_display';
+import { stringAt } from "../core/alphabet";
+import { getFontSizePxByPt } from "../core/font";
+import { displayCellText } from "../../excel_cell_display";
 
-import {
-  Draw, DrawBox, thinLineWidth, npx,
-} from '../canvas/draw';
-import { getExcelThemeColor, resolveExcelCellBg, resolveExcelCellColor } from '../../theme';
+import { Draw, DrawBox, thinLineWidth, npx } from "../canvas/draw";
+import { getExcelThemeColor, resolveExcelCellBg, resolveExcelCellColor } from "../../theme";
 
 // gobal var
 const cellPaddingWidth = 10;
 
 function tableFixedHeaderCleanStyle() {
-  return { fillStyle: getExcelThemeColor('--excel-header-bg', '#f4f5f8') };
+  return { fillStyle: getExcelThemeColor("--excel-header-bg", "#f4f5f8") };
 }
 
 function tableGridStyle() {
   return {
-    fillStyle: getExcelThemeColor('--excel-cell-bg', '#fff'),
+    fillStyle: getExcelThemeColor("--excel-cell-bg", "#fff"),
     lineWidth: thinLineWidth,
-    strokeStyle: getExcelThemeColor('--excel-grid-line', '#e6e6e6'),
+    strokeStyle: getExcelThemeColor("--excel-grid-line", "#e6e6e6"),
   };
 }
 
 function tableFixedHeaderStyle() {
   const scale = this && this.data ? this.data.getZoomScale() : 1;
   return {
-    textAlign: 'center',
-    textBaseline: 'middle',
+    textAlign: "center",
+    textBaseline: "middle",
     font: `500 ${npx(12 * scale)}px Source Sans Pro`,
-    fillStyle: getExcelThemeColor('--excel-header-fg', '#585757'),
+    fillStyle: getExcelThemeColor("--excel-header-fg", "#585757"),
     lineWidth: thinLineWidth(),
-    strokeStyle: getExcelThemeColor('--excel-grid-line', '#e6e6e6'),
+    strokeStyle: getExcelThemeColor("--excel-grid-line", "#e6e6e6"),
   };
 }
 
 function getDrawBox(data, rindex, cindex, yoffset = 0) {
-  const {
-    left, top, width, height,
-  } = data.cellRect(rindex, cindex);
+  const { left, top, width, height } = data.cellRect(rindex, cindex);
   return new DrawBox(left, top + yoffset, width, height, cellPaddingWidth);
 }
 /*
@@ -63,7 +59,7 @@ export function renderCell(draw, data, rindex, cindex, yoffset = 0) {
 
   const cell = data.getCell(rindex, cindex);
   const isLocked = !data.canEditCell(rindex, cindex);
-  const lockedColor = getExcelThemeColor('--excel-locked-indicator', 'rgba(61, 153, 112, 0.42)');
+  const lockedColor = getExcelThemeColor("--excel-locked-indicator", "rgba(61, 153, 112, 0.42)");
 
   if (cell === null) {
     if (!isLocked) return;
@@ -91,18 +87,25 @@ export function renderCell(draw, data, rindex, cindex, yoffset = 0) {
   }
   draw.rect(dbox, () => {
     // render text
-    const cellText = displayCellText(cell, style, (x, y) => data.rows.getCell(y, x), data.settings.evalPaused);
+    const cellText = displayCellText(
+      cell,
+      style,
+      (x, y) => data.rows.getCell(y, x),
+      data.settings.evalPaused,
+    );
     const font = Object.assign({}, style.font);
     if (!font.name) {
-      font.name = (defaultStyle.font && defaultStyle.font.name) || 'Arial';
+      font.name = (defaultStyle.font && defaultStyle.font.name) || "Arial";
     }
-    font.size = getFontSizePxByPt(font.size || (defaultStyle.font && defaultStyle.font.size) || 11) * data.getZoomScale();
+    font.size =
+      getFontSizePxByPt(font.size || (defaultStyle.font && defaultStyle.font.size) || 11) *
+      data.getZoomScale();
     const hyperlink = data.getHyperlink(rindex, cindex);
     const drawStyle = {
       align: style.align,
       valign: style.valign,
       font,
-      color: hyperlink ? '#0563c1' : resolveExcelCellColor(style.color),
+      color: hyperlink ? "#0563c1" : resolveExcelCellColor(style.color),
       strike: style.strike,
       underline: style.underline || !!hyperlink,
     };
@@ -137,8 +140,7 @@ function renderAutofilter(viewRange) {
 function renderContent(viewRange, fw, fh, tx, ty) {
   const { draw, data } = this;
   draw.save();
-  draw.translate(fw, fh)
-    .translate(tx, ty);
+  draw.translate(fw, fh).translate(tx, ty);
 
   const { exceptRowSet } = data;
   const rowVisible = (ri) => !exceptRowSet.has(ri);
@@ -149,7 +151,6 @@ function renderContent(viewRange, fw, fh, tx, ty) {
     renderCell(draw, data, ri, ci);
   }, rowVisible);
   draw.restore();
-
 
   // 2 render mergeCell
   const rset = new Set();
@@ -188,9 +189,7 @@ function renderSelectedHeaderCell(x, y, w, h) {
 function renderFixedHeaders(type, viewRange, w, h, tx, ty) {
   const { draw, data } = this;
   const { rows, cols, exceptRowSet } = data;
-  const {
-    sri: viewSri, sci: viewSci, eri: viewEri, eci: viewEci,
-  } = viewRange;
+  const { sri: viewSri, sci: viewSci, eri: viewEri, eci: viewEci } = viewRange;
   const sumHeight = rows.sumHeight(viewSri, viewEri + 1, exceptRowSet);
   const sumWidth = cols.sumWidth(viewSci, viewEci + 1);
   const rowOrigin = rows.sumHeight(0, viewSri, exceptRowSet);
@@ -199,22 +198,20 @@ function renderFixedHeaders(type, viewRange, w, h, tx, ty) {
   draw.save();
   // draw rect background
   draw.attr(tableFixedHeaderCleanStyle());
-  if (type === 'all' || type === 'left') {
+  if (type === "all" || type === "left") {
     draw.fillRect(0, h + ty + rowOrigin, w, sumHeight);
   }
-  if (type === 'all' || type === 'top') {
+  if (type === "all" || type === "top") {
     draw.fillRect(w + tx + colOrigin, 0, sumWidth, h);
   }
 
-  const {
-    sri, sci, eri, eci,
-  } = data.selector.range;
+  const { sri, sci, eri, eci } = data.selector.range;
   // console.log(data.selectIndexes);
   // draw text
   // text font, align...
   draw.attr(tableFixedHeaderStyle.call(this));
   // y-header-text
-  if (type === 'all' || type === 'left') {
+  if (type === "all" || type === "left") {
     data.rowEach(viewSri, viewEri, (i, y1, rowHeight) => {
       const y = h + ty + rowOrigin + y1;
       const ii = i;
@@ -222,10 +219,10 @@ function renderFixedHeaders(type, viewRange, w, h, tx, ty) {
       if (sri <= ii && ii < eri + 1) {
         renderSelectedHeaderCell.call(this, 0, y, w, rowHeight);
       }
-      draw.fillText(ii + 1, w / 2, y + (rowHeight / 2));
+      draw.fillText(ii + 1, w / 2, y + rowHeight / 2);
       if (i > 0 && data.rows.isHide(i - 1)) {
         draw.save();
-        draw.attr({ strokeStyle: getExcelThemeColor('--excel-muted-line', '#c6c6c6') });
+        draw.attr({ strokeStyle: getExcelThemeColor("--excel-muted-line", "#c6c6c6") });
         draw.line([5, y + 5], [w - 5, y + 5]);
         draw.restore();
       }
@@ -234,7 +231,7 @@ function renderFixedHeaders(type, viewRange, w, h, tx, ty) {
     draw.line([w, h + ty + rowOrigin], [w, h + ty + rowOrigin + sumHeight]);
   }
   // x-header-text
-  if (type === 'all' || type === 'top') {
+  if (type === "all" || type === "top") {
     data.colEach(viewSci, viewEci, (i, x1, colWidth) => {
       const x = w + tx + colOrigin + x1;
       const ii = i;
@@ -242,10 +239,10 @@ function renderFixedHeaders(type, viewRange, w, h, tx, ty) {
       if (sci <= ii && ii < eci + 1) {
         renderSelectedHeaderCell.call(this, x, 0, colWidth, h);
       }
-      draw.fillText(stringAt(ii), x + (colWidth / 2), h / 2);
+      draw.fillText(stringAt(ii), x + colWidth / 2, h / 2);
       if (i > 0 && data.cols.isHide(i - 1)) {
         draw.save();
-        draw.attr({ strokeStyle: getExcelThemeColor('--excel-muted-line', '#c6c6c6') });
+        draw.attr({ strokeStyle: getExcelThemeColor("--excel-muted-line", "#c6c6c6") });
         draw.line([x + 5, 5], [x + 5, h - 5]);
         draw.restore();
       }
@@ -260,21 +257,18 @@ function renderFixedLeftTopCell(fw, fh) {
   const { draw } = this;
   draw.save();
   // left-top-cell
-  draw.attr({ fillStyle: getExcelThemeColor('--excel-header-bg', '#f4f5f8') })
+  draw
+    .attr({ fillStyle: getExcelThemeColor("--excel-header-bg", "#f4f5f8") })
     .fillRect(0, 0, fw, fh);
   draw.restore();
 }
 
-function renderContentGrid({
-  sri, sci, eri, eci,
-}, fw, fh, tx, ty) {
+function renderContentGrid({ sri, sci, eri, eci }, fw, fh, tx, ty) {
   const { draw, data } = this;
   const { settings, rows, cols, exceptRowSet } = data;
 
   draw.save();
-  draw.attr(tableGridStyle())
-    .translate(fw, fh)
-    .translate(tx, ty);
+  draw.attr(tableGridStyle()).translate(fw, fh).translate(tx, ty);
   // const sumWidth = cols.sumWidth(sci, eci + 1);
   // const sumHeight = rows.sumHeight(sri, eri + 1);
   // console.log('sumWidth:', sumWidth);
@@ -307,9 +301,10 @@ function renderFreezeHighlightLine(fw, fh, ftw, fth) {
   const { draw, data } = this;
   const twidth = data.viewWidth() - fw;
   const theight = data.viewHeight() - fh;
-  draw.save()
+  draw
+    .save()
     .translate(fw, fh)
-    .attr({ strokeStyle: getExcelThemeColor('--excel-selection', 'rgba(75, 137, 255, .6)') });
+    .attr({ strokeStyle: getExcelThemeColor("--excel-selection", "rgba(75, 137, 255, .6)") });
   draw.line([0, fth], [twidth, fth]);
   draw.line([ftw, 0], [ftw, theight]);
   draw.restore();
@@ -350,7 +345,7 @@ class Table {
     // 1
     renderContentGrid.call(this, viewRange, fw, fh, -x, -y);
     renderContent.call(this, viewRange, fw, fh, -x, -y);
-    renderFixedHeaders.call(this, 'all', viewRange, fw, fh, -x, -y);
+    renderFixedHeaders.call(this, "all", viewRange, fw, fh, -x, -y);
     renderFixedLeftTopCell.call(this, fw, fh);
     const [fri, fci] = data.freeze;
     if (fri > 0 || fci > 0) {
@@ -362,7 +357,7 @@ class Table {
         vr.h = ty;
         renderContentGrid.call(this, vr, fw, fh, -x, 0);
         renderContent.call(this, vr, fw, fh, -x, 0);
-        renderFixedHeaders.call(this, 'top', vr, fw, fh, -x, 0);
+        renderFixedHeaders.call(this, "top", vr, fw, fh, -x, 0);
       }
       // 3
       if (fci > 0) {
@@ -371,13 +366,13 @@ class Table {
         vr.eci = fci - 1;
         vr.w = tx;
         renderContentGrid.call(this, vr, fw, fh, 0, -y);
-        renderFixedHeaders.call(this, 'left', vr, fw, fh, 0, -y);
+        renderFixedHeaders.call(this, "left", vr, fw, fh, 0, -y);
         renderContent.call(this, vr, fw, fh, 0, -y);
       }
       // 4
       const freezeViewRange = data.freezeViewRange();
       renderContentGrid.call(this, freezeViewRange, fw, fh, 0, 0);
-      renderFixedHeaders.call(this, 'all', freezeViewRange, fw, fh, 0, 0);
+      renderFixedHeaders.call(this, "all", freezeViewRange, fw, fh, 0, 0);
       renderContent.call(this, freezeViewRange, fw, fh, 0, 0);
       // 5
       renderFreezeHighlightLine.call(this, fw, fh, tx, ty);

@@ -6,4 +6,4 @@ allowBuilds:
   es5-ext: true
   esbuild: true
   # vsce-sign's postinstall downloads a signing helper we do not use (packaging is unsigned).
-  '@vscode/vsce-sign': false
+  "@vscode/vsce-sign": false

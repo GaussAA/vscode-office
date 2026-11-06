@@ -22,15 +22,15 @@
  * violation and keeps every other one fatal.
  */
 export function buildWebviewCsp(cspSource: string): string {
-	return [
-		`default-src 'none'`,
-		`script-src ${cspSource} 'wasm-unsafe-eval'`,
-		`style-src ${cspSource} 'unsafe-inline'`,
-		`img-src ${cspSource} data: blob:`,
-		`font-src ${cspSource} data:`,
-		`media-src ${cspSource} data: blob:`,
-		`frame-src ${cspSource} data: blob:`,
-		`connect-src ${cspSource} data: blob:`,
-		`worker-src ${cspSource} blob:`,
-	].join('; ')
+  return [
+    `default-src 'none'`,
+    `script-src ${cspSource} 'wasm-unsafe-eval'`,
+    `style-src ${cspSource} 'unsafe-inline'`,
+    `img-src ${cspSource} data: blob:`,
+    `font-src ${cspSource} data:`,
+    `media-src ${cspSource} data: blob:`,
+    `frame-src ${cspSource} data: blob:`,
+    `connect-src ${cspSource} data: blob:`,
+    `worker-src ${cspSource} blob:`,
+  ].join("; ");
 }

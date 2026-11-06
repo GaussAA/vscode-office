@@ -725,6 +725,7 @@ Other:
   - Fix cannot display images.
   - Fix pager jumping incorrectly.
   - Reduce pagination navigator size.
+
 - Markdown:
 
   - Support hide toolbar.
@@ -826,6 +827,7 @@ Other:
 
   - 自动识别粘贴的图片类型.
   - 修复粘贴文本后选中的文本还在.
+
 - 预览Html支持解析本地js文件.
 
 # 2.7.2 2022-9-15
@@ -964,7 +966,7 @@ Other:
 
 ## 1.8.1 2020-11-24
 
-- Change export markdown pdf chinese font to 'Song  style'
+- Change export markdown pdf chinese font to 'Song style'
 - Export markdown auto add bookmarks.
 - Update markdown list style.
 

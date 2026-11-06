@@ -1,8 +1,8 @@
 /* global document */
 /* global window */
 class Element {
-  constructor(tag, className = '') {
-    if (typeof tag === 'string') {
+  constructor(tag, className = "") {
+    if (typeof tag === "string") {
       this.el = document.createElement(tag);
       this.el.className = className;
     } else {
@@ -20,23 +20,23 @@ class Element {
   }
 
   on(eventNames, handler) {
-    const [fen, ...oen] = eventNames.split('.');
+    const [fen, ...oen] = eventNames.split(".");
     let eventName = fen;
-    if (eventName === 'mousewheel' && /Firefox/i.test(window.navigator.userAgent)) {
-      eventName = 'DOMMouseScroll';
+    if (eventName === "mousewheel" && /Firefox/i.test(window.navigator.userAgent)) {
+      eventName = "DOMMouseScroll";
     }
     this.el.addEventListener(eventName, (evt) => {
-      if (evt.type == 'mousewheel' && document.activeElement?.tagName === 'TEXTAREA') return
+      if (evt.type == "mousewheel" && document.activeElement?.tagName === "TEXTAREA") return;
       handler(evt);
       for (let i = 0; i < oen.length; i += 1) {
         const k = oen[i];
-        if (k === 'left' && evt.button !== 0) {
+        if (k === "left" && evt.button !== 0) {
           return;
         }
-        if (k === 'right' && evt.button !== 2) {
+        if (k === "right" && evt.button !== 2) {
           return;
         }
-        if (k === 'stop') {
+        if (k === "stop") {
           evt.stopPropagation();
         }
       }
@@ -51,9 +51,7 @@ class Element {
       });
       return this;
     }
-    const {
-      offsetTop, offsetLeft, offsetHeight, offsetWidth,
-    } = this.el;
+    const { offsetTop, offsetLeft, offsetHeight, offsetWidth } = this.el;
     return {
       top: offsetTop,
       left: offsetLeft,
@@ -87,7 +85,7 @@ class Element {
     if (arguments.length === 0) {
       return this.el.childNodes;
     }
-    eles.forEach(ele => this.child(ele));
+    eles.forEach((ele) => this.child(ele));
     return this;
   }
 
@@ -129,7 +127,7 @@ class Element {
 
   child(arg) {
     let ele = arg;
-    if (typeof arg === 'string') {
+    if (typeof arg === "string") {
       ele = document.createTextNode(arg);
     } else if (arg instanceof Element) {
       ele = arg.el;
@@ -164,7 +162,7 @@ class Element {
     return this;
   }
 
-  toggle(cls = 'active') {
+  toggle(cls = "active") {
     return this.toggleClass(cls);
   }
 
@@ -172,20 +170,20 @@ class Element {
     return this.el.classList.toggle(name);
   }
 
-  active(flag = true, cls = 'active') {
+  active(flag = true, cls = "active") {
     if (flag) this.addClass(cls);
     else this.removeClass(cls);
     return this;
   }
 
   checked(flag = true) {
-    this.active(flag, 'checked');
+    this.active(flag, "checked");
     return this;
   }
 
   disabled(flag = true) {
-    if (flag) this.addClass('disabled');
-    else this.removeClass('disabled');
+    if (flag) this.addClass("disabled");
+    else this.removeClass("disabled");
     return this;
   }
 
@@ -196,7 +194,7 @@ class Element {
     if (value !== undefined) {
       this.el.setAttribute(key, value);
     } else {
-      if (typeof key === 'string') {
+      if (typeof key === "string") {
         return this.el.getAttribute(key);
       }
       Object.keys(key).forEach((k) => {
@@ -232,7 +230,7 @@ class Element {
   }
 
   cssRemoveKeys(...keys) {
-    keys.forEach(k => this.el.style.removeProperty(k));
+    keys.forEach((k) => this.el.style.removeProperty(k));
     return this;
   }
 
@@ -240,7 +238,7 @@ class Element {
   // css( propertyName, value )
   // css( properties )
   css(name, value) {
-    if (value === undefined && typeof name !== 'string') {
+    if (value === undefined && typeof name !== "string") {
       Object.keys(name).forEach((k) => {
         this.el.style[k] = name[k];
       });
@@ -258,19 +256,16 @@ class Element {
   }
 
   show() {
-    this.css('display', 'block');
+    this.css("display", "block");
     return this;
   }
 
   hide() {
-    this.css('display', 'none');
+    this.css("display", "none");
     return this;
   }
 }
 
-const h = (tag, className = '') => new Element(tag, className);
+const h = (tag, className = "") => new Element(tag, className);
 
-export {
-  Element,
-  h,
-};
+export { Element, h };

@@ -6,16 +6,16 @@
  * without VS Code. Parquet fixtures are served with Range support and counted in `/stats`,
  * which is how the lazy-loading behaviour is asserted.
  */
-import { randomBytes } from 'node:crypto'
-import { createServer } from 'node:http'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { extname, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
-import { build } from 'esbuild'
-import { repoRoot } from './fixtures.mjs'
+import { randomBytes } from "node:crypto";
+import { createServer } from "node:http";
+import { existsSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { extname, join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { build } from "esbuild";
+import { repoRoot } from "./fixtures.mjs";
 
-const WEBVIEW_ROOT = join(repoRoot, 'out', 'webview')
+const WEBVIEW_ROOT = join(repoRoot, "out", "webview");
 
 /**
  * The policy this harness enforces must be the policy the extension ships, or the negative
@@ -26,31 +26,31 @@ const WEBVIEW_ROOT = join(repoRoot, 'out', 'webview')
  * It used to be a copy — which meant "remove 'unsafe-inline' and the suite turns red" was
  * only ever true by accident.
  */
-const cspModulePath = join(tmpdir(), `ovp-webview-csp-${process.pid}-${Date.now()}.mjs`)
+const cspModulePath = join(tmpdir(), `ovp-webview-csp-${process.pid}-${Date.now()}.mjs`);
 await build({
-    entryPoints: [join(repoRoot, 'src', 'common', 'webviewCsp.ts')],
-    outfile: cspModulePath,
-    bundle: true,
-    format: 'esm',
-    platform: 'node',
-    logLevel: 'silent',
-})
-const { buildWebviewCsp } = await import(pathToFileURL(cspModulePath).href)
-rmSync(cspModulePath, { force: true })
+  entryPoints: [join(repoRoot, "src", "common", "webviewCsp.ts")],
+  outfile: cspModulePath,
+  bundle: true,
+  format: "esm",
+  platform: "node",
+  logLevel: "silent",
+});
+const { buildWebviewCsp } = await import(pathToFileURL(cspModulePath).href);
+rmSync(cspModulePath, { force: true });
 
 const MIME = {
-    '.js': 'text/javascript',
-    '.mjs': 'text/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.html': 'text/html',
-    '.png': 'image/png',
-    '.svg': 'image/svg+xml',
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-    '.ttf': 'font/ttf',
-    '.wasm': 'application/wasm',
-}
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".html": "text/html",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".wasm": "application/wasm",
+};
 
 const DARK = `:root{
 --vscode-editor-background:#1f1f1f;--vscode-foreground:#cccccc;
@@ -68,7 +68,7 @@ const DARK = `:root{
 --vscode-focusBorder:#0078d4;--vscode-textCodeBlock-background:#2b2b2b;
 --vscode-gitDecoration-modifiedResourceForeground:#e2c08d;--vscode-disabledForeground:#8a8a8a;
 }
-body{background:#1f1f1f;color:#cccccc}`
+body{background:#1f1f1f;color:#cccccc}`;
 
 const LIGHT = `:root{
 --vscode-editor-background:#ffffff;--vscode-foreground:#3b3b3b;
@@ -85,52 +85,98 @@ const LIGHT = `:root{
 --vscode-focusBorder:#005fb8;--vscode-textCodeBlock-background:#f2f2f2;
 --vscode-gitDecoration-modifiedResourceForeground:#bf8803;--vscode-disabledForeground:#8a8a8a;
 }
-body{background:#ffffff;color:#3b3b3b}`
+body{background:#ffffff;color:#3b3b3b}`;
 
 /** Heterogeneous JSONL: objects, arrays, nesting, null, invalid, empty, too-large, wrap, big. */
 function jsonlFixtures() {
-    const longMessage = '这是一条很长的日志消息，用来验证换行渲染是否正常工作。'.repeat(6)
-        + ' tail-marker-abcdefghijklmnopqrstuvwxyz'
-    const sample = [
-        { id: 1, user: { name: 'alpha', tags: ['a', 'b'], active: true }, score: 9.5, note: null },
-        { id: 2, events: [{ type: 'click', ts: '2026-11-05T10:00:00Z' }], ok: true },
-        null,
-        null,
-        { id: 5, nested: { a: { b: { c: { d: 1 } } } }, msg: 'a rather long string value that should be truncated in the directory preview because it does not fit' },
-        { ts: '2026-11-05T09:59:00Z', level: 'INFO', msg: 'processed 1200 rows' },
-        { name: 'delta', payload: [1, 2, 3, 4, 5] },
-        { _id: 'abc123', value: 42 },
-        { id: 9, list: [[1, 2], [3, 4]], map: { k1: 'v1', k2: 'v2' } },
-        { id: 10, flag: false, empty: '', zero: 0 },
-        null,
-        { id: 12, unicode: '中文测试 🎉' },
-        { id: 11, level: 'WARN', message: longMessage, context: { service: 'ingest', attempt: 3, latencyMs: 1284.5 } },
-    ]
-    const bigEntry = {}
-    for (let i = 0; i < 600; i++) bigEntry[`key_${i}`] = `value-${i}`
-    sample.push(bigEntry)
+  const longMessage =
+    "这是一条很长的日志消息，用来验证换行渲染是否正常工作。".repeat(6) +
+    " tail-marker-abcdefghijklmnopqrstuvwxyz";
+  const sample = [
+    { id: 1, user: { name: "alpha", tags: ["a", "b"], active: true }, score: 9.5, note: null },
+    { id: 2, events: [{ type: "click", ts: "2026-11-05T10:00:00Z" }], ok: true },
+    null,
+    null,
+    {
+      id: 5,
+      nested: { a: { b: { c: { d: 1 } } } },
+      msg: "a rather long string value that should be truncated in the directory preview because it does not fit",
+    },
+    { ts: "2026-11-05T09:59:00Z", level: "INFO", msg: "processed 1200 rows" },
+    { name: "delta", payload: [1, 2, 3, 4, 5] },
+    { _id: "abc123", value: 42 },
+    {
+      id: 9,
+      list: [
+        [1, 2],
+        [3, 4],
+      ],
+      map: { k1: "v1", k2: "v2" },
+    },
+    { id: 10, flag: false, empty: "", zero: 0 },
+    null,
+    { id: 12, unicode: "中文测试 🎉" },
+    {
+      id: 11,
+      level: "WARN",
+      message: longMessage,
+      context: { service: "ingest", attempt: 3, latencyMs: 1284.5 },
+    },
+  ];
+  const bigEntry = {};
+  for (let i = 0; i < 600; i++) bigEntry[`key_${i}`] = `value-${i}`;
+  sample.push(bigEntry);
 
-    return sample.map((value, index) => {
-        if (index === 2) {
-            return { index, kind: 'invalid', raw: '{"id":3, broken', text: '{"id":3, broken', size: 15, error: 'Unexpected token b in JSON at position 9' }
-        }
-        if (index === 3) {
-            return { index, kind: 'empty', raw: '', text: '', size: 0 }
-        }
-        if (index === 10) {
-            return { index, kind: 'too-large', raw: '{"blob":"AAAA…', text: `{"blob":"${'A'.repeat(400)}"}`, size: 900 * 1024 }
-        }
-        const text = JSON.stringify(value)
-        const label = value && typeof value === 'object' ? (value.id ?? value._id ?? value.name ?? value.ts) : undefined
-        return { index, kind: 'value', raw: text, text, size: text.length, label: label === undefined ? undefined : String(label), value }
-    })
+  return sample.map((value, index) => {
+    if (index === 2) {
+      return {
+        index,
+        kind: "invalid",
+        raw: '{"id":3, broken',
+        text: '{"id":3, broken',
+        size: 15,
+        error: "Unexpected token b in JSON at position 9",
+      };
+    }
+    if (index === 3) {
+      return { index, kind: "empty", raw: "", text: "", size: 0 };
+    }
+    if (index === 10) {
+      return {
+        index,
+        kind: "too-large",
+        raw: '{"blob":"AAAA…',
+        text: `{"blob":"${"A".repeat(400)}"}`,
+        size: 900 * 1024,
+      };
+    }
+    const text = JSON.stringify(value);
+    const label =
+      value && typeof value === "object"
+        ? (value.id ?? value._id ?? value.name ?? value.ts)
+        : undefined;
+    return {
+      index,
+      kind: "value",
+      raw: text,
+      text,
+      size: text.length,
+      label: label === undefined ? undefined : String(label),
+      value,
+    };
+  });
 }
 
 function jsonlStub(fixtures) {
-    const summaries = fixtures.map(({ index, kind, raw, size, label, error }) => ({
-        index, kind, raw, size, label, error,
-    }))
-    return `<script>
+  const summaries = fixtures.map(({ index, kind, raw, size, label, error }) => ({
+    index,
+    kind,
+    raw,
+    size,
+    label,
+    error,
+  }));
+  return `<script>
 (function () {
   const summaries = ${JSON.stringify(summaries)};
   const fixtures = ${JSON.stringify(fixtures)};
@@ -185,11 +231,11 @@ function jsonlStub(fixtures) {
   };
   window.acquireVsCodeApi = function () { return api; };
 })();
-</script>`
+</script>`;
 }
 
 function parquetStub() {
-    return `<script>
+  return `<script>
 (function () {
   const api = {
     postMessage(msg) {
@@ -206,40 +252,40 @@ function parquetStub() {
   };
   window.acquireVsCodeApi = function () { return api; };
 })();
-</script>`
+</script>`;
 }
 
 function serveParquet(req, res, file, stats, supportRange) {
-    if (!file || !existsSync(file)) {
-        res.writeHead(404).end('missing fixture')
-        return
+  if (!file || !existsSync(file)) {
+    res.writeHead(404).end("missing fixture");
+    return;
+  }
+  const data = readFileSync(file);
+  const range = req.headers.range;
+  if (supportRange && range) {
+    const match = /bytes=(\d+)-(\d*)/.exec(String(range));
+    if (match) {
+      const start = Number(match[1]);
+      const end = match[2] ? Number(match[2]) : data.length - 1;
+      const chunk = data.subarray(start, end + 1);
+      stats.ranged++;
+      res.writeHead(206, {
+        "content-type": "application/octet-stream",
+        "content-range": `bytes ${start}-${end}/${data.length}`,
+        "accept-ranges": "bytes",
+        "content-length": chunk.length,
+      });
+      res.end(chunk);
+      return;
     }
-    const data = readFileSync(file)
-    const range = req.headers.range
-    if (supportRange && range) {
-        const match = /bytes=(\d+)-(\d*)/.exec(String(range))
-        if (match) {
-            const start = Number(match[1])
-            const end = match[2] ? Number(match[2]) : data.length - 1
-            const chunk = data.subarray(start, end + 1)
-            stats.ranged++
-            res.writeHead(206, {
-                'content-type': 'application/octet-stream',
-                'content-range': `bytes ${start}-${end}/${data.length}`,
-                'accept-ranges': 'bytes',
-                'content-length': chunk.length,
-            })
-            res.end(chunk)
-            return
-        }
-    }
-    stats.full++
-    res.writeHead(200, {
-        'content-type': 'application/octet-stream',
-        'content-length': data.length,
-        ...(supportRange ? { 'accept-ranges': 'bytes' } : {}),
-    })
-    res.end(data)
+  }
+  stats.full++;
+  res.writeHead(200, {
+    "content-type": "application/octet-stream",
+    "content-length": data.length,
+    ...(supportRange ? { "accept-ranges": "bytes" } : {}),
+  });
+  res.end(data);
 }
 
 /**
@@ -248,8 +294,21 @@ function serveParquet(req, res, file, stats, supportRange) {
  * introduced by fork-wide changes (entry, provider, shared utils).
  */
 function smokeStub(route) {
-    const name = { excel: 'smoke.xlsx', word: 'smoke.docx', ppt: 'smoke.pptx', pdf: 'smoke.pdf', archive: 'smoke.zip', image: 'smoke.png', html: 'smoke.html', markdown: 'smoke.md', font: 'smoke.ttf', svg: 'smoke.svg', mermaid: 'smoke.mmd' }[route] ?? 'smoke.bin'
-    return `<script>
+  const name =
+    {
+      excel: "smoke.xlsx",
+      word: "smoke.docx",
+      ppt: "smoke.pptx",
+      pdf: "smoke.pdf",
+      archive: "smoke.zip",
+      image: "smoke.png",
+      html: "smoke.html",
+      markdown: "smoke.md",
+      font: "smoke.ttf",
+      svg: "smoke.svg",
+      mermaid: "smoke.mmd",
+    }[route] ?? "smoke.bin";
+  return `<script>
 (function () {
   const api = {
     postMessage(msg) {
@@ -268,95 +327,115 @@ function smokeStub(route) {
   };
   window.acquireVsCodeApi = function () { return api; };
 })();
-</script>`
+</script>`;
 }
 
 export function startHarness(fixtures, port = 0) {
-    if (!existsSync(join(WEBVIEW_ROOT, 'index.html'))) {
-        throw new Error('out/webview/index.html is missing — run `pnpm build` first')
+  if (!existsSync(join(WEBVIEW_ROOT, "index.html"))) {
+    throw new Error("out/webview/index.html is missing — run `pnpm build` first");
+  }
+  const indexHtml = readFileSync(join(WEBVIEW_ROOT, "index.html"), "utf8");
+  const entries = jsonlFixtures();
+  const stats = { ranged: 0, full: 0 };
+
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, "http://127.0.0.1");
+    const path = url.pathname;
+
+    if (path === "/stats") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(stats));
+      return;
     }
-    const indexHtml = readFileSync(join(WEBVIEW_ROOT, 'index.html'), 'utf8')
-    const entries = jsonlFixtures()
-    const stats = { ranged: 0, full: 0 }
 
-    const server = createServer((req, res) => {
-        const url = new URL(req.url, 'http://127.0.0.1')
-        const path = url.pathname
+    if (path === "/harness" || path === "/harness-parquet" || path === "/harness-route") {
+      const route =
+        path === "/harness-parquet"
+          ? "parquet"
+          : path === "/harness-route"
+            ? (url.searchParams.get("route") ?? "html")
+            : "jsonl";
+      const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
+      const stub =
+        path === "/harness-route"
+          ? smokeStub(url.searchParams.get("route") ?? "html")
+          : route === "parquet"
+            ? parquetStub()
+            : jsonlStub(entries);
+      // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
+      // nonce: the injected stub is inline, and production has no inline script at all.
+      const origin = `http://${req.headers.host}`;
+      const nonce = randomBytes(16).toString("base64");
+      const csp = buildWebviewCsp(origin).replace(
+        `script-src ${origin} `,
+        `script-src ${origin} 'nonce-${nonce}' `,
+      );
+      const html = indexHtml
+        .replace(
+          /<meta id="office-configs"[^>]*>/,
+          `<meta id="office-configs" data-config='${JSON.stringify({ route })}'>`,
+        )
+        .replace("{{csp}}", csp)
+        .replace(
+          '<script type="module"',
+          `<style>${theme}</style>\n${stub.replace("<script>", `<script nonce="${nonce}">`)}\n<script type="module"`,
+        );
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(html);
+      return;
+    }
 
-        if (path === '/stats') {
-            res.writeHead(200, { 'content-type': 'application/json' })
-            res.end(JSON.stringify(stats))
-            return
-        }
+    if (path === "/codicon.ttf") {
+      const font = join(repoRoot, "node_modules", "@vscode", "codicons", "dist", "codicon.ttf");
+      if (!existsSync(font)) {
+        res.writeHead(404).end("missing font");
+        return;
+      }
+      res.writeHead(200, { "content-type": "font/ttf" });
+      res.end(readFileSync(font));
+      return;
+    }
 
-        if (path === '/harness' || path === '/harness-parquet' || path === '/harness-route') {
-            const route = path === '/harness-parquet'
-                ? 'parquet'
-                : path === '/harness-route' ? (url.searchParams.get('route') ?? 'html') : 'jsonl'
-            const theme = url.searchParams.get('theme') === 'light' ? LIGHT : DARK
-            const stub = path === '/harness-route'
-                ? smokeStub(url.searchParams.get('route') ?? 'html')
-                : route === 'parquet' ? parquetStub() : jsonlStub(entries)
-            // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
-            // nonce: the injected stub is inline, and production has no inline script at all.
-            const origin = `http://${req.headers.host}`
-            const nonce = randomBytes(16).toString('base64')
-            const csp = buildWebviewCsp(origin)
-                .replace(`script-src ${origin} `, `script-src ${origin} 'nonce-${nonce}' `)
-            const html = indexHtml
-                .replace(/<meta id="office-configs"[^>]*>/, `<meta id="office-configs" data-config='${JSON.stringify({ route })}'>`)
-                .replace('{{csp}}', csp)
-                .replace('<script type="module"', `<style>${theme}</style>\n${stub.replace('<script>', `<script nonce="${nonce}">`)}\n<script type="module"`)
-            res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-            res.end(html)
-            return
-        }
+    // The Word route fetches its document by path (`loadOfficeBuffer` throws on an empty
+    // buffer), so the fixture has to be a real docx served over HTTP.
+    if (path === "/smoke.docx") {
+      res.writeHead(200, {
+        "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      });
+      res.end(readFileSync(fixtures.docx));
+      return;
+    }
 
-        if (path === '/codicon.ttf') {
-            const font = join(repoRoot, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.ttf')
-            if (!existsSync(font)) { res.writeHead(404).end('missing font'); return }
-            res.writeHead(200, { 'content-type': 'font/ttf' })
-            res.end(readFileSync(font))
-            return
-        }
+    if (path === "/sample.parquet" || path === "/mixed.parquet" || path === "/big.parquet") {
+      const file =
+        path === "/sample.parquet"
+          ? fixtures.sample
+          : path === "/mixed.parquet"
+            ? fixtures.mixed
+            : fixtures.big;
+      serveParquet(req, res, file, stats, url.searchParams.get("range") !== "off");
+      return;
+    }
 
-        // The Word route fetches its document by path (`loadOfficeBuffer` throws on an empty
-        // buffer), so the fixture has to be a real docx served over HTTP.
-        if (path === '/smoke.docx') {
-            res.writeHead(200, { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
-            res.end(readFileSync(fixtures.docx))
-            return
-        }
+    const file = join(WEBVIEW_ROOT, path.replace(/^\//, ""));
+    if (!existsSync(file) || path.endsWith("/")) {
+      res.writeHead(404).end("not found");
+      return;
+    }
+    res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
+    res.end(readFileSync(file));
+  });
 
-        if (path === '/sample.parquet' || path === '/mixed.parquet' || path === '/big.parquet') {
-            const file = path === '/sample.parquet'
-                ? fixtures.sample
-                : path === '/mixed.parquet' ? fixtures.mixed : fixtures.big
-            serveParquet(req, res, file, stats, url.searchParams.get('range') !== 'off')
-            return
-        }
-
-        const file = join(WEBVIEW_ROOT, path.replace(/^\//, ''))
-        if (!existsSync(file) || path.endsWith('/')) {
-            res.writeHead(404).end('not found')
-            return
-        }
-        res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' })
-        res.end(readFileSync(file))
-    })
-
-    return new Promise((resolve, reject) => {
-        server.on('error', reject)
-        server.listen(port, '127.0.0.1', () => {
-            const actual = server.address().port
-            resolve({
-                port: actual,
-                url: `http://127.0.0.1:${actual}`,
-                stats,
-                close: () => new Promise(done => server.close(done)),
-            })
-        })
-    })
+  return new Promise((resolve, reject) => {
+    server.on("error", reject);
+    server.listen(port, "127.0.0.1", () => {
+      const actual = server.address().port;
+      resolve({
+        port: actual,
+        url: `http://127.0.0.1:${actual}`,
+        stats,
+        close: () => new Promise((done) => server.close(done)),
+      });
+    });
+  });
 }
-
-

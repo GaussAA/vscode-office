@@ -1,4 +1,4 @@
-import Item from './item';
+import Item from "./item";
 
 export default class DropdownItem extends Item {
   dropdown() {}
@@ -15,9 +15,7 @@ export default class DropdownItem extends Item {
       this.trackTelemetry({ value });
       this.change(tag, value);
     };
-    return super.element().child(
-      this.dd,
-    );
+    return super.element().child(this.dd);
   }
 
   setState(v) {

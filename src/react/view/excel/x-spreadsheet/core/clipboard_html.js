@@ -3,18 +3,18 @@
 function normalizeColor(value) {
   if (!value) return null;
   const text = value.trim().toLowerCase();
-  if (!text || text === 'transparent' || text === 'inherit' || text === 'initial') return null;
+  if (!text || text === "transparent" || text === "inherit" || text === "initial") return null;
   if (/^#[0-9a-f]{6}$/i.test(text)) return text;
   if (/^#[0-9a-f]{3}$/i.test(text)) {
     return `#${text[1]}${text[1]}${text[2]}${text[2]}${text[3]}${text[3]}`.toLowerCase();
   }
   const rgb = /^rgba?\(([^)]+)\)$/.exec(text);
   if (rgb) {
-    const parts = rgb[1].split(',').map(it => Number.parseFloat(it.trim()));
+    const parts = rgb[1].split(",").map((it) => Number.parseFloat(it.trim()));
     if (parts.length >= 3 && parts.every((it, index) => index > 2 || Number.isFinite(it))) {
       if (parts.length > 3 && parts[3] === 0) return null;
-      const [r, g, b] = parts.slice(0, 3).map(it => Math.max(0, Math.min(255, Math.round(it))));
-      return `#${[r, g, b].map(it => it.toString(16).padStart(2, '0')).join('')}`;
+      const [r, g, b] = parts.slice(0, 3).map((it) => Math.max(0, Math.min(255, Math.round(it))));
+      return `#${[r, g, b].map((it) => it.toString(16).padStart(2, "0")).join("")}`;
     }
   }
   return null;
@@ -31,14 +31,14 @@ function parseFontSize(value) {
 
 function borderFromCss(value) {
   if (!value || /none|hidden/i.test(value)) return null;
-  const color = normalizeColor(value) || '#000000';
-  let style = 'thin';
-  if (/double/i.test(value)) style = 'double';
-  else if (/dotted/i.test(value)) style = 'dotted';
-  else if (/dashed/i.test(value)) style = 'dashed';
+  const color = normalizeColor(value) || "#000000";
+  let style = "thin";
+  if (/double/i.test(value)) style = "double";
+  else if (/dotted/i.test(value)) style = "dotted";
+  else if (/dashed/i.test(value)) style = "dashed";
   else {
     const width = /([\d.]+)px/i.exec(value);
-    if (width && Number.parseFloat(width[1]) >= 2) style = 'medium';
+    if (width && Number.parseFloat(width[1]) >= 2) style = "medium";
   }
   return [style, color];
 }
@@ -47,23 +47,28 @@ function styleFromCell(cell) {
   const computed = window.getComputedStyle(cell);
   const style = {};
   const font = {};
-  const fontFamily = computed.fontFamily.split(',')[0]?.replace(/^["']|["']$/g, '').trim();
+  const fontFamily = computed.fontFamily
+    .split(",")[0]
+    ?.replace(/^["']|["']$/g, "")
+    .trim();
   if (fontFamily) font.name = fontFamily;
   const fontSize = parseFontSize(computed.fontSize);
   if (fontSize) font.size = fontSize;
-  if (computed.fontWeight === 'bold' || Number.parseInt(computed.fontWeight, 10) >= 600) font.bold = true;
-  if (computed.fontStyle === 'italic') font.italic = true;
+  if (computed.fontWeight === "bold" || Number.parseInt(computed.fontWeight, 10) >= 600)
+    font.bold = true;
+  if (computed.fontStyle === "italic") font.italic = true;
   if (Object.keys(font).length > 0) style.font = font;
 
   const color = normalizeColor(computed.color);
   if (color) style.color = color;
   const bgcolor = normalizeColor(computed.backgroundColor);
-  if (bgcolor && bgcolor !== '#ffffff') style.bgcolor = bgcolor;
-  if (computed.textDecorationLine.includes('underline')) style.underline = true;
-  if (computed.textDecorationLine.includes('line-through')) style.strike = true;
-  if (['left', 'center', 'right'].includes(computed.textAlign)) style.align = computed.textAlign;
-  if (['top', 'middle', 'bottom'].includes(computed.verticalAlign)) style.valign = computed.verticalAlign;
-  if (['pre-wrap', 'pre-line', 'break-spaces'].includes(computed.whiteSpace)) style.textwrap = true;
+  if (bgcolor && bgcolor !== "#ffffff") style.bgcolor = bgcolor;
+  if (computed.textDecorationLine.includes("underline")) style.underline = true;
+  if (computed.textDecorationLine.includes("line-through")) style.strike = true;
+  if (["left", "center", "right"].includes(computed.textAlign)) style.align = computed.textAlign;
+  if (["top", "middle", "bottom"].includes(computed.verticalAlign))
+    style.valign = computed.verticalAlign;
+  if (["pre-wrap", "pre-line", "break-spaces"].includes(computed.whiteSpace)) style.textwrap = true;
 
   const border = {};
   const top = borderFromCss(computed.borderTop);
@@ -81,15 +86,15 @@ function styleFromCell(cell) {
 
 function collectCellText(node) {
   if (node.nodeType === Node.TEXT_NODE) {
-    return node.nodeValue || '';
+    return node.nodeValue || "";
   }
   if (node.nodeType !== Node.ELEMENT_NODE) {
-    return '';
+    return "";
   }
-  if (node.tagName === 'BR') {
-    return '\n';
+  if (node.tagName === "BR") {
+    return "\n";
   }
-  let text = '';
+  let text = "";
   node.childNodes.forEach((child) => {
     text += collectCellText(child);
   });
@@ -98,33 +103,33 @@ function collectCellText(node) {
 
 function cellText(cell) {
   return collectCellText(cell)
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .replace(/\u00a0/g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n[ \t]+/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
 function escapeHtml(text) {
-  return String(text ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function borderSideToCss(side) {
   if (!side || !side[0]) return null;
   const [styleName, color] = side;
-  let width = '1px';
-  let lineStyle = 'solid';
-  if (styleName === 'medium') width = '2px';
-  else if (styleName === 'thick') width = '3px';
-  else if (styleName === 'dashed') lineStyle = 'dashed';
-  else if (styleName === 'dotted') lineStyle = 'dotted';
-  else if (styleName === 'double') lineStyle = 'double';
+  let width = "1px";
+  let lineStyle = "solid";
+  if (styleName === "medium") width = "2px";
+  else if (styleName === "thick") width = "3px";
+  else if (styleName === "dashed") lineStyle = "dashed";
+  else if (styleName === "dotted") lineStyle = "dotted";
+  else if (styleName === "double") lineStyle = "double";
   return `${width} ${lineStyle} ${color}`;
 }
 
@@ -138,20 +143,24 @@ function styleToCss(style, defaultStyle) {
   if (font.size && font.size !== defaultFont.size) {
     parts.push(`font-size:${font.size}pt`);
   }
-  if (font.bold) parts.push('font-weight:bold');
-  if (font.italic) parts.push('font-style:italic');
+  if (font.bold) parts.push("font-weight:bold");
+  if (font.italic) parts.push("font-style:italic");
   if (style.color && style.color !== defaultStyle.color) {
     parts.push(`color:${style.color}`);
   }
-  if (style.bgcolor && style.bgcolor !== defaultStyle.bgcolor
-    && style.bgcolor !== '#ffffff' && style.bgcolor !== '#fff') {
+  if (
+    style.bgcolor &&
+    style.bgcolor !== defaultStyle.bgcolor &&
+    style.bgcolor !== "#ffffff" &&
+    style.bgcolor !== "#fff"
+  ) {
     parts.push(`background-color:${style.bgcolor}`);
   }
   const decorations = [];
-  if (style.underline) decorations.push('underline');
-  if (style.strike) decorations.push('line-through');
+  if (style.underline) decorations.push("underline");
+  if (style.strike) decorations.push("line-through");
   if (decorations.length > 0) {
-    parts.push(`text-decoration:${decorations.join(' ')}`);
+    parts.push(`text-decoration:${decorations.join(" ")}`);
   }
   if (style.align && style.align !== defaultStyle.align) {
     parts.push(`text-align:${style.align}`);
@@ -160,7 +169,7 @@ function styleToCss(style, defaultStyle) {
     parts.push(`vertical-align:${style.valign}`);
   }
   if (style.textwrap) {
-    parts.push('white-space:pre-wrap');
+    parts.push("white-space:pre-wrap");
   }
   if (style.border) {
     const { border } = style;
@@ -173,15 +182,13 @@ function styleToCss(style, defaultStyle) {
     if (bottom) parts.push(`border-bottom:${bottom}`);
     if (left) parts.push(`border-left:${left}`);
   }
-  return parts.join(';');
+  return parts.join(";");
 }
 
-function formatCellHtml(text, style, defaultStyle, extraAttrs = '') {
+function formatCellHtml(text, style, defaultStyle, extraAttrs = "") {
   const css = styleToCss(style, defaultStyle);
-  const styleAttr = css ? ` style="${css}"` : '';
-  const body = style.textwrap
-    ? escapeHtml(text)
-    : escapeHtml(text).replace(/\n/g, '<br>');
+  const styleAttr = css ? ` style="${css}"` : "";
+  const body = style.textwrap ? escapeHtml(text) : escapeHtml(text).replace(/\n/g, "<br>");
   return `<td${extraAttrs}${styleAttr}>${body}</td>`;
 }
 
@@ -189,14 +196,12 @@ function formatCellHtml(text, style, defaultStyle, extraAttrs = '') {
  * Serialize a selected range to HTML table for system clipboard (Excel / WPS).
  */
 export function formatHtmlClipboard(data, range) {
-  const {
-    sri, eri, sci, eci,
-  } = range;
+  const { sri, eri, sci, eci } = range;
   const defaultStyle = data.defaultStyle();
   const rows = [];
 
   for (let ri = sri; ri <= eri; ri += 1) {
-    let rowHtml = '<tr>';
+    let rowHtml = "<tr>";
     for (let ci = sci; ci <= eci; ci += 1) {
       const merge = data.merges.getFirstIncludes(ri, ci);
       if (merge && (merge.sri !== ri || merge.sci !== ci)) {
@@ -204,43 +209,44 @@ export function formatHtmlClipboard(data, range) {
       }
       const style = data.getCellStyleOrDefault(ri, ci);
       const text = data.getCellTextOrDefault(ri, ci);
-      let extraAttrs = '';
+      let extraAttrs = "";
       if (merge) {
         const rowspan = Math.min(merge.eri, eri) - ri + 1;
         const colspan = Math.min(merge.eci, eci) - ci + 1;
         const attrs = [];
         if (rowspan > 1) attrs.push(`rowspan="${rowspan}"`);
         if (colspan > 1) attrs.push(`colspan="${colspan}"`);
-        if (attrs.length > 0) extraAttrs = ` ${attrs.join(' ')}`;
+        if (attrs.length > 0) extraAttrs = ` ${attrs.join(" ")}`;
       }
       rowHtml += formatCellHtml(text, style, defaultStyle, extraAttrs);
     }
-    rowHtml += '</tr>';
+    rowHtml += "</tr>";
     rows.push(rowHtml);
   }
 
-  const table = `<table>${rows.join('')}</table>`;
+  const table = `<table>${rows.join("")}</table>`;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${table}</body></html>`;
 }
 
 export function parseHtmlClipboard(html) {
   if (!html) return null;
-  const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;left:-10000px;top:-10000px;visibility:hidden;pointer-events:none;';
+  const container = document.createElement("div");
+  container.style.cssText =
+    "position:fixed;left:-10000px;top:-10000px;visibility:hidden;pointer-events:none;";
   container.innerHTML = html;
   document.body.appendChild(container);
   try {
-    const table = container.querySelector('table');
+    const table = container.querySelector("table");
     if (!table) return null;
     const rows = [];
     const merges = [];
-    table.querySelectorAll('tr').forEach((tr, ri) => {
+    table.querySelectorAll("tr").forEach((tr, ri) => {
       const row = rows[ri] || [];
       let ci = 0;
-      tr.querySelectorAll('td,th').forEach((td) => {
+      tr.querySelectorAll("td,th").forEach((td) => {
         while (row[ci]) ci += 1;
-        const rowspan = Math.max(1, Number.parseInt(td.getAttribute('rowspan') || '1', 10));
-        const colspan = Math.max(1, Number.parseInt(td.getAttribute('colspan') || '1', 10));
+        const rowspan = Math.max(1, Number.parseInt(td.getAttribute("rowspan") || "1", 10));
+        const colspan = Math.max(1, Number.parseInt(td.getAttribute("colspan") || "1", 10));
         row[ci] = {
           text: cellText(td),
           style: styleFromCell(td),
@@ -264,7 +270,7 @@ export function parseHtmlClipboard(html) {
       });
       rows[ri] = row;
     });
-    return rows.some(row => row && row.length > 0) ? { rows, merges } : null;
+    return rows.some((row) => row && row.length > 0) ? { rows, merges } : null;
   } finally {
     document.body.removeChild(container);
   }

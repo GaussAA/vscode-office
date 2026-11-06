@@ -1,6 +1,9 @@
-#print,#download,#viewBookmark,#openFile,#secondaryOpenFile{
+#print,
+#download,
+#viewBookmark,
+#openFile,
+#secondaryOpenFile {
   display: none;
-
 }
 
 /* Copyright 2014 Mozilla Foundation
@@ -78,9 +81,9 @@
   z-index: -1;
   cursor: default;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .textLayer .endOfContent.active {
@@ -219,8 +222,8 @@
 .annotationLayer .buttonWidgetAnnotation.checkBox input,
 .annotationLayer .buttonWidgetAnnotation.radioButton input {
   -webkit-appearance: none;
-     -moz-appearance: none;
-          appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   padding: 0;
 }
 
@@ -541,9 +544,9 @@ select {
 
 .pdfViewer.enablePermissions .textLayer > span {
   -webkit-user-select: none !important;
-     -moz-user-select: none !important;
-      -ms-user-select: none !important;
-          user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
   cursor: not-allowed;
 }
 
@@ -556,7 +559,7 @@ select {
   overflow: hidden;
   cursor: none;
   -webkit-user-select: none;
-          user-select: none;
+  user-select: none;
 }
 
 #viewerContainer.pdfPresentationMode:-moz-full-screen {
@@ -568,7 +571,7 @@ select {
   overflow: hidden;
   cursor: none;
   -moz-user-select: none;
-       user-select: none;
+  user-select: none;
 }
 
 #viewerContainer.pdfPresentationMode:-ms-fullscreen {
@@ -580,7 +583,7 @@ select {
   overflow: hidden;
   cursor: none;
   -ms-user-select: none;
-      user-select: none;
+  user-select: none;
 }
 
 #viewerContainer.pdfPresentationMode:fullscreen {
@@ -592,9 +595,9 @@ select {
   overflow: hidden;
   cursor: none;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .pdfPresentationMode:-webkit-full-screen a:not(.internalLink) {
@@ -640,17 +643,30 @@ select {
   position: relative;
 }
 
-::-webkit-scrollbar{width:4px!important;height:6px!important;}
-body::-webkit-scrollbar{width:4px!important;height:6px!important;}
-::-webkit-scrollbar-track{background:rgba(255,255,255,0.8)!important;border-radius:8px!important;}
-::-webkit-scrollbar-thumb{background-color:#8D8D8D !important;min-height:50px;border-radius:5px!important;}
+::-webkit-scrollbar {
+  width: 4px !important;
+  height: 6px !important;
+}
+body::-webkit-scrollbar {
+  width: 4px !important;
+  height: 6px !important;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 8px !important;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #8d8d8d !important;
+  min-height: 50px;
+  border-radius: 5px !important;
+}
 
 #sidebarContainer {
   position: absolute;
   top: 32px;
   bottom: 0;
   width: 270px;
-  width: var(--sidebar-width,270px);
+  width: var(--sidebar-width, 270px);
   visibility: hidden;
   z-index: 100;
   border-top: 1px solid rgba(51, 51, 51, 1);
@@ -675,9 +691,9 @@ html[dir="rtl"] #sidebarContainer {
   transition-duration: 0s;
   /* Prevent e.g. the thumbnails being selected when the sidebar is resized. */
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 #outerContainer.sidebarMoving #sidebarContainer,
@@ -740,16 +756,12 @@ html[dir="rtl"] #sidebarContent {
   transition-duration: 0s;
 }
 
-html[dir="ltr"]
-  #outerContainer.sidebarOpen
-  #viewerContainer:not(.pdfPresentationMode) {
+html[dir="ltr"] #outerContainer.sidebarOpen #viewerContainer:not(.pdfPresentationMode) {
   transition-property: left;
   left: 200px;
   left: var(--sidebar-width);
 }
-html[dir="rtl"]
-  #outerContainer.sidebarOpen
-  #viewerContainer:not(.pdfPresentationMode) {
+html[dir="rtl"] #outerContainer.sidebarOpen #viewerContainer:not(.pdfPresentationMode) {
   transition-property: right;
   right: 200px;
   right: var(--sidebar-width);
@@ -775,11 +787,15 @@ html[dir="rtl"]
 }
 
 html[dir="ltr"] #toolbarSidebar {
-  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.25), 0 1px 0 rgba(0, 0, 0, 0.15),
+  box-shadow:
+    inset -1px 0 0 rgba(0, 0, 0, 0.25),
+    0 1px 0 rgba(0, 0, 0, 0.15),
     0 0 1px rgba(0, 0, 0, 0.1);
 }
 html[dir="rtl"] #toolbarSidebar {
-  box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.25), 0 1px 0 rgba(0, 0, 0, 0.15),
+  box-shadow:
+    inset 1px 0 0 rgba(0, 0, 0, 0.25),
+    0 1px 0 rgba(0, 0, 0, 0.15),
     0 0 1px rgba(0, 0, 0, 0.1);
 }
 
@@ -828,7 +844,6 @@ html[dir="rtl"] #sidebarResizer {
 
 html[dir="ltr"] #toolbarContainer {
   box-shadow: 0 1px 0 rgba(204, 204, 204, 1);
-
 }
 
 .findbar {
@@ -846,7 +861,7 @@ html[dir="rtl"] #toolbarContainer {
   box-shadow: 0 1px 0 var(--toolbar-border-color);
 }
 
-.toolbarButtonSpacer{
+.toolbarButtonSpacer {
   display: none !important;
 }
 
@@ -967,7 +982,7 @@ html[dir="rtl"] #outerContainer.sidebarOpen #loadingBar {
     var(--progressBar-indeterminate-blend-color) 100px
   );
   -webkit-animation: progressIndeterminate 1s linear infinite;
-          animation: progressIndeterminate 1s linear infinite;
+  animation: progressIndeterminate 1s linear infinite;
 }
 
 .findbar,
@@ -1073,9 +1088,9 @@ html[dir="rtl"] .findbar .splitToolbarButton > .findNext {
 
 .findbar label {
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .findbar label:hover {
@@ -1159,17 +1174,21 @@ html[dir="rtl"] .secondaryToolbar {
 
 .doorHanger {
   border-radius: 2px;
-  box-shadow: 0 1px 5px rgba(12, 12, 13, 0.2),
+  box-shadow:
+    0 1px 5px rgba(12, 12, 13, 0.2),
     0 0 0 1px rgba(12, 12, 13, 0.2);
-  box-shadow: 0 1px 5px var(--doorhanger-border-color),
+  box-shadow:
+    0 1px 5px var(--doorhanger-border-color),
     0 0 0 1px var(--doorhanger-border-color);
 }
 
 .doorHangerRight {
   border-radius: 2px;
-  box-shadow: 0 1px 5px rgba(12, 12, 13, 0.2),
+  box-shadow:
+    0 1px 5px rgba(12, 12, 13, 0.2),
     0 0 0 1px rgba(12, 12, 13, 0.2);
-  box-shadow: 0 1px 5px var(--doorhanger-border-color),
+  box-shadow:
+    0 1px 5px var(--doorhanger-border-color),
     0 0 0 1px var(--doorhanger-border-color);
 }
 
@@ -1417,9 +1436,9 @@ html[dir="rtl"] .splitToolbarButtonSeparator {
   font-size: 12px;
   line-height: 14px;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
   cursor: default;
   box-sizing: border-box;
 }
@@ -1434,9 +1453,9 @@ html[dir="rtl"] .splitToolbarButtonSeparator {
   font-size: 12px;
   line-height: 14px;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
   cursor: default;
   box-sizing: border-box;
 }
@@ -1451,9 +1470,9 @@ html[dir="rtl"] .splitToolbarButtonSeparator {
   font-size: 12px;
   line-height: 14px;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
   cursor: default;
   box-sizing: border-box;
 }
@@ -1468,9 +1487,9 @@ html[dir="rtl"] .splitToolbarButtonSeparator {
   font-size: 12px;
   line-height: 14px;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
   cursor: default;
   box-sizing: border-box;
 }
@@ -2010,9 +2029,9 @@ html[dir="rtl"] .toolbarField[type="checkbox"] {
   line-height: 14px;
   text-align: left;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
   cursor: default;
 }
 
@@ -2063,7 +2082,9 @@ html[dir="rtl"] .thumbnail {
 
 .thumbnailImage {
   border: 1px solid rgba(0, 0, 0, 0);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3);
   opacity: 0.8;
   z-index: 99;
   background-color: rgba(255, 255, 255, 1);
@@ -2117,9 +2138,9 @@ a:focus > .thumbnail > .thumbnailSelectionRing {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 html[dir="ltr"] .treeWithDeepNesting > .treeItem,
@@ -2136,7 +2157,7 @@ html[dir="rtl"] .treeItem > .treeItems {
   padding-left: 20px !important;
   font-size: 14px;
   line-height: 24px;
-  font-family: '微软雅黑';
+  font-family: "微软雅黑";
   outline: none;
   text-decoration: none;
   display: inline-block;
@@ -2149,9 +2170,9 @@ html[dir="rtl"] .treeItem > .treeItems {
   color: rgba(0, 0, 0, 0.8);
   color: var(--treeitem-color);
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
   white-space: normal;
   cursor: pointer;
 }
@@ -2480,8 +2501,7 @@ html[dir="rtl"] #documentPropertiesOverlay .row > * {
   cursor: -webkit-grab !important;
   cursor: grab !important;
 }
-.grab-to-pan-grab
-  *:not(input):not(textarea):not(button):not(select):not(:link) {
+.grab-to-pan-grab *:not(input):not(textarea):not(button):not(select):not(:link) {
   cursor: inherit !important;
 }
 .grab-to-pan-grab:active,

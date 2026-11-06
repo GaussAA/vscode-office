@@ -1,5 +1,5 @@
 /* global window */
-export const cssPrefix = 'x-spreadsheet';
+export const cssPrefix = "x-spreadsheet";
 export const dpr = window.devicePixelRatio || 1;
 /** 视口最少列数（A–X） */
 export const MIN_VIEW_COLS = 24;

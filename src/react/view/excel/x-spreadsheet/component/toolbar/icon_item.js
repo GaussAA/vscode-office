@@ -1,11 +1,12 @@
-import Item from './item';
-import Icon from '../icon';
+import Item from "./item";
+import Icon from "../icon";
 
 export default class IconItem extends Item {
   element() {
-    return super.element()
+    return super
+      .element()
       .child(new Icon(this.tag))
-      .on('click', () => {
+      .on("click", () => {
         this.trackTelemetry();
         this.change(this.tag);
       });

@@ -2,42 +2,42 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [ main, dev ]
+    branches: [main, dev]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 jobs:
   build-and-verify:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: pnpm/action-setup@v4
-      with:
-        version: 12.16.1
-    - uses: actions/setup-node@v4
-      with:
-        node-version: 24.x
-        cache: pnpm
-    - run: pnpm install --frozen-lockfile
-    # Cheap and most likely to fail first: lint + typecheck + unit tests (~15s).
-    - name: Check (lint, typecheck, unit tests)
-      run: pnpm check
-    - name: Build
-      run: pnpm build
-    # Runs inside a real VS Code Extension Development Host. This is the only layer that
-    # can see activation and custom-editor routing; verify:ui covers the webview DOM.
-    - name: Integration smoke (real VS Code host)
-      run: xvfb-run -a pnpm test:smoke
-    # Turnstile for the `engines.vscode` floor: it is only real if the floor is executed.
-    - name: Integration smoke on the minimum supported VS Code
-      run: xvfb-run -a pnpm test:smoke:min
-    - name: UI verification (headless DOM assertions)
-      run: xvfb-run -a pnpm verify:ui
-    # Same command a developer runs locally — one packaging path, pinned tool version.
-    - name: Package vsix
-      run: pnpm run package
-    - name: Upload vsix
-      uses: actions/upload-artifact@v4
-      with:
-        name: office-viewer-plus-vsix
-        path: '*.vsix'
-        if-no-files-found: error
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Cheap and most likely to fail first: lint + typecheck + unit tests (~15s).
+      - name: Check (lint, typecheck, unit tests)
+        run: pnpm check
+      - name: Build
+        run: pnpm build
+      # Runs inside a real VS Code Extension Development Host. This is the only layer that
+      # can see activation and custom-editor routing; verify:ui covers the webview DOM.
+      - name: Integration smoke (real VS Code host)
+        run: xvfb-run -a pnpm test:smoke
+      # Turnstile for the `engines.vscode` floor: it is only real if the floor is executed.
+      - name: Integration smoke on the minimum supported VS Code
+        run: xvfb-run -a pnpm test:smoke:min
+      - name: UI verification (headless DOM assertions)
+        run: xvfb-run -a pnpm verify:ui
+      # Same command a developer runs locally — one packaging path, pinned tool version.
+      - name: Package vsix
+        run: pnpm run package
+      - name: Upload vsix
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-viewer-plus-vsix
+          path: "*.vsix"
+          if-no-files-found: error

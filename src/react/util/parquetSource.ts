@@ -13,108 +13,111 @@
  * Whether `vscode-webview://` honours `Range` differs per VS Code version and host
  * (desktop vs web), which is why this probes instead of assuming.
  */
-import type { AsyncBuffer } from 'hyparquet';
+import type { AsyncBuffer } from "hyparquet";
 
 /** Keeps the range cache bounded; pages are read in column-chunk sized slices. */
 const RANGE_CACHE_BYTES = 64 * 1024 * 1024;
 const RANGE_CACHE_ENTRIES = 48;
 
 export interface ParquetSource {
-    file: AsyncBuffer;
+  file: AsyncBuffer;
 }
 
 class RangeCache {
-    private entries = new Map<string, ArrayBuffer>();
-    private bytes = 0;
+  private entries = new Map<string, ArrayBuffer>();
+  private bytes = 0;
 
-    get(key: string): ArrayBuffer | undefined {
-        const hit = this.entries.get(key);
-        if (!hit) return undefined;
-        // refresh LRU position
-        this.entries.delete(key);
-        this.entries.set(key, hit);
-        return hit;
-    }
+  get(key: string): ArrayBuffer | undefined {
+    const hit = this.entries.get(key);
+    if (!hit) return undefined;
+    // refresh LRU position
+    this.entries.delete(key);
+    this.entries.set(key, hit);
+    return hit;
+  }
 
-    set(key: string, value: ArrayBuffer) {
-        if (this.entries.has(key)) return;
-        this.entries.set(key, value);
-        this.bytes += value.byteLength;
-        while ((this.bytes > RANGE_CACHE_BYTES || this.entries.size > RANGE_CACHE_ENTRIES) && this.entries.size > 1) {
-            const oldestKey = this.entries.keys().next().value as string;
-            const oldest = this.entries.get(oldestKey);
-            this.entries.delete(oldestKey);
-            this.bytes -= oldest?.byteLength ?? 0;
-        }
+  set(key: string, value: ArrayBuffer) {
+    if (this.entries.has(key)) return;
+    this.entries.set(key, value);
+    this.bytes += value.byteLength;
+    while (
+      (this.bytes > RANGE_CACHE_BYTES || this.entries.size > RANGE_CACHE_ENTRIES) &&
+      this.entries.size > 1
+    ) {
+      const oldestKey = this.entries.keys().next().value as string;
+      const oldest = this.entries.get(oldestKey);
+      this.entries.delete(oldestKey);
+      this.bytes -= oldest?.byteLength ?? 0;
     }
+  }
 }
 
 function makeRangeBuffer(url: string, byteLength: number): AsyncBuffer {
-    const cache = new RangeCache();
-    return {
-        byteLength,
-        async slice(start: number, end?: number): Promise<ArrayBuffer> {
-            const from = Math.max(0, Math.min(start, byteLength));
-            const to = Math.max(from, Math.min(end ?? byteLength, byteLength));
-            if (to <= from) return new ArrayBuffer(0);
-            const key = `${from}-${to}`;
-            const cached = cache.get(key);
-            if (cached) return cached;
+  const cache = new RangeCache();
+  return {
+    byteLength,
+    async slice(start: number, end?: number): Promise<ArrayBuffer> {
+      const from = Math.max(0, Math.min(start, byteLength));
+      const to = Math.max(from, Math.min(end ?? byteLength, byteLength));
+      if (to <= from) return new ArrayBuffer(0);
+      const key = `${from}-${to}`;
+      const cached = cache.get(key);
+      if (cached) return cached;
 
-            const response = await fetch(url, {
-                headers: { Range: `bytes=${from}-${to - 1}` },
-            });
-            if (response.status !== 206) {
-                throw new Error(`Range request failed (${response.status})`);
-            }
-            const buffer = await response.arrayBuffer();
-            cache.set(key, buffer);
-            return buffer;
-        },
-    };
+      const response = await fetch(url, {
+        headers: { Range: `bytes=${from}-${to - 1}` },
+      });
+      if (response.status !== 206) {
+        throw new Error(`Range request failed (${response.status})`);
+      }
+      const buffer = await response.arrayBuffer();
+      cache.set(key, buffer);
+      return buffer;
+    },
+  };
 }
 
 function makeBufferFromArrayBuffer(buffer: ArrayBuffer): AsyncBuffer {
-    return {
-        byteLength: buffer.byteLength,
-        slice(start: number, end?: number) {
-            return buffer.slice(start, end ?? buffer.byteLength);
-        },
-    };
+  return {
+    byteLength: buffer.byteLength,
+    slice(start: number, end?: number) {
+      return buffer.slice(start, end ?? buffer.byteLength);
+    },
+  };
 }
 
 export async function openParquetSource(url: string): Promise<ParquetSource> {
-    // Probe with the smallest useful request: two bytes.
-    let probeStatus = 0;
-    try {
-        const probe = await fetch(url, { headers: { Range: 'bytes=0-1' } });
-        probeStatus = probe.status;
-        const contentRange = probe.headers.get('Content-Range');
-        if (probe.status === 206 && contentRange) {
-            const total = Number(contentRange.split('/').pop());
-            await probe.arrayBuffer();
-            if (Number.isFinite(total) && total > 0) {
-                console.info('[parquet] source: ranged', total, 'bytes');
-                return { file: makeRangeBuffer(url, total) };
-            }
-        }
-        if (probe.status === 200) {
-            // The host ignored Range and sent the whole body — that body IS the file,
-            // so keep it instead of downloading the same bytes twice.
-            const buffer = await probe.arrayBuffer();
-            console.info('[parquet] source: full (no range support)', buffer.byteLength, 'bytes');
-            return { file: makeBufferFromArrayBuffer(buffer) };
-        }
-        await probe.arrayBuffer().catch(() => undefined);
-    } catch {
-        // fall through to the plain fetch below
+  // Probe with the smallest useful request: two bytes.
+  let probeStatus = 0;
+  try {
+    const probe = await fetch(url, { headers: { Range: "bytes=0-1" } });
+    probeStatus = probe.status;
+    const contentRange = probe.headers.get("Content-Range");
+    if (probe.status === 206 && contentRange) {
+      const total = Number(contentRange.split("/").pop());
+      await probe.arrayBuffer();
+      if (Number.isFinite(total) && total > 0) {
+        console.info("[parquet] source: ranged", total, "bytes");
+        return { file: makeRangeBuffer(url, total) };
+      }
     }
+    if (probe.status === 200) {
+      // The host ignored Range and sent the whole body — that body IS the file,
+      // so keep it instead of downloading the same bytes twice.
+      const buffer = await probe.arrayBuffer();
+      console.info("[parquet] source: full (no range support)", buffer.byteLength, "bytes");
+      return { file: makeBufferFromArrayBuffer(buffer) };
+    }
+    await probe.arrayBuffer().catch(() => undefined);
+  } catch {
+    // fall through to the plain fetch below
+  }
 
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch (${response.status}, probe ${probeStatus})`);
-    }
-    const buffer = await response.arrayBuffer();
-    console.info('[parquet] source: full', buffer.byteLength, 'bytes');
-    return { file: makeBufferFromArrayBuffer(buffer) };
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch (${response.status}, probe ${probeStatus})`);
+  }
+  const buffer = await response.arrayBuffer();
+  console.info("[parquet] source: full", buffer.byteLength, "bytes");
+  return { file: makeBufferFromArrayBuffer(buffer) };
 }

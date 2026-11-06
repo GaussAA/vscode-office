@@ -1,37 +1,37 @@
 // docs
-import './_.prototypes';
+import "./_.prototypes";
 
 function getSystemDefaultFont() {
-  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
-  if (ua.includes('Mac OS')) return { key: 'PingFang SC', title: 'PingFang SC' };
-  if (ua.includes('Windows')) return { key: 'Microsoft YaHei', title: 'Microsoft YaHei' };
-  return { key: 'Arial', title: 'Arial' };
+  const ua = (typeof navigator !== "undefined" && navigator.userAgent) || "";
+  if (ua.includes("Mac OS")) return { key: "PingFang SC", title: "PingFang SC" };
+  if (ua.includes("Windows")) return { key: "Microsoft YaHei", title: "Microsoft YaHei" };
+  return { key: "Arial", title: "Arial" };
 }
 
 /** default font list
  * @type {BaseFont[]}
  */
 const macCnFonts = [
-  { key: 'STSong', title: '华文宋体' },
-  { key: 'STHeiti', title: '华文黑体' },
-  { key: 'STKaiti', title: '华文楷体' },
-  { key: 'STFangsong', title: '华文仿宋' },
-  { key: 'STXihei', title: '华文细黑' },
-  { key: 'Menlo', title: 'Menlo' },
+  { key: "STSong", title: "华文宋体" },
+  { key: "STHeiti", title: "华文黑体" },
+  { key: "STKaiti", title: "华文楷体" },
+  { key: "STFangsong", title: "华文仿宋" },
+  { key: "STXihei", title: "华文细黑" },
+  { key: "Menlo", title: "Menlo" },
 ];
 
 const winCnFonts = [
-  { key: 'SimSun', title: '宋体' },
-  { key: 'SimHei', title: '黑体' },
-  { key: 'KaiTi', title: '楷体' },
-  { key: 'FangSong', title: '仿宋' },
-  { key: 'Consolas', title: 'Consolas' },
+  { key: "SimSun", title: "宋体" },
+  { key: "SimHei", title: "黑体" },
+  { key: "KaiTi", title: "楷体" },
+  { key: "FangSong", title: "仿宋" },
+  { key: "Consolas", title: "Consolas" },
 ];
 
 function getPlatformCnFonts() {
-  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
-  if (ua.includes('Mac OS')) return macCnFonts;
-  if (ua.includes('Windows')) return winCnFonts;
+  const ua = (typeof navigator !== "undefined" && navigator.userAgent) || "";
+  if (ua.includes("Mac OS")) return macCnFonts;
+  if (ua.includes("Windows")) return winCnFonts;
   return [];
 }
 
@@ -40,15 +40,15 @@ const baseFonts = [
   getSystemDefaultFont(),
   { divider: true },
   // 通用字体
-  { key: 'Arial', title: 'Arial' },
-  { key: 'Helvetica', title: 'Helvetica' },
-  { key: 'Verdana', title: 'Verdana' },
-  { key: 'Tahoma', title: 'Tahoma' },
-  { key: 'Calibri', title: 'Calibri' },
-  { key: 'Segoe UI', title: 'Segoe UI' },
-  { key: 'Times New Roman', title: 'Times New Roman' },
-  { key: 'Georgia', title: 'Georgia' },
-  { key: 'Courier New', title: 'Courier New' },
+  { key: "Arial", title: "Arial" },
+  { key: "Helvetica", title: "Helvetica" },
+  { key: "Verdana", title: "Verdana" },
+  { key: "Tahoma", title: "Tahoma" },
+  { key: "Calibri", title: "Calibri" },
+  { key: "Segoe UI", title: "Segoe UI" },
+  { key: "Times New Roman", title: "Times New Roman" },
+  { key: "Georgia", title: "Georgia" },
+  { key: "Courier New", title: "Courier New" },
   // 平台中文字体
   ...(() => {
     const cnFonts = getPlatformCnFonts();
@@ -106,9 +106,4 @@ function fonts(ary = []) {
 }
 
 export default {};
-export {
-  fontSizes,
-  fonts,
-  baseFonts,
-  getFontSizePxByPt,
-};
+export { fontSizes, fonts, baseFonts, getFontSizePxByPt };

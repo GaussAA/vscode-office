@@ -7,48 +7,48 @@
  *
  * `pnpm build` wipes `out/`, so this must run *after* it — `pnpm test:smoke` does.
  */
-import { build } from 'esbuild'
-import { mkdirSync, readdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { build } from "esbuild";
+import { mkdirSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const here = dirname(fileURLToPath(import.meta.url))
-const root = join(here, '..', '..')
-const outdir = join(root, 'out', 'test', 'smoke')
-const testRoot = join(root, 'test', 'smoke')
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, "..", "..");
+const outdir = join(root, "out", "test", "smoke");
+const testRoot = join(root, "test", "smoke");
 
 function findTests(dir) {
-    let found = []
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const full = join(dir, entry.name)
-        if (entry.isDirectory()) found = found.concat(findTests(full))
-        else if (entry.name.endsWith('.test.ts')) found.push(full)
-    }
-    return found
+  let found = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) found = found.concat(findTests(full));
+    else if (entry.name.endsWith(".test.ts")) found.push(full);
+  }
+  return found;
 }
 
-mkdirSync(outdir, { recursive: true })
+mkdirSync(outdir, { recursive: true });
 
-const entryPoints = findTests(testRoot)
+const entryPoints = findTests(testRoot);
 
 if (entryPoints.length === 0) {
-    console.error('smoke: no test files found under test/smoke/')
-    process.exit(1)
+  console.error("smoke: no test files found under test/smoke/");
+  process.exit(1);
 }
 
 await build({
-    entryPoints,
-    outdir,
-    outExtension: { '.js': '.cjs' },
-    bundle: true,
-    platform: 'node',
-    format: 'cjs',
-    target: 'node20',
-    sourcemap: true,
-    // Provided by the host at runtime, never bundled.
-    external: ['vscode'],
-    alias: { '@': join(root, 'src') },
-    logLevel: 'warning',
-})
+  entryPoints,
+  outdir,
+  outExtension: { ".js": ".cjs" },
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  target: "node20",
+  sourcemap: true,
+  // Provided by the host at runtime, never bundled.
+  external: ["vscode"],
+  alias: { "@": join(root, "src") },
+  logLevel: "warning",
+});
 
-console.log(`bundled ${entryPoints.length} smoke suite(s) into ${outdir}`)
+console.log(`bundled ${entryPoints.length} smoke suite(s) into ${outdir}`);

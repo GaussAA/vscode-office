@@ -1,14 +1,15 @@
-import { h } from './element';
-import { cssPrefix } from '../config';
-import { sheetImageDataUrl } from '../../excel_images';
-import { mouseMoveUp } from './event';
+import { h } from "./element";
+import { cssPrefix } from "../config";
+import { sheetImageDataUrl } from "../../excel_images";
+import { mouseMoveUp } from "./event";
 
-const RESIZE_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+const RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 const MIN_IMAGE_SIZE = 8;
 
 function anchorUsesExtSize(anchor) {
-  return anchor.width != null || anchor.height != null
-    || (anchor.brCol == null && anchor.brRow == null);
+  return (
+    anchor.width != null || anchor.height != null || (anchor.brCol == null && anchor.brRow == null)
+  );
 }
 
 function applyAnchorRect(data, anchor, l, t, widthPx, heightPx) {
@@ -35,22 +36,22 @@ function resizeRect(l, t, w, h, dx, dy, dir) {
   let nt = t;
   let nw = w;
   let nh = h;
-  if (dir.includes('e')) nw = w + dx;
-  if (dir.includes('w')) {
+  if (dir.includes("e")) nw = w + dx;
+  if (dir.includes("w")) {
     nw = w - dx;
     nl = l + dx;
   }
-  if (dir.includes('s')) nh = h + dy;
-  if (dir.includes('n')) {
+  if (dir.includes("s")) nh = h + dy;
+  if (dir.includes("n")) {
     nh = h - dy;
     nt = t + dy;
   }
   if (nw < MIN_IMAGE_SIZE) {
-    if (dir.includes('w')) nl -= MIN_IMAGE_SIZE - nw;
+    if (dir.includes("w")) nl -= MIN_IMAGE_SIZE - nw;
     nw = MIN_IMAGE_SIZE;
   }
   if (nh < MIN_IMAGE_SIZE) {
-    if (dir.includes('n')) nt -= MIN_IMAGE_SIZE - nh;
+    if (dir.includes("n")) nt -= MIN_IMAGE_SIZE - nh;
     nh = MIN_IMAGE_SIZE;
   }
   return { l: nl, t: nt, w: nw, h: nh };
@@ -102,7 +103,7 @@ function getItemDisplayRect(data, item) {
 
 export default class SheetImages {
   constructor() {
-    this.el = h('div', `${cssPrefix}-sheet-images`);
+    this.el = h("div", `${cssPrefix}-sheet-images`);
     this.items = [];
     this.data = null;
     this.editable = false;
@@ -113,7 +114,7 @@ export default class SheetImages {
 
   setEditable(editable) {
     this.editable = editable;
-    this.el.active(editable, 'editable');
+    this.el.active(editable, "editable");
   }
 
   setOnChange(fn) {
@@ -128,9 +129,9 @@ export default class SheetImages {
     if (this.selectedIndex < 0) return;
     const prev = this.items[this.selectedIndex];
     if (prev) {
-      prev.wrapEl.removeClass('selected');
-      prev.wrapEl.removeClass('dragging');
-      prev.wrapEl.removeClass('resizing');
+      prev.wrapEl.removeClass("selected");
+      prev.wrapEl.removeClass("dragging");
+      prev.wrapEl.removeClass("resizing");
     }
     this.selectedIndex = -1;
     this.updatePositions();
@@ -141,27 +142,27 @@ export default class SheetImages {
     this.clearSelection();
     if (index < 0 || index >= this.items.length) return;
     this.selectedIndex = index;
-    this.items[index].wrapEl.addClass('selected');
+    this.items[index].wrapEl.addClass("selected");
     if (this.onSelect) this.onSelect();
     this.updatePositions();
   }
 
   reset(data) {
     this.data = data;
-    this.el.html('');
+    this.el.html("");
     this.items = [];
     this.selectedIndex = -1;
     const images = data.images || [];
     for (let i = 0; i < images.length; i += 1) {
       const image = images[i];
-      const wrapEl = h('div', `${cssPrefix}-sheet-image-item`);
-      const imgEl = h('img')
-        .attr('src', sheetImageDataUrl(image))
-        .attr('draggable', 'false')
-        .attr('alt', '');
+      const wrapEl = h("div", `${cssPrefix}-sheet-image-item`);
+      const imgEl = h("img")
+        .attr("src", sheetImageDataUrl(image))
+        .attr("draggable", "false")
+        .attr("alt", "");
       wrapEl.child(imgEl);
       const item = { wrapEl, imgEl, anchor: image.anchor, naturalWidth: 0, naturalHeight: 0 };
-      imgEl.on('load', () => {
+      imgEl.on("load", () => {
         item.naturalWidth = imgEl.el.naturalWidth;
         item.naturalHeight = imgEl.el.naturalHeight;
         this.updatePositions();
@@ -169,9 +170,11 @@ export default class SheetImages {
       if (this.editable) {
         for (let hi = 0; hi < RESIZE_HANDLES.length; hi += 1) {
           const dir = RESIZE_HANDLES[hi];
-          wrapEl.child(h('div', `${cssPrefix}-sheet-image-handle ${cssPrefix}-sheet-image-handle-${dir}`));
+          wrapEl.child(
+            h("div", `${cssPrefix}-sheet-image-handle ${cssPrefix}-sheet-image-handle-${dir}`),
+          );
         }
-        wrapEl.on('mousedown', (evt) => {
+        wrapEl.on("mousedown", (evt) => {
           const dir = getResizeDirection(evt.target);
           if (dir) {
             this.onResizeMouseDown(evt, i, dir);
@@ -199,28 +202,32 @@ export default class SheetImages {
     let moved = false;
 
     this.select(index);
-    item.wrapEl.addClass('dragging');
+    item.wrapEl.addClass("dragging");
 
-    mouseMoveUp(window, (e) => {
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      if (!moved && Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-      moved = true;
-      applyAnchorRect(
-        data,
-        item.anchor,
-        startRect.l + dx,
-        startRect.t + dy,
-        startRect.width,
-        startRect.height,
-      );
-      this.updatePositions();
-    }, () => {
-      item.wrapEl.removeClass('dragging');
-      if (moved && this.onChange) {
-        this.onChange();
-      }
-    });
+    mouseMoveUp(
+      window,
+      (e) => {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (!moved && Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+        moved = true;
+        applyAnchorRect(
+          data,
+          item.anchor,
+          startRect.l + dx,
+          startRect.t + dy,
+          startRect.width,
+          startRect.height,
+        );
+        this.updatePositions();
+      },
+      () => {
+        item.wrapEl.removeClass("dragging");
+        if (moved && this.onChange) {
+          this.onChange();
+        }
+      },
+    );
   }
 
   onResizeMouseDown(evt, index, dir) {
@@ -236,39 +243,41 @@ export default class SheetImages {
     let resized = false;
 
     this.select(index);
-    item.wrapEl.addClass('resizing');
+    item.wrapEl.addClass("resizing");
 
-    mouseMoveUp(window, (e) => {
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      if (!resized && Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-      resized = true;
-      const next = resizeRect(
-        startRect.l,
-        startRect.t,
-        startRect.width,
-        startRect.height,
-        dx,
-        dy,
-        dir,
-      );
-      applyAnchorRect(data, item.anchor, next.l, next.t, next.w, next.h);
-      this.updatePositions();
-    }, () => {
-      item.wrapEl.removeClass('resizing');
-      if (resized && this.onChange) {
-        this.onChange();
-      }
-    });
+    mouseMoveUp(
+      window,
+      (e) => {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (!resized && Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+        resized = true;
+        const next = resizeRect(
+          startRect.l,
+          startRect.t,
+          startRect.width,
+          startRect.height,
+          dx,
+          dy,
+          dir,
+        );
+        applyAnchorRect(data, item.anchor, next.l, next.t, next.w, next.h);
+        this.updatePositions();
+      },
+      () => {
+        item.wrapEl.removeClass("resizing");
+        if (resized && this.onChange) {
+          this.onChange();
+        }
+      },
+    );
   }
 
   updatePositions(data = this.data) {
     if (!data) return;
     this.data = data;
     for (let i = 0; i < this.items.length; i += 1) {
-      const {
-        wrapEl, anchor, naturalWidth, naturalHeight,
-      } = this.items[i];
+      const { wrapEl, anchor, naturalWidth, naturalHeight } = this.items[i];
       const rect = getItemDisplayRect(data, {
         anchor,
         naturalWidth,
@@ -278,9 +287,9 @@ export default class SheetImages {
         wrapEl.hide();
         continue;
       }
-      const zIndex = (i === this.selectedIndex) ? 2 : 1;
+      const zIndex = i === this.selectedIndex ? 2 : 1;
       wrapEl.show().css({
-        position: 'absolute',
+        position: "absolute",
         left: `${rect.left}px`,
         top: `${rect.top}px`,
         width: `${rect.width}px`,

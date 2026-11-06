@@ -1,5 +1,5 @@
-import { Buffer } from 'buffer';
+import { Buffer } from "buffer";
 
 if (!globalThis.Buffer) {
-    globalThis.Buffer = Buffer;
+  globalThis.Buffer = Buffer;
 }

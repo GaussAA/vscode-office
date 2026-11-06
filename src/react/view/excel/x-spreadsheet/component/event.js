@@ -7,7 +7,7 @@ export function unbind(target, name, fn) {
 }
 export function unbindClickoutside(el) {
   if (el.xclickoutside) {
-    unbind(window.document.body, 'click', el.xclickoutside);
+    unbind(window.document.body, "click", el.xclickoutside);
     delete el.xclickoutside;
   }
 }
@@ -26,30 +26,30 @@ export function bindClickoutside(el, cb) {
       unbindClickoutside(el);
     }
   };
-  bind(window.document.body, 'click', el.xclickoutside);
+  bind(window.document.body, "click", el.xclickoutside);
 }
 export function mouseMoveUp(target, movefunc, upfunc) {
-  bind(target, 'mousemove', movefunc);
+  bind(target, "mousemove", movefunc);
   const t = target;
   t.xEvtUp = (evt) => {
     // console.log('mouseup>>>');
-    unbind(target, 'mousemove', movefunc);
-    unbind(target, 'mouseup', target.xEvtUp);
+    unbind(target, "mousemove", movefunc);
+    unbind(target, "mouseup", target.xEvtUp);
     upfunc(evt);
   };
-  bind(target, 'mouseup', target.xEvtUp);
+  bind(target, "mouseup", target.xEvtUp);
 }
 
 function calTouchDirection(spanx, spany, evt, cb) {
-  let direction = '';
+  let direction = "";
   // console.log('spanx:', spanx, ', spany:', spany);
   if (Math.abs(spanx) > Math.abs(spany)) {
     // horizontal
-    direction = spanx > 0 ? 'right' : 'left';
+    direction = spanx > 0 ? "right" : "left";
     cb(direction, spanx, evt);
   } else {
     // vertical
-    direction = spany > 0 ? 'down' : 'up';
+    direction = spany > 0 ? "down" : "up";
     cb(direction, spany, evt);
   }
 }
@@ -57,12 +57,12 @@ function calTouchDirection(spanx, spany, evt, cb) {
 export function bindTouch(target, { move, end }) {
   let startx = 0;
   let starty = 0;
-  bind(target, 'touchstart', (evt) => {
+  bind(target, "touchstart", (evt) => {
     const { pageX, pageY } = evt.touches[0];
     startx = pageX;
     starty = pageY;
   });
-  bind(target, 'touchmove', (evt) => {
+  bind(target, "touchmove", (evt) => {
     if (!move) return;
     const { pageX, pageY } = evt.changedTouches[0];
     const spanx = pageX - startx;
@@ -75,7 +75,7 @@ export function bindTouch(target, { move, end }) {
     }
     evt.preventDefault();
   });
-  bind(target, 'touchend', (evt) => {
+  bind(target, "touchend", (evt) => {
     if (!end) return;
     const { pageX, pageY } = evt.changedTouches[0];
     const spanx = pageX - startx;
@@ -91,16 +91,12 @@ export function createEventEmitter() {
   function on(eventName, callback) {
     const push = () => {
       const currentListener = listeners.get(eventName);
-      return (Array.isArray(currentListener)
-          && currentListener.push(callback))
-          || false;
+      return (Array.isArray(currentListener) && currentListener.push(callback)) || false;
     };
 
     const create = () => listeners.set(eventName, [].concat(callback));
 
-    return (listeners.has(eventName)
-        && push())
-        || create();
+    return (listeners.has(eventName) && push()) || create();
   }
 
   function fire(eventName, args) {
@@ -109,22 +105,22 @@ export function createEventEmitter() {
       for (const callback of currentListener) callback.call(null, ...args);
     };
 
-    return listeners.has(eventName)
-        && exec();
+    return listeners.has(eventName) && exec();
   }
 
   function removeListener(eventName, callback) {
     const remove = () => {
       const currentListener = listeners.get(eventName);
       const idx = currentListener.indexOf(callback);
-      return (idx >= 0)
-          && currentListener.splice(idx, 1)
-          && listeners.get(eventName).length === 0
-          && listeners.delete(eventName);
+      return (
+        idx >= 0 &&
+        currentListener.splice(idx, 1) &&
+        listeners.get(eventName).length === 0 &&
+        listeners.delete(eventName)
+      );
     };
 
-    return listeners.has(eventName)
-        && remove();
+    return listeners.has(eventName) && remove();
   }
 
   function once(eventName, callback) {

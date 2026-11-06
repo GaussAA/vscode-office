@@ -1,38 +1,25 @@
 {
-	"compilerOptions": {
-		"target": "ES2024",
-		"lib": [
-			"ES2024",
-			"DOM",
-			"DOM.Iterable"
-		],
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"jsx": "react-jsx",
-		"paths": {
-			"@/*": [
-				"./src/*"
-			]
-		},
-		"resolveJsonModule": true,
-		"esModuleInterop": true,
-		"allowSyntheticDefaultImports": true,
-		"allowImportingTsExtensions": true,
-		"skipLibCheck": true,
-		"allowJs": true,
-		"checkJs": false,
-		"noEmit": true,
-		"strict": true,
-		"experimentalDecorators": true,
-		"useDefineForClassFields": true
-	},
-	"include": [
-		"src/**/*.ts",
-		"src/**/*.tsx"
-	],
-	"exclude": [
-		"node_modules",
-		".vscode-test",
-		"out"
-	]
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules", ".vscode-test", "out"]
 }

@@ -10,7 +10,7 @@ name: Release
 # already succeeded. `workflow_dispatch` therefore takes a flag per registry.
 on:
   push:
-    tags: ['v*']
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       publish_marketplace:
@@ -71,7 +71,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-vsix
-          path: '*.vsix'
+          path: "*.vsix"
           if-no-files-found: error
 
       # Publishing is behind a repository variable, not behind a tag alone. Trusted publishing

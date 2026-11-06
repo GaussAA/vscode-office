@@ -18,27 +18,27 @@ Issues 已同步到 [GaussAA/vscode-office #5](https://github.com/GaussAA/vscode
 
 ## 顺序
 
-| # | Issue | 任务 | 依赖 | 为什么单独一步 |
-|---|---|---|---|---|
-| T01 | [#6](https://github.com/GaussAA/vscode-office/issues/6) | 新增 release workflow，发布改 OIDC 受信发布 | — | **硬截止 2026-12-01**：Marketplace PAT 退役。现有 CI 只上传 vsix artifact，从不发布 |
-| T02 | [#7](https://github.com/GaussAA/vscode-office/issues/7) | 新建 `@vscode/test-cli` smoke 层 | — | T03–T06 的失败模式只在真实宿主里显现 |
-| T03 | [#8](https://github.com/GaussAA/vscode-office/issues/8) | 平台基线三件套对齐 + CI 断言 | T02 | 见 [ADR-0003](adr/0003-platform-baseline.md) |
-| T04 | [#9](https://github.com/GaussAA/vscode-office/issues/9) | 删除 `activationEvents: onStartupFinished` | T03 | 需要 `engines >= 1.74` 才允许隐式激活 |
-| T05 | [#10](https://github.com/GaussAA/vscode-office/issues/10) | webview 补 CSP + HTML 预览改沙箱 | T02 | 当前把用户 HTML 直接塞进扩展 origin |
-| T06 | [#11](https://github.com/GaussAA/vscode-office/issues/11) | `supportsMultipleEditorsPerDocument: true` | T02 | 一行，但改变同文档多编辑器的行为 |
-| T07 | [#12](https://github.com/GaussAA/vscode-office/issues/12) | `tsconfig` 收敛：`target/lib` → ES2022，单一 check 配置 | T03 | 基线抬升后 es2019 不再有保护价值 |
-| T08 | [#13](https://github.com/GaussAA/vscode-office/issues/13) | `vditor/` 收编为 pnpm workspace 包 + 构建拆出 | — | 让"这块代码依赖什么"重新可计算 |
-| T09 | [#14](https://github.com/GaussAA/vscode-office/issues/14) | 清理真正无引用的依赖 | T08 | 先让依赖可见，再判断谁没用 |
-| T10 | [#15](https://github.com/GaussAA/vscode-office/issues/15) | 安全升级批（`iconv-lite` / `katex` / `node-html-parser` / vite patch） | — | 无 API 变化，一次做完 |
-| T11 | [#16](https://github.com/GaussAA/vscode-office/issues/16) | `xlsx` → SheetJS 官方自托管 tarball | T05 | 排在 CSP 之后：两者是同一条攻击链的两段 |
-| T12 | [#17](https://github.com/GaussAA/vscode-office/issues/17) | `@eigenpal/docx-editor-react` → `@docx-editor.dev/react` | — | 渠道废弃，作者已换包名 |
-| T13 | [#18](https://github.com/GaussAA/vscode-office/issues/18) | TypeScript 7 + 闸门自证 | T02 | 单独一步，否则错误来源混杂 |
-| T14 | [#19](https://github.com/GaussAA/vscode-office/issues/19) | `strictNullChecks` | T13 | 收益最大、噪声最大的一个 |
-| T15 | [#20](https://github.com/GaussAA/vscode-office/issues/20) | 其余 strict 家族 | T14 | 小步跟上，每条可回退 |
-| T16 | [#21](https://github.com/GaussAA/vscode-office/issues/21) | 去全局 `retainContextWhenHidden` | T02 | 改 `getState/setState`，行为面明显 |
-| T17 | [#22](https://github.com/GaussAA/vscode-office/issues/22) | `antd` 6 + `@ant-design/icons` 6 | T06 | 主题/token 重做，26 处引用 |
-| T18 | [#23](https://github.com/GaussAA/vscode-office/issues/23) | `markdown-it` 15 / `mermaid` 12 / `file-type` 22 | T16 | 三个 ESM-only，各自独立 |
-| T19 | [#24](https://github.com/GaussAA/vscode-office/issues/24) | i18n 扩展侧迁 `vscode.l10n` | — | 收益上限是"一半"，排最后 |
+| #   | Issue                                                     | 任务                                                                   | 依赖 | 为什么单独一步                                                                      |
+| --- | --------------------------------------------------------- | ---------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------- |
+| T01 | [#6](https://github.com/GaussAA/vscode-office/issues/6)   | 新增 release workflow，发布改 OIDC 受信发布                            | —    | **硬截止 2026-12-01**：Marketplace PAT 退役。现有 CI 只上传 vsix artifact，从不发布 |
+| T02 | [#7](https://github.com/GaussAA/vscode-office/issues/7)   | 新建 `@vscode/test-cli` smoke 层                                       | —    | T03–T06 的失败模式只在真实宿主里显现                                                |
+| T03 | [#8](https://github.com/GaussAA/vscode-office/issues/8)   | 平台基线三件套对齐 + CI 断言                                           | T02  | 见 [ADR-0003](adr/0003-platform-baseline.md)                                        |
+| T04 | [#9](https://github.com/GaussAA/vscode-office/issues/9)   | 删除 `activationEvents: onStartupFinished`                             | T03  | 需要 `engines >= 1.74` 才允许隐式激活                                               |
+| T05 | [#10](https://github.com/GaussAA/vscode-office/issues/10) | webview 补 CSP + HTML 预览改沙箱                                       | T02  | 当前把用户 HTML 直接塞进扩展 origin                                                 |
+| T06 | [#11](https://github.com/GaussAA/vscode-office/issues/11) | `supportsMultipleEditorsPerDocument: true`                             | T02  | 一行，但改变同文档多编辑器的行为                                                    |
+| T07 | [#12](https://github.com/GaussAA/vscode-office/issues/12) | `tsconfig` 收敛：`target/lib` → ES2022，单一 check 配置                | T03  | 基线抬升后 es2019 不再有保护价值                                                    |
+| T08 | [#13](https://github.com/GaussAA/vscode-office/issues/13) | `vditor/` 收编为 pnpm workspace 包 + 构建拆出                          | —    | 让"这块代码依赖什么"重新可计算                                                      |
+| T09 | [#14](https://github.com/GaussAA/vscode-office/issues/14) | 清理真正无引用的依赖                                                   | T08  | 先让依赖可见，再判断谁没用                                                          |
+| T10 | [#15](https://github.com/GaussAA/vscode-office/issues/15) | 安全升级批（`iconv-lite` / `katex` / `node-html-parser` / vite patch） | —    | 无 API 变化，一次做完                                                               |
+| T11 | [#16](https://github.com/GaussAA/vscode-office/issues/16) | `xlsx` → SheetJS 官方自托管 tarball                                    | T05  | 排在 CSP 之后：两者是同一条攻击链的两段                                             |
+| T12 | [#17](https://github.com/GaussAA/vscode-office/issues/17) | `@eigenpal/docx-editor-react` → `@docx-editor.dev/react`               | —    | 渠道废弃，作者已换包名                                                              |
+| T13 | [#18](https://github.com/GaussAA/vscode-office/issues/18) | TypeScript 7 + 闸门自证                                                | T02  | 单独一步，否则错误来源混杂                                                          |
+| T14 | [#19](https://github.com/GaussAA/vscode-office/issues/19) | `strictNullChecks`                                                     | T13  | 收益最大、噪声最大的一个                                                            |
+| T15 | [#20](https://github.com/GaussAA/vscode-office/issues/20) | 其余 strict 家族                                                       | T14  | 小步跟上，每条可回退                                                                |
+| T16 | [#21](https://github.com/GaussAA/vscode-office/issues/21) | 去全局 `retainContextWhenHidden`                                       | T02  | 改 `getState/setState`，行为面明显                                                  |
+| T17 | [#22](https://github.com/GaussAA/vscode-office/issues/22) | `antd` 6 + `@ant-design/icons` 6                                       | T06  | 主题/token 重做，26 处引用                                                          |
+| T18 | [#23](https://github.com/GaussAA/vscode-office/issues/23) | `markdown-it` 15 / `mermaid` 12 / `file-type` 22                       | T16  | 三个 ESM-only，各自独立                                                             |
+| T19 | [#24](https://github.com/GaussAA/vscode-office/issues/24) | i18n 扩展侧迁 `vscode.l10n`                                            | —    | 收益上限是"一半"，排最后                                                            |
 
 ## 陷阱
 
@@ -72,20 +72,20 @@ Issues 已同步到 [GaussAA/vscode-office #5](https://github.com/GaussAA/vscode
 
 四份只读审计（手搓逻辑 vs 开源替代、vendored / 死代码、工具链现状、依赖健康度）的结论落成 13 条决定：
 
-| # | 决定 | 落点 |
-|---|---|---|
-| D1 | 平台下限 `^1.100` → `^1.125`（宿主 Node 20 → 24），闸门扩成「求交依赖的 `engines.node`」 | [ADR-0007](adr/0007-platform-floor-1-125.md) |
-| D2 | 删除 Web 扩展宿主与 `src/shims/` | [ADR-0008](adr/0008-drop-web-extension-host.md) |
-| D3 | `vditor/` 认领为 fork；Lute / Mermaid 预构建 blob 与 npm 对齐 | [ADR-0009](adr/0009-vendored-copy-vs-fork.md) |
-| D4 | `x-spreadsheet/` 认领为 fork，删 382 行内部死文件；换引擎另立 ADR | 同上 |
-| D5 | 删除 `.http` REST client 整个功能 | [ADR-0010](adr/0010-feature-boundary.md) |
-| D6 | gitHistory 换 `simple-git`；`vscode.git` API 定为仓库事实的正统来源 | 同上 |
-| D7 | 删除 AI polish | 同上 |
-| D8 | 五份语法与两个配色主题删除；图标主题重写成最小集 | 同上 |
-| D9 | `oxfmt`、`oxlint --type-aware`、`tsx`、`puppeteer-core`、typecheck `--self-test` | [ADR-0011](adr/0011-toolchain-oxc-and-gate-coverage.md) |
-| D10 | `src/` 一次性 reformat，配 `.git-blame-ignore-revs` | 同上 |
-| D11 | 依赖替换批（判据：18 个月内有发布 + 有 CI + 不是弃仓） | 每条独立提交 |
-| D12 | 8 个死文件 + 3 个一次性迁移 + 13 个零调用 `@deprecated` 别名 | 每条独立提交 |
-| D13 | 打包：剔除 183 KB dev 材料；合并 katex ×3 / mermaid ×2 / highlight.js ×2 | 每条独立提交 |
+| #   | 决定                                                                                     | 落点                                                    |
+| --- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| D1  | 平台下限 `^1.100` → `^1.125`（宿主 Node 20 → 24），闸门扩成「求交依赖的 `engines.node`」 | [ADR-0007](adr/0007-platform-floor-1-125.md)            |
+| D2  | 删除 Web 扩展宿主与 `src/shims/`                                                         | [ADR-0008](adr/0008-drop-web-extension-host.md)         |
+| D3  | `vditor/` 认领为 fork；Lute / Mermaid 预构建 blob 与 npm 对齐                            | [ADR-0009](adr/0009-vendored-copy-vs-fork.md)           |
+| D4  | `x-spreadsheet/` 认领为 fork，删 382 行内部死文件；换引擎另立 ADR                        | 同上                                                    |
+| D5  | 删除 `.http` REST client 整个功能                                                        | [ADR-0010](adr/0010-feature-boundary.md)                |
+| D6  | gitHistory 换 `simple-git`；`vscode.git` API 定为仓库事实的正统来源                      | 同上                                                    |
+| D7  | 删除 AI polish                                                                           | 同上                                                    |
+| D8  | 五份语法与两个配色主题删除；图标主题重写成最小集                                         | 同上                                                    |
+| D9  | `oxfmt`、`oxlint --type-aware`、`tsx`、`puppeteer-core`、typecheck `--self-test`         | [ADR-0011](adr/0011-toolchain-oxc-and-gate-coverage.md) |
+| D10 | `src/` 一次性 reformat，配 `.git-blame-ignore-revs`                                      | 同上                                                    |
+| D11 | 依赖替换批（判据：18 个月内有发布 + 有 CI + 不是弃仓）                                   | 每条独立提交                                            |
+| D12 | 8 个死文件 + 3 个一次性迁移 + 13 个零调用 `@deprecated` 别名                             | 每条独立提交                                            |
+| D13 | 打包：剔除 183 KB dev 材料；合并 katex ×3 / mermaid ×2 / highlight.js ×2                 | 每条独立提交                                            |
 
 新增词汇见 [GLOSSARY](../GLOSSARY.md)：**Vendored copy** 与 **Fork** 的区分（ADR-0009）、**Gate coverage**（ADR-0011）。

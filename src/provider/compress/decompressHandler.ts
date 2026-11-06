@@ -6,20 +6,22 @@ import { resolve } from "path";
 import { Uri, commands } from "vscode";
 
 export function handlerCommonDecompress(uri: Uri, handler: Handler) {
-    const decompressPath = `${tmpdir()}/officeViewer-decompress-${new Date().getTime()}`;
-    handler
-        .on('showInExplorer', () => {
-            const path = uri.fsPath;
-            if (platform() == 'win32') {
-                exec(`explorer /select, "${resolve(path)}"`);
-            } else if (platform() == 'darwin') {
-                exec(`open -R "${resolve(path)}"`);
-            } else {
-                commands.executeCommand('vscode.open', Uri.file(uri.fsPath));
-            }
-        }).on('dispose', () => {
-            if (existsSync(decompressPath)) rm(decompressPath, { recursive: true, force: true }, () => { });
-        });
+  const decompressPath = `${tmpdir()}/officeViewer-decompress-${new Date().getTime()}`;
+  handler
+    .on("showInExplorer", () => {
+      const path = uri.fsPath;
+      if (platform() == "win32") {
+        exec(`explorer /select, "${resolve(path)}"`);
+      } else if (platform() == "darwin") {
+        exec(`open -R "${resolve(path)}"`);
+      } else {
+        commands.executeCommand("vscode.open", Uri.file(uri.fsPath));
+      }
+    })
+    .on("dispose", () => {
+      if (existsSync(decompressPath))
+        rm(decompressPath, { recursive: true, force: true }, () => {});
+    });
 
-    return decompressPath;
+  return decompressPath;
 }

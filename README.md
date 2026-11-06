@@ -111,10 +111,10 @@ To use the built-in VS Code Markdown editor instead, add this to your `settings.
 
 ```json
 {
-    "workbench.editorAssociations": {
-        "*.md": "default",
-        "*.markdown": "default"
-    }
+  "workbench.editorAssociations": {
+    "*.md": "default",
+    "*.markdown": "default"
+  }
 }
 ```
 
@@ -192,8 +192,8 @@ Office Viewer collects **anonymous usage data** to understand which preview feat
 
 ### What we collect
 
-| Event         | When                              | Properties                                                                                                 |
-| ------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Event       | When                              | Properties                                                                                   |
+| ----------- | --------------------------------- | -------------------------------------------------------------------------------------------- |
 | `view.open` | A custom preview/editor is opened | `viewType` (e.g. `excel`, `markdown`, `pdf`), `fileType` (extension only, e.g. `xlsx`, `md`) |
 
 We **do not** collect file paths, file names, URLs, repository names, request contents, or other personally identifiable information.

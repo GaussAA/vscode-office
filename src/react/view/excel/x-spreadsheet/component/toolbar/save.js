@@ -1,19 +1,20 @@
-import Item from './item';
-import Icon from '../icon';
+import Item from "./item";
+import Icon from "../icon";
 
 export default class Save extends Item {
   constructor() {
-    super('save', 'Ctrl+S');
+    super("save", "Ctrl+S");
     this.el.disabled(true);
   }
 
   element() {
-    return super.element()
-      .child(new Icon('save'))
-      .on('click', () => {
-        if (!this.el.el.classList.contains('disabled')) {
+    return super
+      .element()
+      .child(new Icon("save"))
+      .on("click", () => {
+        if (!this.el.el.classList.contains("disabled")) {
           this.trackTelemetry();
-          this.change('save');
+          this.change("save");
         }
       });
   }

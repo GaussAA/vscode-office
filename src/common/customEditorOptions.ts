@@ -1,4 +1,4 @@
-import type * as vscode from 'vscode';
+import type * as vscode from "vscode";
 
 /**
  * Options shared by every custom editor registration.
@@ -18,10 +18,10 @@ import type * as vscode from 'vscode';
  * The two dedicated panels that still keep it (git history, HTML preview) say why on site.
  */
 export type CustomEditorOptions = {
-	webviewOptions?: vscode.WebviewPanelOptions;
-	supportsMultipleEditorsPerDocument?: boolean;
+  webviewOptions?: vscode.WebviewPanelOptions;
+  supportsMultipleEditorsPerDocument?: boolean;
 };
 
 export const customEditorOptions: CustomEditorOptions = {
-	supportsMultipleEditorsPerDocument: true,
+  supportsMultipleEditorsPerDocument: true,
 };

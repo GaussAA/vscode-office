@@ -27,8 +27,13 @@
 
     "no-unused-vars": [
       "error",
-      { "args": "none", "caughtErrors": "none", "varsIgnorePattern": "^_", "argsIgnorePattern": "^_" }
-    ],
+      {
+        "args": "none",
+        "caughtErrors": "none",
+        "varsIgnorePattern": "^_",
+        "argsIgnorePattern": "^_"
+      }
+    ]
   },
   "ignorePatterns": [
     "**/*.d.ts",

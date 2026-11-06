@@ -1,5 +1,5 @@
-import helper from './helper';
-import { expr2expr } from './alphabet';
+import helper from "./helper";
+import { expr2expr } from "./alphabet";
 
 class Rows {
   constructor({ len, height }) {
@@ -103,14 +103,14 @@ class Rows {
   }
 
   // what: all | text | format
-  setCell(ri, ci, cell, what = 'all') {
+  setCell(ri, ci, cell, what = "all") {
     const row = this.getOrNew(ri);
-    if (what === 'all') {
+    if (what === "all") {
       row.cells[ci] = cell;
-    } else if (what === 'text') {
+    } else if (what === "text") {
       row.cells[ci] = row.cells[ci] || {};
       row.cells[ci].text = cell.text;
-    } else if (what === 'format') {
+    } else if (what === "format") {
       row.cells[ci] = row.cells[ci] || {};
       row.cells[ci].style = cell.style;
       if (cell.merge) row.cells[ci].merge = cell.merge;
@@ -123,10 +123,15 @@ class Rows {
   }
 
   // what: all | format | text
-  copyPaste(srcCellRange, dstCellRange, what, autofill = false, cb = () => {}, mapRow = (ri) => ri) {
-    const {
-      sri, sci, eri, eci,
-    } = srcCellRange;
+  copyPaste(
+    srcCellRange,
+    dstCellRange,
+    what,
+    autofill = false,
+    cb = () => {},
+    mapRow = (ri) => ri,
+  ) {
+    const { sri, sci, eri, eci } = srcCellRange;
     const dsri = dstCellRange.sri;
     const dsci = dstCellRange.sci;
     const deri = dstCellRange.eri;
@@ -154,11 +159,11 @@ class Rows {
                 // ncell.text
                 if (autofill && ncell && ncell.text && ncell.text.length > 0) {
                   const { text } = ncell;
-                  let n = (jj - dsci) + (ii - dsri) + 2;
+                  let n = jj - dsci + (ii - dsri) + 2;
                   if (!isAdd) {
                     n -= dn + 1;
                   }
-                  if (text[0] === '=') {
+                  if (text[0] === "=") {
                     ncell.text = text.replace(/[a-zA-Z]{1,3}\d+/g, (word) => {
                       let [xn, yn] = [0, 0];
                       if (sri === dsri) {
@@ -170,9 +175,11 @@ class Rows {
                       if (/^\d+$/.test(word)) return word;
                       return expr2expr(word, xn, yn);
                     });
-                  } else if ((rn <= 1 && cn > 1 && (dsri > eri || deri < sri))
-                    || (cn <= 1 && rn > 1 && (dsci > eci || deci < sci))
-                    || (rn <= 1 && cn <= 1)) {
+                  } else if (
+                    (rn <= 1 && cn > 1 && (dsri > eri || deri < sri)) ||
+                    (cn <= 1 && rn > 1 && (dsci > eci || deci < sci)) ||
+                    (rn <= 1 && cn <= 1)
+                  ) {
                     const result = /[\\.\d]+$/.exec(text);
                     // console.log('result:', result);
                     if (result !== null) {
@@ -192,8 +199,8 @@ class Rows {
   }
 
   cutPaste(srcCellRange, dstCellRange, mapRow = (ri) => ri) {
-    this.copyPaste(srcCellRange, dstCellRange, 'all', false, () => {}, mapRow);
-    this.deleteCells(srcCellRange, 'all', mapRow);
+    this.copyPaste(srcCellRange, dstCellRange, "all", false, () => {}, mapRow);
+    this.deleteCells(srcCellRange, "all", mapRow);
   }
 
   // src: Array<Array<String>>
@@ -216,8 +223,10 @@ class Rows {
       if (nri >= sri) {
         nri += n;
         this.eachCells(ri, (ci, cell) => {
-          if (cell.text && cell.text[0] === '=') {
-            cell.text = cell.text.replace(/[a-zA-Z]{1,3}\d+/g, word => expr2expr(word, 0, n, (x, y) => y >= sri));
+          if (cell.text && cell.text[0] === "=") {
+            cell.text = cell.text.replace(/[a-zA-Z]{1,3}\d+/g, (word) =>
+              expr2expr(word, 0, n, (x, y) => y >= sri),
+            );
           }
         });
       }
@@ -237,8 +246,10 @@ class Rows {
       } else if (ri > eri) {
         ndata[nri - n] = row;
         this.eachCells(ri, (ci, cell) => {
-          if (cell.text && cell.text[0] === '=') {
-            cell.text = cell.text.replace(/[a-zA-Z]{1,3}\d+/g, word => expr2expr(word, 0, -n, (x, y) => y > eri));
+          if (cell.text && cell.text[0] === "=") {
+            cell.text = cell.text.replace(/[a-zA-Z]{1,3}\d+/g, (word) =>
+              expr2expr(word, 0, -n, (x, y) => y > eri),
+            );
           }
         });
       }
@@ -254,8 +265,10 @@ class Rows {
         let nci = parseInt(ci, 10);
         if (nci >= sci) {
           nci += n;
-          if (cell.text && cell.text[0] === '=') {
-            cell.text = cell.text.replace(/[a-zA-Z]{1,3}\d+/g, word => expr2expr(word, n, 0, x => x >= sci));
+          if (cell.text && cell.text[0] === "=") {
+            cell.text = cell.text.replace(/[a-zA-Z]{1,3}\d+/g, (word) =>
+              expr2expr(word, n, 0, (x) => x >= sci),
+            );
           }
         }
         rndata[nci] = cell;
@@ -274,8 +287,10 @@ class Rows {
           rndata[nci] = cell;
         } else if (nci > eci) {
           rndata[nci - n] = cell;
-          if (cell.text && cell.text[0] === '=') {
-            cell.text = cell.text.replace(/[a-zA-Z]{1,3}\d+/g, word => expr2expr(word, -n, 0, x => x > eci));
+          if (cell.text && cell.text[0] === "=") {
+            cell.text = cell.text.replace(/[a-zA-Z]{1,3}\d+/g, (word) =>
+              expr2expr(word, -n, 0, (x) => x > eci),
+            );
           }
         }
       });
@@ -284,27 +299,27 @@ class Rows {
   }
 
   // what: all | text | format | merge
-  deleteCells(cellRange, what = 'all', mapRow = (ri) => ri) {
+  deleteCells(cellRange, what = "all", mapRow = (ri) => ri) {
     cellRange.each((i, j) => {
       this.deleteCell(mapRow(i), j, what);
     });
   }
 
   // what: all | text | format | merge
-  deleteCell(ri, ci, what = 'all') {
+  deleteCell(ri, ci, what = "all") {
     const row = this.get(ri);
     if (row !== null) {
       const cell = this.getCell(ri, ci);
       if (cell !== null && cell.editable !== false) {
-        if (what === 'all') {
+        if (what === "all") {
           delete row.cells[ci];
-        } else if (what === 'text') {
+        } else if (what === "text") {
           if (cell.text) delete cell.text;
           if (cell.value) delete cell.value;
-        } else if (what === 'format') {
+        } else if (what === "format") {
           if (cell.style !== undefined) delete cell.style;
           if (cell.merge) delete cell.merge;
-        } else if (what === 'merge') {
+        } else if (what === "merge") {
           if (cell.merge) delete cell.merge;
         }
       }
@@ -366,6 +381,4 @@ class Rows {
 }
 
 export default {};
-export {
-  Rows,
-};
+export { Rows };

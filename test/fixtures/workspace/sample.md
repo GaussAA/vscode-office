@@ -6,5 +6,5 @@ Opened by the integration smoke tests through `GaussAA.markdownViewer`.
 - two
 
 ```js
-const answer = 42
+const answer = 42;
 ```

@@ -91,10 +91,10 @@ Office Viewer 內建完整的 Git 歷史工作區，讓你無需離開 VS Code �
 
 ```json
 {
-    "workbench.editorAssociations": {
-        "*.md": "default",
-        "*.markdown": "default"
-    }
+  "workbench.editorAssociations": {
+    "*.md": "default",
+    "*.markdown": "default"
+  }
 }
 ```
 
@@ -172,8 +172,8 @@ Office Viewer 會收集**匿名使用資料**，用於了解各預覽功能的�
 
 ### 收集內容
 
-| 事件 | 觸發時機 | 屬性 |
-|------|---------|------|
+| 事件        | 觸發時機            | 屬性                                                                                 |
+| ----------- | ------------------- | ------------------------------------------------------------------------------------ |
 | `view.open` | 開啟自訂預覽/編輯器 | `viewType`（如 `excel`、`markdown`、`pdf`）、`fileType`（僅副檔名，如 `xlsx`、`md`） |
 
 **不會**收集檔案路徑、檔名、URL、儲存庫名稱、請求內容或其他可識別個人身份的資訊。

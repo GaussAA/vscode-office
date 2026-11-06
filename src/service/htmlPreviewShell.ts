@@ -14,11 +14,11 @@
  * tracked separately lives on the other viewers, which do not embed third-party documents.
  */
 
-export const PREVIEW_CONTENT_TYPE = 'htmlPreview/content'
-export const PREVIEW_READY_TYPE = 'htmlPreview/ready'
+export const PREVIEW_CONTENT_TYPE = "htmlPreview/content";
+export const PREVIEW_READY_TYPE = "htmlPreview/ready";
 
 export function buildHtmlPreviewShell(): string {
-	return `<!doctype html>
+  return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -43,5 +43,5 @@ export function buildHtmlPreviewShell(): string {
   })()
 </script>
 </body>
-</html>`
+</html>`;
 }

@@ -1,4 +1,4 @@
-import { CellRange } from './cell_range';
+import { CellRange } from "./cell_range";
 // operator: all|eq|neq|gt|gte|lt|lte|in|be
 // value:
 //   in => []
@@ -17,10 +17,10 @@ class Filter {
 
   includes(v) {
     const { operator, value } = this;
-    if (operator === 'all') {
+    if (operator === "all") {
       return true;
     }
-    if (operator === 'in') {
+    if (operator === "in") {
       return value.includes(v);
     }
     return false;
@@ -28,7 +28,7 @@ class Filter {
 
   vlength() {
     const { operator, value } = this;
-    if (operator === 'in') {
+    if (operator === "in") {
       return value.length;
     }
     return 0;
@@ -47,11 +47,11 @@ class Sort {
   }
 
   asc() {
-    return this.order === 'asc';
+    return this.order === "asc";
   }
 
   desc() {
-    return this.order === 'desc';
+    return this.order === "desc";
   }
 }
 
@@ -68,14 +68,14 @@ export default class AutoFilter {
       return;
     }
     this.ref = data.ref;
-    this.filters = (data.filters || []).map(it => new Filter(it.ci, it.operator, it.value));
+    this.filters = (data.filters || []).map((it) => new Filter(it.ci, it.operator, it.value));
     this.sort = data.sort ? new Sort(data.sort.ci, data.sort.order) : null;
   }
 
   getData() {
     if (this.active()) {
       const { ref, filters, sort } = this;
-      return { ref, filters: filters.map(it => it.getData()), sort };
+      return { ref, filters: filters.map((it) => it.getData()), sort };
     }
     return {};
   }
@@ -130,7 +130,7 @@ export default class AutoFilter {
         for (let i = 0; i < filters.length; i += 1) {
           const filter = filters[i];
           const cell = getCell(ri, filter.ci);
-          const ctext = cell ? cell.text : '';
+          const ctext = cell ? cell.text : "";
           if (filter.includes(ctext)) {
             visible = true;
           } else {
@@ -159,7 +159,7 @@ export default class AutoFilter {
           const cnt = (m[key] || 0) + 1;
           m[key] = cnt;
         } else {
-          m[''] = (m[''] || 0) + 1;
+          m[""] = (m[""] || 0) + 1;
         }
       }
     }

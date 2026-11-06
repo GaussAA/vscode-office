@@ -1,12 +1,17 @@
 #!/bin/sh
-# Pre-commit: everything that must never regress, in cheap-to-expensive order.
+# Pre-commit: every gate that must never regress, in one command.
 #
-# 1. Prettier over OUR docs only (~1.5s). `src/` is not auto-formatted yet: upstream
-#    style (4 spaces, single quotes) still dominates it, and mixing a format pass into
-#    a feature commit makes both unreviewable. Adopting prettier repo-wide is its own
-#    commit (see AGENTS.md).
-# 2. `pnpm check` = lint + typecheck + test (~15s warm). Each gate fails closed:
-#    eslint reports zero problems, tsc must not introduce an error outside the
-#    checked-in baseline, and node:test guards the parser edge cases.
-pnpm exec lint-staged
+# `pnpm check` = format:check + lint + baseline + typecheck + typecheck:self-test + test
+# (~15s warm). Each gate fails closed:
+#   format:check        -> oxfmt finds a difference (`pnpm format` is the fix)
+#   lint                -> oxlint reports anything at all
+#   baseline            -> engines / @types / a runtime dependency's engines.node disagree
+#   typecheck           -> a type error that is not in the (empty) baseline
+#   typecheck:self-test -> the type gate failed to see an injected error, so it proves nothing
+#   test                -> node:test
+#
+# There is no per-file auto-format step: oxfmt rewrites the whole tree in ~300ms, and
+# lint-staged's "pass every staged path as argv" is exactly what breaks on a large commit
+# (Windows caps the command line, so the 434-file reformat commit died with an argument
+# list that was too long). One command, one source of truth.
 pnpm check

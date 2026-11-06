@@ -1,10 +1,10 @@
-import * as vscode from 'vscode';
-import { ExtensionContext } from 'vscode';
+import * as vscode from "vscode";
+import { ExtensionContext } from "vscode";
 
-const prefix = 'vscode-office';
+const prefix = "vscode-office";
 
 export function language() {
-    return vscode.env.language;
+  return vscode.env.language;
 }
 
 /**
@@ -17,36 +17,38 @@ export function language() {
  * The webview has its own i18n (`src/react/i18n`): `vscode.l10n` only covers the host.
  */
 export function i18n(key: string, ...args: string[]) {
-    return vscode.l10n.t(key, ...args);
+  return vscode.l10n.t(key, ...args);
 }
 
 export class Global {
-    public static context: ExtensionContext;
+  public static context: ExtensionContext;
 
-    public static async init(context: ExtensionContext) {
-        Global.context = context;
-    }
+  public static async init(context: ExtensionContext) {
+    Global.context = context;
+  }
 
-    /**
-     * get configuration from vscode setting.
-     * @param key config key
-     */
-    public static getConfig<T>(key: string, defaultValue?: T): T {
-        const config = vscode.workspace.getConfiguration(prefix);
-        // The VS Code API has no overload that accepts an explicit `undefined` default, so
-        // the optional parameter is narrowed away here instead of at every call site.
-        return defaultValue === undefined ? config.get<T>(key) as T : config.get<T>(key, defaultValue);
-    }
+  /**
+   * get configuration from vscode setting.
+   * @param key config key
+   */
+  public static getConfig<T>(key: string, defaultValue?: T): T {
+    const config = vscode.workspace.getConfiguration(prefix);
+    // The VS Code API has no overload that accepts an explicit `undefined` default, so
+    // the optional parameter is narrowed away here instead of at every call site.
+    return defaultValue === undefined
+      ? (config.get<T>(key) as T)
+      : config.get<T>(key, defaultValue);
+  }
 
-    /**
-     * update config for vscode, config must def in package.json.
-     * @param name  config name
-     * @param value config value
-     */
-    public static async updateConfig(name: string, value: any) {
-        const config = vscode.workspace.getConfiguration(prefix);
-        const meta = config.inspect(name);
-        const newValue = meta?.defaultValue == value ? undefined : value;
-        await config.update(name, newValue, true);
-    }
+  /**
+   * update config for vscode, config must def in package.json.
+   * @param name  config name
+   * @param value config value
+   */
+  public static async updateConfig(name: string, value: any) {
+    const config = vscode.workspace.getConfiguration(prefix);
+    const meta = config.inspect(name);
+    const newValue = meta?.defaultValue == value ? undefined : value;
+    await config.update(name, newValue, true);
+  }
 }
