@@ -1,9 +1,10 @@
 export interface MaterialIconThemeJson {
     iconDefinitions: Record<string, { iconPath: string }>;
     fileExtensions: Record<string, string>;
-    fileNames: Record<string, string>;
-    folderNames: Record<string, string>;
-    folderNamesExpanded: Record<string, string>;
+    /** Optional: the VS Code icon-theme schema lets a theme omit any association map. */
+    fileNames?: Record<string, string>;
+    folderNames?: Record<string, string>;
+    folderNamesExpanded?: Record<string, string>;
     file: string;
     folder: string;
     folderExpanded: string;
@@ -42,11 +43,14 @@ function mapAssociationToFiles(
 
 export function buildIconMaps(theme: MaterialIconThemeJson): IconMaps {
     const { iconDefinitions } = theme;
+    // The theme file is ours (theme/material-icons.json) and carries only the formats this
+    // fork renders — no folder-name or file-name associations. Defaulting to an empty map
+    // keeps a partial theme a supported input instead of an activation crash.
     return {
         extToIconFile: mapAssociationToFiles(theme.fileExtensions, iconDefinitions),
-        fileNameToIconFile: mapAssociationToFiles(theme.fileNames, iconDefinitions),
-        folderToIconFile: mapAssociationToFiles(theme.folderNames, iconDefinitions),
-        folderExpandedToIconFile: mapAssociationToFiles(theme.folderNamesExpanded, iconDefinitions),
+        fileNameToIconFile: mapAssociationToFiles(theme.fileNames ?? {}, iconDefinitions),
+        folderToIconFile: mapAssociationToFiles(theme.folderNames ?? {}, iconDefinitions),
+        folderExpandedToIconFile: mapAssociationToFiles(theme.folderNamesExpanded ?? {}, iconDefinitions),
         defaultFileIcon: iconNameToFileName(iconDefinitions, theme.file),
         defaultFolderIcon: iconNameToFileName(iconDefinitions, theme.folder),
         defaultFolderExpandedIcon: iconNameToFileName(iconDefinitions, theme.folderExpanded),

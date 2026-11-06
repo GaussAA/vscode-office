@@ -29,6 +29,7 @@ const entries = {
     highlight: 'src/react/common/highlight.ts',
     htmlPreviewShell: 'src/service/htmlPreviewShell.ts',
     webviewCsp: 'src/common/webviewCsp.ts',
+    iconTheme: 'src/service/icon/iconTheme.ts',
 }
 
 for (const [name, entry] of Object.entries(entries)) {
