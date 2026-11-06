@@ -9,7 +9,7 @@ import {
     type FileEntry,
 } from '@zip.js/zip.js';
 import iconv from 'iconv-lite';
-import format from 'date-format';
+import { formatDateTime } from '@/common/formatDateTime';
 import { mkdirSync, writeFileSync } from 'fs';
 import { basename, resolve } from 'path';
 import prettyBytes from 'pretty-bytes';
@@ -107,7 +107,7 @@ function buildTree(entries: Entry[]): ZipParseResult {
             compressedSizeOrigin: raw.compressedSize,
             fileSize: prettyBytes(raw.uncompressedSize),
             compressedSize: prettyBytes(raw.compressedSize),
-            modifyDateTime: raw.lastModDate ? format('yyyy-MM-dd hh:mm:ss', raw.lastModDate) : null,
+            modifyDateTime: raw.lastModDate ? formatDateTime(raw.lastModDate) : null,
         });
     }
 

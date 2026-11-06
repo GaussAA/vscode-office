@@ -1,4 +1,4 @@
-import format from 'date-format';
+import { formatDateTime } from '@/common/formatDateTime';
 import { resolveContainedPath } from '@/service/compress/archiveUtils';
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
@@ -45,7 +45,7 @@ export async function listTarEntries(data: Buffer, gzip: boolean): Promise<TarEn
 }
 
 export function formatTarModifyTime(mtime?: Date): string | null {
-    return mtime ? format('yyyy-MM-dd hh:mm:ss', mtime) : null;
+    return mtime ? formatDateTime(mtime) : null;
 }
 
 export async function extractTarEntries(data: Buffer, destDir: string, gzip: boolean, entryNames?: string[]): Promise<void> {
