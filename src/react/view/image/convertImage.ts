@@ -1,5 +1,5 @@
 import heic2any from 'heic2any';
-import * as UTIF from 'utif';
+import * as UTIF from 'utif2';
 
 export type ImageSource = {
     src?: string;
