@@ -249,9 +249,10 @@ export class MarkdownService {
 
     public switchEditor(uri: vscode.Uri) {
         const editor = vscode.window.activeTextEditor;
-        if (!uri) uri = editor?.document.uri;
+        const target = uri ?? editor?.document.uri;
+        if (!target) return;
         const type = editor ? 'chaowu21.markdownViewer' : 'default';
-        vscode.commands.executeCommand('vscode.openWith', uri, type);
+        vscode.commands.executeCommand('vscode.openWith', target, type);
     }
 
 }

@@ -23,7 +23,8 @@ const Parquet = lazy(() => import('./view/parquet/Parquet.tsx'))
 const Jsonl = lazy(() => import('./view/jsonl/Jsonl.tsx'))
 const WebUnsupported = lazy(() => import('./view/WebUnsupported.tsx'))
 
-document.getElementById('_defaultStyles')?.parentNode?.removeChild(document.getElementById('_defaultStyles'))
+const defaultStyles = document.getElementById('_defaultStyles')
+if (defaultStyles?.parentNode) defaultStyles.parentNode.removeChild(defaultStyles)
 const configs = getConfigs();
 initI18n(configs?.language);
 
@@ -65,7 +66,7 @@ export default function App() {
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <ConfigProvider
     componentSize='small'
     theme={antThemeConfig}

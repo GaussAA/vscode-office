@@ -18,7 +18,7 @@ export function handlerCommonDecompress(uri: Uri, handler: Handler) {
                 commands.executeCommand('vscode.open', Uri.file(uri.fsPath));
             }
         }).on('dispose', () => {
-            if (existsSync(decompressPath)) rm(decompressPath, { recursive: true, force: true }, null);
+            if (existsSync(decompressPath)) rm(decompressPath, { recursive: true, force: true }, () => { });
         });
 
     return decompressPath;

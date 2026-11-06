@@ -111,7 +111,7 @@ export class HttpResponseView {
 
     private async saveBody() {
         if (!this.currentResponse) return;
-        let extension = MimeUtility.getExtension(this.currentResponse.contentType);
+        let extension: string | undefined = MimeUtility.getExtension(this.currentResponse.contentType);
         if (!extension) {
             const match = this.currentResponse.request.url.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
             extension = match?.[1];

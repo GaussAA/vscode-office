@@ -65,6 +65,7 @@ function renderGlyph(
     const { font, fontScale, fontSize, fontBaseline } = fontInfo;
     const scale = width / cellWidth;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     ctx.clearRect(0, 0, width, height);
     if (glyphIndex >= font.numGlyphs) return;
     const glyph = font.glyphs.glyphs[glyphIndex];

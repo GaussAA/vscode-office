@@ -65,10 +65,10 @@ export class FileUtil {
     }
     public static async getLastPath(key: string | string[], path = '') {
         // 获取已经保存的路径
-        let basePath: string;
+        let basePath = '';
         if (!Array.isArray(key)) { key = [key] }
         for (const itemKey of key) {
-            basePath = this.context.globalState.get(itemKey + 'SelectorPath');
+            basePath = this.context.globalState.get<string>(itemKey + 'SelectorPath') ?? '';
             if (basePath) break;
         }
         if (basePath) {

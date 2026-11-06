@@ -318,6 +318,7 @@ function ExcelViewer() {
 
     useEffect(() => {
         const container = document.getElementById('container');
+        if (!container) return;
 
         const initSpreadsheet = async (buffer: ArrayBuffer, payload: any) => {
             const fileReadOnly = payload.readOnly === true;

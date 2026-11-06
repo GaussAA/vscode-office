@@ -21,6 +21,7 @@
 		"skipLibCheck": true,
 		"noEmit": true,
 		"strict": false,
+		"strictNullChecks": true,
 		"experimentalDecorators": true,
 		"useDefineForClassFields": true
 	},

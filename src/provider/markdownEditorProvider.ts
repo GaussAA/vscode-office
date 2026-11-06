@@ -97,7 +97,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         if (vscode.env.uiKind === vscode.UIKind.Web) {
             return [];
         }
-        const data = [];
+        const data: vscode.Uri[] = [];
         for (let i = 65; i <= 90; i++) {
             data.push(vscode.Uri.file(`${String.fromCharCode(i)}:/`))
         }

@@ -440,7 +440,7 @@ export default function ActionDialog({
             primaryDisabled = !formValues.tagName?.trim();
         } else if (step.variant === 'deleteBranch' || step.variant === 'merge') {
             primaryDisabled = false;
-        } else if ((step.variant as string) === 'pushBranch' || (step.variant as string) === 'pushTag') {
+        } else if ((step.variant as unknown as string) === 'pushBranch' || (step.variant as unknown as string) === 'pushTag') {
             primaryDisabled = !step.fields.some((f) => f.id.startsWith('remote_') && formValues[f.id] === 'yes');
         } else {
             primaryDisabled = step.fields.some((field) => {
@@ -560,7 +560,7 @@ export default function ActionDialog({
                         )}
                     </>
                 );
-            } else if ((step.variant as string) === 'pushBranch' || (step.variant as string) === 'pushTag') {
+            } else if ((step.variant as unknown as string) === 'pushBranch' || (step.variant as unknown as string) === 'pushTag') {
                 message = step.message ?? step.title;
                 const remoteFields = step.fields.filter((f) => f.id.startsWith('remote_'));
                 const otherFields = step.fields.filter((f) => !f.id.startsWith('remote_'));

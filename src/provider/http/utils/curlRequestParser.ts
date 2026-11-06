@@ -103,7 +103,7 @@ export class CurlRequestParser implements RequestParser {
             if (!Array.isArray(parsedHeaders)) {
                 parsedHeaders = [parsedHeaders];
             }
-            headers = parseRequestHeaders(parsedHeaders as string[], this.settings.defaultHeaders, url);
+            headers = parseRequestHeaders(parsedHeaders as string[], this.settings.defaultHeaders, url ?? '');
         }
 
         // parse cookie
@@ -145,7 +145,7 @@ export class CurlRequestParser implements RequestParser {
         }
 
         // `body` comes from the parsed CLI arguments, so its shape is only known here.
-        return new HttpRequest(method, url, headers, body as HttpRequest['body'], typeof body === 'string' ? body : undefined, name);
+        return new HttpRequest(method, url ?? '', headers, body as HttpRequest['body'], typeof body === 'string' ? body : undefined, name ?? '');
     }
 
     private static mergeIntoSingleLine(text: string): string {

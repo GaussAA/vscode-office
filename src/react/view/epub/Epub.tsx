@@ -258,7 +258,7 @@ export default function Epub() {
                 }
                 // epubjs keeps the manager off its public types; it is how the viewer finds the iframe.
         const manager = (rendition as unknown as { manager?: { container?: HTMLElement; getContents?: () => { window: Window }[] } }).manager;
-                const container = manager.container;
+                const container = manager?.container;
                 if (!container) {
                     return;
                 }

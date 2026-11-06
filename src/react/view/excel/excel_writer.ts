@@ -163,7 +163,7 @@ async function exportWithExcelJs(sheets: SheetData[], options?: ExportOptions) {
 function applyColWidths(ws: XLSX.WorkSheet, xws: SheetData) {
     const cols = xws.cols;
     if (!cols?.len) return;
-    const colWidths = [];
+    const colWidths: { wpx: number }[] = [];
     for (let ci = 0; ci < cols.len; ci += 1) {
         colWidths.push({ wpx: getColWidth(cols, ci) });
     }

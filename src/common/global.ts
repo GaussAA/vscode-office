@@ -26,7 +26,9 @@ export class Global {
      */
     public static getConfig<T>(key: string, defaultValue?: T): T {
         const config = vscode.workspace.getConfiguration(prefix);
-        return config.get<T>(key, defaultValue);
+        // The VS Code API has no overload that accepts an explicit `undefined` default, so
+        // the optional parameter is narrowed away here instead of at every call site.
+        return defaultValue === undefined ? config.get<T>(key) as T : config.get<T>(key, defaultValue);
     }
 
     /**

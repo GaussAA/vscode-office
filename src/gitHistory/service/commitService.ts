@@ -655,7 +655,7 @@ export class CommitService {
     private getStashCommitDetails(
         repo: string,
         commitHash: string,
-        stash: GitCommit['stash'],
+        stash: NonNullable<GitCommit['stash']>,
     ): Promise<GitCommitDetailsData> {
         const baseHash = stash.baseHash || `${commitHash}^1`;
         const trackedChanges = Promise.all([

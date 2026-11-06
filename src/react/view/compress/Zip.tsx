@@ -36,7 +36,7 @@ function ZipViewer() {
     const [passwordAction, setPasswordAction] = useState<PasswordAction | null>(null)
     const [passwordError, setPasswordError] = useState('')
     const [tableItems, setTableItems] = useState([] as FileInfo[])
-    const [info, setInfo] = useState({ files: [] } as CompressInfo)
+    const [info, setInfo] = useState<CompressInfo>({ files: [] } as unknown as CompressInfo)
     const [jarInfo, setJarInfo] = useState<JarInfo | null>(null)
     const [loaded, setLoaded] = useState(false)
     const [extractToast, setExtractToast] = useState<ExtractToastMessage | null>(null)
@@ -63,8 +63,8 @@ function ZipViewer() {
                 isDirectory: true,
                 entryName: dirPath.includes('/') ? dirPath.replace(/\/[^\/]+$/, '') : null,
             },
-            ...info.folderMap[dirPath].children
-        ] : info.files)
+            ...(info.folderMap[dirPath].children ?? [])
+        ] as FileInfo[] : info.files)
     }
 
     const needsPassword = useCallback((entry?: FileInfo) => {

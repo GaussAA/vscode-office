@@ -40,7 +40,7 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
 
 		const handler = Handler.bind(webviewPanel, uri);
 
-		let route: string;
+		let route: string | undefined;
 		const suffix = getFileSuffix(uri.fsPath);
 		const isSvg = /\.svg$/i.test(suffix);
 		handleCommonEvent(uri, handler, isSvg ? { skipOpen: true } : undefined);

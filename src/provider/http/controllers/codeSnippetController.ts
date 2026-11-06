@@ -32,7 +32,7 @@ export class CodeSnippetController {
         const { text } = selectedRequest;
 
         // parse http request
-        const httpRequest = await createRequestParser(text).parseHttpRequest(null, false);
+        const httpRequest = await createRequestParser(text).parseHttpRequest(undefined, false);
 
         const harHttpRequest = this.convertToHARHttpRequest(httpRequest);
         const addPrefix = !(url.parse(harHttpRequest.url).protocol);

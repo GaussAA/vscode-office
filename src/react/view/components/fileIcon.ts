@@ -15,7 +15,7 @@ function getIconMaps(): IconMaps | null {
     if (!configs?.iconBaseUrl || !configs?.maps) {
         return null;
     }
-    return configs.maps as IconMaps;
+    return configs.maps as unknown as IconMaps;
 }
 
 function basename(filePath: string): string {

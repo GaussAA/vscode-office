@@ -157,10 +157,12 @@ async function runQuickSyncCommand(): Promise<void> {
         commitMessage = input;
     }
 
+    if (!gitActions) return;
+    const actions = gitActions;
     await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: 'Git: Quick Sync', cancellable: false },
         async () => {
-            const error = await gitActions.quickSync(repo, branch, remote, commitMessage);
+            const error = await actions.quickSync(repo, branch, remote, commitMessage);
             if (error) {
                 vscode.window.showErrorMessage(error);
             }
@@ -205,7 +207,7 @@ export async function activateGitHistory(context: vscode.ExtensionContext): Prom
         }),
         vscode.commands.registerCommand('chaowu21.office.gitHistory.viewFileHistory', async (arg?: unknown) => {
             const fromArg = buildPanelContextFromCommandArg(arg);
-            const fileUri = resolveFileUri(arg) ?? fromArg.fileUri;
+            const fileUri = resolveFileUri(arg as vscode.Uri | undefined) ?? fromArg.fileUri;
             if (!fileUri) {
                 vscode.window.showWarningMessage(i18n('ext.git.openFileFirst'));
                 return;

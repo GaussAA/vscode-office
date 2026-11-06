@@ -11,10 +11,10 @@ import { FontInfo, formatUnicode, loadFont, renderGlyphItem, renderGlyphPreview 
  * https://github.com/mathew-kurian/CharacterMap
  */
 export default function FontViewer() {
-    const [font, setFont] = useState(null)
+    const [font, setFont] = useState<FontInfo['font'] | null>(null)
     const [search, setSearch] = useState('')
-    const fontInfoRef = useRef<FontInfo>(null)
-    const [glyph, setGlyph] = useState(null)
+    const fontInfoRef = useRef<FontInfo | null>(null)
+    const [glyph, setGlyph] = useState<any>(null)
     const [selectedKey, setSelectedKey] = useState<string | null>(null)
     const previewRef = useRef<HTMLCanvasElement>(null)
     const [, height] = useWindowSize()
@@ -60,11 +60,12 @@ export default function FontViewer() {
     ), [font, glyphKeys, selectedKey])
 
     useEffect(() => {
-        if (!font) return
+        const fontInfo = fontInfoRef.current
+        if (!font || !fontInfo) return
         for (const key of glyphKeys) {
             const ele = document.getElementById(`g${key}`)
             if (!ele) continue
-            renderGlyphItem(fontInfoRef.current, ele as HTMLCanvasElement, key)
+            renderGlyphItem(fontInfo, ele as HTMLCanvasElement, key)
         }
     }, [icons, font, glyphKeys])
 
