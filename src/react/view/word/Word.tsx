@@ -68,12 +68,7 @@ export default function Word() {
     };
 
     const emitSave = useCallback((buffer: ArrayBuffer) => {
-        const bytes = new Uint8Array(buffer);
-        const content: number[] = new Array(bytes.length);
-        for (let i = 0; i < bytes.length; i++) {
-            content[i] = bytes[i];
-        }
-        handler.emit("save", content);
+        handler.emit("save", Array.from(new Uint8Array(buffer)));
     }, []);
 
     const handleSave = useCallback(async () => {

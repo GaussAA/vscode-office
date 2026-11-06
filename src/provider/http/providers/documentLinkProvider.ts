@@ -7,7 +7,7 @@ import { getWorkspaceRootPath } from '../utils/workspaceUtility';
 
 export class RequestBodyDocumentLinkProvider implements DocumentLinkProvider {
 
-    private _linkPattern = /^(\<(?:@(?:\w+)?)?\s+)(.+)(\s*)$/g;
+    private _linkPattern = /^(<(?:@(?:\w+)?)?\s+)(.+)(\s*)$/g;
 
     public provideDocumentLinks(document: TextDocument, _token: CancellationToken): DocumentLink[] {
         const results: DocumentLink[] = [];
@@ -18,7 +18,7 @@ export class RequestBodyDocumentLinkProvider implements DocumentLinkProvider {
         for (let index = 0; index < lines.length; index++) {
             const line = lines[index];
             let match: RegExpMatchArray | null;
-            if (match = this._linkPattern.exec(line)) {
+            if ((match = this._linkPattern.exec(line))) {
                 const filePath = match[2];
                 const offset = match[1].length;
                 const linkStart = new Position(index, offset);

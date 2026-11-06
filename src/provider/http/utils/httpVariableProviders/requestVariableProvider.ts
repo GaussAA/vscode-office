@@ -61,7 +61,7 @@ export class RequestVariableProvider implements HttpVariableProvider {
 
         const variableNames = new Set<string>();
         let match: RegExpExecArray | null;
-        while (match = requestVariableReferenceRegex.exec(fileContent)) {
+        while ((match = requestVariableReferenceRegex.exec(fileContent))) {
             const name = match[1];
             variableNames.add(name);
         }

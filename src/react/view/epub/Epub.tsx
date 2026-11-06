@@ -431,14 +431,14 @@ export default function Epub() {
         if (Object.keys(tocPageByHref).length > 0) {
             return;
         }
-        let cancelled = false;
+        const controller = new AbortController();
         buildTocPageMap(book, toc).then(pageMap => {
-            if (!cancelled && Object.keys(pageMap).length > 0) {
+            if (!controller.signal.aborted && Object.keys(pageMap).length > 0) {
                 setTocPageByHref(pageMap);
             }
         });
         return () => {
-            cancelled = true;
+            controller.abort();
         };
     }, [bookReady, sidebarTab, toc, tocPageByHref]);
 

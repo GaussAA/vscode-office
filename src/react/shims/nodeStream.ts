@@ -27,7 +27,7 @@ class EventEmitterLike {
         if (!set) {
             return false;
         }
-        for (const listener of [...set]) {
+        for (const listener of Array.from(set)) {
             listener(...args);
         }
         return true;

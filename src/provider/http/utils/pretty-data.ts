@@ -25,8 +25,8 @@ export class PrettyData {
     xml(text: string): string {
         const ar = text.replace(/>\s{0,}</g, "><")
             .replace(/</g, "~::~<")
-            .replace(/xmlns\:/g, "~::~xmlns:")
-            .replace(/xmlns\=/g, "~::~xmlns=")
+            .replace(/xmlns:/g, "~::~xmlns:")
+            .replace(/xmlns=/g, "~::~xmlns=")
             .split('~::~');
 
         let inComment = false;
@@ -46,7 +46,7 @@ export class PrettyData {
                 str += line;
                 inComment = false;
             } else if (/^<\w/.test(ar[ar.indexOf(line) - 1]) && /^<\/\w/.test(line) &&
-                /^<[\w:\-\.\,]+/.exec(ar[ar.indexOf(line) - 1])?.[0] === /^<\/[\w:\-\.\,]+/.exec(line)?.[0].replace('/', '')) {
+                /^<[\w:\-.,]+/.exec(ar[ar.indexOf(line) - 1])?.[0] === /^<\/[\w:\-.,]+/.exec(line)?.[0].replace('/', '')) {
                 str += line;
                 if (!inComment) deep--;
             } else if (line.search(/<\w/) > -1 && line.search(/<\//) === -1 && line.search(/\/>/) === -1) {
@@ -59,7 +59,7 @@ export class PrettyData {
                 str = !inComment ? str += this.shift[deep] + line : str += line;
             } else if (line.search(/<\?/) > -1) {
                 str += this.shift[deep] + line;
-            } else if (line.search(/xmlns\:/) > -1 || line.search(/xmlns\=/) > -1) {
+            } else if (line.search(/xmlns:/) > -1 || line.search(/xmlns=/) > -1) {
                 str += this.shift[deep] + line;
             } else {
                 str += line;
@@ -95,7 +95,7 @@ export class PrettyData {
         const ar = text.replace(/\s{1,}/g, ' ')
             .replace(/\{/g, "{~::~")
             .replace(/\}/g, "~::~}~::~")
-            .replace(/\;/g, ";~::~")
+            .replace(/;/g, ";~::~")
             .replace(/\/\*/g, "~::~/*")
             .replace(/\*\//g, "*/~::~")
             .replace(/~::~\s{0,}~::~/g, "~::~")
@@ -171,7 +171,7 @@ export class PrettyData {
         };
 
         const arByQuote = text.replace(/\s{1,}/g, " ")
-            .replace(/\'/ig, "~::~\'")
+            .replace(/'/ig, "~::~'")
             .split('~::~');
 
         const ar: string[] = [];
@@ -192,11 +192,11 @@ export class PrettyData {
             parenthesisLevel = isSubquery(line, parenthesisLevel);
 
             if (/\s{0,}\s{0,}SELECT\s{0,}/.test(line)) {
-                str += this.shift[deep] + line.replace(/\,/g, ",\n" + tab + tab + "");
+                str += this.shift[deep] + line.replace(/,/g, ",\n" + tab + tab + "");
             } else if (/\s{0,}\(\s{0,}SELECT\s{0,}/.test(line)) {
                 deep++;
                 str += this.shift[deep] + line;
-            } else if (/\'/.test(line)) {
+            } else if (/'/.test(line)) {
                 if (parenthesisLevel < 1 && deep) {
                     deep--;
                 }
@@ -219,7 +219,7 @@ export class PrettyData {
      */
     xmlmin(text: string, preserveComments?: boolean): string {
         const str = preserveComments ? text
-            : text.replace(/\<![ \r\n\t]*(--([^\-]|[\r\n]|-[^\-])*--[ \r\n\t]*)\>/g, "");
+            : text.replace(/<![ \r\n\t]*(--([^-]|[\r\n]|-[^-])*--[ \r\n\t]*)>/g, "");
         return str.replace(/>\s{0,}</g, "><");
     }
 
@@ -234,13 +234,13 @@ export class PrettyData {
             .replace(/:\s{0,}\[/g, ':[')
             .replace(/\s{0,}\}\s{0,}/g, "}")
             .replace(/\s{0,}\]\s{0,}/g, "]")
-            .replace(/\"\s{0,}\,/g, '",')
-            .replace(/\,\s{0,}\"/g, ',"')
-            .replace(/\"\s{0,}:/g, '":')
-            .replace(/:\s{0,}\"/g, ':"')
+            .replace(/"\s{0,},/g, '",')
+            .replace(/,\s{0,}"/g, ',"')
+            .replace(/"\s{0,}:/g, '":')
+            .replace(/:\s{0,}"/g, ':"')
             .replace(/:\s{0,}\[/g, ':[')
-            .replace(/\,\s{0,}\[/g, ',[')
-            .replace(/\,\s{2,}/g, ', ')
+            .replace(/,\s{0,}\[/g, ',[')
+            .replace(/,\s{2,}/g, ', ')
             .replace(/\]\s{0,},\s{0,}\[/g, '],[');
     }
 
@@ -255,7 +255,7 @@ export class PrettyData {
         return str.replace(/\s{1,}/g, ' ')
             .replace(/\{\s{1,}/g, "{")
             .replace(/\}\s{1,}/g, "}")
-            .replace(/\;\s{1,}/g, ";")
+            .replace(/;\s{1,}/g, ";")
             .replace(/\/\*\s{1,}/g, "/*")
             .replace(/\*\/\s{1,}/g, "*/");
     }

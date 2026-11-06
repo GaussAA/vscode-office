@@ -305,23 +305,25 @@ function ParquetViewer() {
     useEffect(() => {
         const session = sessionRef.current;
         if (!session) return;
-        let live = true;
         setPageLoading(true);
+        // Aborted from the cleanup rather than flipping a captured `let`: the session already
+        // guards staleness, this only stops a superseded page from writing state.
+        const controller = new AbortController();
         void session
             .showPage(page)
             .then(snapshot => {
-                if (!live || snapshot.stale) return;
+                if (controller.signal.aborted || snapshot.stale) return;
                 setPageRows(snapshot.rows);
                 setPageLoading(false);
             })
             .catch((e: unknown) => {
-                if (!live) return;
+                if (controller.signal.aborted) return;
                 setPageLoading(false);
                 setError(e instanceof Error ? e.message : 'Failed to read rows');
             });
         session.prefetch(page + 1);
         return () => {
-            live = false;
+            controller.abort();
         };
     }, [fileInfo, page]);
 

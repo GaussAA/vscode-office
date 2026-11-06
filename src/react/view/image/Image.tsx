@@ -91,7 +91,7 @@ export default function Image() {
     }, [info.images]);
 
     useEffect(() => {
-        let cancelled = false;
+        const controller = new AbortController();
         const cache = imageCache.current;
         for (const [index, src] of cache) {
             if (index < previewStart || index >= previewStart + MAX_LOADED_THUMBNAILS) {
@@ -109,30 +109,30 @@ export default function Image() {
                 (_, offset) => previewStart + offset)
                 .sort((a, b) => Math.abs(a - activeIndex) - Math.abs(b - activeIndex));
             for (const index of indices) {
-                if (cancelled || !count) return;
+                if (controller.signal.aborted || !count) return;
                 if (cache.has(index)) continue;
                 try {
                     const src = await resolveImageSrc(info.images[index]);
-                    if (cancelled) {
+                    if (controller.signal.aborted) {
                         revokeObjectUrl(src);
                         return;
                     }
                     cache.set(index, src);
                     setResolvedImages(previous => ({ ...previous, [index]: src }));
                 } catch {
-                    if (!cancelled) {
+                    if (!controller.signal.aborted) {
                         const src = info.images[index].src ?? PLACEHOLDER;
                         cache.set(index, src);
                         setResolvedImages(previous => ({ ...previous, [index]: src }));
                     }
                 } finally {
-                    if (!cancelled && index === activeIndex) setLoading(false);
+                    if (!controller.signal.aborted && index === activeIndex) setLoading(false);
                 }
             }
         });
 
         return () => {
-            cancelled = true;
+            controller.abort();
         };
     }, [info.images, activeIndex, previewStart]);
 

@@ -115,7 +115,7 @@ export class VariableUtility {
             regex.lastIndex = 0;
 
             let match: RegExpExecArray | null;
-            while (match = regex.exec(line)) {
+            while ((match = regex.exec(line))) {
                 const startPos = match.index + 2;
                 const endPos = startPos + variable.length;
                 locations.push(new Range(index, startPos, index, endPos));

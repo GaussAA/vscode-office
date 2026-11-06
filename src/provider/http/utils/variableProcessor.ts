@@ -23,7 +23,7 @@ export class VariableProcessor {
         let lastIndex = 0;
         const resolvedVariables = new Map<string, string>();
         variable:
-        while (match = variableReferenceRegex.exec(request)) {
+        while ((match = variableReferenceRegex.exec(request))) {
             result += request.substring(lastIndex, match.index);
             lastIndex = variableReferenceRegex.lastIndex;
             const name = match[1].trim();

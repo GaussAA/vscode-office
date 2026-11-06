@@ -20,7 +20,7 @@ enum ParseState {
 
 export class HttpRequestParser implements RequestParser {
     private readonly defaultMethod = 'GET';
-    private readonly queryStringLinePrefix = /^\s*[&\?]/;
+    private readonly queryStringLinePrefix = /^\s*[&?]/;
     private readonly inputFileSyntax = /^<(?:(?<processVariables>@)(?<encoding>\w+)?)?\s+(?<filepath>.+?)\s*$/;
     private readonly defaultFileEncoding = 'utf8';
 
@@ -159,7 +159,7 @@ export class HttpRequestParser implements RequestParser {
         let url: string;
 
         let match: RegExpExecArray | null;
-        if (match = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|CONNECT|TRACE)\s+/i.exec(line)) {
+        if ((match = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|CONNECT|TRACE)\s+/i.exec(line))) {
             method = match[1];
             url = line.substr(match[0].length);
         } else {
@@ -170,7 +170,7 @@ export class HttpRequestParser implements RequestParser {
 
         url = url.trim();
 
-        if (match = /\s+HTTP\/.*$/i.exec(url)) {
+        if ((match = /\s+HTTP\/.*$/i.exec(url))) {
             url = url.substr(0, match.index);
         }
 

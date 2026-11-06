@@ -232,7 +232,7 @@ export function excelJsCellToStyle(cell: ExcelJS.Cell): CellStyle | null {
 }
 
 export function applySpreadsheetStyle(cell: ExcelJS.Cell, style: CellStyle) {
-    const font: Partial<ExcelJS.Font> = { ...(cell.font ?? {}) };
+    const font: Partial<ExcelJS.Font> = { ...cell.font };
 
     if (style.font) {
         if (style.font.name) font.name = style.font.name;
@@ -249,7 +249,7 @@ export function applySpreadsheetStyle(cell: ExcelJS.Cell, style: CellStyle) {
     if (Object.keys(font).length > 0) cell.font = font;
 
     if (style.align || style.valign || style.textwrap != null) {
-        const alignment: Partial<ExcelJS.Alignment> = { ...(cell.alignment ?? {}) };
+        const alignment: Partial<ExcelJS.Alignment> = { ...cell.alignment };
         if (style.align) alignment.horizontal = style.align;
         if (style.valign) alignment.vertical = VALIGN_TO_EXCEL[style.valign];
         if (style.textwrap != null) alignment.wrapText = style.textwrap;

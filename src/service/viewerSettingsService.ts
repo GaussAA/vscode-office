@@ -31,7 +31,7 @@ const serializeGlobalSettingsForFile = (globalSettings: Record<string, unknown>)
 };
 
 const deserializeGlobalSettingsForVditor = (globalSettings: Record<string, unknown> | undefined): Record<string, unknown> => {
-    const result: Record<string, unknown> = { ...(globalSettings ?? {}) };
+    const result: Record<string, unknown> = { ...globalSettings };
     for (const key of JSON_ARRAY_GLOBAL_KEYS) {
         const value = result[key];
         if (value !== undefined && typeof value !== 'string') {

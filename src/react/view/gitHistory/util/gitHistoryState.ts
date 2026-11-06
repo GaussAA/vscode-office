@@ -48,7 +48,7 @@ export function getPullDefaults(repo: string): GitPullDefaults {
 
 export function savePullDefaults(repo: string, defaults: GitPullDefaults): void {
     const state = loadGitHistoryState();
-    const pullDefaultsByRepo = { ...(state.pullDefaultsByRepo ?? {}), [repo]: defaults };
+    const pullDefaultsByRepo = { ...state.pullDefaultsByRepo, [repo]: defaults };
     saveGitHistoryState({ pullDefaultsByRepo });
 }
 

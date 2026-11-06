@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, createElement, type ReactNode, type CSSProperties } from 'react';
+import { createContext, useContext, useEffect, useState, createElement, type ReactNode, type CSSProperties , useMemo } from 'react';
 import { theme, type ThemeConfig } from 'antd';
 import { getVscodeThemeColor, isVscodeDarkTheme, observeVscodeThemeChange } from '../../../util/vscodeTheme';
 import { adjustBranchColoursForLightBackground } from '../util/graphColours';
@@ -271,18 +271,18 @@ export function buildGitHistoryTheme(mode: GitHistoryColorMode = 'adaptive'): Gi
 export function useGitHistoryTheme(modeOverride?: GitHistoryColorMode): GitHistoryTheme {
     const contextMode = useGitHistoryColorMode();
     const mode = modeOverride ?? contextMode;
-    const [graphTheme, setGraphTheme] = useState(() => buildGitHistoryTheme(mode));
+    // The adaptive palette is the one value that cannot be derived from `mode`: it also follows
+    // the OS theme, which changes outside React. It is therefore the only piece held in state,
+    // and it is written from the observer callback rather than from an effect body — that is
+    // also what keeps the immutability rule happy (no state change after the render finished).
+    const [adaptiveTheme, setAdaptiveTheme] = useState(() => buildGitHistoryTheme('adaptive'));
 
-    useEffect(() => {
-        setGraphTheme(buildGitHistoryTheme(mode));
-    }, [mode]);
+    useEffect(() => observeVscodeThemeChange(
+        () => setAdaptiveTheme(buildGitHistoryTheme('adaptive')),
+    ), []);
 
-    useEffect(() => {
-        if (mode !== 'adaptive') {
-            return;
-        }
-        return observeVscodeThemeChange(() => setGraphTheme(buildGitHistoryTheme('adaptive')));
-    }, [mode]);
+    const modeTheme = useMemo(() => buildGitHistoryTheme(mode), [mode]);
+    const graphTheme = mode === 'adaptive' ? adaptiveTheme : modeTheme;
 
     return graphTheme;
 }

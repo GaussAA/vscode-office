@@ -149,11 +149,7 @@ export async function readUriText(uri: Uri): Promise<string> {
 }
 
 export function bytesToPayloadBuffer(data: Uint8Array): number[] {
-    const buffer: number[] = new Array(data.length);
-    for (let i = 0; i < data.length; i++) {
-        buffer[i] = data[i];
-    }
-    return buffer;
+    return Array.from(data);
 }
 
 export async function emitVirtualOfficeOpen(handler: Handler, uri: Uri): Promise<void> {

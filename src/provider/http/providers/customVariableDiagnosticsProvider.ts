@@ -138,14 +138,14 @@ export class CustomVariableDiagnosticsProvider {
 
         const vars = new Map<string, VariableWithPosition[]>();
         const lines = document.getText().split(Constants.LineSplitterRegex);
-        const pattern = /\{\{(\w[^\s\.{}]*)(\.[^\.]*?)*\}\}/g;
+        const pattern = /\{\{(\w[^\s.{}]*)(\.[^.]*?)*\}\}/g;
         lines.forEach((line, lineNumber) => {
             if (Selector.isCommentLine(line)) {
                 return;
             }
 
             let match: RegExpExecArray | null;
-            while (match = pattern.exec(line)) {
+            while ((match = pattern.exec(line))) {
                 const [path, name] = match;
                 const variable = {
                     name,

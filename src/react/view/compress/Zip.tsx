@@ -61,7 +61,7 @@ function ZipViewer() {
             {
                 name: '..',
                 isDirectory: true,
-                entryName: dirPath.includes('/') ? dirPath.replace(/\/[^\/]+$/, '') : null,
+                entryName: dirPath.includes('/') ? dirPath.replace(/\/[^/]+$/, '') : null,
             },
             ...(info.folderMap[dirPath].children ?? [])
         ] as FileInfo[] : info.files)

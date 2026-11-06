@@ -287,16 +287,18 @@ export default function PowerPoint() {
         if (!el) {
             return;
         }
-        let timeout: ReturnType<typeof setTimeout>;
+        // The timer lives in a holder rather than a captured `let` so the debounce does not
+        // depend on a variable that outlives the render it was declared in.
+        const timer: { id?: ReturnType<typeof setTimeout> } = {};
         const observer = new ResizeObserver(() => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
+            clearTimeout(timer.id);
+            timer.id = setTimeout(() => {
                 rerenderSlide();
             }, 100);
         });
         observer.observe(el);
         return () => {
-            clearTimeout(timeout);
+            clearTimeout(timer.id);
             observer.disconnect();
         };
     }, [rerenderSlide]);

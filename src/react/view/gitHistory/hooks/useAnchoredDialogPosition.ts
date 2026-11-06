@@ -12,6 +12,9 @@ export function useAnchoredDialogPosition(
     variant: AnchoredDialogPositionVariant = 'default',
 ) {
     const dialogRef = useRef<HTMLDivElement>(null);
+    // A hook cannot spread a caller's array into its dependency list, so the contents are
+    // folded into a key: same contents, same key, effect does not re-run.
+    const repositionKey = JSON.stringify(repositionDeps);
 
     useLayoutEffect(() => {
         const dialog = dialogRef.current;
@@ -31,7 +34,7 @@ export function useAnchoredDialogPosition(
         dialog.style.left = `${left}px`;
         dialog.style.top = `${top}px`;
         dialog.style.visibility = 'visible';
-    }, [anchor, centerOffsetY, variant, ...repositionDeps]);
+    }, [anchor, centerOffsetY, variant, repositionKey]);
 
     return dialogRef;
 }

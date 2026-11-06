@@ -72,7 +72,7 @@ export class FileVariableProvider implements HttpVariableProvider {
         for (const line of fileContent.split(Constants.LineSplitterRegex)) {
             const regex = new RegExp(Constants.FileVariableDefinitionRegex, 'g');
             let match: RegExpExecArray | null;
-            while (match = regex.exec(line)) {
+            while ((match = regex.exec(line))) {
                 const [, key, originalValue] = match;
                 let value = "";
                 let isPrevCharEscape = false;
@@ -159,7 +159,7 @@ export class FileVariableProvider implements HttpVariableProvider {
         let match: RegExpExecArray | null;
         let lastIndex = 0;
         variable:
-        while (match = variableReferenceRegex.exec(value)) {
+        while ((match = variableReferenceRegex.exec(value))) {
             result += value.substring(lastIndex, match.index);
             lastIndex = variableReferenceRegex.lastIndex;
             const name = match[1].trim();
@@ -188,7 +188,7 @@ export class FileVariableProvider implements HttpVariableProvider {
         const variableReferenceRegex = /\{{2}(.+?)\}{2}/g;
         let match: RegExpExecArray | null;
         const result: string[] = [];
-        while (match = variableReferenceRegex.exec(value)) {
+        while ((match = variableReferenceRegex.exec(value))) {
             result.push(match[1].trim());
         }
         return result;
