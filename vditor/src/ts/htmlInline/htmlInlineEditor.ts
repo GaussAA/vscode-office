@@ -648,9 +648,6 @@ export const handleHtmlEditorAltEnter = (vditor: IVditor, range: Range): boolean
     return false;
 };
 
-/** @deprecated use handleHtmlEditorClick */
-export const handleHtmlInlineClick = handleHtmlEditorClick;
-
 export const showHtmlInlinePopover = (vditor: IVditor, htmlInlineElement: HTMLElement) => {
     showHtmlEditorPopover(vditor, createHtmlInlineTargetWithVditor(vditor, htmlInlineElement));
 };

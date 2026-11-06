@@ -358,10 +358,6 @@ export const handleFrontMatterEditorClick = (
     return true;
 };
 
-/** @deprecated inline YAML editor removed; kept for renderCodeBlocks compatibility */
-export const setupFrontMatterYamlEditors = (_vditor: IVditor) => {
-};
-
 export const flushFrontMatterYamlToSyncCode = (vditor: IVditor) => {
     if (!activeFrontMatterPopover) {
         return;

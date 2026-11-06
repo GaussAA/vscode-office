@@ -21,7 +21,6 @@ initExcelLocale();
 type ExcelColorMode = 'adaptive' | 'light';
 
 const EXCEL_COLOR_MODE_KEY = 'office-excel-color-mode';
-const LEGACY_DARK_MODE_KEY = 'office-dark-mode';
 
 function loadExcelColorMode(): ExcelColorMode {
     const state = vscodeApi?.getState?.() as { excelColorMode?: ExcelColorMode } | undefined;
@@ -32,13 +31,6 @@ function loadExcelColorMode(): ExcelColorMode {
         const saved = localStorage.getItem(EXCEL_COLOR_MODE_KEY);
         if (saved === 'light' || saved === 'adaptive') {
             return saved;
-        }
-        const legacy = localStorage.getItem(LEGACY_DARK_MODE_KEY);
-        if (legacy === '1') {
-            return 'adaptive';
-        }
-        if (legacy === '0') {
-            return 'light';
         }
     } catch { }
     return 'light';

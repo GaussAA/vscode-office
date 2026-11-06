@@ -38,8 +38,6 @@ type MarkdownSyncConfigKey = typeof MARKDOWN_SYNC_CONFIG_KEYS[number];
  */
 export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
-    private static legacyGlobalStatePurged = false;
-
     private countStatus: vscode.StatusBarItem;
     private aiAbortController: AbortController | null = null;
     private aiCancellationSource: vscode.CancellationTokenSource | null = null;
@@ -48,7 +46,6 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         private context: vscode.ExtensionContext
     ) {
         this.countStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-        this.purgeLegacyGlobalState();
         MarkdownEditorProvider.registerConfigSync(this.context);
     }
 
@@ -77,23 +74,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
     private static configSyncRegistered = false;
 
-    private purgeLegacyGlobalState() {
-        if (MarkdownEditorProvider.legacyGlobalStatePurged) {
-            return;
-        }
-        MarkdownEditorProvider.legacyGlobalStatePurged = true;
-        const state = this.context.globalState;
-        for (const key of state.keys()) {
-            if (key.startsWith('scrollTop_')) {
-                void state.update(key, undefined);
-            }
-        }
-    }
-
     private getFolders(): vscode.Uri[] {
-        if (vscode.env.uiKind === vscode.UIKind.Web) {
-            return [];
-        }
         const data: vscode.Uri[] = [];
         for (let i = 65; i <= 90; i++) {
             data.push(vscode.Uri.file(`${String.fromCharCode(i)}:/`))
@@ -272,9 +253,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
             const side = full ? vscode.ViewColumn.Active : vscode.ViewColumn.Beside;
             vscode.commands.executeCommand('vscode.openWith', uri, "default", side);
         }).on("showInFolder", () => {
-            if (vscode.env.uiKind !== vscode.UIKind.Web) {
-                vscode.commands.executeCommand('revealFileInOS', uri);
-            }
+            vscode.commands.executeCommand('revealFileInOS', uri);
         }).on("save", (newContent) => {
             scheduleDocumentSync(newContent);
         }).on("doSave", async (saveContent) => {

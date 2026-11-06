@@ -195,9 +195,6 @@ export const isCmCodeBlock = (blockElement: HTMLElement | null) => {
     return true;
 };
 
-/** @deprecated use isCmCodeBlock */
-export const isWysiwygCmCodeBlock = isCmCodeBlock;
-
 const isInsideAnyCodeMirrorEditor = (node: Element | null) =>
     !!node?.closest(`.${CM_BLOCK_CLASS} .cm-editor, .vditor-math-inline--editing .cm-editor`);
 
@@ -208,9 +205,6 @@ export const isInsideCodeMirror = (target: EventTarget | Node | null) => {
     const node = target instanceof Element ? target : (target as Node).parentElement;
     return isInsideAnyCodeMirrorEditor(node);
 };
-
-/** @deprecated use isInsideCodeMirror */
-export const isInsideWysiwygCodeMirror = isInsideCodeMirror;
 
 export const getCodeLanguageName = (codeElement: HTMLElement) => {
     const match = codeElement.className.match(/language-([^\s]+)/);
@@ -556,9 +550,6 @@ export const prepareCmBlockDom = (blockElement: HTMLElement, keepPreview = false
         }
     }
 };
-
-/** @deprecated use prepareCmBlockDom */
-export const prepareWysiwygCmBlockDom = prepareCmBlockDom;
 
 const loadLanguage = (languageName: string): Promise<LanguageSupport | undefined> => {
     return loadCodeMirrorHighlightLanguage(languageName);
@@ -1344,9 +1335,6 @@ export const destroyAllCodeMirrors = (vditor: IVditor) => {
     });
 };
 
-/** @deprecated use destroyAllCodeMirrors */
-export const destroyAllWysiwygCodeMirrors = destroyAllCodeMirrors;
-
 /** Spin DOM 前卸载 CodeMirror，保持 sync code 隐藏 */
 export const deactivateAllCodeMirrors = (vditor: IVditor) => {
     const editor = getModeEditor(vditor);
@@ -1360,9 +1348,6 @@ export const deactivateAllCodeMirrors = (vditor: IVditor) => {
         }
     }
 };
-
-/** @deprecated use deactivateAllCodeMirrors */
-export const deactivateAllWysiwygCodeMirrors = deactivateAllCodeMirrors;
 
 const collectCodeBlocksInScope = (vditor: IVditor, scope: HTMLElement) => {
     const editor = getModeEditor(vditor);
@@ -1529,15 +1514,6 @@ export const autoFocusCreatedBlockAfterSpin = (
     return false;
 };
 
-/** @deprecated use autoFocusCreatedBlockAfterSpin */
-export const autoEnterCreatedMathBlock = (
-    vditor: IVditor,
-    editorElement: HTMLElement,
-    spinBeforeHtml: string,
-): boolean => {
-    return autoFocusCreatedBlockAfterSpin(vditor, editorElement, getEditorRange(vditor), spinBeforeHtml);
-};
-
 /** Spin 后若光标位于普通代码块内，自动挂载并聚焦 CodeMirror */
 export const focusCmBlockAtCursor = (vditor: IVditor, editorElement: HTMLElement) => {
     const blockElement = getCmBlockFromRange(getEditorRange(vditor), editorElement);
@@ -1660,9 +1636,6 @@ export const renderCodeBlocks = (vditor: IVditor) => {
     syncMathBlocksDisplayMode(editor, vditor);
 };
 
-/** @deprecated use renderCodeBlocks */
-export const renderWysiwygCodeBlocks = renderCodeBlocks;
-
 export const restoreCodeMirrorFocus = (
     blockElement: HTMLElement,
     anchor: number,
@@ -1735,9 +1708,6 @@ export const focusCodeMirror = (
     }
 };
 
-/** @deprecated use focusCodeMirror */
-export const focusWysiwygCodeMirror = focusCodeMirror;
-
 export const focusCodeBlock = (blockElement: HTMLElement, vditor: IVditor, collapseToStart = true) => {
     if (isSpecialPreviewBlock(blockElement)) {
         return enterSpecialBlockEdit(vditor, blockElement);
@@ -1763,18 +1733,9 @@ export const updateCodeMirrorLanguage = (blockElement: HTMLElement, languageName
     updateCodeBlockChromeLanguage(blockElement, lang);
 };
 
-/** @deprecated use updateCodeMirrorLanguage */
-export const updateWysiwygCodeMirrorLanguage = updateCodeMirrorLanguage;
-
 export const hasCodeMirror = (blockElement: HTMLElement) => bindings.has(blockElement);
 
-/** @deprecated use hasCodeMirror */
-export const hasWysiwygCodeMirror = hasCodeMirror;
-
 export const getCodeMirrorView = (blockElement: HTMLElement) => bindings.get(blockElement)?.view;
-
-/** @deprecated use getCodeMirrorView */
-export const getWysiwygCodeMirrorView = getCodeMirrorView;
 
 const resolveLanguageFromCmDom = (root: ParentNode): string => {
     const chromeLang = (root as HTMLElement).querySelector(".vditor-cm-chrome__lang")?.getAttribute("data-lang");

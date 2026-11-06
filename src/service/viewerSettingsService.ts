@@ -61,9 +61,6 @@ export class ViewerSettingsService {
     private static lastBroadcastJson = '';
 
     static getConfigUri(): vscode.Uri | undefined {
-        if (vscode.env.uiKind === vscode.UIKind.Web) {
-            return undefined;
-        }
         const home = homedir();
         if (!home) {
             return undefined;

@@ -375,9 +375,6 @@ export const applyTypewriterModeClass = (vditorElement: HTMLElement, enabled?: b
     vditorElement.classList.toggle("vditor--typewriter", on);
 };
 
-/** @deprecated use applyEditorSettings */
-export const applyFontSizes = applyEditorSettings;
-
 const PRESERVED_ON_RESET_KEYS = [AI_PROMPTS_KEY, AI_MODELS_KEY] as const;
 
 export const resetGlobalSettings = () => {

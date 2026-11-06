@@ -17,11 +17,9 @@ import { activateYaml } from './provider/yaml';
 import { activateXml } from './provider/xml';
 import { activateGitHistory } from './gitHistory/provider';
 import { IconService } from './service/icon/iconService';
-import { autoClearCacheStorage } from './service/autoClearCacheStorage';
 
 export async function activate(context: vscode.ExtensionContext) {
 	await Global.init(context);
-	autoClearCacheStorage(context);
 	await IconService.getInstance().init(context);
 	activateHttp(context);
 	activateYaml(context);

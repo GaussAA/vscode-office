@@ -65,7 +65,6 @@ handler.on("open", async (md) => {
       handler.emit("openLink", uri);
     },
     debugger: isDev,
-    wysiwygInputPerf: isDev && false,
     changeEditorTheme(theme) {
       handler.emit('editorTheme', theme)
     },
