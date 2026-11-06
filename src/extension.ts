@@ -12,7 +12,6 @@ import { MarkdownService } from './service/markdownService';
 import { switchCsvEditor } from './service/csvService';
 import { FileUtil } from './common/fileUtil';
 import { ReactApp } from './common/reactApp';
-import { activateHttp } from './provider/http';
 import { activateYaml } from './provider/yaml';
 import { activateXml } from './provider/xml';
 import { activateGitHistory } from './gitHistory/provider';
@@ -21,7 +20,6 @@ import { IconService } from './service/icon/iconService';
 export async function activate(context: vscode.ExtensionContext) {
 	await Global.init(context);
 	await IconService.getInstance().init(context);
-	activateHttp(context);
 	activateYaml(context);
 	activateXml(context);
 	// Awaited on purpose: the git-history commands are only registered at the end of
