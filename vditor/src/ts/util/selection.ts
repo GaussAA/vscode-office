@@ -752,34 +752,6 @@ export const normalizeMdInsertHtml = (html: string, vditor: IVditor): string => 
     return tempElement.innerHTML;
 };
 
-/** AI 局部替换：强制行内插入，避免 insertHTML 块级路径留下前置空段落 */
-export const insertMdForAIReplace = (html: string, vditor: IVditor, hostBlock: HTMLElement | null) => {
-    let insertHtml = normalizeMdInsertHtml(html, vditor);
-    const temp = document.createElement("div");
-    temp.innerHTML = insertHtml;
-    if (temp.children.length === 1) {
-        const child = temp.firstElementChild as HTMLElement;
-        if (child.getAttribute("data-block") === "0" && child.tagName === "P") {
-            insertHtml = child.innerHTML.replace(/^(<br\s*\/?>\s*)+/i, "").trim();
-        }
-    }
-    const range = getEditorRange(vditor);
-    vditor[vditor.currentMode].preventInput = true;
-    const pasteTemplate = document.createElement("template");
-    pasteTemplate.innerHTML = insertHtml;
-    range.insertNode(pasteTemplate.content.cloneNode(true));
-    range.collapse(false);
-    setSelectionFocus(range);
-    vditor[vditor.currentMode].range = range;
-    if (hostBlock && isEmptyParagraphBlock(hostBlock)) {
-        hostBlock.remove();
-    }
-    const currentBlock = hasClosestBlock(range.startContainer);
-    if (currentBlock) {
-        removeAdjacentEmptyParagraphs(currentBlock as HTMLElement);
-    }
-};
-
 export const insertHTML = (html: string, vditor: IVditor) => {
     // 使用 lute 方法会添加 p 元素，只有一个 p 元素的时候进行删除
     const tempElement = document.createElement("div");
