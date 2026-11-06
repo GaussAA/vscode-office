@@ -6,6 +6,10 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 
 截止压力：**Azure DevOps 全局 PAT 于 2026-12-01 退役**。之后靠 PAT 发布的路子整体消失。
 
+**如果来不及在截止前完成配置**，损失的是「CI 自动发布到 Marketplace」，不是「无法发布」——
+见文末 [F. 来不及配置怎么办](#f-来不及配置怎么办)。这份清单目前处于**挂起**状态：需要在
+一台已登录相关账号的机器上操作。
+
 ## 已经查过的现状（2026-11-06）
 
 | 事实 | 怎么查的 | 结论 |
@@ -153,6 +157,25 @@ curl -s https://open-vsx.org/api/GaussAA/office-viewer-plus | head -c 200
 最后三项无法在仓库里验证——需要登录态。它们的失败信息分别是
 "trusted publishing policy not found"（Marketplace）和 "no matching trusted publisher"（Open VSX），
 两种都只会在打 tag 之后才出现，所以 A2/B1/B2 务必在 C2 之前完成。
+
+## F. 来不及配置怎么办
+
+截止日期只影响**一条**路径，值得说清楚，免得把 2026-12-01 理解成"之后就不能发布了"。
+
+| 路径 | 2026-12-01 之后 |
+|---|---|
+| `vsce publish` + PAT（本地或 CI） | **失效** —— Marketplace 的认证就是 Azure DevOps，全局 PAT 退役 |
+| `vsce publish --oidc`（本仓库的 CI） | 可用，前提是 A2 配好 |
+| **手动上传 vsix** | **仍然可用** —— 浏览器会话，不涉及 PAT |
+
+手动上传的操作：本地 `pnpm run package`，打开
+<https://marketplace.visualstudio.com/manage>，在扩展页面选择上传 vsix。代价是每次发布都要人做，
+且拿不到 CI 的 `check:full` 作为发布前的闸门（本地得自己跑一遍）。
+
+**Open VSX 完全不受这个日期影响**：它用 Eclipse 账号和 Open VSX 自己的访问令牌，与 Azure DevOps
+无关。所以 B1/B2 可以慢慢来，只有 Marketplace 的 A2 有真实的时间压力。
+
+结论：即使挂起到截止日之后，也只是"每次发布手动上传"，不会失去发布能力。
 
 ## 参考
 
