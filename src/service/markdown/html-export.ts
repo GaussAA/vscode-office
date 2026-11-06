@@ -1,19 +1,34 @@
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const { pathToFileURL } = require("url");
-const { createOutline } = require("./outline.ts");
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import puppeteer, { type Browser, type ElementHandle, type Page } from "puppeteer-core";
+import htmlToDocx from "vscode-html-to-docx";
+import { toDisplayText } from "@/common/displayText";
+import type { MarkdownExportConfig } from "./markdown-pdf";
+import { createOutline } from "./outline";
+
 const isDev = process.argv.indexOf("--type=extensionHost") >= 0;
 
-export async function exportHtml(exportFilePath, data) {
+/** Options for the screenshot-for-DOCX pass. */
+interface ImageShotOptions {
+  display?: boolean;
+  style?: string;
+  label?: string;
+}
+
+export async function exportHtml(exportFilePath: string, data: string): Promise<void> {
   console.log("[pretty-md-pdf] Exported to file: " + exportFilePath);
   fs.writeFileSync(exportFilePath, data, "utf-8");
 }
 
-export async function exportDocx(exportFilePath, data, config) {
+export async function exportDocx(
+  exportFilePath: string,
+  data: string,
+  config: MarkdownExportConfig,
+): Promise<void> {
   console.log("[pretty-md-pdf] Exported to file: " + exportFilePath);
   const html = await replaceDynamicContentWithImages(data, config, exportFilePath);
-  const htmlToDocx = require("vscode-html-to-docx");
   const exportTask = await htmlToDocx(html, "", {}, "");
   const buffer = Buffer.from(await exportTask.arrayBuffer());
   fs.writeFileSync(exportFilePath, buffer);
@@ -22,56 +37,60 @@ export async function exportDocx(exportFilePath, data, config) {
 /*
  * export a html to a pdf file
  */
-export async function exportByType(filePath, data, type, config) {
+export async function exportByType(
+  filePath: string,
+  data: string,
+  type: string,
+  config: MarkdownExportConfig,
+): Promise<void> {
   console.log("[pretty-md-pdf] Exporting (" + type + ") ...");
   const originPath = path.parse(filePath);
-  let targetFilePath = originPath.dir + "/" + originPath.name + "." + type;
+  const targetFilePath = originPath.dir + "/" + originPath.name + "." + type;
 
   // export html
-  if (type == "html") {
-    exportHtml(targetFilePath, data);
+  if (type === "html") {
+    await exportHtml(targetFilePath, data);
     return;
-  } else if (type == "docx") {
+  } else if (type === "docx") {
     return exportDocx(targetFilePath, data, config);
   }
 
   // Linux: keep temp html beside the markdown file (snap/isolated browsers often cannot read /tmp)
   const tmpDir =
     process.platform === "linux" ? originPath.dir : isDev ? originPath.dir : os.tmpdir();
-  let tmpfilename = path.resolve(tmpDir, originPath.name + "_tmp.html");
-  exportHtml(tmpfilename, data);
+  const tmpfilename = path.resolve(tmpDir, originPath.name + "_tmp.html");
+  await exportHtml(tmpfilename, data);
   if (!isExistsPath(tmpfilename)) {
     throw new Error(`Temporary HTML file not found: ${tmpfilename}`);
   }
 
   const fileUrl = pathToFileURL(tmpfilename).href;
-  let launchOptions = {
+  const launchOptions = {
     headless: true,
-    executablePath: config["executablePath"] || undefined,
-    args: ["--allow-file-access-from-files", ...(config["puppeteerArgs"] || [])],
+    executablePath: (config.executablePath as string) || undefined,
+    args: ["--allow-file-access-from-files", ...((config.puppeteerArgs as string[]) || [])],
   };
 
-  const puppeteer = require("puppeteer-core");
-  const browser = await puppeteer.launch(launchOptions).catch((error) => {
+  const browser = await puppeteer.launch(launchOptions).catch((error: unknown) => {
     showErrorMessage("puppeteer.launch()", error);
     throw error;
   });
-  const page = await browser.newPage().catch((error) => {
+  const page = await browser.newPage().catch((error: unknown) => {
     showErrorMessage("browser.newPage()", error);
     throw error;
   });
-  await page.goto(fileUrl, { waitUntil: "load", timeout: 60000 }).catch(async (error) => {
+  await page.goto(fileUrl, { waitUntil: "load", timeout: 60000 }).catch(async (error: unknown) => {
     showErrorMessage("page.goto()", error);
     await page.setContent(data, { waitUntil: "load", timeout: 60000 });
   });
 
   // generate pdf
-  if (type == "pdf") {
+  if (type === "pdf") {
     // https://pptr.dev/api/puppeteer.pdfoptions
-    const margin = config["margin"] || {};
+    const margin = (config.margin as Record<string, number | undefined>) || {};
     const pdfOptions = {
-      format: config["format"] || "A4",
-      printBackground: config["printBackground"] || true,
+      format: (config.format as "A4") || "A4",
+      printBackground: (config.printBackground as boolean) || true,
       margin: {
         top: margin.top != null ? `${margin.top}px` : undefined,
         right: margin.right != null ? `${margin.right}px` : undefined,
@@ -79,12 +98,12 @@ export async function exportByType(filePath, data, type, config) {
         left: margin.left != null ? `${margin.left}px` : undefined,
       },
     };
-    const pdf = await page.pdf(pdfOptions).catch((error) => {
+    const pdf = await page.pdf(pdfOptions).catch((error: unknown) => {
       showErrorMessage("page.pdf", error);
       throw error;
     });
 
-    let pdfBytes;
+    let pdfBytes: Uint8Array;
     try {
       pdfBytes = await createOutline(pdf, data);
     } catch (error) {
@@ -97,7 +116,7 @@ export async function exportByType(filePath, data, type, config) {
   await browser.close();
 
   // delete temporary file
-  let debug = config["debug"] || false;
+  const debug = (config.debug as boolean) || false;
   if (!debug) {
     if (isExistsPath(tmpfilename)) {
       fs.unlink(tmpfilename, () => {});
@@ -107,7 +126,11 @@ export async function exportByType(filePath, data, type, config) {
   console.log("[pretty-md-pdf] Exported to file: " + targetFilePath);
 }
 
-async function replaceDynamicContentWithImages(data, config = {}, exportFilePath = "") {
+async function replaceDynamicContentWithImages(
+  data: string,
+  config: MarkdownExportConfig = { type: "docx" },
+  exportFilePath = "",
+): Promise<string> {
   const containsKatex = data.indexOf('class="katex') >= 0 || data.indexOf("class='katex") >= 0;
   const containsMermaid =
     data.indexOf('class="mermaid') >= 0 || data.indexOf("class='mermaid") >= 0;
@@ -115,19 +138,18 @@ async function replaceDynamicContentWithImages(data, config = {}, exportFilePath
     return data;
   }
 
-  const puppeteer = require("puppeteer-core");
-  let browser;
+  let browser: Browser | undefined;
   let tmpfilename = "";
   try {
     const tmpDir = exportFilePath ? path.dirname(exportFilePath) : os.tmpdir();
     const tmpBaseName = exportFilePath ? path.parse(exportFilePath).name : `markdown_${Date.now()}`;
     tmpfilename = path.resolve(tmpDir, `${tmpBaseName}_math_tmp.html`);
-    exportHtml(tmpfilename, data);
+    await exportHtml(tmpfilename, data);
 
     browser = await puppeteer.launch({
       headless: true,
-      executablePath: config["executablePath"] || undefined,
-      args: ["--allow-file-access-from-files", ...(config["puppeteerArgs"] || [])],
+      executablePath: (config.executablePath as string) || undefined,
+      args: ["--allow-file-access-from-files", ...((config.puppeteerArgs as string[]) || [])],
     });
     const page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 800, deviceScaleFactor: 2 });
@@ -164,13 +186,13 @@ async function replaceDynamicContentWithImages(data, config = {}, exportFilePath
     if (browser) {
       await browser.close();
     }
-    if (!config["debug"] && tmpfilename && isExistsPath(tmpfilename)) {
+    if (!config.debug && tmpfilename && isExistsPath(tmpfilename)) {
       fs.unlink(tmpfilename, () => {});
     }
   }
 }
 
-async function waitForMermaid(page) {
+async function waitForMermaid(page: Page): Promise<void> {
   try {
     const hasMermaid = await page.evaluate(() => document.querySelectorAll(".mermaid").length > 0);
     if (!hasMermaid) {
@@ -179,12 +201,10 @@ async function waitForMermaid(page) {
     await page.waitForFunction(
       () => {
         const elements = Array.from(document.querySelectorAll(".mermaid"));
-        return (
-          elements.length === 0 ||
-          elements.every(
-            (element) =>
-              element.querySelector("svg") || element.getAttribute("data-processed") === "true",
-          )
+        // `every` is vacuously true on an empty list, so the old `length === 0 ||` was redundant.
+        return elements.every(
+          (element) =>
+            element.querySelector("svg") || element.getAttribute("data-processed") === "true",
         );
       },
       { timeout: 10000 },
@@ -194,7 +214,15 @@ async function waitForMermaid(page) {
   }
 }
 
-async function replaceMermaidWithImages(page) {
+/** `JSHandle.getProperties()` is typed loosely; the values are always element handles here. */
+async function elementHandles(handle: Awaited<ReturnType<Page["evaluateHandle"]>>) {
+  const properties = await handle.getProperties();
+  return [...properties.values()]
+    .map((item) => item.asElement())
+    .filter((item): item is ElementHandle<Element> => item !== null);
+}
+
+async function replaceMermaidWithImages(page: Page): Promise<void> {
   try {
     const handles = await page.evaluateHandle(() => {
       const diagrams = Array.from(document.querySelectorAll(".mermaid")).filter((element) =>
@@ -206,10 +234,10 @@ async function replaceMermaidWithImages(page) {
       });
       return diagrams;
     });
-    const diagrams = await handles.getProperties();
+    const diagrams = await elementHandles(handles);
 
-    for (const handle of diagrams.values()) {
-      await replaceElementWithImage(handle, {
+    for (const diagram of diagrams) {
+      await replaceElementWithImage(diagram, {
         display: true,
         style: "display:block;margin:1em auto",
         label: "mermaid",
@@ -220,7 +248,7 @@ async function replaceMermaidWithImages(page) {
   }
 }
 
-async function replaceKatexWithImages(page) {
+async function replaceKatexWithImages(page: Page): Promise<void> {
   try {
     const handles = await page.evaluateHandle(() => {
       const formulas = Array.from(document.querySelectorAll(".katex-display, .katex")).filter(
@@ -237,22 +265,18 @@ async function replaceKatexWithImages(page) {
       });
       return formulas;
     });
-    const formulas = await handles.getProperties();
+    const formulas = await elementHandles(handles);
 
-    for (const handle of formulas.values()) {
-      await replaceKatexFormulaWithImage(handle);
+    for (const formula of formulas) {
+      await replaceKatexFormulaWithImage(formula);
     }
   } catch (error) {
     showErrorMessage("replaceKatexWithImages()", error);
   }
 }
 
-async function replaceKatexFormulaWithImage(handle) {
+async function replaceKatexFormulaWithImage(formula: ElementHandle<Element>): Promise<void> {
   try {
-    const formula = handle.asElement();
-    if (!formula) {
-      return;
-    }
     const box = await formula.boundingBox();
     if (!box || box.width <= 0 || box.height <= 0) {
       return;
@@ -288,20 +312,19 @@ async function replaceKatexFormulaWithImage(handle) {
   }
 }
 
-async function replaceElementWithImage(handle, options = {}) {
+async function replaceElementWithImage(
+  handle: ElementHandle<Element>,
+  options: ImageShotOptions = {},
+): Promise<void> {
   try {
-    const element = handle.asElement();
-    if (!element) {
-      return;
-    }
-    const box = await element.boundingBox();
+    const box = await handle.boundingBox();
     if (!box || box.width <= 0 || box.height <= 0) {
       return;
     }
-    const image = await element.screenshot({ type: "png", omitBackground: true });
+    const image = await handle.screenshot({ type: "png", omitBackground: true });
     const imageBuffer = Buffer.from(image);
     const src = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-    await element.evaluate(
+    await handle.evaluate(
       (target, imageSrc, width, height, imageOptions) => {
         const imageElement = document.createElement("img");
         imageElement.setAttribute("src", imageSrc);
@@ -331,25 +354,25 @@ async function replaceElementWithImage(handle, options = {}) {
   }
 }
 
-function showErrorMessage(msg, error) {
-  if (!error) return;
+function showErrorMessage(msg: string, error?: unknown): void {
+  if (error == null) return;
   console.error("ERROR: " + msg);
-  console.log("ERROR: " + msg);
-  if (error) {
-    console.error(error.toString());
-    console.log(error);
+  if (error instanceof Error) {
+    console.error(error.message);
+  } else {
+    console.error(toDisplayText(error));
   }
 }
 
-function isExistsPath(path) {
-  if (path.length === 0) {
+function isExistsPath(target: string): boolean {
+  if (target.length === 0) {
     return false;
   }
   try {
-    fs.accessSync(path);
+    fs.accessSync(target);
     return true;
   } catch (error) {
-    console.warn(error.message);
+    console.warn((error as Error).message);
     return false;
   }
 }

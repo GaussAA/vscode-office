@@ -4,9 +4,9 @@
 // which blocked TypeScript 7 (see #18). oxlint does not depend on the TypeScript package
 // at all, runs the whole tree in under a second, and understands the TS/JSX syntax we use.
 //
-// Scope is deliberately the same as the old gate: `src/**/*.{ts,tsx}` only. The vendored
-// JavaScript under `src/**/*.js` (x-spreadsheet, markdown-it plugins) was never linted and
-// is not being dragged in by a tool swap.
+// Scope: every hand-written `.ts`/`.tsx` in `src/` **and** `test/`. The only JavaScript left
+// in the tree is the vendored x-spreadsheet engine under `src/react/view/excel/x-spreadsheet/`,
+// which is a fork (ADR-0009) and stays excluded — everything we wrote ourselves is now `.ts`.
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "react", "react-hooks", "import", "unicorn", "oxc"],
@@ -25,6 +25,14 @@
     // explicit parentheses rather than the rule being turned off.
     "no-cond-assign": ["error", "except-parens"],
 
+    // node:test hands every `test()` a promise that is handled by the runner itself; awaiting
+    // it in 40 call sites would be noise, and the type-aware pass only sees the call at all
+    // once `out/unit-tests/` exists — so the exception is spelled out instead of incidental.
+    "typescript/no-floating-promises": [
+      "error",
+      { "allowForKnownSafeCalls": [{ "from": "package", "name": "test", "package": "node:test" }] }
+    ],
+
     "no-unused-vars": [
       "error",
       {
@@ -37,7 +45,7 @@
   },
   "ignorePatterns": [
     "**/*.d.ts",
-    "src/**/*.js",
+    "src/react/view/excel/x-spreadsheet/**",
     "vditor/**",
     "out/**",
     "node_modules/**",
