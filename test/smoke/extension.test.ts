@@ -1,3 +1,4 @@
+/// <reference types="mocha" />
 /**
  * Integration smoke tests — the layer between `node --test` (pure logic) and
  * `verify:ui` (webview DOM in a plain browser).

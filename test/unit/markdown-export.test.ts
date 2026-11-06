@@ -16,8 +16,10 @@ import { convertMarkdownToHtml } from "@/service/markdown/markdown-pdf";
  * filename only matters for image-path rewriting, which is skipped for `type: "html"`.
  */
 
-const config = { breaks: true, type: ["html"] };
-const render = (markdown) => convertMarkdownToHtml("/tmp/fixture.md", "html", markdown, config);
+// `type` is a string in `MarkdownExportConfig`; the array form died with the old config shape.
+const config = { breaks: true, type: "html" };
+const render = (markdown: string): string =>
+  convertMarkdownToHtml("/tmp/fixture.md", "html", markdown, config);
 
 test("export: headings render with anchors", () => {
   const html = render("# Export heading\n");

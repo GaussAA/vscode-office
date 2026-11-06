@@ -46,7 +46,7 @@ const LOCALES = {
  * into seven languages is a job for a native speaker, not a commit hook; until then the
  * English fallback is correct but unlocalised, and this budget keeps the gap from growing.
  */
-const MAX_MISSING = {
+const MAX_MISSING: Record<string, number> = {
   "zh-cn": 0,
   "zh-tw": 0,
   ja: 56,
@@ -58,12 +58,13 @@ const MAX_MISSING = {
   ru: 56,
 };
 
-function flatten(tree, prefix = "") {
-  const out = new Map();
+function flatten(tree: Record<string, unknown>, prefix = ""): Map<string, unknown> {
+  const out = new Map<string, unknown>();
   for (const [key, value] of Object.entries(tree)) {
     const path = prefix ? `${prefix}.${key}` : key;
     if (value && typeof value === "object") {
-      for (const [nested, text] of flatten(value, path)) out.set(nested, text);
+      for (const [nested, text] of flatten(value as Record<string, unknown>, path))
+        out.set(nested, text);
     } else {
       out.set(path, value);
     }
@@ -71,8 +72,8 @@ function flatten(tree, prefix = "") {
   return out;
 }
 
-function walk(dir, extensions) {
-  const out = [];
+function walk(dir: string, extensions: string[]): string[] {
+  const out: string[] = [];
   for (const entry of readdirSync(join(root, dir))) {
     const path = join(dir, entry);
     if (statSync(join(root, path)).isDirectory()) out.push(...walk(path, extensions));
@@ -111,7 +112,7 @@ test("no locale carries keys English does not have", () => {
 test("every key used in the webview exists in English", () => {
   const english = flat.en;
   const files = walk("src/react", [".ts", ".tsx"]);
-  const used = new Map();
+  const used = new Map<string, string>();
   for (const file of files) {
     const text = readFileSync(join(root, file), "utf8");
     for (const match of text.matchAll(/\$t\(\s*['"]([^'"]+)['"]/g)) {
@@ -140,7 +141,7 @@ test("no message is an empty string", () => {
 
 test("placeholders survive translation", () => {
   // A translation that drops or renames {count} renders a literal brace group to the user.
-  const placeholders = (text) =>
+  const placeholders = (text: unknown): Set<string> =>
     new Set([...String(text).matchAll(/\{(\w+)\}/g)].map((match) => match[1]));
   const problems = [];
   for (const [locale, messages] of Object.entries(flat)) {

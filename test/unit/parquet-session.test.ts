@@ -6,16 +6,19 @@ import { ParquetSession } from "@/react/view/parquet/parquetSession";
  * A fake row reader shaped like the real one: `readRows(start, end)` returns objects.
  * `calls` records every range so tests can prove the cache and prefetch actually work.
  */
-function makeSource(rowCount, { readOnly = false, delay = 0 } = {}) {
-  const calls = [];
+function makeSource(
+  rowCount: number,
+  { readOnly = false, delay = 0 }: { readOnly?: boolean; delay?: number } = {},
+) {
+  const calls: Array<[number, number]> = [];
   return {
     rowCount,
     readOnly,
     calls,
-    async readRows(start, end) {
+    async readRows(start: number, end: number) {
       calls.push([start, end]);
-      if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
-      const rows = [];
+      if (delay) await new Promise<void>((resolve) => setTimeout(resolve, delay));
+      const rows: Array<{ id: number; name: string }> = [];
       for (let index = start; index < end; index++) {
         rows.push({ id: index, name: `row-${index}` });
       }

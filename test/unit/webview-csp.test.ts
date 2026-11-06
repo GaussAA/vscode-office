@@ -11,7 +11,8 @@ import { buildWebviewCsp } from "@/common/webviewCsp";
 
 const ORIGIN = "vscode-webview://abc";
 const csp = buildWebviewCsp(ORIGIN);
-const directive = (name) => csp.split("; ").find((part) => part.startsWith(`${name} `)) ?? "";
+const directive = (name: string) =>
+  csp.split("; ").find((part) => part.startsWith(`${name} `)) ?? "";
 
 test("csp: denies by default", () => {
   assert.ok(csp.startsWith(`default-src 'none'`), csp);

@@ -3,11 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import type { JsonlRangeRequest } from "@/common/jsonlTypes";
 import { createJsonlHandlers } from "@/provider/jsonlHandlers";
 import { JsonlFile, fileByteSource } from "@/service/jsonlFile";
 import { JsonlSession } from "@/service/jsonlSession";
 
-const lines = (count) =>
+const lines = (count: number): string =>
   Array.from({ length: count }, (_, i) => JSON.stringify({ id: i, msg: `row ${i}` })).join("\n");
 
 /**
@@ -15,13 +16,15 @@ const lines = (count) =>
  * posted to the webview. This is the glue `verify:ui` cannot reach (it stubs the webview),
  * so it is exercised here instead.
  */
-async function harness(contents) {
+async function harness(contents: string) {
   const dir = mkdtempSync(join(tmpdir(), "jsonl-handlers-"));
   const path = join(dir, "log.jsonl");
   writeFileSync(path, contents);
 
   let session = new JsonlSession(await JsonlFile.open(await fileByteSource(path)));
-  const emitted = [];
+  // One bus carries every message kind, so the payload is deliberately untyped here — the
+  // assertions below are the contract, and `createJsonlHandlers` is what gets type-checked.
+  const emitted: Array<{ type: string; payload: any }> = [];
   const handlers = createJsonlHandlers({
     session: () => session,
     reopen: async () => {
@@ -29,7 +32,7 @@ async function harness(contents) {
       session = new JsonlSession(await JsonlFile.open(await fileByteSource(path)));
       previous.dispose();
     },
-    emit: (type, payload) => emitted.push({ type, payload }),
+    emit: (type: string, payload: any) => emitted.push({ type, payload }),
     info: () => ({
       fileName: "log.jsonl",
       cacheId: "cache",
@@ -47,7 +50,11 @@ async function harness(contents) {
       return session;
     },
     types: () => emitted.map((message) => message.type),
-    last: (type) => [...emitted].reverse().find((message) => message.type === type),
+    last: (type: string) => {
+      const hit = [...emitted].reverse().find((message) => message.type === type);
+      if (!hit) throw new Error(`no ${type} message was emitted`);
+      return hit;
+    },
     cleanup: async () => {
       session.dispose();
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -78,7 +85,7 @@ test("index: a range request is answered with entries and the original requestId
     const payload = h.last("jsonlEntries").payload;
     assert.equal(payload.requestId, 7, "the webview matches replies by requestId");
     assert.deepEqual(
-      payload.entries.map((entry) => entry.index),
+      payload.entries.map((entry: { index: number }) => entry.index),
       [1, 2],
     );
     assert.equal(payload.entries[0].kind, "value");
@@ -92,7 +99,12 @@ test("index: a malformed request is ignored instead of crashing the loop", async
   try {
     await h.handlers.index(undefined);
     await h.handlers.index({ start: 0, end: 1 });
-    await h.handlers.index({ requestId: "nope", start: 0, end: 1 });
+    // A malformed message from the webview is exactly what the guard is for.
+    await h.handlers.index({
+      requestId: "nope",
+      start: 0,
+      end: 1,
+    } as unknown as Partial<JsonlRangeRequest>);
     assert.deepEqual(h.types(), [], "nothing may be emitted for a bad request");
   } finally {
     await h.cleanup();
@@ -211,7 +223,7 @@ test("reload: the session is replaced and the new document is announced", async 
 
     await h.handlers.index({ requestId: 9, start: 6, end: 7 });
     assert.deepEqual(
-      h.last("jsonlEntries").payload.entries.map((entry) => entry.index),
+      h.last("jsonlEntries").payload.entries.map((entry: { index: number }) => entry.index),
       [6],
     );
   } finally {

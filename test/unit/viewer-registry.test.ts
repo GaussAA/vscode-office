@@ -13,10 +13,21 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const read = (path) => readFileSync(join(root, path), "utf8");
+const read = (path: string): string => readFileSync(join(root, path), "utf8");
 
-function walk(dir, extensions) {
-  const out = [];
+interface CustomEditorContribution {
+  viewType: string;
+  selector: Array<{ filenamePattern?: string }>;
+}
+
+interface Manifest {
+  contributes: { customEditors: CustomEditorContribution[] };
+}
+
+const readManifest = (): Manifest => JSON.parse(read("package.json")) as Manifest;
+
+function walk(dir: string, extensions: string[]): string[] {
+  const out: string[] = [];
   for (const entry of readdirSync(join(root, dir))) {
     const path = join(dir, entry);
     if (statSync(join(root, path)).isDirectory()) out.push(...walk(path, extensions));
@@ -26,21 +37,21 @@ function walk(dir, extensions) {
 }
 
 /** `registerCustomEditorProvider('<viewType>'` anywhere in a file. */
-function literalViewTypes(text) {
+function literalViewTypes(text: string): string[] {
   return [...text.matchAll(/registerCustomEditorProvider\(\s*['"]([^'"]+)['"]/g)].map(
     (match) => match[1],
   );
 }
 
 /** The desktop-only list the web entry re-registers as an "unsupported" screen. */
-function unsupportedViewTypes(text) {
+function unsupportedViewTypes(text: string): string[] {
   const block = /WEB_UNSUPPORTED_VIEW_TYPES\s*=\s*\[([\s\S]*?)\]/.exec(text);
   if (!block) return [];
   return [...block[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
 }
 
 const providerFiles = walk("src/provider", [".ts"]);
-const providerTypes = new Set();
+const providerTypes = new Set<string>();
 for (const file of providerFiles) {
   const text = read(file);
   for (const type of literalViewTypes(text)) providerTypes.add(type);
@@ -48,16 +59,18 @@ for (const file of providerFiles) {
 }
 
 /** viewTypes the given entry point registers, following `x.bindCustomEditors(...)` one hop. */
-function registeredBy(entryFile) {
+function registeredBy(entryFile: string): Set<string> {
   const text = read(entryFile);
-  const types = new Set(literalViewTypes(text));
+  const types = new Set<string>(literalViewTypes(text));
 
   for (const match of text.matchAll(/(\w+)\.bindCustomEditors?\(/g)) {
     const variable = match[1];
     const ctor = new RegExp(`const ${variable}\\s*=\\s*new\\s+(\\w+)`).exec(text);
     if (!ctor) continue;
     const className = ctor[1];
-    const file = providerFiles.find((candidate) => read(candidate).includes(`class ${className}`));
+    const file = providerFiles.find((candidate: string) =>
+      read(candidate).includes(`class ${className}`),
+    );
     assert.ok(
       file,
       `${entryFile} binds ${variable} (${className}) but no provider file declares it`,
@@ -70,8 +83,10 @@ function registeredBy(entryFile) {
 }
 
 test("every contributed custom editor is registered somewhere", () => {
-  const pkg = JSON.parse(read("package.json"));
-  const contributed = pkg.contributes.customEditors.map((editor) => editor.viewType);
+  const pkg = readManifest();
+  const contributed = pkg.contributes.customEditors.map(
+    (editor: CustomEditorContribution) => editor.viewType,
+  );
   const desktop = registeredBy("src/extension.ts");
   const missing = contributed.filter((type) => !desktop.has(type));
   assert.deepEqual(
@@ -82,7 +97,7 @@ test("every contributed custom editor is registered somewhere", () => {
 });
 
 test("every registered provider is contributed", () => {
-  const pkg = JSON.parse(read("package.json"));
+  const pkg = readManifest();
   const contributed = new Set(pkg.contributes.customEditors.map((editor) => editor.viewType));
   const invisible = [...providerTypes].filter((type) => !contributed.has(type));
   assert.deepEqual(
@@ -93,8 +108,8 @@ test("every registered provider is contributed", () => {
 });
 
 test("no viewType declares the same file pattern twice", () => {
-  const pkg = JSON.parse(read("package.json"));
-  const duplicates = [];
+  const pkg = readManifest();
+  const duplicates: string[] = [];
   for (const editor of pkg.contributes.customEditors) {
     const patterns = editor.selector.flatMap((selector) =>
       String(selector.filenamePattern ?? "")
@@ -122,14 +137,14 @@ test("every React route is covered by the smoke list or a dedicated scenario", (
   const smoked = new Set([...smokeBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]));
 
   // Routes that get their own scenario instead of the mount-only smoke.
-  const dedicated = {
+  const dedicated: Record<string, string> = {
     parquet: "parquet-paging",
     jsonl: "jsonl-directory",
   };
 
   // The source is formatted by oxfmt, which emits double quotes — every scraper in this file
   // accepts either style so a format pass can never silently empty a scan.
-  const hasScenario = (name) => new RegExp(`name:\\s*['"]${name}['"]`).test(runner);
+  const hasScenario = (name: string) => new RegExp(`name:\\s*['"]${name}['"]`).test(runner);
 
   const uncovered = routes.filter((route) => {
     if (smoked.has(route)) return false;
@@ -147,6 +162,7 @@ test("every React route is covered by the smoke list or a dedicated scenario", (
 test("the smoke list names routes that actually exist", () => {
   const runner = read("scripts/ui-verify/runner.mjs");
   const smokeBlock = /const routes = \[([\s\S]*?)\]/.exec(runner);
+  assert.ok(smokeBlock, "the smoke scenario should build its routes from a literal array");
   const smoked = [...smokeBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
   const known = new Set(
     [...read("src/react/main.tsx").matchAll(/case\s+['"]([^'"]+)['"]:/g)].map((match) => match[1]),

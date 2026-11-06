@@ -11,7 +11,7 @@ import {
 
 const encoder = new TextEncoder();
 
-function open(text) {
+function open(text: string) {
   const bytes = encoder.encode(text);
   return { bytes, index: buildJsonlIndex(bytes) };
 }
@@ -53,6 +53,7 @@ test("label: derives identity from configured top-level keys only", () => {
 
 test("label: truncates long values to 40 characters plus an ellipsis", () => {
   const label = deriveLabel({ name: "x".repeat(60) });
+  assert.ok(label, "a name yields a label");
   assert.equal(label.length, 41);
   assert.ok(label.endsWith("…"));
 });
@@ -63,6 +64,7 @@ test("snippet: keeps short text intact and marks a window in long text", () => {
 
   const long = `${"x".repeat(100)}needle${"y".repeat(100)}`;
   const snippet = matchSnippet(long, "needle", 5);
+  assert.ok(snippet, "a hit returns a snippet");
   assert.ok(snippet.startsWith("…"), "text before the window is elided");
   assert.ok(snippet.endsWith("…"), "text after the window is elided");
   assert.ok(snippet.includes("needle"));
@@ -72,6 +74,7 @@ test("snippet: keeps short text intact and marks a window in long text", () => {
 test("snippet: matching is case-insensitive against the text", () => {
   const text = "ABC".repeat(40) + "NEEDLE";
   const snippet = matchSnippet(text, "needle", 3);
+  assert.ok(snippet, "a hit returns a snippet");
   assert.ok(snippet.includes("NEEDLE"));
   assert.ok(snippet.startsWith("…"));
 });
@@ -92,7 +95,12 @@ test("classify: the summary carries the identity label, not the value", () => {
   const summary = buildJsonlSummary(bytes, index, 0);
   assert.equal(summary.kind, "value");
   assert.equal(summary.label, "42");
-  assert.equal(summary.value, undefined, "the directory must not keep parsed values");
+  // A summary deliberately has no `value` field; the cast is what lets us assert the absence.
+  assert.equal(
+    (summary as { value?: unknown }).value,
+    undefined,
+    "the directory must not keep parsed values",
+  );
 });
 
 test("detail: every kind carries the text the raw view needs", () => {

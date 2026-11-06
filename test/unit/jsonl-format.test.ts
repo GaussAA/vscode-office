@@ -9,10 +9,14 @@ import {
 } from "@/react/view/jsonl/jsonlFormat";
 import { highlightRuns } from "@/react/common/highlight";
 
-const objectOfSize = (size) =>
+const objectOfSize = (size: number): Record<string, number> =>
   Object.fromEntries(Array.from({ length: size }, (_, index) => [`key_${index}`, index]));
 
-function maxDepth(nodes, depth = 1) {
+interface ChainNode {
+  children?: ChainNode[];
+}
+
+function maxDepth(nodes: ChainNode[], depth = 1): number {
   let deepest = depth;
   for (const node of nodes) {
     if (!node.children?.length) continue;
@@ -33,7 +37,7 @@ test("countNodes: exactly the limit still fits, one more does not", () => {
 
 test("countNodes: stops descending at MAX_DEPTH", () => {
   // A chain deeper than MAX_DEPTH can never produce a node beyond MAX_DEPTH - 1.
-  let chain = { leaf: 1 };
+  let chain: Record<string, unknown> = { leaf: 1 };
   for (let depth = 0; depth < MAX_DEPTH + 5; depth++) chain = { child: chain };
   assert.ok(countNodes(chain) <= MAX_DEPTH);
 });
@@ -49,7 +53,7 @@ test('buildEntryModel: caps children and appends a non-selectable "more keys" ro
 });
 
 test("buildEntryModel: keeps the tree inside MAX_DEPTH", () => {
-  let chain = { leaf: 1 };
+  let chain: Record<string, unknown> = { leaf: 1 };
   for (let depth = 0; depth < MAX_DEPTH + 5; depth++) chain = { child: chain };
   const model = buildEntryModel(chain);
   assert.ok(model.count > 0);

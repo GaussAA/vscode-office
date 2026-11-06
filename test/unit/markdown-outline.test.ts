@@ -13,7 +13,7 @@ import { createOutline } from "@/service/markdown/outline";
  * dynamic `import("@cantoo/pdf-lib")` that only runs on this path.
  */
 
-async function makePdf(pages) {
+async function makePdf(pages: number): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   for (let index = 0; index < pages; index++) {
     doc.addPage();

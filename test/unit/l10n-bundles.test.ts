@@ -13,17 +13,22 @@ import { fileURLToPath } from "node:url";
  */
 
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
-const read = (path) => JSON.parse(readFileSync(join(root, path), "utf8"));
-const manifest = read("package.json");
-const base = read("l10n/bundle.l10n.json");
+/** A `bundle.l10n*.json` file: flat keys to message templates. */
+type Bundle = Record<string, string>;
+
+const readText = (path: string): string => readFileSync(join(root, path), "utf8");
+const readJson = <T>(path: string): T => JSON.parse(readText(path)) as T;
+const manifest = readJson<{ l10n?: string }>("package.json");
+const readBundle = (path: string): Bundle => readJson<Bundle>(path);
+const base = readBundle("l10n/bundle.l10n.json");
 const localeFiles = readdirSync(join(root, "l10n")).filter((name) =>
   /^bundle\.l10n\..+\.json$/.test(name),
 );
 
 /** Extension-side lookups only: the webview has its own i18n module. */
 function keysUsedByExtension() {
-  const sources = [];
-  const walk = (dir) => {
+  const sources: string[] = [];
+  const walk = (dir: string) => {
     for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
       const path = `${dir}/${entry.name}`;
       if (entry.isDirectory()) {
@@ -34,7 +39,7 @@ function keysUsedByExtension() {
     }
   };
   walk("src");
-  const keys = new Set();
+  const keys = new Set<string>();
   for (const file of sources) {
     for (const match of readFileSync(join(root, file), "utf8").matchAll(
       /\bi18n\(\s*['"]([^'"]+)['"]/g,
@@ -61,7 +66,7 @@ test("l10n: every key the extension asks for exists", () => {
 test("l10n: no locale bundle drops or invents a key", () => {
   const expected = Object.keys(base).sort();
   for (const file of localeFiles) {
-    const bundle = read(`l10n/${file}`);
+    const bundle = readBundle(`l10n/${file}`);
     assert.deepStrictEqual(
       Object.keys(bundle).sort(),
       expected,
@@ -75,7 +80,7 @@ test("l10n: placeholders were converted and stay contiguous", () => {
   // literal `$1` to the user, which is exactly the kind of thing nobody notices in review.
   const files = ["l10n/bundle.l10n.json", ...localeFiles.map((file) => `l10n/${file}`)];
   for (const file of files) {
-    const bundle = read(file);
+    const bundle = readBundle(file);
     for (const [key, text] of Object.entries(bundle)) {
       assert.ok(!/\$\d/.test(text), `${file}: ${key} still uses $N placeholders`);
       const indices = [...text.matchAll(/\{(\d+)\}/g)].map((match) => Number(match[1]));

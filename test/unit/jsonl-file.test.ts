@@ -11,10 +11,10 @@ import {
   memoryByteSource,
 } from "@/service/jsonlFile";
 
-const encode = (text) => new TextEncoder().encode(text);
+const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
 
 /** A source that refuses to return more than `maxChunk` bytes per read, like a real file. */
-function chunkedSource(bytes, maxChunk) {
+function chunkedSource(bytes: Uint8Array, maxChunk: number) {
   const inner = memoryByteSource(bytes);
   let reads = 0;
   return {
@@ -22,7 +22,7 @@ function chunkedSource(bytes, maxChunk) {
     get reads() {
       return reads;
     },
-    async read(offset, length) {
+    async read(offset: number, length: number) {
       reads++;
       return inner.read(offset, Math.min(length, maxChunk));
     },

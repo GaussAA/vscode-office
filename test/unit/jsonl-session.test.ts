@@ -1,17 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { JsonlEntryDetail, JsonlEntrySummary, JsonlSearchBatch } from "@/common/jsonlTypes";
 import { JsonlFile, memoryByteSource } from "@/service/jsonlFile";
-import { JsonlSession } from "@/service/jsonlSession";
+import { JsonlSession, type JsonlSearchOptions } from "@/service/jsonlSession";
 
 /** Build a session over literal JSONL text. */
-async function makeSession(lines) {
+async function makeSession(lines: string[]): Promise<JsonlSession> {
   const bytes = new TextEncoder().encode(lines.map((line) => `${line}\n`).join(""));
   return new JsonlSession(await JsonlFile.open(memoryByteSource(bytes)));
 }
 
 /** Run a scan to completion with a synchronous scheduler and collect the batches. */
-async function runSearch(session, query, options = {}) {
-  const batches = [];
+async function runSearch(
+  session: JsonlSession,
+  query: string,
+  options: Partial<JsonlSearchOptions> = {},
+): Promise<JsonlSearchBatch[]> {
+  const batches: JsonlSearchBatch[] = [];
   const handle = session.search(7, query, {
     onBatch: (batch) => batches.push(batch),
     schedule: (run) => run(),
@@ -21,7 +26,15 @@ async function runSearch(session, query, options = {}) {
   return batches;
 }
 
-const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
+
+/**
+ * `label` only exists on the `value` member of the entry union, so reaching for it is also an
+ * assertion that the line parsed — spell that out instead of casting.
+ */
+function labelOf(entry: JsonlEntrySummary | JsonlEntryDetail): string | undefined {
+  return entry.kind === "value" ? entry.label : undefined;
+}
 
 test("readRange: echoes the request id and clamps to the file", async () => {
   const session = await makeSession(['{"id":0}', '{"id":1}', '{"id":2}']);
@@ -53,16 +66,17 @@ test("readRange: absolute line numbers survive the windowed read", async () => {
     payload.entries.map((entry) => entry.index),
     [30, 31, 32, 33, 34],
   );
-  assert.equal(payload.entries[0].label, "30");
+  assert.equal(labelOf(payload.entries[0]), "30");
 });
 
 test("readEntry: echoes the request id, and rejects an out-of-range line", async () => {
   const session = await makeSession(['{"id":"a","name":"first"}', '{"id":"b"}']);
 
   const payload = await session.readEntry(9, 0);
+  assert.ok(payload, "a valid line must come back");
   assert.equal(payload.requestId, 9);
   assert.equal(payload.index, 0);
-  assert.equal(payload.entry.label, "a");
+  assert.equal(labelOf(payload.entry), "a");
 
   assert.equal(await session.readEntry(10, 2), null);
   assert.equal(await session.readEntry(11, -1), null);
@@ -73,8 +87,9 @@ test("readEntry: works for the last line of a file without a trailing newline", 
   const session = new JsonlSession(await JsonlFile.open(memoryByteSource(bytes)));
 
   const payload = await session.readEntry(5, 1);
+  assert.ok(payload, "the last line must come back");
   assert.equal(payload.index, 1);
-  assert.equal(payload.entry.label, "b");
+  assert.equal(labelOf(payload.entry), "b");
 });
 
 test("search: streams matches in batches and ends with done", async () => {
@@ -94,7 +109,10 @@ test("search: streams matches in batches and ends with done", async () => {
     batch.entries.map((entry) => entry.index),
     [0, 2],
   );
-  assert.ok(batch.entries[0].snippet.includes("alpha"), "the snippet is centred on the match");
+  const [hit] = batch.entries;
+  assert.ok(hit.kind === "value", "a matched line is a parsed value");
+  assert.ok(hit.snippet, "a matched line carries a snippet");
+  assert.ok(hit.snippet.includes("alpha"), "the snippet is centred on the match");
 });
 
 test("search: an empty query answers immediately with a finished batch", async () => {
@@ -102,9 +120,10 @@ test("search: an empty query answers immediately with a finished batch", async (
   const batches = await runSearch(session, "   ");
 
   assert.equal(batches.length, 1);
-  assert.equal(batches[0].done, true);
-  assert.equal(batches[0].entries.length, 0);
-  assert.equal(batches[0].matches, 0);
+  const [batch] = batches;
+  assert.equal(batch.done, true);
+  assert.equal(batch.entries.length, 0);
+  assert.equal(batch.matches, 0);
 });
 
 test("search: stops at maxMatches and says it was capped", async () => {
@@ -112,6 +131,7 @@ test("search: stops at maxMatches and says it was capped", async () => {
   const batches = await runSearch(session, "n", { maxMatches: 1 });
 
   const last = batches.at(-1);
+  assert.ok(last, "a scan always reports at least one batch");
   assert.equal(last.capped, true);
   assert.equal(last.done, true);
   assert.equal(last.matches, 1);
@@ -121,7 +141,7 @@ test("search: a newer scan cancels the old one instead of finishing it", async (
   const lines = Array.from({ length: 200 }, (_, index) => `{"id":${index}}`);
   const session = await makeSession(lines);
 
-  const firstBatches = [];
+  const firstBatches: JsonlSearchBatch[] = [];
   const handle = session.search(1, "id", {
     step: 1,
     batchSize: 1,
@@ -133,14 +153,18 @@ test("search: a newer scan cancels the old one instead of finishing it", async (
   await tick();
   const beforeCancel = firstBatches.length;
   assert.ok(beforeCancel > 0, "the scan had started");
-  assert.ok(firstBatches.at(-1).scanned < 200, "the scan had not finished");
+  const midScan = firstBatches.at(-1);
+  assert.ok(midScan, "a batch arrived before the cancel");
+  assert.ok(midScan.scanned < 200, "the scan had not finished");
 
   handle.cancel();
   await handle.finished;
   await tick();
 
   assert.equal(firstBatches.length, beforeCancel, "no batch arrives after cancel()");
-  assert.equal(firstBatches.at(-1).done, false, "a cancelled scan never reports done");
+  const afterCancel = firstBatches.at(-1);
+  assert.ok(afterCancel, "the earlier batches are still there");
+  assert.equal(afterCancel.done, false, "a cancelled scan never reports done");
   assert.equal(handle.done, true);
 });
 
@@ -148,7 +172,7 @@ test("search: starting a second scan cancels the first one host-side", async () 
   const lines = Array.from({ length: 40 }, (_, index) => `{"id":${index}}`);
   const session = await makeSession(lines);
 
-  const first = [];
+  const first: JsonlSearchBatch[] = [];
   const firstRun = session.search(1, "id", {
     step: 5,
     onBatch: (batch) => first.push(batch),
@@ -156,7 +180,7 @@ test("search: starting a second scan cancels the first one host-side", async () 
   });
   await tick();
 
-  const second = [];
+  const second: JsonlSearchBatch[] = [];
   const secondRun = session.search(2, "id", {
     step: 5,
     onBatch: (batch) => second.push(batch),
@@ -185,5 +209,7 @@ test("search: a scan over several steps still reports absolute line numbers", as
     all,
     lines.map((_, index) => index),
   );
-  assert.equal(batches.at(-1).done, true);
+  const last = batches.at(-1);
+  assert.ok(last, "a scan always reports at least one batch");
+  assert.equal(last.done, true);
 });

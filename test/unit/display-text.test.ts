@@ -32,7 +32,7 @@ test("displayText: dates use ISO, not the locale default", () => {
 });
 
 test("displayText: a cyclic object does not throw", () => {
-  const cyclic = { name: "loop" };
+  const cyclic: { name: string; self?: unknown } = { name: "loop" };
   cyclic.self = cyclic;
   assert.equal(toDisplayText(cyclic), "[object]");
 });

@@ -43,7 +43,7 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
       emit("jsonlInfo", info());
     },
 
-    async index(request?: JsonlRangeRequest) {
+    async index(request?: Partial<JsonlRangeRequest>) {
       if (typeof request?.requestId !== "number") return;
       const start = Math.max(0, request.start ?? 0);
       const end = request.end ?? start + JSONL_CHUNK_SIZE;
@@ -56,8 +56,8 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
       emit("jsonlEntries", payload);
     },
 
-    async entry(request?: JsonlEntryRequest) {
-      if (typeof request?.requestId !== "number") return;
+    async entry(request?: Partial<JsonlEntryRequest>) {
+      if (typeof request?.requestId !== "number" || typeof request.index !== "number") return;
       let payload: JsonlEntryPayload | null = null;
       try {
         payload = await session().readEntry(request.requestId, request.index);
