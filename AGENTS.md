@@ -31,7 +31,7 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 1. **需要上游的修复就读它的 diff，自己重写一遍**，不要 `git merge upstream/main`，也不要 rebase 到上游。`upstream` remote 保留，仅用于对照和可选的单点 `cherry-pick`。
 2. **上游文件可以改写**。「能新增就不改写」不再是规则，取而代之的是：**一次改动只做一件事，且这个提交能单独回退**；不要把重构和功能混进同一个提交。
 3. **继承来的债是我们的债**：上游代码的类型错误、死代码、残留配置都可以修。`pnpm typecheck` 的目标是零错误，不是给历史错误建永久白名单。
-4. **风格**：上游的 4 空格 / 单引号不再有保护价值。统一到 prettier 要单独提交，不与功能改动混在一起。
+4. **风格**：整个树由 `oxfmt` 统一（`.oxfmtrc.json`，printWidth 100 / 双引号 / 2 空格）。`vditor/` 是唯一的例外 —— 它是独立的 workspace 包，保持与上游 Vditor 可对照，不要格式化它。
 
 ## 代码结构（沿用上游布局）
 
@@ -64,6 +64,6 @@ pnpm check:full       # check + build + test:smoke + verify:ui（CI 跑这个）
 pnpm verify:ui        # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
 ```
 
-**三层测试各管一件事**：`pnpm test` 管纯逻辑（不认识 `vscode`），`pnpm test:smoke` 管真实宿主里的激活与 custom editor 路由，`pnpm verify:ui` 管 webview 的 DOM。三者的失败模式不重叠——`verify:ui` 渲染的是 webview 的 HTML，它看不见「VS Code 有没有激活这个扩展」，所以升 `engines`、改激活事件、动 CSP 这类改动必须靠 smoke 兜。
+**三层测试各管一件事**：`pnpm test` 管纯逻辑（个别模块会 `require('vscode')` —— 那些用 `test/support/vscode-stub.ts` 顶替，Markdown 导出链就是这样被覆盖的），`pnpm test:smoke` 管真实宿主里的激活与 custom editor 路由，`pnpm verify:ui` 管 webview 的 DOM（含 `resource/markdown/index.html` 这个非 React 路由）。三者的失败模式不重叠——`verify:ui` 渲染的是 webview 的 HTML，它看不见「VS Code 有没有激活这个扩展」，所以升 `engines`、改激活事件、动 CSP 这类改动必须靠 smoke 兜。
 
 **闸门是 fail-closed 的**：`scripts/typecheck.mjs` 把每个类型错误按「文件 + 错误码 + 消息」与 `scripts/typecheck-baseline.json` 比对，出现基线外的错误就红。基线已经清空（继承来的 75 条全部修掉），所以现在的规则很简单：**任何类型错误都会让构建失败**。不要用 `typecheck:update` 把新错误塞进基线 —— 那是这个闸门唯一能欺骗自己的方式。
