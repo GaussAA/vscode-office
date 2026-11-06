@@ -20,14 +20,6 @@ import { join } from "node:path";
 
 const bundles = ["out/extension.js"];
 
-/**
- * Bare dynamic imports that are known to be unreachable, with the reason. Adding an entry is a
- * deliberate act: it asserts "this code path never executes in the packaged extension".
- */
-const KNOWN_UNREACHABLE = {
-  katex: "mermaid legacy MathML branch; the exporter only calls mermaid.parse(), never render()",
-};
-
 const problems = [];
 
 for (const bundle of bundles) {
@@ -35,9 +27,6 @@ for (const bundle of bundles) {
   for (const match of source.matchAll(/\bimport\(\s*(["'])([^"']+)\1\s*\)/g)) {
     const specifier = match[2];
     if (specifier.startsWith(".") || specifier.startsWith("node:")) {
-      continue;
-    }
-    if (Object.hasOwn(KNOWN_UNREACHABLE, specifier)) {
       continue;
     }
     problems.push(`${bundle}: dynamic import("${specifier}")`);

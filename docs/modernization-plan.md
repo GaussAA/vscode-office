@@ -8,7 +8,7 @@ D1–D8、D10、D12、D13a 已落地；D9 只剩 `tsx`，D11 还剩可选项，D
 | D9                                | 完成   | `oxfmt`（D10 一并）、`typecheck --self-test`、`puppeteer-core`、`oxlint --type-aware`（首轮 50 条发现全部修完，无基线）、`type: module` + `out/` CJS 作用域（ADR-0012）已完成；**含 `tsx`，全部完成**                     |
 | D11                               | 部分   | 已换 9 个：`codemirror`(删)、`node-unrar-js`(归类修正)、`pretty-bytes`、`utif2`、`chrome-launcher`、`date-format`、`pdf-lib`→`@cantoo/pdf-lib`、`markdown-it-checkbox`/`markdown-it-plantuml`/手抄 katex 插件 → `@mdit/*` |
 | D6                                | 未开始 | gitHistory 换 `simple-git`                                                                                                                                                                                                |
-| D13b                              | 未开始 | katex ×3 / mermaid ×2 / highlight.js ×2 合并，约 4.6 MB                                                                                                                                                                   |
+| D13b                              | 部分   | `mermaid` 从扩展包移除（只用于一个结果被丢弃的 `parse()` 校验）：`out/extension.js` 6.55 → 1.62 MB，vsix 13.61 → 12.20 MB；katex / highlight.js 的重复仍在                                                                |
 
 `src/` 里非 vendored 的 `.js` 现在是 **0 个**（`x-spreadsheet/` 下 ~100 个是 vendored CJS，
 按 ADR-0009 保持原样）。根 `package.json` 是 `"type": "module"`，`out/` 由构建生成一个
