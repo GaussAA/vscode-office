@@ -102,8 +102,20 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
     // Uncaught page errors are evidence too: a view that throws while mounting is broken
     // even if the DOM looks present.
     const exceptions = []
+    // CSP violations arrive as Log entries, not as exceptions: a blocked stylesheet or frame
+    // leaves the page looking fine while the rule is doing nothing useful. Collected so the
+    // runner can assert the policy is actually compatible with every viewer.
+    const violations = []
     socket.addEventListener('message', event => {
         const message = JSON.parse(event.data)
+        if (message.method === 'Log.entryAdded') {
+            const entry = message.params?.entry
+            const text = entry?.text ?? ''
+            if (entry?.source === 'security' || /Content Security Policy/i.test(text)) {
+                violations.push(text)
+            }
+            return
+        }
         if (message.method === 'Runtime.exceptionThrown') {
             const details = message.params?.exceptionDetails
             exceptions.push(details?.exception?.description ?? details?.text ?? 'unknown exception')
@@ -128,6 +140,7 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
 
     await send('Page.enable')
     await send('Runtime.enable')
+    await send('Log.enable')
 
     const evaluate = async expression => {
         const result = await send('Runtime.evaluate', {
@@ -162,6 +175,8 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
         sleep,
         child,
         exceptions: () => [...exceptions],
+        violations: () => [...violations],
+        clearViolations: () => { violations.length = 0 },
         clearExceptions: () => { exceptions.length = 0 },
         close: async () => {
             try { socket.close() } catch { /* already closed */ }

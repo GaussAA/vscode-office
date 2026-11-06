@@ -28,6 +28,7 @@ const entries = {
     excelFind: 'src/react/view/excel/excel_find.ts',
     highlight: 'src/react/common/highlight.ts',
     htmlPreviewShell: 'src/service/htmlPreviewShell.ts',
+    webviewCsp: 'src/common/webviewCsp.ts',
 }
 
 for (const [name, entry] of Object.entries(entries)) {

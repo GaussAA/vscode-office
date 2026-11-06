@@ -395,8 +395,21 @@ async function main() {
                 base: harness.url,
                 stats: async () => (await fetch(`${harness.url}/stats`)).json(),
             }
+            browser.clearViolations()
             try {
                 const detail = await scenario.run(context)
+                // A viewer that trips the policy must fail here: the page still looks fine when
+                // a rule blocks a stylesheet or a frame, so the only evidence is this log.
+                //
+                // One violation is expected and harmless: epubjs ships a `globalThis` polyfill
+                // that probes with `new Function("return this")` inside a try/catch and falls
+                // back to `window`. CSP reports the probe whether or not the caller handles it,
+                // so an `EvalError` from eval-as-JavaScript is filtered out — everything else
+                // stays fatal. Allow-listing this is strictly better than adding 'unsafe-eval'
+                // to the policy for every viewer, which the probe does not need.
+                const expectedProbe = /EvalError: Evaluating a string as JavaScript/
+                const violations = browser.violations().filter(text => !expectedProbe.test(text))
+                expect(violations.length === 0, `CSP violation: ${violations[0] ?? ''}`)
                 await browser.screenshot(join(shotsDir, `${scenario.name}.png`))
                 if (refreshDocs && scenario.docs) {
                     copyFileSync(join(shotsDir, `${scenario.name}.png`), join(docsDir, scenario.docs))

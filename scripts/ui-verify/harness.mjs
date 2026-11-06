@@ -6,6 +6,7 @@
  * without VS Code. Parquet fixtures are served with Range support and counted in `/stats`,
  * which is how the lazy-loading behaviour is asserted.
  */
+import { randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
@@ -272,9 +273,27 @@ export function startHarness(fixtures, port = 0) {
             const stub = path === '/harness-route'
                 ? smokeStub(url.searchParams.get('route') ?? 'html')
                 : route === 'parquet' ? parquetStub() : jsonlStub(entries)
+            // The real policy is built by `src/common/webviewCsp.ts` from `webview.cspSource`.
+            // Here the origin is this server, and the injected stub needs a nonce because it is
+            // inline. Same directives otherwise, so a viewer that violates the production
+            // policy — an inline style, an eval, a frame — breaks this run too.
+            const origin = `http://${req.headers.host}`
+            const nonce = randomBytes(16).toString('base64')
+            const csp = [
+                `default-src 'none'`,
+                `script-src ${origin} 'nonce-${nonce}' 'wasm-unsafe-eval'`,
+                `style-src ${origin} 'unsafe-inline'`,
+                `img-src ${origin} data: blob:`,
+                `font-src ${origin} data:`,
+                `media-src ${origin} data: blob:`,
+                `frame-src ${origin} data: blob:`,
+                `connect-src ${origin} data: blob:`,
+                `worker-src ${origin} blob:`,
+            ].join('; ')
             const html = indexHtml
                 .replace(/<meta id="office-configs"[^>]*>/, `<meta id="office-configs" data-config='${JSON.stringify({ route })}'>`)
-                .replace('<script type="module"', `<style>${theme}</style>\n${stub}\n<script type="module"`)
+                .replace('{{csp}}', csp)
+                .replace('<script type="module"', `<style>${theme}</style>\n${stub.replace('<script>', `<script nonce="${nonce}">`)}\n<script type="module"`)
             res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
             res.end(html)
             return

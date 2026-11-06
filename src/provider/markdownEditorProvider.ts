@@ -21,6 +21,7 @@ import { ViewerSettingsService } from '@/service/viewerSettingsService';
 import { parseWebviewResourceUri } from '@/common/webviewUri';
 import { MarkdownDocumentSync } from '@/service/markdown/documentSync';
 import { openLinkedFile } from '@/service/markdown/linkedFile';
+import { buildWebviewCsp } from '@/common/webviewCsp';
 
 export interface MarkdownEditorProviderOptions {
     isWeb?: boolean;
@@ -340,7 +341,11 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         // await the HTML leaves nothing to report the failure to.
         if (handler.disposed) return;
         webview.html = Util.buildPath(
-            indexHtml.replace("{{baseUrl}}", baseUrl), webview, contextUri
+            indexHtml
+                .replace("{{csp}}", buildWebviewCsp(webview.cspSource))
+                .replace("{{baseUrl}}", baseUrl),
+            webview,
+            contextUri
         );
     }
 

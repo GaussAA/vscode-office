@@ -2,6 +2,14 @@
 
 # Unreleased
 
+Security:
+
+- The viewer webview and the Markdown editor now run under a Content-Security-Policy
+  (`default-src 'none'`, sources limited to the webview origin). Remote scripts, inline
+  scripts and `eval` are blocked; the HTML preview panel is exempt because it embeds the page
+  you asked to preview. No behaviour change is expected — the policy is what was already
+  happening, now enforced. See `docs/adr/0005-webview-csp.md`.
+
 Activation:
 
 - The extension no longer activates on every VS Code start. It now wakes up when a viewer

@@ -2,6 +2,7 @@ import axios from 'axios';
 import * as vscode from 'vscode';
 import { extensionResource, getExtensionUri, readExtensionText } from './extensionResource';
 import { IconService } from '../service/icon/iconService';
+import { buildWebviewCsp } from './webviewCsp';
 
 interface ViewOption {
     route: string;
@@ -30,6 +31,7 @@ export class ReactApp {
             extensionResource(this.context, 'resource', 'sponsor')
         ).toString();
         webview.html = this.buildPath(html, webview)
+            .replace(`{{csp}}`, buildWebviewCsp(webview.cspSource))
             .replace(`{{configs}}`, JSON.stringify({
                 ...option,
                 ...iconConfig,
