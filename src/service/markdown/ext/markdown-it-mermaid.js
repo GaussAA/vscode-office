@@ -1,12 +1,17 @@
 import mermaid from 'mermaid'
 
 const mermaidChart = (code) => {
+  // mermaid 12 made `parse()` asynchronous. A Markdown-It fence rule has to return a string
+  // synchronously, so the result can no longer gate the output: the old `try { parse } catch`
+  // would never fire and a bad diagram became an unhandled rejection. Validate for the sake
+  // of surfacing nothing, absorb the rejection, and let the mermaid runtime in the exported
+  // page report the error itself — it already renders its own error diagram.
   try {
-    mermaid.parse(code)
-    return `<div class="mermaid">${code}</div>`
-  } catch ({ str, hash }) {
-    return `<pre>${str}</pre>`
+    Promise.resolve(mermaid.parse(code)).catch(() => { })
+  } catch {
+    // Older synchronous throw paths (if any) must not escape either.
   }
+  return `<div class="mermaid">${code}</div>`
 }
 
 const MermaidPlugin = (md) => {
