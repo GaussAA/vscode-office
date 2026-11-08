@@ -353,10 +353,17 @@ body:has(.parquet-app) {
 }
 
 .parquet-viewer__table-wrap {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
   padding: 0;
+  outline: none;
+
+  &:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder, #0078d4);
+    outline-offset: -1px;
+  }
 
   .ant-table-wrapper,
   .ant-spin-nested-loading,
@@ -618,8 +625,21 @@ body:has(.parquet-app) {
   color: var(--vscode-charts-green, #89d185);
 }
 
-.parquet-viewer__cell--bool {
+/* true keeps the accent; false steps back to the muted foreground so a dense boolean
+   column stops reading as a wall of colour, and the two states are told apart at all. */
+.parquet-viewer__cell--bool-true {
   color: var(--vscode-charts-orange, #f0a45e);
+}
+
+.parquet-viewer__cell--bool-false {
+  color: var(--pv-muted, rgba(204, 204, 204, 0.7));
+}
+
+/* keyboard cursor cell (arrows on the focused table area) */
+.parquet-viewer__cell--cursor {
+  outline: 1px solid var(--vscode-focusBorder, #0078d4);
+  outline-offset: -1px;
+  border-radius: 2px;
 }
 
 .parquet-viewer__cell--datetime {
@@ -641,8 +661,15 @@ body:has(.parquet-app) {
   border-radius: 2px;
 }
 
-/* fork: full value of the selected cell, for text too long to read in a cell */
+/* fork: full value of the selected cell, for text too long to read in a cell.
+   An overlay pinned to the bottom of the table area: opening it must not reflow the
+   grid, or the second click of a double-click-to-edit lands on a different cell. */
 .parquet-viewer__inspector {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -650,7 +677,7 @@ body:has(.parquet-app) {
   max-height: 120px;
   border-top: 1px solid var(--vscode-panel-border, #2b2b2b);
   background: var(--vscode-editorWidget-background, #202020);
-  flex: 0 0 auto;
+  box-shadow: 0 -2px 8px color-mix(in srgb, var(--vscode-widget-shadow, #000000) 35%, transparent);
 }
 
 .parquet-viewer__inspector-label {
@@ -732,4 +759,9 @@ body:has(.parquet-app) {
     var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33)) 22%,
     transparent
   );
+}
+
+/* fork: the row the footer jump aimed at, highlighted until the next navigation */
+.parquet-table tbody tr.parquet-viewer__row--target > td {
+  background: color-mix(in srgb, var(--vscode-button-background, #0078d4) 25%, transparent);
 }

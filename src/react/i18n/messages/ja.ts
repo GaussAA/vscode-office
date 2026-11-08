@@ -202,5 +202,8 @@ export default {
   parquet: {
     unsupportedSave:
       "保存できません: このファイルにはネストされた列または構造列（{columns}）が含まれています。保存はフラットなスカラー列のみ対応しています。",
+    cappedSuffix: " · 5,000 で停止",
+    invalidRow: "有効な行番号を入力してください",
+    saveTimeout: "保存に時間がかかっています。編集内容は保持されているため、再試行してください。",
   },
 };

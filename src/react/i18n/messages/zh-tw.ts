@@ -223,6 +223,9 @@ export default {
       "此檔案的欄位以 {codecs} 儲存。儲存會將所有欄位寫回 SNAPPY —— 資料不變，但編碼會變。",
     saveAnyway: "仍要儲存",
     unsupportedSave: "無法儲存：此檔包含巢狀或結構欄位（{columns}）。僅支援儲存扁平純量欄位。",
+    cappedSuffix: " · 已停在 5,000",
+    invalidRow: "請輸入有效行號",
+    saveTimeout: "儲存耗時過長——修改仍已記錄，請重試。",
   },
   jsonl: {
     entriesCount: "共 {count} 筆",

@@ -331,7 +331,7 @@ const scenarios = [
       expect(/Read-only/.test(state.banner ?? ""), `missing read-only banner: ${state.banner}`);
       expect(state.range === "1–50 of 250,000", `large range: ${state.range}`);
       await page.evaluate(`(() => {
-                const input = document.querySelector('.parquet-viewer__row-jump');
+                const input = document.querySelector('.parquet-viewer__row-jump input');
                 const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                 setter.call(input, '240000');
                 input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -402,6 +402,80 @@ const scenarios = [
       const cleared = await page.evaluate(`!document.querySelector('.parquet-viewer__inspector')`);
       expect(cleared, "inspector survived a page change");
       return `${state.label} = ${state.value}`;
+    },
+  },
+  {
+    name: "parquet-bool-cursor-jump",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+
+      // Booleans split into true/false colours: false stops reading as a wall of accent.
+      const boolState = json(
+        await page.evaluate(`JSON.stringify({
+                trues: document.querySelectorAll('.parquet-viewer__cell--bool-true').length,
+                falses: document.querySelectorAll('.parquet-viewer__cell--bool-false').length,
+                legacy: document.querySelectorAll('.parquet-viewer__cell--bool').length,
+            })`),
+      );
+      expect(
+        boolState.trues > 0 && boolState.falses > 0,
+        `boolean cells not split into true/false: ${JSON.stringify(boolState)}`,
+      );
+      expect(boolState.legacy === 0, "the unsplit --bool class is still rendered");
+
+      // Keyboard: focus the table area, arrow to a cell, Enter inspects it.
+      const heightBefore = await page.evaluate(
+        `document.querySelector('.parquet-table')?.getBoundingClientRect().height ?? 0`,
+      );
+      await page.evaluate(`(() => {
+            const wrap = document.querySelector('.parquet-viewer__table-wrap');
+            wrap.focus();
+            const press = (key) => wrap.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+            press('ArrowRight');
+            press('ArrowDown');
+        })()`);
+      const cursorShown = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__cell--cursor')`,
+      );
+      expect(cursorShown, "keyboard cursor never appeared");
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__table-wrap')
+            .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`,
+      );
+      const inspected = await page.waitFor(
+        `/name · row 2/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,
+      );
+      expect(inspected, "Enter did not inspect the cursor cell (name · row 2)");
+      // The overlay must not reflow the grid: reflow is what made double-click-to-edit
+      // land on a different cell when the inspector squeezed the table.
+      const heightAfter = await page.evaluate(
+        `document.querySelector('.parquet-table')?.getBoundingClientRect().height ?? 0`,
+      );
+      expect(
+        heightBefore === heightAfter,
+        `table reflowed when the inspector opened: ${heightBefore} -> ${heightAfter}`,
+      );
+
+      // The footer jump lands on the right page AND highlights the target row.
+      await page.evaluate(`(() => {
+            const input = document.querySelector('.parquet-viewer__row-jump input');
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            setter.call(input, '123');
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            [...document.querySelectorAll('.parquet-viewer__pager-btn')]
+                .find(b => b.textContent.trim() === 'Go')
+                ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        })()`);
+      const targeted = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__row--target')`,
+        15000,
+      );
+      expect(targeted, "jump never highlighted the target row");
+      const range = await page.evaluate(
+        `document.querySelector('.parquet-viewer__pager-info')?.innerText ?? ''`,
+      );
+      expect(range === "101–150 of 300", `jump page range: ${range}`);
+      return "bool split + keyboard cursor + overlay inspector + target row";
     },
   },
   {
