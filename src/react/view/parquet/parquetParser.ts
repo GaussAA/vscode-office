@@ -5,9 +5,7 @@ import {
   type AsyncBuffer,
   type FileMetaData,
   type SchemaElement,
-  type SchemaTree,
 } from "hyparquet";
-import { getPhysicalColumns } from "hyparquet/src/schema.js";
 import { parquetWriteBuffer, type BasicType, type ColumnSource } from "hyparquet-writer";
 // Fork addition: decode ZSTD/GZIP/BROTLI/LZ4 columns (upstream shipped SNAPPY only).
 import { compressors } from "hyparquet-compressors";
@@ -95,17 +93,34 @@ function formatSchemaType(element: SchemaElement): string {
   return element.type ?? "UNKNOWN";
 }
 
-function findLeafElement(tree: SchemaTree, pathParts: string[]): SchemaElement | null {
-  if (pathParts.length == 0) {
-    return tree.element.type ? tree.element : null;
+/**
+ * Whether this schema element is a group (LIST / MAP / STRUCT), not a physical leaf.
+ *
+ * `hyparquet` stores a LIST's logical type keyed by its union member, and a plain
+ * STRUCT group carries neither `type` nor `converted_type` — so check `num_children`
+ * first and only then look at the declared types.
+ */
+function isGroupElement(element: SchemaElement): boolean {
+  if ((element.num_children ?? 0) > 0) return true;
+  const logical = element.logical_type as Record<string, unknown> | undefined;
+  if (logical) {
+    const key = Object.keys(logical)[0];
+    if (key === "LIST" || key === "MAP" || key === "STRUCT") return true;
   }
-  const [head, ...rest] = pathParts;
-  for (const child of tree.children) {
-    if (child.element.name == head) {
-      return findLeafElement(child, rest);
-    }
+  return element.converted_type === "LIST" || element.converted_type === "MAP";
+}
+
+/**
+ * Display type for a top-level column. Groups never have a physical `element.type`,
+ * so without this branch every nested column rendered as UNKNOWN and stayed editable.
+ */
+function formatColumnType(element: SchemaElement): string {
+  if (isGroupElement(element)) {
+    const logical = element.logical_type as Record<string, unknown> | undefined;
+    const logicalKey = logical ? Object.keys(logical)[0] : undefined;
+    return element.converted_type ?? logicalKey ?? "STRUCT";
   }
-  return null;
+  return formatSchemaType(element);
 }
 
 function isAsyncBuffer(source: ArrayBuffer | AsyncBuffer): source is AsyncBuffer {
@@ -117,19 +132,19 @@ export async function openParquetFile(source: ArrayBuffer | AsyncBuffer): Promis
   const file = isAsyncBuffer(source) ? source : asyncBufferFromArrayBuffer(source);
   const metadata = await parquetMetadataAsync(file);
   const schemaTree = parquetSchema(metadata);
-  const columnNames = getPhysicalColumns(schemaTree);
-  const columns: ParquetColumnInfo[] = [];
-  for (const name of columnNames) {
-    const element = findLeafElement(schemaTree, name.split("."));
-    const type = element ? formatSchemaType(element) : "UNKNOWN";
+  // Top-level columns only. `getPhysicalColumns` returns leaf paths, so a LIST column
+  // named `tags` came out as three "columns" (`tags.list.element`…), while the row
+  // objects are keyed by the top-level name — the lookup missed and rendered NULL.
+  const columns: ParquetColumnInfo[] = schemaTree.children.map((child) => {
+    const type = formatColumnType(child.element);
     const category = categorizeType(type);
-    columns.push({
-      name,
+    return {
+      name: child.element.name,
       type,
       category,
       editable: category !== "structure",
-    });
-  }
+    };
+  });
   return {
     file,
     metadata,
@@ -232,6 +247,15 @@ export function writeParquetBuffer(
   columns: ParquetColumnInfo[],
   rows: Record<string, unknown>[],
 ): ArrayBuffer {
+  // hyparquet-writer only writes flat columns; serialising a LIST/STRUCT would either
+  // throw or silently downgrade it to a JSON string column. Refuse with a clear message.
+  const nested = columns.filter((column) => column.category === "structure");
+  if (nested.length > 0) {
+    const names = nested.map((column) => column.name).join(", ");
+    throw new Error(
+      `Cannot save: nested columns (${names}) are read-only in this viewer. Edit a copy without them.`,
+    );
+  }
   const columnData: ColumnSource[] = [];
   for (const column of columns) {
     const values = rows.map((row) => row[column.name]);
