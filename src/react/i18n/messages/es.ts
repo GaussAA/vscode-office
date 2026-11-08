@@ -203,5 +203,8 @@ export default {
   parquet: {
     unsupportedSave:
       "No se puede guardar: este archivo contiene columnas anidadas o estructurales ({columns}). Solo se admite guardar columnas escalares planas.",
+    cappedSuffix: " · detenido en 5.000",
+    invalidRow: "Introduce un número de fila válido",
+    saveTimeout: "El guardado tarda demasiado: los cambios se conservan, inténtelo de nuevo.",
   },
 };

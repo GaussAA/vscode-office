@@ -55,9 +55,30 @@ function loadPersisted(cacheId: string): PersistedState | null {
   }
 }
 
+/** Restored-state entries kept per document before the oldest ones are evicted. */
+const PERSIST_MAX_ENTRIES = 20;
+
 function savePersisted(cacheId: string, state: PersistedState) {
   try {
-    localStorage.setItem(PERSIST_PREFIX + cacheId, JSON.stringify(state));
+    localStorage.setItem(PERSIST_PREFIX + cacheId, JSON.stringify({ ...state, ts: Date.now() }));
+    // The restore map grows by one key per document; keep only the recent ones.
+    const entries: Array<{ key: string; ts: number }> = [];
+    for (let index = 0; index < localStorage.length; index++) {
+      const storageKey = localStorage.key(index);
+      if (!storageKey?.startsWith(PERSIST_PREFIX)) continue;
+      let ts = 0;
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) ts = (JSON.parse(raw) as { ts?: number }).ts ?? 0;
+      } catch {}
+      entries.push({ key: storageKey, ts });
+    }
+    if (entries.length > PERSIST_MAX_ENTRIES) {
+      entries.sort((a, b) => a.ts - b.ts);
+      for (const entry of entries.slice(0, entries.length - PERSIST_MAX_ENTRIES)) {
+        localStorage.removeItem(entry.key);
+      }
+    }
   } catch {
     // storage may be unavailable; state is a convenience, not a requirement
   }

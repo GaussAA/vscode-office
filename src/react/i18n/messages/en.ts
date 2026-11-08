@@ -229,6 +229,9 @@ export default {
     saveAnyway: "Save anyway",
     unsupportedSave:
       "Cannot save: this file contains nested or structural columns ({columns}). Saving is only supported for flat scalar columns.",
+    cappedSuffix: " · stopped at 5,000",
+    invalidRow: "Enter a valid row number",
+    saveTimeout: "Save is taking unusually long — your edits are kept, try again.",
   },
   jsonl: {
     entriesCount: "{count} entries",
