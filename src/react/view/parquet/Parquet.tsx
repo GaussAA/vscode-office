@@ -1,12 +1,4 @@
-import {
-  App,
-  ConfigProvider,
-  Input,
-  InputNumber,
-  theme as antdTheme,
-  type InputRef,
-  Table,
-} from "antd";
+import { App, ConfigProvider, InputNumber, Table, theme as antdTheme } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@vscode/codicons/dist/codicon.css";
@@ -22,19 +14,13 @@ import {
   formatCellValue,
   PARQUET_PAGE_SIZE,
   openParquetFile,
-  parseCellInput,
   readParquetRows,
-  UnsupportedColumnsError,
-  writeParquetBuffer,
   type ColumnCategory,
-  type ParquetColumnInfo,
   type ParquetFileInfo,
 } from "./parquetParser.ts";
 import "./Parquet.less";
 
 const PAGE_SIZE = PARQUET_PAGE_SIZE;
-/** Above this many rows, editing is disabled: saving would re-read the whole file. */
-const EDIT_ROW_LIMIT = 200_000;
 /** Rows read per batch while searching the whole file. */
 const SEARCH_BATCH = 5_000;
 /** Cap on matched rows kept in memory (highlight + navigation). */
@@ -73,61 +59,6 @@ type TableRow = Record<string, unknown> & { key: string };
 interface CellCursor {
   row: number;
   col: number;
-}
-
-/**
- * The in-cell editor, isolated so its keystrokes never re-render the table: the value lives
- * here, not in the viewer's state, so `tableColumns` does not rebuild on every character.
- */
-function CellEditor({
-  initialValue,
-  onCommit,
-  onCancel,
-}: {
-  initialValue: string;
-  onCommit: (value: string) => void;
-  onCancel: () => void;
-}) {
-  const inputRef = useRef<InputRef | null>(null);
-  const [value, setValue] = useState(initialValue);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
-
-  return (
-    <Input
-      ref={inputRef}
-      size="small"
-      className="parquet-viewer__cell-input"
-      value={value}
-      onChange={(event) => setValue(event.target.value)}
-      onBlur={() => onCommit(value)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") onCommit(value);
-        if (event.key === "Escape") onCancel();
-      }}
-    />
-  );
-}
-
-/** Codecs actually used by this file's column chunks. */
-function collectCodecs(metadata: unknown): string[] {
-  const codecs = new Set<string>();
-  const groups =
-    (
-      metadata as {
-        row_groups?: Array<{ columns?: Array<{ meta_data?: { codec?: string } }> }>;
-      }
-    )?.row_groups ?? [];
-  for (const group of groups) {
-    for (const column of group.columns ?? []) {
-      const codec = column.meta_data?.codec;
-      if (codec) codecs.add(codec);
-    }
-  }
-  return [...codecs];
 }
 
 /**
@@ -189,11 +120,10 @@ function evictPersistedEntries() {
 }
 
 function ParquetViewer() {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
   const [pageRows, setPageRows] = useState<Record<string, unknown>[]>([]);
   const [pageLoading, setPageLoading] = useState(false);
-  const [largeFile, setLargeFile] = useState(false);
   const [rowJump, setRowJump] = useState<number | null>(null);
   const [inspected, setInspected] = useState<{
     row: number;
@@ -211,13 +141,6 @@ function ParquetViewer() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingRow, setEditingRow] = useState<number | null>(null);
-  const [editingColumn, setEditingColumn] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [readOnly, setReadOnly] = useState(false);
-  /** `${absoluteRow}:${column}` for every patched cell, so render never reads a ref. */
-  const [editedCells, setEditedCells] = useState<Set<string>>(() => new Set());
   /** Keyboard cursor into the grid; null until an arrow key (or a click) lands somewhere. */
   const [cursor, setCursor] = useState<CellCursor | null>(null);
   /** Absolute row the footer jump aimed at, highlighted until the next navigation. */
@@ -227,13 +150,9 @@ function ParquetViewer() {
   const fileInfoRef = useRef<ParquetFileInfo | null>(null);
   /** localStorage key of the open document; empty for inline (virtual) buffers. */
   const documentKeyRef = useRef<string | undefined>(undefined);
-  /** Owns the page cache, the edit patches, cancellation and the page<->row arithmetic. */
+  /** Owns the page cache, cancellation and the page<->row arithmetic. */
   const sessionRef = useRef<ParquetSession | null>(null);
   const searchSeq = useRef(0);
-  const dirtyRef = useRef(false);
-  const savingRef = useRef(false);
-  /** Guard against a host that never answers `saveDone`: resets the spinner and says so. */
-  const saveTimeoutRef = useRef<number | undefined>(undefined);
 
   const totalPages = useMemo(() => {
     if (!fileInfo?.rowCount) return 1;
@@ -247,177 +166,55 @@ function ParquetViewer() {
     }));
   }, [pageRows, page]);
 
-  const cancelEdit = useCallback(() => {
-    setEditingRow(null);
-    setEditingColumn(null);
-  }, []);
+  const loadParquet = useCallback(async (payload: { path?: string; buffer?: number[] }) => {
+    setLoading(true);
+    setError(null);
+    setFileInfo(null);
+    fileInfoRef.current = null;
+    sessionRef.current?.reset();
+    sessionRef.current = null;
+    setPageRows([]);
+    setInspected(null);
+    setCursor(null);
+    setTargetRow(null);
+    searchSeq.current++;
+    setSearching(false);
+    setSearchProgress(null);
+    setSearchCapped(false);
+    setMatchRows(new Set());
+    setQuery("");
+    // Clear the key before resetting the page, otherwise the reset would be persisted
+    // against the document we are leaving.
+    documentKeyRef.current = undefined;
+    setPage(0);
+    try {
+      // Files arrive either as an inline byte array (virtual documents) or as a
+      // fetchable URI. For URIs we probe Range support so hyparquet pulls only the
+      // footer and the pages it needs, instead of the whole file.
+      const info = payload.buffer?.length
+        ? await openParquetFile(arrayBufferFromPayload(payload))
+        : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
+      fileInfoRef.current = info;
+      setFileInfo(info);
+      // Come back to the page this document was left on, clamped: the file may have
+      // shrunk since. Only file-backed documents have a stable key.
+      documentKeyRef.current = payload.path;
+      const lastPage = Math.max(0, Math.ceil(info.rowCount / PAGE_SIZE) - 1);
+      setPage(Math.min(loadPersistedPage(payload.path), lastPage));
 
-  const markDirty = useCallback(() => {
-    if (dirtyRef.current) return;
-    dirtyRef.current = true;
-    setDirty(true);
-    handler.emit("change");
-  }, []);
-
-  const handleSave = useCallback(() => {
-    const info = fileInfoRef.current;
-    const session = sessionRef.current;
-    if (!info || !session || !dirtyRef.current || savingRef.current || session.readOnly) return;
-
-    const write = async () => {
-      savingRef.current = true;
-      setSaving(true);
-      try {
-        // Display rows are lazy, so saving re-reads the whole file and re-applies every
-        // recorded edit before serialising. This is the price of keeping the writer's
-        // semantics while not holding every row in memory.
-        const rows = await session.rowsForSave();
-        const buffer = writeParquetBuffer(info.columns, rows);
-        handler.emit("save", [...new Uint8Array(buffer)]);
-        // The spinner resets on the host's `saveDone`; if the extension host died mid-save
-        // nothing would ever arrive, so give up waiting (edits stay recorded) and say so.
-        window.clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = window.setTimeout(() => {
-          if (!savingRef.current) return;
-          savingRef.current = false;
-          setSaving(false);
-          message.warning($t("parquet.saveTimeout"));
-        }, 30_000);
-      } catch (e) {
-        savingRef.current = false;
-        setSaving(false);
-        const errMessage =
-          e instanceof UnsupportedColumnsError
-            ? $t("parquet.unsupportedSave", { columns: e.columns.join(", ") })
-            : e instanceof Error
-              ? e.message
-              : "Failed to serialize parquet file";
-        setError(errMessage);
-        message.error(errMessage);
-      }
-    };
-
-    // Fork addition: hyparquet-compressors can READ zstd/gzip/brotli/lz4 but the
-    // writer only encodes SNAPPY. Saving would silently re-encode the file, so warn.
-    const reencoded = collectCodecs(info.metadata).filter((codec) => codec !== "SNAPPY");
-    if (reencoded.length === 0) {
-      void write();
-      return;
+      sessionRef.current = new ParquetSession(
+        {
+          rowCount: info.rowCount,
+          readRows: (start, end) => readParquetRows(info.file, info.metadata, start, end),
+        },
+        { pageSize: PAGE_SIZE },
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load parquet file");
+    } finally {
+      setLoading(false);
     }
-    modal.confirm({
-      title: $t("parquet.codecWarningTitle"),
-      content: $t("parquet.codecWarningBody", { codecs: reencoded.join(", ") }),
-      okText: $t("parquet.saveAnyway"),
-      cancelText: $t("common.cancel"),
-      onOk: () => {
-        void write();
-      },
-    });
-  }, [message, modal]);
-
-  const startEdit = useCallback((rowIndex: number, column: ParquetColumnInfo) => {
-    if (sessionRef.current?.readOnly || !column.editable) return;
-    setEditingRow(rowIndex);
-    setEditingColumn(column.name);
   }, []);
-
-  const commitEdit = useCallback(
-    (rowIndex: number, column: ParquetColumnInfo, text: string) => {
-      if (editingRow !== rowIndex || editingColumn !== column.name) return;
-      const session = sessionRef.current;
-      if (!session) return;
-      const row = session.rows[rowIndex - session.startOf(session.page)];
-      if (!row) {
-        cancelEdit();
-        return;
-      }
-      const nextValue = parseCellInput(text, column.type);
-      if (formatCellValue(row[column.name]) === formatCellValue(nextValue)) {
-        cancelEdit();
-        return;
-      }
-
-      // The session records the edit against the absolute row, so it survives page changes
-      // and is re-applied when the file is saved.
-      if (!session.patch(rowIndex, column.name, nextValue)) {
-        cancelEdit();
-        return;
-      }
-      setPageRows([...session.rows]);
-      setEditedCells(new Set(session.editedCells));
-      // Editing is a new navigation intent: drop the jump highlight so the target-row
-      // effect does not snap the grid back to an old jump when pageRows changes.
-      setTargetRow(null);
-      cancelEdit();
-      markDirty();
-    },
-    [cancelEdit, editingColumn, editingRow, markDirty],
-  );
-
-  const loadParquet = useCallback(
-    async (payload: { path?: string; buffer?: number[]; readOnly?: boolean }) => {
-      setLoading(true);
-      setError(null);
-      setFileInfo(null);
-      fileInfoRef.current = null;
-      sessionRef.current?.reset();
-      sessionRef.current = null;
-      setPageRows([]);
-      setEditedCells(new Set());
-      setInspected(null);
-      setCursor(null);
-      setTargetRow(null);
-      searchSeq.current++;
-      setSearching(false);
-      setSearchProgress(null);
-      setSearchCapped(false);
-      setMatchRows(new Set());
-      setQuery("");
-      // Clear the key before resetting the page, otherwise the reset would be persisted
-      // against the document we are leaving.
-      documentKeyRef.current = undefined;
-      setPage(0);
-      cancelEdit();
-      dirtyRef.current = false;
-      setDirty(false);
-      savingRef.current = false;
-      setSaving(false);
-      const fileReadOnly = payload.readOnly === true;
-      try {
-        // Files arrive either as an inline byte array (virtual documents) or as a
-        // fetchable URI. For URIs we probe Range support so hyparquet pulls only the
-        // footer and the pages it needs, instead of the whole file.
-        const info = payload.buffer?.length
-          ? await openParquetFile(arrayBufferFromPayload(payload))
-          : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
-        fileInfoRef.current = info;
-        setFileInfo(info);
-        // Come back to the page this document was left on, clamped: the file may have
-        // shrunk since. Only file-backed documents have a stable key.
-        documentKeyRef.current = payload.path;
-        const lastPage = Math.max(0, Math.ceil(info.rowCount / PAGE_SIZE) - 1);
-        setPage(Math.min(loadPersistedPage(payload.path), lastPage));
-
-        const session = new ParquetSession(
-          {
-            rowCount: info.rowCount,
-            readOnly: fileReadOnly,
-            readRows: (start, end) => readParquetRows(info.file, info.metadata, start, end),
-          },
-          { pageSize: PAGE_SIZE, editRowLimit: EDIT_ROW_LIMIT },
-        );
-        sessionRef.current = session;
-        // Saving re-reads every row, so a huge file is read-only; the session derives both.
-        setLargeFile(session.largeFile);
-        setReadOnly(session.readOnly);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load parquet file");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [cancelEdit],
-  );
 
   // Rows are read one page at a time; a big file no longer materialises every row in the
   // webview. The session owns the cache, the prefetch and the "only the newest page wins"
@@ -469,10 +266,9 @@ function ParquetViewer() {
       return;
     }
     const row = Math.max(0, Math.min(info.rowCount - 1, Math.round(rowJump) - 1));
-    cancelEdit();
     goToPage(Math.floor(row / PAGE_SIZE));
     setTargetRow(row);
-  }, [rowJump, cancelEdit, goToPage, message]);
+  }, [rowJump, goToPage, message]);
 
   // Bring the jumped-to row into view once its page has rendered; without this the right
   // page loads but the target row can sit below the fold and the user hunts for it.
@@ -574,12 +370,12 @@ function ParquetViewer() {
   );
   /**
    * Grid keyboard cursor: arrows move, Home/End jump to first/last column, Enter inspects,
-   * F2 edits, Escape dismisses. The cells themselves are spans, so without this the table
-   * is mouse-only — the JSONL viewer ships a full keyboard model and the grid should too.
+   * Escape dismisses. The cells themselves are spans, so without this the table is
+   * mouse-only — the JSONL viewer ships a full keyboard model and the grid should too.
    */
   const handleTableKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      if (editingRow != null || !fileInfo) return;
+      if (!fileInfo) return;
       const target = event.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
         return;
@@ -598,10 +394,6 @@ function ParquetViewer() {
             value: row[column.name],
           });
         }
-        return;
-      }
-      if (event.key === "F2") {
-        if (cursor && row && column && !readOnly) startEdit(page * PAGE_SIZE + cursor.row, column);
         return;
       }
       const rows = Math.max(1, pageRows.length);
@@ -630,7 +422,7 @@ function ParquetViewer() {
         };
       });
     },
-    [cursor, editingRow, fileInfo, page, pageRows, readOnly, startEdit],
+    [cursor, fileInfo, page, pageRows],
   );
 
   useEffect(() => {
@@ -663,18 +455,7 @@ function ParquetViewer() {
         align: kind === "numeric" ? "right" : "left",
         render: (value: unknown, _row, index) => {
           const rowIndex = page * PAGE_SIZE + index;
-          const editing = editingRow === rowIndex && editingColumn === column.name;
-          if (editing) {
-            return (
-              <CellEditor
-                initialValue={formatCellValue(value)}
-                onCommit={(text) => commitEdit(rowIndex, column, text)}
-                onCancel={cancelEdit}
-              />
-            );
-          }
           const isNull = value === null || value === undefined;
-          const edited = editedCells.has(`${rowIndex}:${column.name}`);
           const classes = [
             "parquet-viewer__cell",
             isNull
@@ -690,8 +471,6 @@ function ParquetViewer() {
             cursor && cursor.row === index && cursor.col === position
               ? "parquet-viewer__cell--cursor"
               : "",
-            edited ? "parquet-viewer__cell--edited" : "",
-            !readOnly && column.editable ? "parquet-viewer__cell--editable" : "",
           ]
             .filter(Boolean)
             .join(" ");
@@ -699,7 +478,6 @@ function ParquetViewer() {
             <span
               className={classes}
               title={isNull ? "null" : formatCellValue(value)}
-              onDoubleClick={() => startEdit(rowIndex, column)}
               onClick={() => {
                 setCursor({ row: index, col: position });
                 setInspected({ row: rowIndex, column: column.name, value });
@@ -714,45 +492,15 @@ function ParquetViewer() {
       });
     });
     return cols;
-  }, [
-    cancelEdit,
-    commitEdit,
-    cursor,
-    editedCells,
-    editingColumn,
-    editingRow,
-    fileInfo,
-    page,
-    query,
-    readOnly,
-    startEdit,
-  ]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "s") return;
-      event.preventDefault();
-      handleSave();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleSave]);
+  }, [cursor, fileInfo, page, query]);
 
   useEffect(() => {
     handler
       .on("open", (payload) => {
         void loadParquet(payload);
       })
-      .on("saveDone", () => {
-        window.clearTimeout(saveTimeoutRef.current);
-        savingRef.current = false;
-        setSaving(false);
-        dirtyRef.current = false;
-        setDirty(false);
-        message.success($t("parquet.saveSuccess"));
-      })
       .emit("init");
-  }, [loadParquet, message]);
+  }, [loadParquet]);
 
   // The inspector overlays the bottom of the table area instead of squeezing it: a fixed
   // table height means opening it never reflows the grid under an in-progress double-click.
@@ -829,13 +577,6 @@ function ParquetViewer() {
           </div>
         </aside>
         <main className="parquet-viewer__main">
-          {readOnly && !loading && !error && fileInfo && (
-            <div className="parquet-viewer__readonly-banner">
-              {largeFile
-                ? $t("parquet.readOnlyLarge", { count: fileInfo.rowCount.toLocaleString() })
-                : $t("viewer.readOnly")}
-            </div>
-          )}
           {error ? (
             <div className="parquet-viewer__empty">
               <div className="parquet-viewer__error">
@@ -847,20 +588,6 @@ function ParquetViewer() {
             <>
               <div className="parquet-viewer__toolbar">
                 <div className="parquet-viewer__toolbar-left">
-                  {dirty && (
-                    <span className="parquet-viewer__dirty-dot" title={$t("parquet.unsaved")} />
-                  )}
-                  <button
-                    type="button"
-                    className="parquet-viewer__save-btn"
-                    disabled={!dirty || saving || readOnly}
-                    onClick={handleSave}
-                  >
-                    <span
-                      className={`codicon ${saving ? "codicon-loading codicon-modifier-spin" : "codicon-save"}`}
-                    />
-                    {$t("parquet.save")}
-                  </button>
                   <div className="parquet-viewer__find">
                     <input
                       className="parquet-viewer__find-input"
@@ -1002,10 +729,7 @@ function ParquetViewer() {
                     type="button"
                     className="parquet-viewer__pager-btn"
                     disabled={page <= 0}
-                    onClick={() => {
-                      cancelEdit();
-                      goToPage((p) => Math.max(0, p - 1));
-                    }}
+                    onClick={() => goToPage((p) => Math.max(0, p - 1))}
                     aria-label={$t("parquet.previousPage")}
                   >
                     <span className="codicon codicon-chevron-left" />
@@ -1034,10 +758,7 @@ function ParquetViewer() {
                     type="button"
                     className="parquet-viewer__pager-btn"
                     disabled={page >= totalPages - 1}
-                    onClick={() => {
-                      cancelEdit();
-                      goToPage((p) => Math.min(totalPages - 1, p + 1));
-                    }}
+                    onClick={() => goToPage((p) => Math.min(totalPages - 1, p + 1))}
                     aria-label={$t("parquet.nextPage")}
                   >
                     <span className="codicon codicon-chevron-right" />

@@ -6,14 +6,10 @@ import { ParquetSession } from "@/react/view/parquet/parquetSession";
  * A fake row reader shaped like the real one: `readRows(start, end)` returns objects.
  * `calls` records every range so tests can prove the cache and prefetch actually work.
  */
-function makeSource(
-  rowCount: number,
-  { readOnly = false, delay = 0 }: { readOnly?: boolean; delay?: number } = {},
-) {
+function makeSource(rowCount: number, { delay = 0 }: { delay?: number } = {}) {
   const calls: Array<[number, number]> = [];
   return {
     rowCount,
-    readOnly,
     calls,
     async readRows(start: number, end: number) {
       calls.push([start, end]);
@@ -112,101 +108,14 @@ test("reset: a prefetch from the previous file never lands in the new cache", as
   assert.equal(pageOneReads, 2, "the post-reset read must hit the source again");
 });
 
-test("edits: a patch survives navigation and is re-applied on the way back", async () => {
-  const source = makeSource(300);
-  const session = new ParquetSession(source);
-
-  await session.showPage(0);
-  assert.equal(session.patch(0, "name", "edited"), true);
-  assert.deepEqual([...session.editedCells], ["0:name"]);
-
-  await session.showPage(1);
-  await session.showPage(0);
-
-  assert.equal(session.rows[0].name, "edited");
-  assert.equal(session.editedCount, 1);
-});
-
-test("edits: a patch for a page that was never displayed still applies when it loads", async () => {
-  const session = new ParquetSession(makeSource(300));
-  await session.showPage(0);
-
-  assert.equal(session.patch(75, "name", "later"), true);
-  const page = await session.showPage(1);
-
-  assert.equal(page.rows[25].name, "later");
-});
-
-test("edits: patching the same value twice is not a change", async () => {
-  const session = new ParquetSession(makeSource(50));
-  await session.showPage(0);
-
-  assert.equal(session.patch(0, "name", "row-0"), false, "unchanged value must be rejected");
-  assert.equal(session.patch(0, "name", "other"), true);
-  assert.equal(session.patch(0, "name", "other"), false, "the same edit twice is still no change");
-});
-
-test("edits: out-of-range rows and read-only sessions reject patches", async () => {
-  const session = new ParquetSession(makeSource(50));
-  assert.equal(session.patch(-1, "name", "x"), false);
-  assert.equal(session.patch(50, "name", "x"), false);
-
-  const locked = new ParquetSession(makeSource(50, { readOnly: true }));
-  assert.equal(locked.readOnly, true);
-  assert.equal(locked.patch(0, "name", "x"), false);
-});
-
-test("readOnly: derived from the row limit, and largeFile says why", async () => {
-  const small = new ParquetSession(makeSource(1000));
-  assert.equal(small.readOnly, false);
-  assert.equal(small.largeFile, false);
-
-  const big = new ParquetSession(makeSource(200_001));
-  assert.equal(big.readOnly, true);
-  assert.equal(
-    big.largeFile,
-    true,
-    'largeFile distinguishes "too big to edit" from "file is read-only"',
-  );
-});
-
-test("edits: a patch on the visible page updates rows immediately", async () => {
-  const session = new ParquetSession(makeSource(50));
-  await session.showPage(0);
-
-  session.patch(3, "name", "live");
-  assert.equal(session.rows[3].name, "live", "no reload needed for the page on screen");
-});
-
-test("search: readRange applies edits so a scan sees what the table shows", async () => {
+test("search: readRange reads the requested window", async () => {
   const session = new ParquetSession(makeSource(120));
   await session.showPage(0);
 
-  session.patch(60, "name", "needle");
   const rows = await session.readRange(0, 120);
 
   assert.equal(rows.length, 120);
-  assert.equal(rows[60].name, "needle");
-});
-
-test("save: rowsForSave re-reads everything once and applies every patch", async () => {
-  const source = makeSource(120);
-  const session = new ParquetSession(source);
-
-  await session.showPage(0);
-  session.patch(1, "name", "a");
-  session.patch(60, "name", "b");
-  session.patch(119, "name", "c");
-
-  const before = source.calls.length;
-  const rows = await session.rowsForSave();
-
-  assert.equal(rows.length, 120);
-  assert.equal(rows[1].name, "a");
-  assert.equal(rows[60].name, "b");
-  assert.equal(rows[119].name, "c");
-  assert.deepEqual(source.calls.at(-1), [0, 120], "save reads the whole file in one call");
-  assert.equal(source.calls.length, before + 1);
+  assert.equal(rows[60].name, "row-60");
 });
 
 test("prefetch: warms the next page so showing it costs no read", async () => {

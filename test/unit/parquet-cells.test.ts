@@ -1,13 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  categorizeType,
-  formatCellValue,
-  isColumnEditable,
-  parseCellInput,
-} from "@/react/view/parquet/parquetParser";
+import { categorizeType, formatCellValue } from "@/react/view/parquet/parquetParser";
 
-test("categorizeType: one decode for the icon, the alignment and editability", () => {
+test("categorizeType: one decode for the icon and the alignment", () => {
   const cases = {
     BOOLEAN: "bool",
     INT32: "numeric",
@@ -40,23 +35,6 @@ test("categorizeType: a nested type is a structure, not whatever it contains", (
   assert.equal(categorizeType("MAP<STRING,INT32>"), "structure");
 });
 
-test("isColumnEditable: only structures are read-only", () => {
-  for (const type of ["BOOLEAN", "INT32", "DOUBLE", "TIMESTAMP_MILLIS", "STRING", "UNKNOWN"]) {
-    assert.equal(isColumnEditable(type), true, type);
-  }
-  for (const type of ["STRUCT", "LIST<INT32>", "MAP<STRING,INT32>", "JSON"]) {
-    assert.equal(isColumnEditable(type), false, type);
-  }
-});
-
-test("parseCellInput: a structure column parses JSON, a insert column keeps text", () => {
-  assert.deepEqual(parseCellInput("[1,2]", "LIST<INT32>"), [1, 2]);
-  assert.deepEqual(parseCellInput('{"a":1}', "STRUCT"), { a: 1 });
-  assert.equal(parseCellInput("abc", "LIST<INT32>"), "abc", "unparsable input is kept verbatim");
-  assert.equal(parseCellInput("12", "STRING"), "12", "a string column must not coerce digits");
-  assert.equal(parseCellInput("12", "INT32"), 12);
-});
-
 test('formatCellValue: null and undefined render as empty, not "null"', () => {
   assert.equal(formatCellValue(null), "");
   assert.equal(formatCellValue(undefined), "");
@@ -72,32 +50,4 @@ test("formatCellValue: serialises objects and stringifies scalars", () => {
   assert.equal(formatCellValue([1, 2]), "[1,2]");
   assert.equal(formatCellValue(true), "true");
   assert.equal(formatCellValue(3.5), "3.5");
-});
-
-test("parseCellInput: empty input clears the cell", () => {
-  assert.equal(parseCellInput("", "INT32"), null);
-  assert.equal(parseCellInput("   ", "STRING"), null);
-});
-
-test("parseCellInput: integer columns truncate", () => {
-  assert.equal(parseCellInput("42", "INT32"), 42);
-  assert.equal(parseCellInput(" 3.9 ", "INT64"), 3);
-  assert.equal(parseCellInput("-7", "INT32"), -7);
-});
-
-test("parseCellInput: floating columns keep the fraction", () => {
-  assert.equal(parseCellInput("3.9", "DOUBLE"), 3.9);
-  assert.equal(parseCellInput("1e3", "FLOAT"), 1000);
-});
-
-test("parseCellInput: boolean columns accept common spellings", () => {
-  assert.equal(parseCellInput("true", "BOOLEAN"), true);
-  assert.equal(parseCellInput("yes", "BOOLEAN"), true);
-  assert.equal(parseCellInput("0", "BOOLEAN"), false);
-  assert.equal(parseCellInput("maybe", "BOOLEAN"), "maybe", "unknown words are kept verbatim");
-});
-
-test("parseCellInput: unparsable numbers fall back to the raw text", () => {
-  assert.equal(parseCellInput("abc", "INT32"), "abc");
-  assert.equal(parseCellInput("12abc", "DOUBLE"), "12abc");
 });

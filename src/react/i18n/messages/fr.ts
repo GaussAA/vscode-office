@@ -48,7 +48,6 @@ export default {
     failedOpenFile: "Échec de l'ouverture du fichier",
     failedLoadDocument: "Échec du chargement du document",
     failedLoadPresentation: "Échec du chargement de la présentation",
-    readOnly: "Lecture seule — les modifications ne sont pas enregistrées sur le disque",
     convertingImage: "Conversion de l'image...",
     loadingSvg: "Chargement du SVG...",
     loadingIcns: "Chargement du ICNS...",
@@ -201,11 +200,7 @@ export default {
     branch: "branche",
   },
   parquet: {
-    unsupportedSave:
-      "Enregistrement impossible : ce fichier contient des colonnes imbriquées ou structurelles ({columns}). L'enregistrement n'est pris en charge que pour les colonnes scalaires plates.",
     cappedSuffix: " · arrêté à 5 000",
     invalidRow: "Veuillez saisir un numéro de ligne valide",
-    saveTimeout:
-      "L'enregistrement est anormalement long — vos modifications sont conservées, réessayez.",
   },
 };

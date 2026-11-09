@@ -48,7 +48,6 @@ export default {
     failedOpenFile: "ファイルを開けませんでした",
     failedLoadDocument: "ドキュメントの読み込みに失敗しました",
     failedLoadPresentation: "プレゼンテーションの読み込みに失敗しました",
-    readOnly: "読み取り専用 — 変更はディスクに保存されません",
     convertingImage: "画像を変換中...",
     loadingSvg: "SVG を読み込み中...",
     loadingIcns: "ICNS を読み込み中...",
@@ -200,10 +199,7 @@ export default {
     branch: "ブランチ",
   },
   parquet: {
-    unsupportedSave:
-      "保存できません: このファイルにはネストされた列または構造列（{columns}）が含まれています。保存はフラットなスカラー列のみ対応しています。",
     cappedSuffix: " · 5,000 で停止",
     invalidRow: "有効な行番号を入力してください",
-    saveTimeout: "保存に時間がかかっています。編集内容は保持されているため、再試行してください。",
   },
 };

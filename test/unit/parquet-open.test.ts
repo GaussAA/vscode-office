@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { parquetMetadataAsync, type SchemaElement } from "hyparquet";
+import type { SchemaElement } from "hyparquet";
 import {
   describeColumn,
   formatCellValue,
   openParquetFile,
   readParquetRows,
-  UnsupportedColumnsError,
-  writeParquetBuffer,
-  type ParquetColumnInfo,
 } from "@/react/view/parquet/parquetParser";
 
 /**
@@ -36,7 +33,7 @@ test("openParquetFile: nested columns appear once, under their top-level name", 
   );
 });
 
-test("openParquetFile: a LIST column is a structure, so it is not editable", async () => {
+test("openParquetFile: a LIST column is a structure", async () => {
   const info = await openFixture();
 
   const tags = info.columns.find((column) => column.name === "tags");
@@ -44,10 +41,9 @@ test("openParquetFile: a LIST column is a structure, so it is not editable", asy
   assert.equal(tags.type, "LIST");
   assert.equal(tags.category, "structure");
   assert.equal(tags.nested, true);
-  assert.equal(tags.editable, false);
 });
 
-test("openParquetFile: a plain STRUCT is structural and read-only", async () => {
+test("openParquetFile: a plain STRUCT is structural", async () => {
   const info = await openFixture();
 
   const meta = info.columns.find((column) => column.name === "meta");
@@ -55,7 +51,6 @@ test("openParquetFile: a plain STRUCT is structural and read-only", async () => 
   assert.equal(meta.type, "STRUCT");
   assert.equal(meta.category, "structure");
   assert.equal(meta.nested, true);
-  assert.equal(meta.editable, false);
 });
 
 test("readParquetRows: list values are reachable under the column name", async () => {
@@ -89,10 +84,9 @@ test("describeColumn: a logical-type-only LIST is a structure, not a field", () 
   assert.equal(column.type, "LIST");
   assert.equal(column.category, "structure");
   assert.equal(column.nested, true);
-  assert.equal(column.editable, false);
 });
 
-test("describeColumn: a legacy repeated primitive is structural and read-only", () => {
+test("describeColumn: a legacy repeated primitive is structural", () => {
   const repeated: SchemaElement = {
     name: "tags",
     type: "BYTE_ARRAY",
@@ -103,10 +97,9 @@ test("describeColumn: a legacy repeated primitive is structural and read-only", 
 
   assert.equal(column.category, "structure");
   assert.equal(column.nested, true);
-  assert.equal(column.editable, false);
 });
 
-test("describeColumn: a flat scalar stays editable", () => {
+test("describeColumn: a flat scalar stays a scalar", () => {
   const flat: SchemaElement = {
     name: "id",
     type: "BYTE_ARRAY",
@@ -118,41 +111,4 @@ test("describeColumn: a flat scalar stays editable", () => {
 
   assert.equal(column.category, "string");
   assert.equal(column.nested, false);
-  assert.equal(column.editable, true);
-});
-
-test("writeParquetBuffer refuses unsupported columns instead of downgrading them", async () => {
-  const info = await openFixture();
-  const rows = await readParquetRows(info.file, info.metadata, 0, 2);
-
-  // Saving would re-encode `tags`/`meta` as JSON string columns (the writer only does
-  // flat scalar columns). A clear refusal beats silent data mangling.
-  assert.throws(
-    () => writeParquetBuffer(info.columns, rows),
-    (error: unknown) => {
-      assert.ok(error instanceof UnsupportedColumnsError);
-      assert.deepEqual(error.columns, ["tags", "meta"]);
-      return true;
-    },
-  );
-});
-
-test("writeParquetBuffer still writes flat scalar columns", async () => {
-  const columns: ParquetColumnInfo[] = [
-    { name: "id", type: "STRING", category: "string", nested: false, editable: true },
-    { name: "n", type: "INT32", category: "numeric", nested: false, editable: true },
-  ];
-  const buffer = writeParquetBuffer(columns, [
-    { id: "a", n: 1 },
-    { id: "b", n: 2 },
-  ]);
-  const file = {
-    byteLength: buffer.byteLength,
-    slice(start: number, end?: number) {
-      return buffer.slice(start, end ?? buffer.byteLength);
-    },
-  };
-
-  const metadata = await parquetMetadataAsync(file);
-  assert.equal(Number(metadata.num_rows), 2);
 });

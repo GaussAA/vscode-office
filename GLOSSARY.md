@@ -17,8 +17,8 @@ _Avoid_: 预览器, 面板, 功能
 _Avoid_: 界面, UI
 
 **Editable surface（可编辑预览面）**:
-会把握改的结果写回文件的预览面。parquet viewer 目前是可编辑的；只读预览面不是它的退化版本，而是不同的承诺。
-_Avoid_: 编辑器（与 VS Code 自己的 editor 冲突）
+会把握改的结果写回文件的预览面。6.0.0 起它只属于宿主第三方编辑器的能力（Word、Excel、XMind）；我们自己写的 viewer（parquet、jsonl）是只读的，parquet 的写端在这一版被删掉。只读不是可编辑面的退化版本，而是另一种承诺。
+_Avoid_: 编辑器（与 VS Code 自己的 editor 冲突）；也别把只读的 viewer 叫「缺功能」
 
 **Format（格式）**:
 由文件名决定的文件种类（parquet、jsonl、xlsx…），决定用哪个 viewer。

@@ -254,7 +254,7 @@ function parquetStub() {
         : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
       setTimeout(function () {
-        window.postMessage({ type: 'open', content: { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo', readOnly: false } }, '*');
+        window.postMessage({ type: 'open', content: { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo' } }, '*');
       }, 80);
     },
     getState() { return undefined; },

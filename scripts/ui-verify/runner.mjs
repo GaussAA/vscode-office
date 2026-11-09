@@ -129,7 +129,6 @@ const pagerState = (page) =>
     .evaluate(`JSON.stringify({
     range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
     first: document.querySelector('.parquet-table tbody tr:nth-child(2) td')?.innerText ?? null,
-    banner: document.querySelector('.parquet-viewer__readonly-banner')?.innerText ?? null,
 })`)
     .then(json);
 
@@ -275,7 +274,6 @@ const scenarios = [
         await page.evaluate(`JSON.stringify({
                 names: [...document.querySelectorAll('.parquet-viewer__list-name')].map(n => n.textContent),
                 firstRow: [...document.querySelectorAll('.parquet-table tbody tr:nth-child(2) .parquet-viewer__cell')].map(n => n.textContent),
-                editable: document.querySelectorAll('.parquet-viewer__cell--editable').length,
             })`),
       );
       expect(
@@ -290,9 +288,7 @@ const scenarios = [
         state.firstRow.join("|").includes('["ko","en"]'),
         `LIST cell did not render JSON: ${state.firstRow.join("|")}`,
       );
-      // Two rows, one editable scalar column; LIST/STRUCT must stay read-only.
-      expect(state.editable === 2, `nested cells stayed editable: ${state.editable}`);
-      return "top-level names + JSON cell + read-only nested columns";
+      return "top-level names + JSON cell";
     },
   },
   {
@@ -323,12 +319,11 @@ const scenarios = [
     },
   },
   {
-    name: "parquet-large-readonly",
+    name: "parquet-large-jump",
     docs: "parquet-large-file.png",
     async run({ page, base }) {
       await openParquet(page, base, "?big=1");
       const state = await pagerState(page);
-      expect(/Read-only/.test(state.banner ?? ""), `missing read-only banner: ${state.banner}`);
       expect(state.range === "1–50 of 250,000", `large range: ${state.range}`);
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__row-jump input');
@@ -346,7 +341,7 @@ const scenarios = [
       const jumped = await pagerState(page);
       expect(jumped.range === "239,951–240,000 of 250,000", `jump range: ${jumped.range}`);
       expect(jumped.first === "239951", `jump first row: ${jumped.first}`);
-      return "read-only + jump to row 240,000";
+      return "jump to row 240,000 in a 250k-row file";
     },
   },
   {

@@ -47,7 +47,6 @@ export default {
     failedOpenFile: "Falha ao abrir o arquivo",
     failedLoadDocument: "Falha ao carregar o documento",
     failedLoadPresentation: "Falha ao carregar a apresentação",
-    readOnly: "Somente leitura — as alterações não são salvas no disco",
     convertingImage: "Convertendo imagem...",
     loadingSvg: "Carregando SVG...",
     loadingIcns: "Carregando ICNS...",
@@ -200,10 +199,7 @@ export default {
     branch: "branch",
   },
   parquet: {
-    unsupportedSave:
-      "Não é possível salvar: este arquivo contém colunas aninhadas ou estruturais ({columns}). O salvamento só é suportado para colunas escalares planas.",
     cappedSuffix: " · parou em 5.000",
     invalidRow: "Insira um número de linha válido",
-    saveTimeout: "O salvamento está demorando — suas edições foram mantidas, tente novamente.",
   },
 };

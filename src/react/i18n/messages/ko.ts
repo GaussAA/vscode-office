@@ -48,7 +48,6 @@ export default {
     failedOpenFile: "파일을 열지 못했습니다",
     failedLoadDocument: "문서를 불러오지 못했습니다",
     failedLoadPresentation: "프레젠테이션을 불러오지 못했습니다",
-    readOnly: "읽기 전용 — 변경 사항은 디스크에 저장되지 않습니다",
     convertingImage: "이미지 변환 중...",
     loadingSvg: "SVG 로딩 중...",
     loadingIcns: "ICNS 로딩 중...",
@@ -199,10 +198,7 @@ export default {
     branch: "브랜치",
   },
   parquet: {
-    unsupportedSave:
-      "저장할 수 없습니다: 이 파일에는 중첩되거나 구조적인 열({columns})이 있습니다. 저장은 평면 스칼라 열만 지원합니다.",
     cappedSuffix: " · 5,000에서 중단",
     invalidRow: "유효한 행 번호를 입력하세요",
-    saveTimeout: "저장이 평소보다 오래 걸립니다. 편집 내용은 유지되니 다시 시도하세요.",
   },
 };

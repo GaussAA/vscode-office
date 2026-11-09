@@ -47,7 +47,6 @@ export default {
     failedOpenFile: "Failed to open file",
     failedLoadDocument: "Failed to load document",
     failedLoadPresentation: "Failed to load presentation",
-    readOnly: "Read-only — changes are not saved to disk",
     convertingImage: "Converting image...",
     loadingSvg: "Loading SVG...",
     loadingIcns: "Loading ICNS...",
@@ -205,9 +204,6 @@ export default {
     createdBy: "Created by",
     loading: "Loading Parquet…",
     totalRows: "{count} rows",
-    save: "Save",
-    saveSuccess: "Parquet file saved",
-    unsaved: "Unsaved changes",
     findInFile: "Find in file",
     searchAllRows: "Search all rows",
     previousMatch: "Previous match",
@@ -221,17 +217,8 @@ export default {
     rowLabel: "row",
     copyValue: "Copy value",
     nullLabel: "NULL",
-    readOnlyLarge:
-      "Read-only: {count} rows. Editing is disabled because saving re-reads the whole file.",
-    codecWarningTitle: "Saving will change the compression codec",
-    codecWarningBody:
-      "This file stores its columns as {codecs}. Saving writes every column back as SNAPPY, so the encoding changes even though the data does not.",
-    saveAnyway: "Save anyway",
-    unsupportedSave:
-      "Cannot save: this file contains nested or structural columns ({columns}). Saving is only supported for flat scalar columns.",
     cappedSuffix: " · stopped at 5,000",
     invalidRow: "Enter a valid row number",
-    saveTimeout: "Save is taking unusually long — your edits are kept, try again.",
   },
   jsonl: {
     entriesCount: "{count} entries",

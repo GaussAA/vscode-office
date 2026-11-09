@@ -39,18 +39,15 @@ Upstream bundles `hyparquet` without its decompressors, so a ZSTD-compressed fil
 Reading is lazy and stays usable on big files:
 
 - **One page at a time.** Only the visible 50 rows are decoded, so a 377 MB file no longer
-  materialises its whole table. Edits are recorded per absolute row and re-applied when a
-  page is shown.
+  materialises its whole table.
 - **Range requests when the host supports them.** A 2-byte probe decides between ranged
   reads (footer plus the pages you look at) and a single full fetch; the console logs
   `[parquet] source: ranged|full`.
-- **Large files open read-only.** Saving re-reads the file, so above 200,000 rows editing is
-  disabled with an explanation instead of failing later.
 - **Navigation for millions of rows.** Jump to any row number; the footer shows the visible
   range (`239,951–240,000 of 250,000`).
 - **Type-aware cells.** Numbers are right-aligned with tabular figures, strings, booleans and
-  timestamps are coloured from the theme, nulls render as `NULL`, edited cells are marked,
-  and clicking a cell opens its full value.
+  timestamps are coloured from the theme, nulls render as `NULL`, and clicking a cell opens
+  its full value.
 
 ![Parquet types](docs/screenshots/parquet-types.png)
 
@@ -93,10 +90,8 @@ CI runs both on every push, together with `pnpm build` and `pnpm run package`. A
 
 ### Known limits
 
-- Saving a non-SNAPPY parquet rewrites it as SNAPPY (the writer supports nothing else) and
-  warns first.
-- Parquet files above 200,000 rows are read-only; whole-file search on a very large file is
-  I/O bound because it reads every row group it visits.
+- Whole-file parquet search on a very large file is I/O bound because it reads every row
+  group it visits.
 - JSONL search matches raw text, not JSON paths.
 - Upstream telemetry has been removed entirely.
 

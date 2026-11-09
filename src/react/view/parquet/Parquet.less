@@ -22,18 +22,10 @@ body:has(.parquet-app) {
   --pv-accent: var(--vscode-button-background, #0e639c);
   --pv-accent-hover: var(--vscode-button-hoverBackground, #1177bb);
   --pv-error: var(--vscode-errorForeground, #f48771);
-  --pv-input-bg: var(--vscode-input-background, #3c3c3c);
-  --pv-input-border: var(--vscode-input-border, rgba(128, 128, 128, 0.35));
   --pv-shadow: none;
   --pv-radius: 6px;
   --pv-type-bg: color-mix(in srgb, var(--pv-fg) 10%, transparent);
   --pv-type-fg: var(--pv-muted);
-  --pv-banner-bg: color-mix(
-    in srgb,
-    var(--vscode-inputValidation-warningBackground, #cca700) 22%,
-    transparent
-  );
-  --pv-banner-fg: var(--vscode-editorWarning-foreground, #e8d48b);
   --pv-scrollbar-thumb: var(--vscode-scrollbarSlider-background, #79797966);
   --pv-scrollbar-track: var(--pv-bg);
   --pv-icon-rows: var(--vscode-charts-blue, #3794ff);
@@ -264,16 +256,6 @@ body:has(.parquet-app) {
   overflow: hidden;
 }
 
-.parquet-viewer__readonly-banner {
-  flex-shrink: 0;
-  padding: 6px 14px;
-  font-size: 12px;
-  color: var(--pv-banner-fg);
-  background: var(--pv-banner-bg);
-  border-bottom: 1px solid var(--pv-border);
-  text-align: center;
-}
-
 .parquet-viewer__toolbar {
   display: flex;
   align-items: center;
@@ -291,37 +273,6 @@ body:has(.parquet-app) {
   align-items: center;
   gap: 10px;
   min-width: 0;
-}
-
-.parquet-viewer__save-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-radius: var(--pv-radius);
-  background: var(--pv-accent);
-  color: var(--vscode-button-foreground, #ffffff);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    opacity 0.12s ease;
-
-  .codicon {
-    font-size: 14px;
-  }
-
-  &:hover:not(:disabled) {
-    background: var(--pv-accent-hover);
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
 }
 
 .parquet-theme-toggle {
@@ -342,14 +293,6 @@ body:has(.parquet-app) {
   &:hover {
     background: var(--pv-hover);
   }
-}
-
-.parquet-viewer__dirty-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--vscode-charts-orange, #e08855);
-  flex-shrink: 0;
 }
 
 .parquet-viewer__table-wrap {
@@ -436,37 +379,6 @@ body:has(.parquet-app) {
   white-space: nowrap;
   color: var(--pv-fg);
   line-height: 22px;
-
-  &--editable {
-    cursor: text;
-    border-radius: 3px;
-
-    &:hover {
-      outline: 1px solid var(--pv-input-border);
-      background: var(--pv-input-bg);
-    }
-  }
-}
-
-.parquet-viewer__cell-input {
-  width: 100%;
-
-  &.ant-input {
-    font-family: var(
-      --vscode-editor-font-family,
-      ui-monospace,
-      SFMono-Regular,
-      Menlo,
-      Monaco,
-      Consolas,
-      monospace
-    );
-    font-size: 12px;
-    background: var(--pv-input-bg);
-    color: var(--pv-fg);
-    border-color: var(--pv-accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--pv-accent) 20%, transparent);
-  }
 }
 
 .parquet-viewer__footer {
@@ -651,19 +563,9 @@ body:has(.parquet-app) {
   font-style: italic;
 }
 
-.parquet-viewer__cell--edited {
-  background: color-mix(
-    in srgb,
-    var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d) 18%,
-    transparent
-  );
-  box-shadow: inset 2px 0 0 var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
-  border-radius: 2px;
-}
-
 /* fork: full value of the selected cell, for text too long to read in a cell.
-   An overlay pinned to the bottom of the table area: opening it must not reflow the
-   grid, or the second click of a double-click-to-edit lands on a different cell. */
+   An overlay pinned to the bottom of the table area: opening it must not reflow the grid
+   under the pointer, or the click that opened it lands on a different row. */
 .parquet-viewer__inspector {
   position: absolute;
   left: 0;

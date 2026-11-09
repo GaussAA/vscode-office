@@ -1,7 +1,7 @@
 /**
- * Parquet paging session: everything about "which rows are on screen, which bytes have
- * already been read, and which cells the user edited" — with no React, no DOM and no
- * hyparquet import, so it can be exercised by `node --test` with a fake reader.
+ * Parquet paging session: everything about "which rows are on screen and which bytes have
+ * already been read" — with no React, no DOM and no hyparquet import, so it can be exercised
+ * by `node --test` with a fake reader.
  *
  * The invariants this module owns (each one used to live in a comment inside the component,
  * where several call sites had to remember it separately):
@@ -10,18 +10,17 @@
  *  2. A prefetch that started before `reset()` must never populate the new cache. The old
  *     component checked the sequence guard on the visible page but not on the prefetch, so a
  *     reload could serve the previous file's rows from the new file's cache.
- *  3. The cache is raw bytes-to-rows; edits live in one absolute-row map and are applied on
- *     read, so a page cannot be patched twice.
- *  4. The cache is bounded (LRU-ish: oldest insertion wins), and revisiting a page costs no read.
- *  5. Page <-> row arithmetic lives here. Nothing else may do `page * pageSize` again.
- *  6. `readOnly` is derived once, from the source plus the row limit.
+ *  3. The cache is bounded (LRU-ish: oldest insertion wins), and revisiting a page costs no read.
+ *  4. Page <-> row arithmetic lives here. Nothing else may do `page * pageSize` again.
+ *
+ * The viewer is read-only: there is no edit map, no patch and no save payload. Rows go straight
+ * from the source to the table.
  */
 
 export type ParquetRow = Record<string, unknown>;
 
 export interface ParquetRowsSource {
   rowCount: number;
-  readOnly?: boolean;
   readRows(start: number, end: number): Promise<ParquetRow[]>;
 }
 
@@ -29,8 +28,6 @@ export interface ParquetSessionOptions {
   pageSize?: number;
   /** Pages kept in memory; the viewer prefetches one page ahead. */
   maxCachedPages?: number;
-  /** Above this many rows editing is refused: saving re-reads and rewrites the whole file. */
-  editRowLimit?: number;
 }
 
 export interface PageSnapshot {
@@ -46,25 +43,16 @@ export interface PageSnapshot {
 
 const DEFAULT_PAGE_SIZE = 50;
 const DEFAULT_MAX_CACHED_PAGES = 6;
-const DEFAULT_EDIT_ROW_LIMIT = 200_000;
-
-const cellKey = (row: number, column: string) => `${row}:${column}`;
 
 export class ParquetSession {
   readonly pageSize: number;
   readonly rowCount: number;
   readonly totalPages: number;
-  /** Editing is refused either because the file is read-only or because it is too big. */
-  readonly readOnly: boolean;
-  /** True when reading is allowed but editing was disabled by the row limit. */
-  readonly largeFile: boolean;
 
   private readonly source: ParquetRowsSource;
   private readonly maxCachedPages: number;
   private readonly cache = new Map<number, ParquetRow[]>();
   private readonly pending = new Map<number, Promise<ParquetRow[]>>();
-  private readonly edits = new Map<number, Record<string, unknown>>();
-  private readonly editedKeys = new Set<string>();
 
   /** Bumped by reset(); in-flight work from an older generation is discarded. */
   private generation = 0;
@@ -79,8 +67,6 @@ export class ParquetSession {
     this.pageSize = Math.max(1, options.pageSize ?? DEFAULT_PAGE_SIZE);
     this.rowCount = Math.max(0, source.rowCount);
     this.totalPages = Math.max(1, Math.ceil(this.rowCount / this.pageSize));
-    this.largeFile = this.rowCount > (options.editRowLimit ?? DEFAULT_EDIT_ROW_LIMIT);
-    this.readOnly = (source.readOnly ?? false) || this.largeFile;
     this.maxCachedPages = Math.max(1, options.maxCachedPages ?? DEFAULT_MAX_CACHED_PAGES);
   }
 
@@ -88,18 +74,9 @@ export class ParquetSession {
     return this.currentPage;
   }
 
-  /** Rows of the current page, edits already applied. */
+  /** Rows of the current page. */
   get rows(): ParquetRow[] {
     return this.currentRows;
-  }
-
-  /** `${absoluteRow}:${column}` for every patched cell. */
-  get editedCells(): ReadonlySet<string> {
-    return this.editedKeys;
-  }
-
-  get editedCount(): number {
-    return this.edits.size;
   }
 
   startOf(page: number): number {
@@ -122,14 +99,14 @@ export class ParquetSession {
     const seq = ++this.loadSeq;
     const generation = this.generation;
 
-    const raw = await this.loadRaw(target, start, end);
+    const rows = await this.loadRaw(target, start, end);
     if (generation !== this.generation || seq !== this.loadSeq) {
       return { page: target, start, end, rows: [], stale: true };
     }
 
     this.currentPage = target;
-    this.currentRows = this.applyEdits(start, raw);
-    return { page: target, start, end, rows: this.currentRows, stale: false };
+    this.currentRows = rows;
+    return { page: target, start, end, rows, stale: false };
   }
 
   /**
@@ -145,70 +122,22 @@ export class ParquetSession {
     void this.loadRaw(target, start, end).catch(() => undefined);
   }
 
-  /**
-   * Record an edit against an absolute row. Returns false when nothing changed (unknown
-   * row, read-only session, or identical value), true when the patch was stored.
-   */
-  patch(row: number, column: string, value: unknown): boolean {
-    if (this.readOnly) return false;
-    if (!Number.isInteger(row) || row < 0 || row >= this.rowCount) return false;
-
-    const previous = this.valueAt(row, column);
-    if (previous === value) return false;
-
-    const patch = this.edits.get(row) ?? {};
-    patch[column] = value;
-    this.edits.set(row, patch);
-    this.editedKeys.add(cellKey(row, column));
-
-    // Keep the visible page in step, so the caller can re-render without a reload.
-    if (this.pageOf(row) === this.currentPage) {
-      const offset = row - this.startOf(this.currentPage);
-      const visible = this.currentRows[offset];
-      if (visible) this.currentRows[offset] = { ...visible, [column]: value };
-    }
-    return true;
-  }
-
-  /** Read an arbitrary range with edits applied — what whole-file search must scan. */
+  /** Read an arbitrary range — what whole-file search scans. */
   async readRange(start: number, end: number): Promise<ParquetRow[]> {
     const from = Math.max(0, Math.min(start, this.rowCount));
     const to = Math.max(from, Math.min(end, this.rowCount));
     if (to <= from) return [];
-    const rows = await this.source.readRows(from, to);
-    return this.applyEdits(from, rows);
+    return this.source.readRows(from, to);
   }
 
-  /** Re-read every row with the recorded edits applied — the payload of a save. */
-  async rowsForSave(): Promise<ParquetRow[]> {
-    if (this.rowCount === 0) return [];
-    const rows = await this.source.readRows(0, this.rowCount);
-    for (const [index, patch] of this.edits) {
-      const row = rows[index];
-      if (row) Object.assign(row, patch);
-    }
-    return rows;
-  }
-
-  /** Drop every cached page, edit and pending load. In-flight work becomes stale. */
+  /** Drop every cached page and pending load. In-flight work becomes stale. */
   reset(): void {
     this.generation++;
     this.loadSeq++;
     this.cache.clear();
     this.pending.clear();
-    this.edits.clear();
-    this.editedKeys.clear();
     this.currentPage = 0;
     this.currentRows = [];
-  }
-
-  private valueAt(row: number, column: string): unknown {
-    const cached = this.cache.get(this.pageOf(row));
-    const offset = row - this.startOf(this.pageOf(row));
-    const source = cached?.[offset] ?? undefined;
-    const base = source ? source[column] : undefined;
-    const patch = this.edits.get(row);
-    return patch && column in patch ? patch[column] : base;
   }
 
   private async loadRaw(page: number, start: number, end: number): Promise<ParquetRow[]> {
@@ -241,20 +170,5 @@ export class ParquetSession {
       if (oldest === undefined) break;
       this.cache.delete(oldest);
     }
-  }
-
-  private applyEdits(start: number, rows: ParquetRow[]): ParquetRow[] {
-    if (this.edits.size === 0) return rows;
-    let copied = false;
-    for (let offset = 0; offset < rows.length; offset++) {
-      const patch = this.edits.get(start + offset);
-      if (!patch) continue;
-      if (!copied) {
-        rows = rows.slice();
-        copied = true;
-      }
-      rows[offset] = { ...rows[offset], ...patch };
-    }
-    return rows;
   }
 }

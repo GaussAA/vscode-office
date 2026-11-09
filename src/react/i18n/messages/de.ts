@@ -47,7 +47,6 @@ export default {
     failedOpenFile: "Datei konnte nicht geöffnet werden",
     failedLoadDocument: "Dokument konnte nicht geladen werden",
     failedLoadPresentation: "Präsentation konnte nicht geladen werden",
-    readOnly: "Schreibgeschützt — Änderungen werden nicht auf der Festplatte gespeichert",
     convertingImage: "Bild wird konvertiert...",
     loadingSvg: "SVG wird geladen...",
     loadingIcns: "ICNS wird geladen...",
@@ -199,11 +198,7 @@ export default {
     branch: "Branch",
   },
   parquet: {
-    unsupportedSave:
-      "Speichern nicht möglich: Diese Datei enthält verschachtelte oder strukturelle Spalten ({columns}). Speichern wird nur für flache skalare Spalten unterstützt.",
     cappedSuffix: " · bei 5.000 gestoppt",
     invalidRow: "Bitte eine gültige Zeilennummer eingeben",
-    saveTimeout:
-      "Das Speichern dauert ungewöhnlich lange – Ihre Änderungen sind erhalten, bitte erneut versuchen.",
   },
 };

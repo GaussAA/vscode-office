@@ -48,7 +48,6 @@ export default {
     failedOpenFile: "Error al abrir el archivo",
     failedLoadDocument: "Error al cargar el documento",
     failedLoadPresentation: "Error al cargar la presentación",
-    readOnly: "Solo lectura — los cambios no se guardan en disco",
     convertingImage: "Convirtiendo imagen...",
     loadingSvg: "Cargando SVG...",
     loadingIcns: "Cargando ICNS...",
@@ -201,10 +200,7 @@ export default {
     branch: "rama",
   },
   parquet: {
-    unsupportedSave:
-      "No se puede guardar: este archivo contiene columnas anidadas o estructurales ({columns}). Solo se admite guardar columnas escalares planas.",
     cappedSuffix: " · detenido en 5.000",
     invalidRow: "Introduce un número de fila válido",
-    saveTimeout: "El guardado tarda demasiado: los cambios se conservan, inténtelo de nuevo.",
   },
 };
