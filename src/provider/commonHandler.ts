@@ -56,6 +56,14 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
     .on("change", () => {
       setDirty(handler, uri, true);
     })
+    .on("openForce", async () => {
+      // The webview's size guard said "open anyway". A `file:` document is fetched by the
+      // webview itself, so only a virtual one needs the host to read it again — this time
+      // without the guard.
+      if (isVirtualUri(uri)) {
+        await emitVirtualOfficeOpen(handler, uri, { force: true });
+      }
+    })
     .on("save", async (content) => {
       const res = Array.isArray(content)
         ? new Uint8Array(content)

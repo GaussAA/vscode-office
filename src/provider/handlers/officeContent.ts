@@ -3,6 +3,7 @@ import { basename, dirname, extname, isAbsolute, relative } from "path";
 import { extensions, Uri, workspace, type Webview } from "vscode";
 import { Handler } from "@/common/handler";
 import { isUriReadOnly } from "@/common/fileReadOnly";
+import { isOverPreviewLimit } from "@/common/previewLimit";
 
 export function isVirtualUri(uri: Uri): boolean {
   return uri.scheme !== "file";
@@ -153,33 +154,59 @@ export function bytesToPayloadBuffer(data: Uint8Array): number[] {
   return Array.from(data);
 }
 
-export async function emitVirtualOfficeOpen(handler: Handler, uri: Uri): Promise<void> {
+/**
+ * Byte size of the document, or undefined when the scheme cannot answer.
+ *
+ * The webview needs it to decide whether to parse, and the host needs it to decide whether to
+ * read a virtual document at all — a 100 MB file that has to travel through a `postMessage`
+ * as `number[]` is worse than an extra stat.
+ */
+async function statSize(uri: Uri): Promise<number | undefined> {
+  try {
+    const stat = await workspace.fs.stat(uri);
+    return stat.size;
+  } catch {
+    return undefined;
+  }
+}
+
+export interface VirtualOpenOptions {
+  /** The user answered "open anyway": skip the size guard and read the bytes. */
+  force?: boolean;
+}
+
+export async function emitVirtualOfficeOpen(
+  handler: Handler,
+  uri: Uri,
+  options: VirtualOpenOptions = {},
+): Promise<void> {
   const now = Date.now();
   const ext = extname(uri.fsPath);
   const readOnly = await isUriReadOnly(uri);
+  const size = await statSize(uri);
+  const payload: Record<string, unknown> = {
+    ext,
+    path: getPayloadPath(uri),
+    fileName: basename(uri.fsPath),
+    scheme: uri.scheme,
+    documentCacheId: buildDocumentCacheId(uri),
+    readOnly,
+    size,
+    nonce: now,
+  };
+  // A virtual document has to be read whole and shipped as `number[]`, so this is the one
+  // place where refusing early saves the expensive part of the work rather than a parse.
+  if (!options.force && isOverPreviewLimit(ext, size)) {
+    handler.emit("open", { ...payload, tooLarge: true });
+    return;
+  }
   try {
     const data = await readUriBytes(uri);
-    const payload: Record<string, unknown> = {
-      ext,
-      path: getPayloadPath(uri),
-      fileName: basename(uri.fsPath),
-      scheme: uri.scheme,
-      documentCacheId: buildDocumentCacheId(uri),
-      readOnly,
-      nonce: now,
-    };
-    payload.buffer = bytesToPayloadBuffer(data);
-    handler.emit("open", payload);
+    handler.emit("open", { ...payload, buffer: bytesToPayloadBuffer(data) });
   } catch (error) {
     handler.emit("open", {
-      ext,
-      path: getPayloadPath(uri),
-      fileName: basename(uri.fsPath),
-      scheme: uri.scheme,
-      documentCacheId: buildDocumentCacheId(uri),
-      readOnly,
+      ...payload,
       error: error instanceof Error ? error.message : "Failed to read file",
-      nonce: now,
     });
   }
 }
@@ -194,7 +221,11 @@ export async function emitFileOfficeOpen(
     ext: extname(uri.fsPath),
     path: webview.asWebviewUri(uri).toString(),
     fileName: basename(uri.fsPath),
+    scheme: uri.scheme,
     documentCacheId: buildDocumentCacheId(uri),
     readOnly,
+    // The webview fetches the bytes itself for this scheme, so the size only informs its
+    // size guard; the host never reads the file.
+    size: await statSize(uri),
   });
 }

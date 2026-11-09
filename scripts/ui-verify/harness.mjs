@@ -337,6 +337,39 @@ function smokeStub(route) {
 </script>`;
 }
 
+/**
+ * Bridge for the spreadsheet size guard: a `file:` payload that claims to be 900 MB.
+ *
+ * The guard is a payload decision, not a file decision — the viewer must refuse before it
+ * fetches anything — so a stub that lies about `size` tests it without committing a large
+ * fixture. `/huge.csv` is a three-line CSV, so "Open anyway" can prove it really loads.
+ */
+function excelGuardStub() {
+  return `<script>
+(function () {
+  const api = {
+    postMessage(msg) {
+      if (!msg || msg.type !== 'init') return;
+      setTimeout(function () {
+        window.postMessage({ type: 'open', content: {
+          ext: '.csv',
+          fileName: 'huge.csv',
+          path: '/huge.csv',
+          scheme: 'file',
+          size: 900 * 1024 * 1024,
+          readOnly: true,
+          documentCacheId: 'demo:huge',
+        } }, '*');
+      }, 60);
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
+
 export function startHarness(fixtures, port = 0) {
   if (!existsSync(join(WEBVIEW_ROOT, "index.html"))) {
     throw new Error("out/webview/index.html is missing — run `pnpm build` first");
@@ -363,8 +396,10 @@ export function startHarness(fixtures, port = 0) {
             ? (url.searchParams.get("route") ?? "html")
             : "jsonl";
       const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
-      const stub =
-        path === "/harness-route"
+      const guard = path === "/harness-route" && url.searchParams.get("guard") === "1";
+      const stub = guard
+        ? excelGuardStub()
+        : path === "/harness-route"
           ? smokeStub(url.searchParams.get("route") ?? "html")
           : route === "parquet"
             ? parquetStub()
@@ -412,6 +447,14 @@ export function startHarness(fixtures, port = 0) {
         "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       });
       res.end(readFileSync(fixtures.docx));
+      return;
+    }
+
+    // What the size guard's "Open anyway" loads: small enough that the grid proves the
+    // retry happened, real enough that the CSV parser runs.
+    if (path === "/huge.csv") {
+      res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+      res.end("a,b,c\n1,2,3\n4,5,6\n");
       return;
     }
 

@@ -500,6 +500,63 @@ body:has(.excel-app) {
     }
   }
 
+  // Refusal shown when the file is over the preview limit: same frame as the load-error
+  // panel, so "we did not open it" and "we could not open it" look like siblings.
+  .excel-too-large {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(20px, 4vw, 48px);
+    background: var(--vscode-editor-background, #fff);
+    color: var(--vscode-foreground, #333);
+
+    &-panel {
+      width: min(580px, 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(12px, 2vw, 18px);
+      padding: clamp(28px, 4vw, 44px);
+      text-align: center;
+      border: 1px solid var(--vscode-editorWidget-border, rgba(0, 0, 0, 0.12));
+      border-radius: 10px;
+      background: var(--vscode-editorWidget-background, #f8f9fa);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+    }
+
+    &-icon {
+      color: var(--vscode-editorWarning-foreground, #bf8803);
+      opacity: 0.9;
+      flex-shrink: 0;
+    }
+
+    &-title {
+      margin: 0;
+      font-size: clamp(16px, 2vw, 20px);
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--vscode-foreground, #1a1a1a);
+    }
+
+    &-body {
+      margin: 0;
+      max-width: 46em;
+      font-size: clamp(12px, 1.3vw, 14px);
+      line-height: 1.6;
+      color: var(--vscode-descriptionForeground, #666);
+    }
+
+    &-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 4px;
+    }
+  }
+
   .excel-readonly-banner {
     position: fixed;
     top: 0;

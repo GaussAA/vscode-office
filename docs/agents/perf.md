@@ -70,7 +70,9 @@ raise the budget in the same commit and say why.
   inside run-to-run noise (~2x on a loaded machine) while the regression it would guard is
   only 2-3x.
 - **Spreadsheet (CSV/XLSX) cost**: a 19 MB workbook took 10 s and a 152 MB CSV held 1.36 GB of
-  heap. A budget there needs a size guard first (ADR or feature), not a threshold.
+  heap. Those numbers are why oversized files now hit a size guard instead of a budget
+  ([ADR-0016](../adr/0016-preview-size-guard.md)); parsing inside a size limit is still
+  all-at-once, so there is nothing stable to assert until the grid is windowed.
 - **Open latency itself** (1-3 s for 1M rows x 5 columns, dominated by decoding the first data
   page per column plus loading the ~430 KB parquet bundle) is not asserted either: it moves
   with bundle size, and the byte budget above already catches the failure mode that mattered.

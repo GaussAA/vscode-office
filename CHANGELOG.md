@@ -1,5 +1,27 @@
 # Change log
 
+# Unreleased
+
+Performance work on the parquet viewer, measured against a 1M-row single-row-group file
+(PyArrow's default shape) in the built webview:
+
+- **First paint reads the file once, not twice.** The visible page and its prefetch computed
+  the same read plan in the same tick; identical in-flight range requests now share one fetch,
+  and the byte cache is interval-based. 26.9 MB → 13.7 MB (2.04x → 1.04x of the file), and
+  0.97 s → 0.31 s on the same machine.
+- **Whole-file search is a single pass.** 5000-row batches re-decoded the data page that
+  contained each batch. 1M rows: 28 s → ~1.4 s; 200k × 60 columns: 40 s → ~1.5 s.
+- **Wide-table page turns no longer wait for the next page's decode.** The prefetch is
+  idle-scheduled now; a cache hit on a 60-column file went from 1.2–1.9 s to ~0.5 s.
+- `pnpm verify:perf` makes the first two numbers a CI gate.
+
+Added:
+
+- **Oversized spreadsheets are not parsed automatically.** Above 25 MB (CSV/TSV) or 15 MB
+  (xlsx/xlsm/xls/ods) the viewer shows the size and an "Open anyway" button instead of loading
+  it: a 152 MB CSV used to cost 9.7 s and 1.36 GB of heap. See
+  [ADR-0016](docs/adr/0016-preview-size-guard.md).
+
 # 6.0.1 2026-11-09
 
 Fixed:

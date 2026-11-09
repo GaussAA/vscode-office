@@ -639,6 +639,49 @@ const scenarios = [
     },
   },
   {
+    name: "excel-large-file-guard",
+    docs: "excel-too-large.png",
+    async run({ page, base }) {
+      // The stub claims 900 MB; the guard has to refuse before fetching anything, so the
+      // grid must not be there and the panel must name the file and the limit.
+      await page.navigate(`${base}/harness-route?route=excel&guard=1`);
+      const panel = await page.waitFor(`!!document.querySelector('.excel-too-large')`, 15000);
+      expect(panel, "the size guard did not render for an oversized file");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                text: document.querySelector('.excel-too-large')?.innerText ?? '',
+                grid: !!document.querySelector('#container .x-spreadsheet'),
+                buttons: [...document.querySelectorAll('.excel-too-large button')].map(b => b.textContent.trim()),
+            })`),
+      );
+      expect(/huge\.csv/.test(state.text), `panel does not name the file: ${state.text}`);
+      expect(/900\.0 MB/.test(state.text), `panel does not show the file size: ${state.text}`);
+      expect(/25\.0 MB/.test(state.text), `panel does not show the limit: ${state.text}`);
+      expect(!state.grid, "the grid rendered anyway — the guard must not parse the file");
+      expect(
+        state.buttons.includes("Open anyway"),
+        `missing the retry button: ${state.buttons.join(" / ")}`,
+      );
+
+      // Answering "open anyway" really does load it.
+      await page.evaluate(`[...document.querySelectorAll('.excel-too-large button')]
+                .find(b => b.textContent.trim() === 'Open anyway')?.click()`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the viewer never loaded the file after confirming");
+      const cells = await page.evaluate(
+        `document.querySelectorAll('#container .x-spreadsheet').length`,
+      );
+      expect(
+        await page.evaluate(`!document.querySelector('.excel-too-large')`),
+        "the guard stayed up",
+      );
+      return `refused 900 MB, loaded after confirm (${cells} grid)`;
+    },
+  },
+  {
     name: "remaining-routes-smoke",
     async run({ page, base }) {
       // The routes without a behavioural scenario of their own: the spreadsheet viewer and the
