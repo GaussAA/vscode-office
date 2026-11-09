@@ -8,7 +8,7 @@
 
 | 格式                                                     | 你能得到什麼                                            |
 | -------------------------------------------------------- | ------------------------------------------------------- |
-| 試算表：`.xls`、`.xlsx`、`.xlsm`、`.csv`、`.tsv`、`.ods` | 可編輯並寫回的格線，含尋找/取代                         |
+| 試算表：`.xls`、`.xlsx`、`.xlsm`、`.csv`、`.tsv`、`.ods` | 可編輯格線與尋找/取代；大檔案進入唯讀視窗檢視           |
 | Parquet：`.parquet`                                      | ZSTD/GZIP/BROTLI/LZ4 欄位、懶載入分頁、全檔案搜尋，唯讀 |
 | JSONL / NDJSON：`.jsonl`、`.ndjson`                      | 左側項目目錄，右側把選取項目呈現為樹狀或原文            |
 
@@ -37,13 +37,13 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解碼。
 - **支援時按 Range 取位元組**：先用 2 位元組探測，支援就只讀 footer 和你看的頁，否則退回
   一次性抓取；主控台會印出 `[parquet] source: ranged|full`。
 - **百萬列也能導覽**：按列號跳轉，頁尾顯示目前區間（`239,951–240,000 of 250,000`）。
-- **依型別呈現**：數字靠右對齊 + 等寬數字，字串/布林/時間戳依主題著色，null 顯示為 `NULL`，
-  點擊儲存格可查看完整值。
+- **依型別呈現**：數字靠右對齊 + 等寬數字，字串/布林/時間戳依主題著色，一般 `BYTE_ARRAY`
+  以十六進位顯示，null 顯示為 `NULL`，點擊儲存格可查看完整值。
 
 ![Parquet 型別著色](docs/screenshots/parquet-types.png)
 
-工具列的 **Find in file** 以 5000 列為一批掃描整個檔案，帶進度、標記命中的列、在儲存格內
-醒目顯示符合的文字，並自動跳到第一筆命中。
+工具列的 **Find in file** 每個欄位只掃描一遍整個檔案，帶進度、標記命中的列、在儲存格內
+醒目顯示符合的文字，並自動跳到第一筆命中；100 萬列約 1.3 秒。
 
 檢視器跟隨 VS Code 主題——包括以前在深色檢視下仍是淺色的 antd 控件。沒有獨立的明暗切換開關。
 
@@ -65,9 +65,10 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解碼。
 ```bash
 pnpm test        # 解析邏輯單元測試（node:test，不引入額外框架）
 pnpm verify:ui   # 無頭瀏覽器 DOM 斷言；截圖輸出到 .ui-verify/shots
+pnpm verify:perf # 大檔案首屏位元組/耗時與搜尋耗時閘門
 ```
 
-CI 在每次 push 時都會跑這兩項，以及 `pnpm build` 和 `pnpm run package`。`pnpm verify:ui -- --docs`
+CI 在每次 push 時都會跑這三項，以及 `pnpm build` 和 `pnpm run package`。`pnpm verify:ui --docs`
 可刷新上面的截圖。
 
 ### 已知限制
@@ -100,7 +101,7 @@ pnpm install
 pnpm build        # 生產建置到 out/
 pnpm run package  # 打包 vsix（需先 build）
 pnpm check        # 格式 + lint + 基線 + 型別 + 單元測試
-pnpm check:full   # check + build + smoke + verify:ui
+pnpm check:full   # check + build + smoke + verify:ui + verify:perf
 ```
 
 在 VS Code 裡按 `F5`，選擇 **Extension** 執行本地建置。

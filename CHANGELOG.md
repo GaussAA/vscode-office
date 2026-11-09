@@ -1,8 +1,36 @@
 # Change log
 
-# Unreleased
+# 6.1.0 2026-11-09
 
-Performance work on the parquet viewer, measured against a 1M-row single-row-group file
+The parquet and JSONL viewers share a rebuilt shell, and large files cost much less to open.
+
+Changed:
+
+- **Parquet and JSONL are laid out as surfaces, not rules.** The command bar, content panes
+  and bottom bar use tonal surfaces instead of full-width dividers; the splitter only shows a
+  handle on hover. The parquet schema sidebar is resizable, numeric columns align right, and
+  long column names keep a one-line header with the full name in `title`.
+- **The JSONL detail identity and actions moved into the bottom bar.** Search count is inline
+  next to the search field, so the directory and detail panes start at the same height and only
+  the top/bottom bars span the surface. Long values wrap; large entries stay single-line and
+  virtualised.
+- **Dense tables are readable in both themes.** Parquet uses a 12px mono table and a 10.5px
+  header; semantic colours have dedicated light-theme values and measure at least 5.1:1 against
+  white. The toolbar, scrollbars, buttons and segmented controls share one control vocabulary.
+- **Empty, malformed and oversized states are explicit.** A zero-row parquet shows a centred
+  `No rows` state with jump disabled; a malformed file shows its parser error plus `Retry`; an
+  oversized inline parquet asks before loading. A zero-line JSONL is one centred empty state
+  with no fake row; invalid / too-large lines get a narrow chip and a truncated raw view.
+- **Binary and logical values render correctly.** Plain `BYTE_ARRAY` values show exact hex
+  (`0x00 01 02 ff`) instead of decoded control characters; UTF8/STRING still decode, UUID bytes
+  become canonical UUID text, `DATE` drops the midnight timestamp, and `ENUM` is no longer
+  classified numeric.
+- **JSONL handles UTF-8 BOM, CRLF and empty entries**, and an empty/unreadable entry request
+  terminates instead of leaving the detail pane spinning.
+
+Performance:
+
+Measured against a 1M-row single-row-group parquet
 (PyArrow's default shape) in the built webview:
 
 - **First paint reads the file once, not twice.** The visible page and its prefetch computed

@@ -34,9 +34,9 @@ row paints) keeps DevTools round-trip time out of the duration.
 ```bash
 pnpm build             # required: the harness serves out/webview
 pnpm verify:perf       # assert
-pnpm verify:perf -- --all                 # also print fixture sizes
-pnpm verify:perf -- --filter=search       # only matching scenarios
-pnpm verify:perf -- --headed              # watch it run
+pnpm verify:perf --all           # also print fixture sizes
+pnpm verify:perf --filter=search # only matching scenarios
+pnpm verify:perf --headed        # watch it run
 ```
 
 Fixtures are cached in `.perf/` (gitignored), so a warm run costs nothing.

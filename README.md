@@ -8,7 +8,7 @@ This extension previews **three things** in VS Code:
 
 | Format                                                         | What you get                                                                 |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Spreadsheets: `.xls`, `.xlsx`, `.xlsm`, `.csv`, `.tsv`, `.ods` | A grid you can edit and save back, plus find/replace                         |
+| Spreadsheets: `.xls`, `.xlsx`, `.xlsm`, `.csv`, `.tsv`, `.ods` | Editable grid and find/replace; large files open read-only in a window       |
 | Parquet: `.parquet`                                            | ZSTD/GZIP/BROTLI/LZ4 columns, lazy paging, whole-file search, read-only      |
 | JSONL / NDJSON: `.jsonl`, `.ndjson`                            | A directory of entries on the left, the selected entry as a tree or raw text |
 
@@ -43,13 +43,13 @@ Reading is lazy and stays usable on big files:
 - **Navigation for millions of rows.** Jump to any row number; the footer shows the visible
   range (`239,951–240,000 of 250,000`).
 - **Type-aware cells.** Numbers are right-aligned with tabular figures, strings, booleans and
-  timestamps are coloured from the theme, nulls render as `NULL`, and clicking a cell opens
-  its full value.
+  timestamps are coloured from the theme, plain `BYTE_ARRAY` values render as hex, nulls show
+  as `NULL`, and clicking a cell opens its full value.
 
 ![Parquet types](docs/screenshots/parquet-types.png)
 
-**Find in file** scans in 5,000-row batches with progress, marks matching rows, highlights
-the matching text inside cells, and jumps to the first hit.
+**Find in file** scans each column once with progress, marks matching rows, highlights the
+matching text inside cells, and jumps to the first hit. A 1M-row file scans in about 1.3 s.
 
 The viewer follows the VS Code theme — including the antd widgets, which used to stay light
 under a dark view. There is no separate light/dark switch.
@@ -77,10 +77,11 @@ lists entries, the right pane renders the selected entry as a tree (or as raw te
 ```bash
 pnpm test        # unit tests for the parsing logic (node:test, no extra framework)
 pnpm verify:ui   # headless DOM scenarios; screenshots land in .ui-verify/shots
+pnpm verify:perf # byte/time budgets on large files
 ```
 
-CI runs both on every push, together with `pnpm build` and `pnpm run package`. Add
-`-- --docs` to `verify:ui` to refresh the screenshots above.
+CI runs all three on every push, together with `pnpm build` and `pnpm run package`. Add
+`--docs` to `verify:ui` to refresh the screenshots above.
 
 ### Known limits
 
@@ -115,7 +116,7 @@ pnpm install
 pnpm build        # production build into out/
 pnpm run package  # create the .vsix (build first)
 pnpm check        # format + lint + baseline + typecheck + unit tests
-pnpm check:full   # check + build + smoke + verify:ui
+pnpm check:full   # check + build + smoke + verify:ui + verify:perf
 ```
 
 Press `F5` in VS Code and choose **Extension** to run the local build.
