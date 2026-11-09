@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "analyze": "node scripts/bundle-analysis.mjs"
+  }
+}
