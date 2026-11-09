@@ -16,7 +16,6 @@ interface Props {
   onSelect: (index: number) => void;
   /** Undefined in search mode — there is nothing more to load. */
   onNeedMore?: () => void;
-  header?: ReactNode;
   emptyText?: string;
   /** Active search term, used to highlight matches in each row. */
   highlight?: string;
@@ -31,7 +30,6 @@ export default function JsonlIndex({
   loading,
   onSelect,
   onNeedMore,
-  header,
   emptyText,
   highlight,
 }: Props) {
@@ -179,7 +177,6 @@ export default function JsonlIndex({
 
   return (
     <div className="jsonl-index" ref={containerRef} tabIndex={0} onKeyDown={onKeyDown}>
-      {header}
       {items.length === 0 ? (
         <div className="jsonl-empty">{emptyText ?? $t("jsonl.empty")}</div>
       ) : (
@@ -191,7 +188,7 @@ export default function JsonlIndex({
             const key = keys[0];
             if (key !== undefined) onSelect(Number(key));
           }}
-          height={height - (header ? 26 : 0)}
+          height={height}
           itemHeight={ROW_HEIGHT}
           virtual
           showIcon={false}

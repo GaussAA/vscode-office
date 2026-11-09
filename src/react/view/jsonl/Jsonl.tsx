@@ -81,6 +81,7 @@ export default function JsonlViewer() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [chunkLoading, setChunkLoading] = useState(false);
   const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
+  const [detailBar, setDetailBar] = useState<HTMLDivElement | null>(null);
   const [mode, setMode] = useState<DetailMode>("tree");
   const [jumpValue, setJumpValue] = useState<number | null>(null);
   const [dark, setDark] = useState(isVscodeDarkTheme);
@@ -297,30 +298,30 @@ export default function JsonlViewer() {
     selectEntry(target);
   }, [info, jumpValue, directory, query, recenter, requestEntry, selectEntry]);
 
-  const banner = useMemo(() => {
-    if (!searchActive) return undefined;
+  const searchStatus = useMemo(() => {
+    if (!searchActive) return null;
     if (searching || (searchMeta && !searchMeta.done)) {
       const percent =
         searchMeta && searchMeta.total > 0
           ? Math.round((searchMeta.scanned / searchMeta.total) * 100)
           : 0;
       return (
-        <div className="jsonl-index__banner">
+        <span className="jsonl-search-status" aria-live="polite">
           {$t("jsonl.searching", { percent, count: searchMeta?.matches ?? 0 })}
-        </div>
+        </span>
       );
     }
-    if (!searchMeta) return undefined;
+    if (!searchMeta) return null;
     const label =
       searchMeta.matches === 1
         ? $t("jsonl.matchCountOne", { count: searchMeta.matches })
         : $t("jsonl.matchCountMany", { count: searchMeta.matches });
     return (
-      <div className="jsonl-index__banner">
+      <span className="jsonl-search-status" aria-live="polite">
         {searchMeta.matches === 0
           ? $t("jsonl.noMatches")
           : `${label}${searchMeta.capped ? $t("jsonl.cappedSuffix") : ""}`}
-      </div>
+      </span>
     );
   }, [searchActive, searching, searchMeta]);
 
@@ -382,6 +383,7 @@ export default function JsonlViewer() {
               value={query}
               onChange={(event) => handleQueryChange(event.target.value)}
             />
+            {searchStatus}
             <InputNumber
               size="small"
               min={1}
@@ -421,7 +423,6 @@ export default function JsonlViewer() {
               loading={searchActive ? false : chunkLoading}
               onSelect={selectEntry}
               onNeedMore={searchActive ? undefined : onNeedMore}
-              header={banner}
               highlight={searchActive ? query.trim() : undefined}
               emptyText={
                 searchActive
@@ -442,9 +443,13 @@ export default function JsonlViewer() {
               loading={detailLoading}
               mode={mode}
               onModeChange={setMode}
+              actionsHost={detailBar}
             />
           </Splitter.Panel>
         </Splitter>
+        <footer className="jsonl-bottombar">
+          <div className="jsonl-bottombar__detail" ref={setDetailBar} />
+        </footer>
       </div>
     </ConfigProvider>
   );

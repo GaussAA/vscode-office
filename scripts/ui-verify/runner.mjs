@@ -168,12 +168,16 @@ const scenarios = [
                 meta: document.querySelector('.jsonl-meta')?.innerText ?? null,
                 index: document.querySelector('.jsonl-detail__index')?.innerText ?? null,
                 rows: document.querySelectorAll('.jsonl-index__tree .ant-tree-treenode').length,
+                actionInBottomBar: !!document.querySelector('.jsonl-bottombar .jsonl-detail__header'),
+                toolbarBorder: getComputedStyle(document.querySelector('.jsonl-toolbar')).borderBottomWidth,
             })`),
       );
       expect(state.file === "events.jsonl", `unexpected file name: ${state.file}`);
       expect(state.rows >= 10, `directory rendered ${state.rows} rows`);
       expect(state.index === "L1", `unexpected first selection: ${state.index}`);
       expect(/entries/.test(state.meta ?? ""), `missing entry count: ${state.meta}`);
+      expect(state.actionInBottomBar, "detail actions are not in the bottom bar");
+      expect(state.toolbarBorder === "0px", `toolbar border: ${state.toolbarBorder}`);
       return `${state.rows} rows, ${state.meta}`;
     },
   },
@@ -229,25 +233,25 @@ const scenarios = [
                 setter.call(input, 'id');
                 input.dispatchEvent(new Event('input', { bubbles: true }));
             })()`);
-      const sawBanner = await page.waitFor(`!!document.querySelector('.jsonl-index__banner')`);
-      expect(sawBanner, "search banner never appeared");
+      const sawStatus = await page.waitFor(`!!document.querySelector('.jsonl-search-status')`);
+      expect(sawStatus, "search status never appeared");
       const sawHits = await page.waitFor(`document.querySelectorAll('.jsonl-hit').length > 0`);
       expect(sawHits, "no match highlighting rendered");
       // Settled means: a match count, and no longer "Searching…".
       const settled = await page.waitFor(`(() => {
-                const text = document.querySelector('.jsonl-index__banner')?.innerText ?? '';
+                const text = document.querySelector('.jsonl-search-status')?.innerText ?? '';
                 return /\\d+ match/.test(text) && !text.includes('Searching');
             })()`);
-      expect(settled, "search banner never settled on a match count");
+      expect(settled, "search status never settled on a match count");
       const state = json(
         await page.evaluate(`JSON.stringify({
-                banner: document.querySelector('.jsonl-index__banner')?.innerText ?? null,
+                status: document.querySelector('.jsonl-search-status')?.innerText ?? null,
                 hits: document.querySelectorAll('.jsonl-hit').length,
             })`),
       );
-      expect(/(\d+) match/.test(state.banner ?? ""), `unexpected banner: ${state.banner}`);
+      expect(/(\d+) match/.test(state.status ?? ""), `unexpected status: ${state.status}`);
       expect(state.hits > 0, "no match highlighting rendered");
-      return `${state.banner}, ${state.hits} highlighted runs`;
+      return `${state.status}, ${state.hits} highlighted runs`;
     },
   },
   {

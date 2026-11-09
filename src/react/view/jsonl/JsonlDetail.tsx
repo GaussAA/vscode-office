@@ -2,6 +2,7 @@ import { CopyOutlined } from "@ant-design/icons";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { Button, Modal, Segmented, Tree } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { JsonlEntryDetail } from "../../../common/jsonlTypes.ts";
 import type { DataNode } from "antd/es/tree";
 import {
@@ -27,6 +28,8 @@ interface Props {
   loading: boolean;
   mode: DetailMode;
   onModeChange: (mode: DetailMode) => void;
+  /** The bottom bar owns the row; the detail's identity and actions portal into it. */
+  actionsHost: HTMLElement | null;
 }
 
 function jsonText(value: unknown): string {
@@ -97,7 +100,14 @@ function toAntdNodes(nodes: NodeModel[], wrap: boolean): DataNode[] {
 }
 
 /** Right pane: the full tree (or raw text) of exactly one entry. */
-export default function JsonlDetail({ index, entry, loading, mode, onModeChange }: Props) {
+export default function JsonlDetail({
+  index,
+  entry,
+  loading,
+  mode,
+  onModeChange,
+  actionsHost,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState(320);
   /**
@@ -318,7 +328,7 @@ export default function JsonlDetail({ index, entry, loading, mode, onModeChange 
 
   return (
     <div className="jsonl-detail" ref={containerRef} tabIndex={-1} onKeyDown={onKeyDown}>
-      {header}
+      {actionsHost ? createPortal(header, actionsHost) : null}
       <div className="jsonl-detail__body">{body}</div>
     </div>
   );
