@@ -224,7 +224,7 @@ export default {
     saveAnyway: "仍然保存",
     unsupportedSave: "无法保存：该文件包含嵌套或结构列（{columns}）。仅支持保存扁平标量列。",
     inspectHint: "点击单元格查看完整值",
-    cappedSuffix: " · 已停在 5,000",
+    cappedSuffix: " · 已停在 {max}",
     invalidRow: "请输入有效行号",
     saveTimeout: "保存耗时过长——修改仍已记录，请重试。",
   },

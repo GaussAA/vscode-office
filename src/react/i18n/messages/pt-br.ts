@@ -203,7 +203,7 @@ export default {
     unsupportedSave:
       "Não é possível salvar: este arquivo contém colunas aninhadas ou estruturais ({columns}). O salvamento só é suportado para colunas escalares planas.",
     inspectHint: "Selecione uma célula para ver o valor",
-    cappedSuffix: " · parou em 5.000",
+    cappedSuffix: " · parou em {max}",
     invalidRow: "Insira um número de linha válido",
     saveTimeout: "O salvamento está demorando — suas edições foram mantidas, tente novamente.",
   },

@@ -202,7 +202,7 @@ export default {
     unsupportedSave:
       "Speichern nicht möglich: Diese Datei enthält verschachtelte oder strukturelle Spalten ({columns}). Speichern wird nur für flache skalare Spalten unterstützt.",
     inspectHint: "Zelle auswählen, um den Wert zu sehen",
-    cappedSuffix: " · bei 5.000 gestoppt",
+    cappedSuffix: " · bei {max} gestoppt",
     invalidRow: "Bitte eine gültige Zeilennummer eingeben",
     saveTimeout:
       "Das Speichern dauert ungewöhnlich lange – Ihre Änderungen sind erhalten, bitte erneut versuchen.",

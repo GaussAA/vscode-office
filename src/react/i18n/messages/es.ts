@@ -204,7 +204,7 @@ export default {
     unsupportedSave:
       "No se puede guardar: este archivo contiene columnas anidadas o estructurales ({columns}). Solo se admite guardar columnas escalares planas.",
     inspectHint: "Selecciona una celda para ver su valor",
-    cappedSuffix: " · detenido en 5.000",
+    cappedSuffix: " · detenido en {max}",
     invalidRow: "Introduce un número de fila válido",
     saveTimeout: "El guardado tarda demasiado: los cambios se conservan, inténtelo de nuevo.",
   },

@@ -202,7 +202,7 @@ export default {
     unsupportedSave:
       "저장할 수 없습니다: 이 파일에는 중첩되거나 구조적인 열({columns})이 있습니다. 저장은 평면 스칼라 열만 지원합니다.",
     inspectHint: "셀을 선택하면 값을 표시합니다",
-    cappedSuffix: " · 5,000에서 중단",
+    cappedSuffix: " · {max}에서 중단",
     invalidRow: "유효한 행 번호를 입력하세요",
     saveTimeout: "저장이 평소보다 오래 걸립니다. 편집 내용은 유지되니 다시 시도하세요.",
   },

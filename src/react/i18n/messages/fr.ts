@@ -204,7 +204,7 @@ export default {
     unsupportedSave:
       "Enregistrement impossible : ce fichier contient des colonnes imbriquées ou structurelles ({columns}). L'enregistrement n'est pris en charge que pour les colonnes scalaires plates.",
     inspectHint: "Sélectionnez une cellule pour voir sa valeur",
-    cappedSuffix: " · arrêté à 5 000",
+    cappedSuffix: " · arrêté à {max}",
     invalidRow: "Veuillez saisir un numéro de ligne valide",
     saveTimeout:
       "L'enregistrement est anormalement long — vos modifications sont conservées, réessayez.",
