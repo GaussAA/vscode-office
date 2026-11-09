@@ -24,6 +24,7 @@ import { getVscodeThemeColor, useVscodeDarkTheme } from "../../util/vscodeTheme.
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
 import { highlightRuns } from "../../common/highlight.ts";
+import { savePersistedState } from "../../common/persistedState.ts";
 import { ParquetSession } from "./parquetSession.ts";
 import SponsorBar from "../components/SponsorBar.tsx";
 import {
@@ -231,38 +232,9 @@ function loadPersistedPage(key: string | undefined): number {
   }
 }
 
-/** Restored-state entries kept per document before the oldest ones are evicted. */
-const PERSIST_MAX_ENTRIES = 20;
-
 function savePersistedPage(key: string | undefined, page: number) {
   if (!key) return;
-  try {
-    localStorage.setItem(PERSIST_PREFIX + key, JSON.stringify({ page, ts: Date.now() }));
-    evictPersistedEntries();
-  } catch {}
-}
-
-/**
- * The restore map grows by one key per document path and nothing read it back otherwise,
- * so it accumulated forever. Keep only the most recent entries.
- */
-function evictPersistedEntries() {
-  const entries: Array<{ key: string; ts: number }> = [];
-  for (let index = 0; index < localStorage.length; index++) {
-    const storageKey = localStorage.key(index);
-    if (!storageKey?.startsWith(PERSIST_PREFIX)) continue;
-    let ts = 0;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) ts = (JSON.parse(raw) as { ts?: number }).ts ?? 0;
-    } catch {}
-    entries.push({ key: storageKey, ts });
-  }
-  if (entries.length <= PERSIST_MAX_ENTRIES) return;
-  entries.sort((a, b) => a.ts - b.ts);
-  for (const entry of entries.slice(0, entries.length - PERSIST_MAX_ENTRIES)) {
-    localStorage.removeItem(entry.key);
-  }
+  savePersistedState(PERSIST_PREFIX, key, { page });
 }
 
 function ParquetViewer() {
