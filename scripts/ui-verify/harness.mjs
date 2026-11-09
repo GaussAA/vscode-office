@@ -8,7 +8,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -26,17 +26,24 @@ const WEBVIEW_ROOT = join(repoRoot, "out", "webview");
  * It used to be a copy — which meant "remove 'unsafe-inline' and the suite turns red" was
  * only ever true by accident.
  */
-const cspModulePath = join(tmpdir(), `ovp-webview-csp-${process.pid}-${Date.now()}.mjs`);
+const shellHelpers = mkdtempSync(join(tmpdir(), "ovp-webview-shell-"));
 await build({
-  entryPoints: [join(repoRoot, "src", "common", "webviewCsp.ts")],
-  outfile: cspModulePath,
+  entryPoints: [
+    join(repoRoot, "src", "common", "webviewCsp.ts"),
+    join(repoRoot, "src", "common", "webviewBase.ts"),
+  ],
+  outdir: shellHelpers,
+  outExtension: { ".js": ".mjs" },
   bundle: true,
   format: "esm",
   platform: "node",
   logLevel: "silent",
 });
-const { buildWebviewCsp } = await import(pathToFileURL(cspModulePath).href);
-rmSync(cspModulePath, { force: true });
+const { buildWebviewCsp } = await import(pathToFileURL(join(shellHelpers, "webviewCsp.mjs")).href);
+const { applyWebviewBase } = await import(
+  pathToFileURL(join(shellHelpers, "webviewBase.mjs")).href
+);
+await rmSync(shellHelpers, { recursive: true, force: true });
 
 const MIME = {
   ".js": "text/javascript",
@@ -371,7 +378,9 @@ export function startHarness(fixtures, port = 0) {
         `script-src ${origin} `,
         `script-src ${origin} 'nonce-${nonce}' `,
       );
-      const html = indexHtml
+      // Same helper the extension uses: a shell whose `<base>` cannot be rewritten makes this
+      // run fail, which is the point — the alternative is a green suite and a black webview.
+      const html = applyWebviewBase(indexHtml, origin)
         .replace(
           /<meta id="office-configs"[^>]*>/,
           `<meta id="office-configs" data-config='${JSON.stringify({ route })}'>`,

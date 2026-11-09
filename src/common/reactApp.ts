@@ -2,6 +2,7 @@ import axios from "axios";
 import * as vscode from "vscode";
 import { extensionResource, getExtensionUri, readExtensionText } from "./extensionResource";
 import { IconService } from "../service/icon/iconService";
+import { applyWebviewBase } from "./webviewBase";
 import { buildWebviewCsp } from "./webviewCsp";
 
 interface ViewOption {
@@ -55,8 +56,7 @@ export class ReactApp {
   }
 
   private static buildPath(data: string, webview: vscode.Webview): string {
-    const baseUrl = ReactApp.getBaseUrl(webview);
-    return data.replace('<base href="/">', `<base href="${baseUrl}/">`);
+    return applyWebviewBase(data, ReactApp.getBaseUrl(webview));
   }
 
   private static getBaseUrl(webview: vscode.Webview) {
