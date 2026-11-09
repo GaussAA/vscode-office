@@ -4,6 +4,7 @@ import { extensions, Uri, workspace, type Webview } from "vscode";
 import { Handler } from "@/common/handler";
 import { isUriReadOnly } from "@/common/fileReadOnly";
 import { isOverPreviewLimit } from "@/common/previewLimit";
+import type { OfficeOpenMessage } from "@/common/openPayload";
 
 export function isVirtualUri(uri: Uri): boolean {
   return uri.scheme !== "file";
@@ -184,7 +185,7 @@ export async function emitVirtualOfficeOpen(
   const ext = extname(uri.fsPath);
   const readOnly = await isUriReadOnly(uri);
   const size = await statSize(uri);
-  const payload: Record<string, unknown> = {
+  const payload: OfficeOpenMessage = {
     ext,
     path: getPayloadPath(uri),
     fileName: basename(uri.fsPath),
@@ -216,16 +217,16 @@ export async function emitFileOfficeOpen(
   uri: Uri,
   webview: Webview,
 ): Promise<void> {
-  const readOnly = await isUriReadOnly(uri);
-  handler.emit("open", {
+  const payload: OfficeOpenMessage = {
     ext: extname(uri.fsPath),
     path: webview.asWebviewUri(uri).toString(),
     fileName: basename(uri.fsPath),
     scheme: uri.scheme,
     documentCacheId: buildDocumentCacheId(uri),
-    readOnly,
+    readOnly: await isUriReadOnly(uri),
     // The webview fetches the bytes itself for this scheme, so the size only informs its
     // size guard; the host never reads the file.
     size: await statSize(uri),
-  });
+  };
+  handler.emit("open", payload);
 }

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { handler, vscodeApi } from "../../util/vscode.ts";
 import { isVscodeEditorDark, observeVscodeThemeChange } from "../../util/vscodeTheme.ts";
-import { loadOfficeBuffer, type OfficeOpenPayload } from "../../util/loadOfficeContent.ts";
+import { loadOfficeBuffer } from "../../util/loadOfficeContent.ts";
+import type { OfficeOpenMessage } from "@/common/openPayload";
 import { formatBytes, isOverPreviewLimit, previewLimitBytes } from "@/common/previewLimit";
 import SponsorBar from "../components/SponsorBar";
 import "./Excel.less";
@@ -100,15 +101,7 @@ function isCsvLikeExt(ext: string): boolean {
 }
 
 /** What the host sends on `open`, plus the fields the size guard needs. */
-type ExcelOpenPayload = OfficeOpenPayload & {
-  ext?: string;
-  fileName?: string;
-  documentCacheId?: string;
-  readOnly?: boolean;
-  scheme?: string;
-  size?: number;
-  tooLarge?: boolean;
-};
+type ExcelOpenPayload = OfficeOpenMessage;
 
 function ExcelViewer() {
   const { message, modal } = App.useApp();
