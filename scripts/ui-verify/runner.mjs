@@ -765,6 +765,62 @@ const scenarios = [
     },
   },
   {
+    name: "excel-windowed-find",
+    docs: "excel-windowed-find.png",
+    async run({ page, base }) {
+      // Phase 3: the windowed view has no cell model, so find scans row blocks from the source
+      // and "go to row" only moves the scroll offset. Both must land on real rows.
+      await page.navigate(`${base}/harness-route?route=excel&window=1`);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 15000);
+      expect(ready, "the windowed view did not render");
+
+      await page.evaluate(`(() => {
+                const input = document.querySelectorAll('.windowed-sheet__input')[0];
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'r4999');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                [...document.querySelectorAll('.windowed-sheet__btn')]
+                    .find(b => b.textContent.trim() === 'Find')?.click();
+            })()`);
+      const found = await page.waitFor(
+        `(() => {
+                    const count = document.querySelector('.windowed-sheet__count')?.innerText ?? '';
+                    const cells = [...document.querySelectorAll('.windowed-sheet__cell')];
+                    return /1 match/.test(count) && cells.some(cell => cell.textContent === 'r4999');
+                })()`,
+        20000,
+      );
+      expect(found, "find did not report and jump to the single match");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                count: document.querySelector('.windowed-sheet__count')?.innerText ?? '',
+                marks: document.querySelectorAll('.windowed-sheet__hit').length,
+                matchedRows: document.querySelectorAll('.windowed-sheet__row--match').length,
+                targeted: [...document.querySelectorAll('.windowed-sheet__row--target .windowed-sheet__cell')]
+                    .map(cell => cell.textContent).slice(0, 2),
+            })`),
+      );
+      expect(state.marks > 0, "the matched cell was not highlighted");
+      expect(state.matchedRows === 1, `expected 1 marked row, got ${state.matchedRows}`);
+      expect(state.targeted.includes("r4999"), `target row: ${state.targeted.join(",")}`);
+
+      await page.evaluate(`(() => {
+                const input = document.querySelectorAll('.windowed-sheet__input--row')[0];
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, '3000');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                [...document.querySelectorAll('.windowed-sheet__btn')]
+                    .find(b => b.textContent.trim() === 'Go')?.click();
+            })()`);
+      const jumped = await page.waitFor(
+        `[...document.querySelectorAll('.windowed-sheet__cell')].some(cell => cell.textContent === 'r2999')`,
+        15000,
+      );
+      expect(jumped, "go-to-row never scrolled to row 3000");
+      return `find: ${state.count}, ${state.marks} mark(s); jump: row 3000 visible`;
+    },
+  },
+  {
     name: "remaining-routes-smoke",
     async run({ page, base }) {
       // The routes without a behavioural scenario of their own: the spreadsheet viewer and the

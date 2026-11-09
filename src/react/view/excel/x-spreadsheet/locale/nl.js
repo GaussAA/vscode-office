@@ -86,6 +86,10 @@ export default {
     readonlyBanner:
       "Alleen-lezen — bladeren en zoeken; gebruik Opslaan als om wijzigingen op te slaan",
     windowedBanner: "Alleen-lezen voorbeeld — grote bestanden worden zonder bewerken geopend",
+    matchesOne: "{} resultaat",
+    matchesMany: "{} resultaten",
+    goToRow: "Ga naar rij",
+    go: "Ga",
     formatCannotPreserveTitle: "Opmaak kan niet behouden blijven",
     formatCannotPreserveContent:
       "{} kan stijlen, samenvoegingen, formules enz. niet behouden. Opslaan als xlsx?",

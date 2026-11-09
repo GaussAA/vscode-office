@@ -25,7 +25,8 @@ Added:
 - **Large spreadsheets open as a read-only windowed view.** Above 8 MB, CSV/TSV are shown by
   a viewport-rendering table instead of the editable grid: a 21 MB file paints in ~0.5 s with
   33 MB of heap, where the grid path needs seconds and hundreds of megabytes. Editing large
-  files intentionally stays with the text editor (`Open in VS Code`). See
+  files intentionally stays with the text editor (`Open in VS Code`). The read-only view can
+  find across the whole file and jump to a row without materialising the sheet. See
   [ADR-0017](docs/adr/0017-windowed-spreadsheet.md).
 
 - **Oversized spreadsheets are not parsed automatically.** Above 25 MB (CSV/TSV) or 15 MB
