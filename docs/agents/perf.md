@@ -60,8 +60,18 @@ raise the budget in the same commit and say why.
 
 ## What is not gated
 
-- Spreadsheet (CSV/XLSX) cost: a 19 MB workbook took 10 s and a 152 MB CSV held 1.36 GB of
+- **Page turns on wide tables (~0.5 s after the fix).** Prefetching the next page used to
+  start in the same tick as the visible page, so a cache hit on a 60-column file took 1.2-1.9 s
+  instead of 0.5 s: decoding the next page (one data page per column, ~1.2 s) ran on the same
+  thread as the render of the current one. The prefetch is idle-scheduled now
+  (`requestIdleCallback`, 1.5 s timeout) and the measured turn drops to ~0.5 s. The remaining
+  half-second is antd rendering 50 x 60 cells; a virtual table would cut it further, at the
+  cost of the DOM shape several UI scenarios assert on. Not gated because a budget there sits
+  inside run-to-run noise (~2x on a loaded machine) while the regression it would guard is
+  only 2-3x.
+- **Spreadsheet (CSV/XLSX) cost**: a 19 MB workbook took 10 s and a 152 MB CSV held 1.36 GB of
   heap. A budget there needs a size guard first (ADR or feature), not a threshold.
-- Wide-table page turns (60 columns, ~1.4 s): dominated by decoding one data page per column
-  plus rendering 3,000 antd cells. Fix is a decoded-row cache and/or a virtual table.
-- Nothing here asserts smoothness of scrolling; only the two numbers above are enforced.
+- **Open latency itself** (1-3 s for 1M rows x 5 columns, dominated by decoding the first data
+  page per column plus loading the ~430 KB parquet bundle) is not asserted either: it moves
+  with bundle size, and the byte budget above already catches the failure mode that mattered.
+- Nothing here asserts smoothness of scrolling; only the numbers above are enforced.

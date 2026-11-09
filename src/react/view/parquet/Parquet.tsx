@@ -35,6 +35,24 @@ const PAGE_SIZE = PARQUET_PAGE_SIZE;
 /** Cap on matched rows kept in memory (highlight + navigation). */
 const SEARCH_MAX_ROWS = 5_000;
 
+/**
+ * Run background work when the page is idle.
+ *
+ * Prefetching the next page is a full data page per column (~1.2 s on a 60-column file) and
+ * it runs on the same thread as React. Started in the same tick as the visible page, it
+ * delayed a cache hit to 1.7 s; `requestIdleCallback` lets the render go first, and the
+ * timeout keeps a permanently busy page from starving the prefetch. Falls back to a timer
+ * where rIC does not exist.
+ */
+function schedulePrefetch(run: () => void): () => void {
+  if (typeof requestIdleCallback === "function") {
+    const handle = requestIdleCallback(run, { timeout: 1_500 });
+    return () => cancelIdleCallback(handle);
+  }
+  const handle = window.setTimeout(run, 250);
+  return () => window.clearTimeout(handle);
+}
+
 /** Wrap the matched runs of a cell value in <mark>, so a hit is visible in place. */
 function highlightCell(text: string, needle: string) {
   if (!needle) return text;
@@ -267,21 +285,29 @@ function ParquetViewer() {
     // Aborted from the cleanup rather than flipping a captured `let`: the session already
     // guards staleness, this only stops a superseded page from writing state.
     const controller = new AbortController();
+    let cancelPrefetch: (() => void) | undefined;
     void session
       .showPage(page)
       .then((snapshot) => {
         if (controller.signal.aborted || snapshot.stale) return;
         setPageRows(snapshot.rows);
         setPageLoading(false);
+        // Prefetch only once this page is on screen. Decoding the *next* page is a full
+        // page per column (~1.2 s on a 60-column file) and it runs on the same thread as
+        // React; starting it in the same tick as the visible page made a cache hit take
+        // 1.7 s instead of 0.5 s. Idle time is the right place for it.
+        cancelPrefetch = schedulePrefetch(() => {
+          if (!controller.signal.aborted) session.prefetch(page + 1);
+        });
       })
       .catch((e: unknown) => {
         if (controller.signal.aborted) return;
         setPageLoading(false);
         setError(e instanceof Error ? e.message : "Failed to read rows");
       });
-    session.prefetch(page + 1);
     return () => {
       controller.abort();
+      cancelPrefetch?.();
     };
   }, [fileInfo, page]);
 

@@ -665,6 +665,9 @@ const scenarios = [
     name: "parquet-prefetch",
     async run({ page, base, stats }) {
       await openParquet(page, base, "?mixed=1");
+      // The prefetch is idle-scheduled now (it used to start in the same tick as the visible
+      // page and delay it), so give the idle callback a chance before asserting on it.
+      await page.sleep(300);
       const before = await stats();
       await clickNextPage(page);
       const after = await stats();
