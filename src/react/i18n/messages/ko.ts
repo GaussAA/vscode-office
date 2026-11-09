@@ -8,6 +8,7 @@ export default {
     copied: "복사됨",
     save: "저장",
     close: "닫기",
+    retry: "다시 시도",
     delete: "삭제",
     loading: "로딩 중...",
     officeViewer: "Office 뷰어",
@@ -142,6 +143,9 @@ export default {
     branch: "브랜치",
   },
   parquet: {
+    columnOne: "열",
+    rowOne: "행",
+    noRows: "행 없음",
     inspectHint: "셀을 선택하면 값을 표시합니다",
     cappedSuffix: " · {max}에서 중단",
     invalidRow: "유효한 행 번호를 입력하세요",

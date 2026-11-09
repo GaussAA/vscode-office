@@ -8,6 +8,7 @@ export default {
     copied: "コピーしました",
     save: "保存",
     close: "閉じる",
+    retry: "再試行",
     delete: "削除",
     loading: "読み込み中...",
     officeViewer: "Office Viewer",
@@ -143,6 +144,9 @@ export default {
     branch: "ブランチ",
   },
   parquet: {
+    columnOne: "列",
+    rowOne: "行",
+    noRows: "行がありません",
     inspectHint: "セルを選択すると値を表示します",
     cappedSuffix: " · {max} で停止",
     invalidRow: "有効な行番号を入力してください",

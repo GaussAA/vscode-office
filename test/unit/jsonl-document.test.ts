@@ -34,6 +34,12 @@ test("index: an empty file still exposes one line", () => {
   assert.equal(readJsonlLineText(empty.bytes, empty.index, 0).text, "");
 });
 
+test("read: strips a UTF-8 BOM from the first line", () => {
+  const bom = open('\uFEFF{"a":1}\n{"b":2}\n');
+  assert.equal(readJsonlLineText(bom.bytes, bom.index, 0).text, '{"a":1}');
+  assert.equal(readJsonlLineText(bom.bytes, bom.index, 1).text, '{"b":2}');
+});
+
 test("read: strips a CRLF terminator from the decoded text", () => {
   const crlf = open('{"a":1}\r\n{"b":2}\n');
   assert.equal(crlf.index.lineCount, 2);

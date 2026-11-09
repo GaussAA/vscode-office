@@ -8,6 +8,7 @@ export default {
     copied: "Copiado",
     save: "Guardar",
     close: "Cerrar",
+    retry: "Reintentar",
     delete: "Eliminar",
     loading: "Cargando...",
     officeViewer: "Visor de Office",
@@ -144,6 +145,9 @@ export default {
     branch: "rama",
   },
   parquet: {
+    columnOne: "Columna",
+    rowOne: "Fila",
+    noRows: "Sin filas",
     inspectHint: "Selecciona una celda para ver su valor",
     cappedSuffix: " · detenido en {max}",
     invalidRow: "Introduce un número de fila válido",

@@ -8,6 +8,7 @@ export default {
     copied: "Copié",
     save: "Enregistrer",
     close: "Fermer",
+    retry: "Réessayer",
     delete: "Supprimer",
     loading: "Chargement...",
     officeViewer: "Office Viewer",
@@ -144,6 +145,9 @@ export default {
     branch: "branche",
   },
   parquet: {
+    columnOne: "Colonne",
+    rowOne: "Ligne",
+    noRows: "Aucune ligne",
     inspectHint: "Sélectionnez une cellule pour voir sa valeur",
     cappedSuffix: " · arrêté à {max}",
     invalidRow: "Veuillez saisir un numéro de ligne valide",

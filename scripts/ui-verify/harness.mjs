@@ -193,7 +193,7 @@ function jsonlStub(fixtures) {
       if (!msg) return;
       if (msg.type === 'init') {
         setTimeout(function () {
-          window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: 73482 } }, '*');
+          window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: summaries.length ? 73482 : 0 } }, '*');
         }, 60);
       }
       if (msg.type === 'jsonlIndex') {
@@ -251,6 +251,9 @@ function parquetStub() {
       const file = params.get('big') === '1' ? '/big.parquet'
         : params.get('mixed') === '1' ? '/mixed.parquet'
         : params.get('nested') === '1' ? '/nested.parquet'
+        : params.get('empty') === '1' ? '/empty.parquet'
+        : params.get('types') === '1' ? '/types.parquet'
+        : params.get('bad') === '1' ? '/bad.parquet'
         : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
       setTimeout(function () {
@@ -368,7 +371,7 @@ export function startHarness(fixtures, port = 0) {
           ? smokeStub(url.searchParams.get("route") ?? "html")
           : route === "parquet"
             ? parquetStub()
-            : jsonlStub(entries);
+            : jsonlStub(url.searchParams.get("empty") === "1" ? [] : entries);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;
@@ -419,7 +422,10 @@ export function startHarness(fixtures, port = 0) {
       path === "/sample.parquet" ||
       path === "/mixed.parquet" ||
       path === "/big.parquet" ||
-      path === "/nested.parquet"
+      path === "/nested.parquet" ||
+      path === "/empty.parquet" ||
+      path === "/types.parquet" ||
+      path === "/bad.parquet"
     ) {
       const file =
         path === "/sample.parquet"
@@ -428,7 +434,13 @@ export function startHarness(fixtures, port = 0) {
             ? fixtures.mixed
             : path === "/nested.parquet"
               ? fixtures.nested
-              : fixtures.big;
+              : path === "/empty.parquet"
+                ? fixtures.empty
+                : path === "/types.parquet"
+                  ? fixtures.types
+                  : path === "/bad.parquet"
+                    ? fixtures.bad
+                    : fixtures.big;
       serveParquet(req, res, file, stats, url.searchParams.get("range") !== "off");
       return;
     }

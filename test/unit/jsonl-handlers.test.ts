@@ -135,19 +135,36 @@ test("entry: a request for one line returns its parsed value", async () => {
   }
 });
 
-test("entry: a bad request emits nothing; a closed session is swallowed", async () => {
+test("entry: a malformed request emits nothing", async () => {
   const h = await harness(lines(2));
   try {
     await h.handlers.entry({ index: 0 });
     assert.deepEqual(h.types(), []);
+  } finally {
+    await h.cleanup();
+  }
+});
 
+test("entry: a closed session still answers with a terminal null entry", async () => {
+  const h = await harness(lines(2));
+  try {
     h.session.dispose();
     await h.handlers.entry({ requestId: 1, index: 0 });
-    assert.deepEqual(
-      h.types(),
-      [],
-      "a disposed session must not surface as an unhandled rejection",
-    );
+    const payload = h.last("jsonlEntryData").payload;
+    assert.equal(payload.requestId, 1);
+    assert.equal(payload.index, 0);
+    assert.equal(payload.entry, null, "the webview must clear its loading flag");
+  } finally {
+    await h.cleanup();
+  }
+});
+
+test("entry: an empty file answers with a terminal null entry", async () => {
+  const h = await harness("");
+  try {
+    await h.handlers.entry({ requestId: 2, index: 0 });
+    const payload = h.last("jsonlEntryData").payload;
+    assert.equal(payload.entry, null);
   } finally {
     await h.cleanup();
   }

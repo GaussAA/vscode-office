@@ -51,20 +51,26 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
       try {
         payload = await session().readRange(request.requestId, start, end);
       } catch {
-        return; // the file was swapped underneath us; the webview will ask again
+        // A failed range still has to answer: the client clears its loading flag on a reply.
+        payload = { requestId: request.requestId, start, entries: [] };
       }
       emit("jsonlEntries", payload);
     },
 
     async entry(request?: Partial<JsonlEntryRequest>) {
       if (typeof request?.requestId !== "number" || typeof request.index !== "number") return;
-      let payload: JsonlEntryPayload | null = null;
+      let payload: JsonlEntryPayload;
       try {
-        payload = await session().readEntry(request.requestId, request.index);
+        payload = (await session().readEntry(request.requestId, request.index)) ?? {
+          requestId: request.requestId,
+          index: request.index,
+          entry: null,
+        };
       } catch {
-        return;
+        // A read failure is a terminal answer too; otherwise the detail pane spins forever.
+        payload = { requestId: request.requestId, index: request.index, entry: null };
       }
-      if (payload) emit("jsonlEntryData", payload);
+      emit("jsonlEntryData", payload);
     },
 
     search(request?: JsonlSearchRequest) {

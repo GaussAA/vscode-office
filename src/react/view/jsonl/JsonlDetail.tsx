@@ -244,7 +244,7 @@ export default function JsonlDetail({
 
   const header = (
     <div className="jsonl-detail__header">
-      <span className="jsonl-detail__index">L{index + 1}</span>
+      {(entry || loading) && <span className="jsonl-detail__index">L{index + 1}</span>}
       {entry && (
         <span className={`jsonl-chip jsonl-chip--${chipClass(entry)}`}>{chipLabel(entry)}</span>
       )}
@@ -269,6 +269,7 @@ export default function JsonlDetail({
       <Segmented
         size="small"
         value={mode}
+        disabled={!entry}
         onChange={(value) => onModeChange(value as DetailMode)}
         options={[
           { label: $t("jsonl.tree"), value: "tree" },

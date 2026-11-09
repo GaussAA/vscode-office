@@ -181,8 +181,13 @@ export default function JsonlViewer() {
 
       setDirectory({ start: 0, end: 0, items: [] });
       setSelected(target);
-      recenter(target, payload.lineCount);
-      requestEntry(target);
+      if (payload.lineCount === 0) {
+        setDetail(null);
+        setDetailLoading(false);
+      } else {
+        recenter(target, payload.lineCount);
+        requestEntry(target);
+      }
 
       // the file changed under us: re-run an active search against the new bytes
       const activeQuery = queryRef.current.trim();
@@ -285,7 +290,7 @@ export default function JsonlViewer() {
   const items = searchActive ? searchEntries : directory.items;
 
   const jump = useCallback(() => {
-    if (!info || jumpValue == null) return;
+    if (!info || info.lineCount === 0 || jumpValue == null) return;
     const target = Math.min(info.lineCount - 1, Math.max(0, Math.round(jumpValue) - 1));
     if (query.trim()) {
       pendingJump.current = target;
@@ -391,10 +396,11 @@ export default function JsonlViewer() {
               value={jumpValue}
               placeholder={$t("jsonl.jumpPlaceholder")}
               className="jsonl-jump"
+              disabled={total === 0}
               onChange={(value) => setJumpValue(typeof value === "number" ? value : null)}
               onPressEnter={jump}
             />
-            <Button size="small" onClick={jump}>
+            <Button size="small" disabled={total === 0} onClick={jump}>
               {$t("jsonl.go")}
             </Button>
             <Button
@@ -407,49 +413,60 @@ export default function JsonlViewer() {
           </div>
         </div>
 
-        <Splitter
-          className="jsonl-splitter"
-          onResize={(sizes) => setLeftWidth(sizes[0] ?? DEFAULT_LEFT_WIDTH)}
-        >
-          <Splitter.Panel
-            defaultSize={leftWidth}
-            min={240}
-            max={720}
-            className="jsonl-splitter__panel"
-          >
-            <JsonlIndex
-              items={items}
-              selected={selected}
-              loading={searchActive ? false : chunkLoading}
-              onSelect={selectEntry}
-              onNeedMore={searchActive ? undefined : onNeedMore}
-              highlight={searchActive ? query.trim() : undefined}
-              emptyText={
-                searchActive
-                  ? searching
-                    ? $t("jsonl.searchingShort")
-                    : $t("jsonl.noMatches")
-                  : chunkLoading
-                    ? $t("jsonl.loading")
-                    : $t("jsonl.empty")
-              }
-            />
-          </Splitter.Panel>
-          <Splitter.Panel className="jsonl-splitter__panel">
-            <JsonlDetail
-              key={selected}
-              index={selected}
-              entry={detail}
-              loading={detailLoading}
-              mode={mode}
-              onModeChange={setMode}
-              actionsHost={detailBar}
-            />
-          </Splitter.Panel>
-        </Splitter>
-        <footer className="jsonl-bottombar">
-          <div className="jsonl-bottombar__detail" ref={setDetailBar} />
-        </footer>
+        {info && total === 0 ? (
+          <div className="jsonl-empty jsonl-empty--viewer">
+            <span className="codicon codicon-file" />
+            <span>{$t("jsonl.empty")}</span>
+          </div>
+        ) : (
+          <>
+            <Splitter
+              className="jsonl-splitter"
+              onResize={(sizes) => setLeftWidth(sizes[0] ?? DEFAULT_LEFT_WIDTH)}
+            >
+              <Splitter.Panel
+                defaultSize={leftWidth}
+                min={240}
+                max={720}
+                className="jsonl-splitter__panel"
+              >
+                <JsonlIndex
+                  items={items}
+                  selected={selected}
+                  loading={searchActive ? false : chunkLoading}
+                  onSelect={selectEntry}
+                  onNeedMore={searchActive ? undefined : onNeedMore}
+                  highlight={searchActive ? query.trim() : undefined}
+                  emptyText={
+                    !info
+                      ? $t("jsonl.loading")
+                      : searchActive
+                        ? searching
+                          ? $t("jsonl.searchingShort")
+                          : $t("jsonl.noMatches")
+                        : chunkLoading
+                          ? $t("jsonl.loading")
+                          : $t("jsonl.empty")
+                  }
+                />
+              </Splitter.Panel>
+              <Splitter.Panel className="jsonl-splitter__panel">
+                <JsonlDetail
+                  key={selected}
+                  index={selected}
+                  entry={detail}
+                  loading={detailLoading || !info}
+                  mode={mode}
+                  onModeChange={setMode}
+                  actionsHost={detailBar}
+                />
+              </Splitter.Panel>
+            </Splitter>
+            <footer className="jsonl-bottombar">
+              <div className="jsonl-bottombar__detail" ref={setDetailBar} />
+            </footer>
+          </>
+        )}
       </div>
     </ConfigProvider>
   );

@@ -8,6 +8,7 @@ export default {
     copied: "Скопировано",
     save: "Сохранить",
     close: "Закрыть",
+    retry: "Повторить",
     delete: "Удалить",
     loading: "Загрузка...",
     officeViewer: "Просмотр Office",
@@ -143,6 +144,9 @@ export default {
     branch: "ветка",
   },
   parquet: {
+    columnOne: "Столбец",
+    rowOne: "Строка",
+    noRows: "Нет строк",
     inspectHint: "Выберите ячейку, чтобы увидеть значение",
     cappedSuffix: " · остановлено на {max}",
     invalidRow: "Введите действительный номер строки",

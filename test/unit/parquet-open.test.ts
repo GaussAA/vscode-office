@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import type { SchemaElement } from "hyparquet";
 import {
+  categorizeType,
   describeColumn,
   formatCellValue,
   openParquetFile,
@@ -63,6 +64,16 @@ test("readParquetRows: list values are reachable under the column name", async (
   assert.equal(rows[1]["tags"] ?? null, null);
 });
 
+test("readParquetRows: an explicitly UTF8 column stays a string in raw mode", async () => {
+  const info = await openFixture();
+  const rows = await readParquetRows(info.file, info.metadata, 0, 1, { utf8: false });
+  assert.equal(
+    rows[0]["id"],
+    "row-1",
+    "the UTF8 annotation is authoritative; only an unannotated BYTE_ARRAY is bytes",
+  );
+});
+
 test("formatCellValue renders list values instead of an empty cell", async () => {
   const info = await openFixture();
   const rows = await readParquetRows(info.file, info.metadata, 0, 1);
@@ -97,6 +108,57 @@ test("describeColumn: a legacy repeated primitive is structural", () => {
 
   assert.equal(column.category, "structure");
   assert.equal(column.nested, true);
+});
+
+test("formatCellValue: binary bytes render as hex, not control characters", () => {
+  assert.equal(formatCellValue(new Uint8Array([0, 1, 2, 255])), "0x00 01 02 ff");
+  assert.equal(formatCellValue(new Uint8Array([1, 2, 3])), "0x01 02 03");
+  assert.equal(
+    formatCellValue({ blob: new Uint8Array([0xff, 0xfe]) }),
+    '{"blob":"0xff fe"}',
+    "nested binary values must not become numeric-key objects",
+  );
+  assert.equal(
+    formatCellValue("\u0000\u0001\u0002\u00ff", "BYTE_ARRAY"),
+    "0x00 01 02 c3 bf",
+    "hyparquet hands a plain BYTE_ARRAY back as UTF-8 text; the type must win",
+  );
+  assert.equal(formatCellValue("hello", "UTF8"), "hello", "a declared string column is not binary");
+  assert.equal(
+    formatCellValue(new TextEncoder().encode("hello"), "UTF8"),
+    "hello",
+    "raw UTF-8 bytes from a string column decode back to text",
+  );
+  assert.equal(
+    formatCellValue(new Uint8Array([0, 1, 2, 255]), "BYTE_ARRAY"),
+    "0x00 01 02 ff",
+    "raw bytes from a binary column stay exact",
+  );
+});
+
+test("formatCellValue: a UUID is canonical text, not a hex blob", () => {
+  const bytes = new Uint8Array([
+    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
+  ]);
+  assert.equal(formatCellValue(bytes, "UUID"), "00112233-4455-6677-8899-aabbccddeeff");
+});
+
+test("formatCellValue: a DATE column drops the midnight timestamp", () => {
+  const date = new Date("2023-06-15T00:00:00.000Z");
+  assert.equal(formatCellValue(date, "DATE"), "2023-06-15");
+  assert.equal(formatCellValue(date, "TIMESTAMP"), "2023-06-15T00:00:00.000Z");
+});
+
+test("formatCellValue: long binary values are capped but report their size", () => {
+  const bytes = new Uint8Array(40).fill(0xab);
+  const text = formatCellValue(bytes);
+  assert.match(text, /^0xab ab /);
+  assert.match(text, /\(40 B\)$/);
+});
+
+test("categorizeType: UUID and ENUM are string-like, not unknown fields", () => {
+  assert.equal(categorizeType("UUID"), "string");
+  assert.equal(categorizeType("ENUM"), "string");
 });
 
 test("describeColumn: a flat scalar stays a scalar", () => {
