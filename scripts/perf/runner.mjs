@@ -37,6 +37,14 @@ const FIRST_PAINT_BUDGET = 1.25;
 const SEARCH_BUDGET_FLAT_MS = 12_000;
 /** Milliseconds for a full scan of the 200k-row x 60-column file. Measured: ~1.2-2.4 s; the batched version takes ~40 s. */
 const SEARCH_BUDGET_WIDE_MS = 12_000;
+/**
+ * Milliseconds for a 21 MB CSV to paint its first windowed row. Measured: ~0.3-0.6 s.
+ * The full-parse path this replaces needed ~2.6 s for 37 MB and would have climbed with size;
+ * the window path's cost is a byte scan plus one block read, so the budget stays flat.
+ */
+const SHEET_WINDOW_BUDGET_MS = 2_000;
+/** The windowed path must not hold the sheet: bytes + offsets + one block, not one cell per value. */
+const SHEET_WINDOW_HEAP_MB = 200;
 
 const args = process.argv.slice(2);
 const headed = args.includes("--headed");
@@ -67,6 +75,7 @@ const readTiming = (page) =>
         ready: window.__bench?.ready ?? 0,
         heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
         cells: document.querySelectorAll('.parquet-viewer__cell').length,
+        sheetRows: document.querySelectorAll('.windowed-sheet__row').length,
       })`,
     )
     .then(JSON.parse);
@@ -131,6 +140,51 @@ const search = (page, needle) =>
     .then(JSON.parse);
 
 const scenarios = [
+  {
+    name: "sheet-window-first-paint",
+    async run({ page, base, harness, fixtures }) {
+      // 21 MB CSV: above the 8 MB window threshold, below the 25 MB guard. The editable grid
+      // would build ~2.2M cell objects; the windowed view scans bytes for record starts and
+      // renders one block.
+      harness.reset();
+      await page.navigate(`${base}/sheet`);
+      const ready = await page.waitFor(`(window.__bench?.ready ?? 0) > 0`, 60000);
+      expect(ready, "the windowed sheet never painted");
+      const timing = await readTiming(page);
+      const served = harness.snapshot();
+      const state = await page
+        .evaluate(
+          `JSON.stringify({
+            rows: document.querySelectorAll('.windowed-sheet__row').length,
+            total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
+            grid: !!document.querySelector('.x-spreadsheet'),
+          })`,
+        )
+        .then(JSON.parse);
+
+      expect(state.total >= 200_000, `only ${state.total} records were indexed`);
+      expect(!state.grid, "the editable grid mounted for a large file");
+      expect(
+        timing.sheetRows > 0 && timing.sheetRows < 100,
+        `${timing.sheetRows} rows are in the DOM; the viewport holds tens, not thousands`,
+      );
+      const ms = Math.round(timing.ready - timing.t0);
+      expect(
+        ms <= SHEET_WINDOW_BUDGET_MS,
+        `first windowed paint took ${ms} ms (budget ${SHEET_WINDOW_BUDGET_MS} ms)`,
+      );
+      expect(
+        timing.heapMB === null || timing.heapMB <= SHEET_WINDOW_HEAP_MB,
+        `heap ${timing.heapMB} MB over budget ${SHEET_WINDOW_HEAP_MB} MB; the sheet is being materialised`,
+      );
+      expect(
+        served.bytes <= fixtures.flatCsvBytes * 1.05,
+        `downloaded ${served.bytes} bytes for a ${fixtures.flatCsvBytes} byte file`,
+      );
+      return `${ms} ms, ${timing.sheetRows} rows in the DOM of ${state.total.toLocaleString()}, heap ${timing.heapMB} MB`;
+    },
+  },
+
   {
     name: "parquet-first-paint-bytes",
     async run({ page, base, harness, fixtures }) {

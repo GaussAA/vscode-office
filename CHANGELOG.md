@@ -22,6 +22,12 @@ Performance work on the parquet viewer, measured against a 1M-row single-row-gro
 
 Added:
 
+- **Large spreadsheets open as a read-only windowed view.** Above 8 MB, CSV/TSV are shown by
+  a viewport-rendering table instead of the editable grid: a 21 MB file paints in ~0.5 s with
+  33 MB of heap, where the grid path needs seconds and hundreds of megabytes. Editing large
+  files intentionally stays with the text editor (`Open in VS Code`). See
+  [ADR-0017](docs/adr/0017-windowed-spreadsheet.md).
+
 - **Oversized spreadsheets are not parsed automatically.** Above 25 MB (CSV/TSV) or 15 MB
   (xlsx/xlsm/xls/ods) — and above 50 MB for a parquet that arrives inline instead of being
   range-read — the viewer shows the size and an "Open anyway" button: a 152 MB CSV used to cost

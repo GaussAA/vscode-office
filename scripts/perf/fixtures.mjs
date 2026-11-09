@@ -15,6 +15,7 @@ const FLAT_ROWS = 1_000_000;
 const WIDE_ROWS = 200_000;
 const WIDE_TEXT_COLUMNS = 30;
 const WIDE_NUMBER_COLUMNS = 29;
+const CSV_ROWS = 280_000;
 
 function writeIfMissing(path, create) {
   if (existsSync(path) && statSync(path).size > 0) return path;
@@ -70,8 +71,23 @@ export function createPerfFixtures(cacheDir) {
     return parquetWriteBuffer({ columnData, rowGroupSize: WIDE_ROWS });
   });
 
+  // Just under the 25 MB size guard and well over the 8 MB window threshold: the file the
+  // windowed view exists for. 8 columns, ~70 bytes per row.
+  const flatCsv = writeIfMissing(join(cacheDir, "flat-20mb.csv"), () => {
+    const lines = ["id,name,score,ok,note,city,day,tag"];
+    for (let index = 1; index <= CSV_ROWS; index++) {
+      lines.push(
+        `${index},service-${index % 500},${(index % 10000) / 100},${index % 3 === 0},note ${index} lorem ipsum,beijing,2026-11-09,tag${index % 20}`,
+      );
+    }
+    return Buffer.from(`${lines.join("\n")}\n`, "utf8");
+  });
+
   return {
     flat,
+    flatCsv,
+    flatCsvRows: CSV_ROWS + 1,
+    flatCsvBytes: statSync(flatCsv).size,
     flatRows: FLAT_ROWS,
     flatBytes: statSync(flat).size,
     /** A needle that only exists in the very last row: the scan cannot stop early. */
