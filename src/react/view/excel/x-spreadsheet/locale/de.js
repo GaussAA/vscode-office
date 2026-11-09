@@ -85,6 +85,11 @@ export default {
     protectedCell: "Geschützte Zellen unterstützen diese Funktion nicht",
     readonlyBanner:
       "Schreibgeschützt — durchsuchen und suchen; zum Speichern „Speichern unter“ verwenden",
+    windowedBanner: "Schreibgeschützte Vorschau — große Dateien werden ohne Bearbeitung geöffnet",
+    matchesOne: "{} Treffer",
+    matchesMany: "{} Treffer",
+    goToRow: "Gehe zu Zeile",
+    go: "Los",
     formatCannotPreserveTitle: "Formatierung kann nicht beibehalten werden",
     formatCannotPreserveContent:
       "{} kann Stile, Zusammenführungen, Formeln usw. nicht beibehalten. Als xlsx speichern?",

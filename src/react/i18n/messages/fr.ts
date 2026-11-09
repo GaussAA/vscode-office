@@ -152,4 +152,9 @@ export default {
     cappedSuffix: " · arrêté à {max}",
     invalidRow: "Veuillez saisir un numéro de ligne valide",
   },
+  previewGuard: {
+    title: "Fichier trop volumineux pour un aperçu automatique",
+    body: "{file} fait {size}. Au-delà de {limit}, un fichier Parquet doit passer en un seul bloc par le pont de l'extension ; il n'est donc chargé qu'à la demande.",
+    open: "Ouvrir quand même",
+  },
 };

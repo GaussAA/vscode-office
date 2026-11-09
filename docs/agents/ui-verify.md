@@ -26,10 +26,10 @@ asserted (`0` new range reads when paging forward).
 
 ```bash
 pnpm build            # required: the harness serves out/webview
-pnpm verify:ui        # assert only
-pnpm verify:ui -- --docs              # also refresh docs/screenshots
-pnpm verify:ui --filter=parquet       # only matching scenarios (pnpm forwards args directly)
-pnpm verify:ui -- --headed # watch it run
+pnpm verify:ui                  # assert only
+pnpm verify:ui --docs           # also refresh docs/screenshots
+pnpm verify:ui --filter=parquet # only matching scenarios (pnpm forwards args directly)
+pnpm verify:ui --headed         # watch it run
 ```
 
 Chrome or Edge is auto-detected; set `CHROME_PATH` to override. Node >= 22 is required

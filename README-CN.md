@@ -8,7 +8,7 @@
 
 | 格式                                                   | 你能得到什么                                          |
 | ------------------------------------------------------ | ----------------------------------------------------- |
-| 表格：`.xls`、`.xlsx`、`.xlsm`、`.csv`、`.tsv`、`.ods` | 可编辑并写回的网格，带查找/替换                       |
+| 表格：`.xls`、`.xlsx`、`.xlsm`、`.csv`、`.tsv`、`.ods` | 可编辑网格与查找/替换；大文件进入只读窗口视图         |
 | Parquet：`.parquet`                                    | ZSTD/GZIP/BROTLI/LZ4 列、懒加载分页、全文件搜索，只读 |
 | JSONL / NDJSON：`.jsonl`、`.ndjson`                    | 左侧条目目录，右侧把选中条目渲染成树或原文            |
 
@@ -37,13 +37,13 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解码。
 - **支持时按 Range 取字节**：先用 2 字节探测，支持就只读 footer 和你看的页，否则退回一次性拉取；
   控制台会打印 `[parquet] source: ranged|full`。
 - **百万行也能导航**：按行号跳转，页脚显示当前区间（`239,951–240,000 of 250,000`）。
-- **按类型渲染**：数字右对齐 + 等宽数字，字符串/布尔/时间戳按主题着色，null 显示为 `NULL`，
-  点击单元格可查看完整值。
+- **按类型渲染**：数字右对齐 + 等宽数字，字符串/布尔/时间戳按主题着色，普通 `BYTE_ARRAY`
+  以十六进制显示，null 显示为 `NULL`，点击单元格可查看完整值。
 
 ![Parquet 类型着色](docs/screenshots/parquet-types.png)
 
-工具栏的 **Find in file** 按 5000 行一批扫描全文件，带进度、标记命中行、在单元格内高亮匹配文本，
-并自动跳到第一条命中。
+工具栏的 **Find in file** 每列只扫描一遍全文件，带进度、标记命中行、在单元格内高亮匹配文本，
+并自动跳到第一条命中；100 万行约 1.3 秒。
 
 查看器跟随 VS Code 主题——包括以前在深色视图下仍是浅色的 antd 控件。没有单独的明暗切换开关。
 
@@ -65,15 +65,19 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解码。
 ```bash
 pnpm test        # 解析逻辑单测（node:test，不引入额外框架）
 pnpm verify:ui   # 无头浏览器 DOM 断言；截图输出到 .ui-verify/shots
+pnpm verify:perf # 大文件首屏字节数/耗时与搜索耗时闸门
 ```
 
-CI 在每次 push 时都会跑这两项，以及 `pnpm build` 和 `pnpm run package`。`pnpm verify:ui -- --docs`
+CI 在每次 push 时都会跑这三项，以及 `pnpm build` 和 `pnpm run package`。`pnpm verify:ui --docs`
 可刷新上面的截图。
 
 ### 已知限制
 
 - 超大文件的 parquet 全文件搜索受 I/O 限制（会读取访问到的每个 row group）。
 - parquet 只读，没有写端。
+- 表格超过 8 MB 时进入只读窗口视图（只渲染视口内的行）。工作簿超过 15 MB、虚拟工作区里的
+  CSV/TSV 超过 25 MB 时先询问再加载；本地 CSV/TSV 最多可窗口化到 200 MB。工作簿以行文本
+  窗口化，所以超过 8 MB 也是只读。
 - JSONL 搜索匹配原始文本，不理解 JSON 路径。
 - 上游的遥测已完全移除。
 
@@ -88,7 +92,7 @@ CI 在每次 push 时都会跑这两项，以及 `pnpm build` 和 `pnpm run pack
 
 - YAML：文档大纲与锚点导航（别名引用可跳转到定义）
 - XML：文档格式化
-- 图标主题：25 个 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 图标
+- 图标主题：8 个 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 图标，覆盖表格、parquet 与 JSONL
 
 ## 开发
 
@@ -97,7 +101,7 @@ pnpm install
 pnpm build        # 生产构建到 out/
 pnpm run package  # 打 vsix（需先 build）
 pnpm check        # 格式 + lint + 基线 + 类型 + 单测
-pnpm check:full   # check + build + smoke + verify:ui
+pnpm check:full   # check + build + smoke + verify:ui + verify:perf
 ```
 
 在 VS Code 里按 `F5`，选择 **Extension** 运行本地构建。

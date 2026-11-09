@@ -18,62 +18,11 @@
     "table": {
       "iconPath": "./../icons/table.svg"
     },
-    "word": {
-      "iconPath": "./../icons/word.svg"
-    },
-    "powerpoint": {
-      "iconPath": "./../icons/powerpoint.svg"
-    },
-    "pdf": {
-      "iconPath": "./../icons/pdf.svg"
-    },
-    "epub": {
-      "iconPath": "./../icons/epub.svg"
-    },
-    "font": {
-      "iconPath": "./../icons/font.svg"
-    },
-    "ico": {
-      "iconPath": "./../icons/ico.svg"
-    },
-    "image": {
-      "iconPath": "./../icons/image.svg"
-    },
-    "adobe-photoshop": {
-      "iconPath": "./../icons/adobe-photoshop.svg"
-    },
-    "roadmap": {
-      "iconPath": "./../icons/roadmap.svg"
-    },
-    "heic": {
-      "iconPath": "./../icons/heic.svg"
-    },
-    "java": {
-      "iconPath": "./../icons/java.svg"
-    },
-    "zip": {
-      "iconPath": "./../icons/zip.svg"
-    },
-    "android": {
-      "iconPath": "./../icons/android.svg"
-    },
-    "vscode": {
-      "iconPath": "./../icons/vscode.svg"
-    },
-    "html": {
-      "iconPath": "./../icons/html.svg"
-    },
-    "javaclass": {
-      "iconPath": "./../icons/javaclass.svg"
-    },
     "parquet": {
       "iconPath": "./../icons/parquet.svg"
     },
     "json": {
       "iconPath": "./../icons/json.svg"
-    },
-    "adobe-photoshop_light": {
-      "iconPath": "./../icons/adobe-photoshop_light.svg"
     }
   },
   "fileExtensions": {
@@ -83,48 +32,6 @@
     "csv": "table",
     "tsv": "table",
     "ods": "table",
-    "docx": "word",
-    "dotx": "word",
-    "pptx": "powerpoint",
-    "pptm": "powerpoint",
-    "pdf": "pdf",
-    "epub": "epub",
-    "ttf": "font",
-    "woff": "font",
-    "woff2": "font",
-    "otf": "font",
-    "icns": "image",
-    "psd": "adobe-photoshop",
-    "xmind": "roadmap",
-    "tiff": "image",
-    "tif": "image",
-    "heif": "heic",
-    "heic": "heic",
-    "jar": "java",
-    "zip": "zip",
-    "7z": "zip",
-    "rar": "zip",
-    "tgz": "zip",
-    "tar": "zip",
-    "gz": "zip",
-    "apk": "android",
-    "vsix": "vscode",
-    "crx": "zip",
-    "jpg": "image",
-    "jpeg": "image",
-    "png": "image",
-    "gif": "image",
-    "apng": "image",
-    "bmp": "image",
-    "ico": "ico",
-    "cur": "image",
-    "pjpeg": "image",
-    "pjp": "image",
-    "webp": "image",
-    "htm": "html",
-    "html": "html",
-    "xhtml": "html",
-    "class": "javaclass",
     "parquet": "parquet",
     "jsonl": "json",
     "ndjson": "json"
@@ -134,10 +41,5 @@
   "folderExpanded": "folder-open",
   "rootFolder": "folder-root",
   "rootFolderExpanded": "folder-root-open",
-  "hidesExplorerArrows": false,
-  "light": {
-    "fileExtensions": {
-      "psd": "adobe-photoshop_light"
-    }
-  }
+  "hidesExplorerArrows": false
 }

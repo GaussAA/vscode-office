@@ -15,9 +15,12 @@ import { handler } from "../../util/vscode.ts";
 import { getVscodeThemeColor, useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
+import type { OfficeOpenMessage } from "@/common/openPayload";
+import { formatBytes, previewLimitBytes } from "@/common/previewLimit";
 import { highlightRuns } from "../../common/highlight.ts";
 import { savePersistedState } from "../../common/persistedState.ts";
 import { ParquetSession } from "./parquetSession.ts";
+import { searchParquetValues } from "./parquetSearch.ts";
 import SponsorBar from "../components/SponsorBar.tsx";
 import {
   formatCellValue,
@@ -31,8 +34,6 @@ import {
 import "./Parquet.less";
 
 const PAGE_SIZE = PARQUET_PAGE_SIZE;
-/** Rows read per batch while searching the whole file. */
-const SEARCH_BATCH = 5_000;
 /** Cap on matched rows kept in memory (highlight + navigation). */
 const SEARCH_MAX_ROWS = 5_000;
 /** Schema sidebar bounds; the drag handle and keyboard use the same range. */
@@ -40,6 +41,24 @@ const SIDER_MIN = 208;
 const SIDER_MAX = 420;
 const SIDER_DEFAULT = 260;
 const SIDER_STORAGE_KEY = "parquet-sider-width";
+
+/**
+ * Run background work when the page is idle.
+ *
+ * Prefetching the next page is a full data page per column (~1.2 s on a 60-column file) and
+ * it runs on the same thread as React. Started in the same tick as the visible page, it
+ * delayed a cache hit to 1.7 s; `requestIdleCallback` lets the render go first, and the
+ * timeout keeps a permanently busy page from starving the prefetch. Falls back to a timer
+ * where rIC does not exist.
+ */
+function schedulePrefetch(run: () => void): () => void {
+  if (typeof requestIdleCallback === "function") {
+    const handle = requestIdleCallback(run, { timeout: 1_500 });
+    return () => cancelIdleCallback(handle);
+  }
+  const handle = window.setTimeout(run, 250);
+  return () => window.clearTimeout(handle);
+}
 
 /** Wrap the matched runs of a cell value in <mark>, so a hit is visible in place. */
 function highlightCell(text: string, needle: string) {
@@ -69,6 +88,14 @@ const COLUMN_ICONS: Record<ColumnCategory, string> = {
 };
 
 type TableRow = Record<string, unknown> & { key: string };
+
+/** A virtual document arrives as inline base64; a local one as a fetchable path. */
+type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBase64"> & {
+  fileName?: string;
+  ext?: string;
+  size?: number;
+  tooLarge?: boolean;
+};
 
 /** Keyboard cursor into the visible page: row is page-local, col indexes fileInfo.columns. */
 interface CellCursor {
@@ -187,6 +214,15 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set when the host refused to inline an oversized virtual document. */
+  const [tooLarge, setTooLarge] = useState<{
+    size: number;
+    name: string;
+    ext: string;
+  } | null>(null);
+  /** True once the user answered "open anyway": the retry must not be gated again. */
+  const forcedRef = useRef(false);
+  const lastPathRef = useRef<string | undefined>(undefined);
   /** Keyboard cursor into the grid; null until an arrow key (or a click) lands somewhere. */
   const [cursor, setCursor] = useState<CellCursor | null>(null);
   const [siderWidth, setSiderWidth] = useState(() => {
@@ -232,7 +268,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   }, [pageRows, page]);
 
   const loadParquet = useCallback(
-    async (payload: { path?: string; buffer?: number[] }) => {
+    async (payload: ParquetOpenPayload) => {
       setLoading(true);
       setError(null);
       setFileInfo(null);
@@ -254,12 +290,13 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       documentKeyRef.current = undefined;
       setPage(0);
       try {
-        // Files arrive either as an inline byte array (virtual documents) or as a
+        // Files arrive either as an inline base64 payload (virtual documents) or as a
         // fetchable URI. For URIs we probe Range support so hyparquet pulls only the
         // footer and the pages it needs, instead of the whole file.
-        const info = payload.buffer?.length
-          ? await openParquetFile(arrayBufferFromPayload(payload))
-          : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
+        const info =
+          payload.bufferBase64 || payload.buffer?.length
+            ? await openParquetFile(arrayBufferFromPayload(payload))
+            : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
         fileInfoRef.current = info;
         setFileInfo(info);
         // Come back to the page this document was left on, clamped: the file may have
@@ -295,21 +332,29 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     // Aborted from the cleanup rather than flipping a captured `let`: the session already
     // guards staleness, this only stops a superseded page from writing state.
     const controller = new AbortController();
+    let cancelPrefetch: (() => void) | undefined;
     void session
       .showPage(page)
       .then((snapshot) => {
         if (controller.signal.aborted || snapshot.stale) return;
         setPageRows(snapshot.rows);
         setPageLoading(false);
+        // Prefetch only once this page is on screen. Decoding the *next* page is a full
+        // page per column (~1.2 s on a 60-column file) and it runs on the same thread as
+        // React; starting it in the same tick as the visible page made a cache hit take
+        // 1.7 s instead of 0.5 s. Idle time is the right place for it.
+        cancelPrefetch = schedulePrefetch(() => {
+          if (!controller.signal.aborted) session.prefetch(page + 1);
+        });
       })
       .catch((e: unknown) => {
         if (controller.signal.aborted) return;
         setPageLoading(false);
         setError(e instanceof Error ? e.message : "Failed to read rows");
       });
-    session.prefetch(page + 1);
     return () => {
       controller.abort();
+      cancelPrefetch?.();
     };
   }, [fileInfo, page]);
 
@@ -425,48 +470,34 @@ function ParquetViewer({ dark }: { dark: boolean }) {
 
   const runSearch = useCallback(async () => {
     const info = fileInfoRef.current;
-    const session = sessionRef.current;
     const needle = query.trim().toLowerCase();
     const seq = ++searchSeq.current;
     setMatchRows(new Set());
     setSearchCapped(false);
-    if (!info || !session || !needle) {
+    if (!info || !needle) {
       setSearching(false);
       setSearchProgress(null);
       return;
     }
     setSearching(true);
     setSearchProgress({ scanned: 0, total: info.rowCount, matches: 0 });
-    const found = new Set<number>();
     try {
-      // Batch by batch, so a 250k-row file never lands in memory at once and the
-      // scan can be cancelled by a newer query. Reading through the session means the
-      // scan sees edited cells, exactly like the table does.
-      for (let start = 0; start < info.rowCount; start += SEARCH_BATCH) {
-        if (seq !== searchSeq.current) return;
-        const end = Math.min(info.rowCount, start + SEARCH_BATCH);
-        const rows = await session.readRange(start, end);
-        for (let offset = 0; offset < rows.length; offset++) {
-          const row = rows[offset];
-          const hit = info.columns.some((column) =>
-            formatCellValue(row[column.name], column.type).toLowerCase().includes(needle),
-          );
-          if (hit) found.add(start + offset);
-        }
-        setSearchProgress({ scanned: end, total: info.rowCount, matches: found.size });
-        if (found.size >= SEARCH_MAX_ROWS) {
-          // JSONL shows the same kind of suffix; stopping silently would read as "that
-          // was every match" when it was only the first 5,000.
-          setSearchCapped(true);
-          break;
-        }
-        await new Promise((resolve) => window.setTimeout(resolve, 0));
-      }
-      if (seq !== searchSeq.current) return;
-      setMatchRows(found);
-      if (found.size > 0) {
-        const first = found.values().next().value as number;
-        const target = Math.floor(first / PAGE_SIZE);
+      // One page-aligned pass over the file, column by column, instead of a read per
+      // 5000-row batch: without an offset index every batch re-decoded the data page that
+      // contained it, which made a 1M-row file take ~28 s. See parquetSearch.ts.
+      const result = await searchParquetValues(info, needle, {
+        maxRows: SEARCH_MAX_ROWS,
+        isCancelled: () => seq !== searchSeq.current,
+        onProgress: (scanned, matches) => {
+          if (seq === searchSeq.current)
+            setSearchProgress({ scanned, total: info.rowCount, matches });
+        },
+      });
+      if (seq !== searchSeq.current || result.cancelled) return;
+      setMatchRows(new Set(result.rows));
+      setSearchCapped(result.capped);
+      if (result.rows.length > 0) {
+        const target = Math.floor(result.rows[0] / PAGE_SIZE);
         goToPage((current) => (current === target ? current : target));
       }
     } catch (e) {
@@ -631,7 +662,24 @@ function ParquetViewer({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     handler
-      .on("open", (payload) => {
+      .on("open", (payload: ParquetOpenPayload) => {
+        if (payload.path !== lastPathRef.current) {
+          // A different document: "open anyway" never carries over to it.
+          forcedRef.current = false;
+          lastPathRef.current = payload.path;
+        }
+        // Only virtual documents are gated: a local file is paged with range requests, so its
+        // size is irrelevant; one that arrives inline pays for the whole file at once.
+        if (!forcedRef.current && payload.tooLarge) {
+          setTooLarge({
+            size: payload.size ?? 0,
+            name: payload.fileName ?? "",
+            ext: payload.ext ?? ".parquet",
+          });
+          setLoading(false);
+          return;
+        }
+        setTooLarge(null);
         void loadParquet(payload);
       })
       .emit("init");
@@ -646,8 +694,37 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       : formatCellValue(inspected.value, inspectedType)
     : "";
 
+  /** The host refused to inline an oversized virtual document; ask it to read it anyway. */
+  const handleOpenAnyway = useCallback(() => {
+    forcedRef.current = true;
+    setTooLarge(null);
+    setLoading(true);
+    handler.emit("openForce");
+  }, []);
+
   return (
     <div className={`parquet-viewer${dark ? "" : " parquet-viewer--light"}`}>
+      {tooLarge && !loading && (
+        <div className="parquet-viewer__too-large">
+          <div className="parquet-viewer__too-large-panel">
+            <h2 className="parquet-viewer__too-large-title">{$t("previewGuard.title")}</h2>
+            <p className="parquet-viewer__too-large-body">
+              {$t("previewGuard.body", {
+                file: tooLarge.name,
+                size: formatBytes(tooLarge.size),
+                limit: formatBytes(previewLimitBytes(tooLarge.ext)),
+              })}
+            </p>
+            <button
+              type="button"
+              className="parquet-viewer__pager-btn parquet-viewer__too-large-open"
+              onClick={handleOpenAnyway}
+            >
+              {$t("previewGuard.open")}
+            </button>
+          </div>
+        </div>
+      )}
       {loading && (
         <div className="parquet-viewer__overlay">
           <span className="codicon codicon-loading codicon-modifier-spin" />

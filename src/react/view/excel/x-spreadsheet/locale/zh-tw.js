@@ -155,6 +155,16 @@ export default {
     saveSuccess: "儲存成功",
     protectedCell: "受保護的儲存格不支援此功能",
     readonlyBanner: "唯讀模式 — 可瀏覽與尋找，請使用「另存新檔」儲存變更",
+    windowedBanner: "唯讀預覽 — 大檔案不提供編輯",
+    matchesOne: "{} 個符合",
+    matchesMany: "{} 個符合",
+    goToRow: "跳轉到列",
+    go: "跳轉",
+    tooLargeTitle: "檔案較大，未自動預覽",
+    tooLargeBody:
+      "{} 有 {}，超過預覽上限 {}。解析這種體積的檔案可能要數十秒並佔用上千兆記憶體，所以暫不自動載入。",
+    tooLargeOpen: "仍然開啟",
+    tooLargeOpenInVSCode: "在 VS Code 中開啟",
     formatCannotPreserveTitle: "格式將無法保留",
     formatCannotPreserveContent:
       "{} 格式不支援儲存樣式、合併儲存格、公式等豐富格式內容。是否另存為 xlsx？",

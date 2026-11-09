@@ -71,9 +71,9 @@ original authors.
 
 ### Copies
 
-| Path                                             | Project                                                                                     | License | Upstream                                            |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------- |
-| `icons/` (25 SVGs) + `theme/material-icons.json` | Derived from `vscode-material-icon-theme`, reduced to the file formats this extension opens | MIT     | https://github.com/PKief/vscode-material-icon-theme |
+| Path                                            | Project                                                                                     | License | Upstream                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------- |
+| `icons/` (8 SVGs) + `theme/material-icons.json` | Derived from `vscode-material-icon-theme`, reduced to the file formats this extension opens | MIT     | https://github.com/PKief/vscode-material-icon-theme |
 
 ### Forks
 

@@ -1,5 +1,72 @@
 # Change log
 
+# 6.1.0 2026-11-09
+
+The parquet and JSONL viewers share a rebuilt shell, and large files cost much less to open.
+
+Changed:
+
+- **Parquet and JSONL are laid out as surfaces, not rules.** The command bar, content panes
+  and bottom bar use tonal surfaces instead of full-width dividers; the splitter only shows a
+  handle on hover. The parquet schema sidebar is resizable, numeric columns align right, and
+  long column names keep a one-line header with the full name in `title`.
+- **The JSONL detail identity and actions moved into the bottom bar.** Search count is inline
+  next to the search field, so the directory and detail panes start at the same height and only
+  the top/bottom bars span the surface. Long values wrap; large entries stay single-line and
+  virtualised.
+- **Dense tables are readable in both themes.** Parquet uses a 12px mono table and a 10.5px
+  header; semantic colours have dedicated light-theme values and measure at least 5.1:1 against
+  white. The toolbar, scrollbars, buttons and segmented controls share one control vocabulary.
+- **Empty, malformed and oversized states are explicit.** A zero-row parquet shows a centred
+  `No rows` state with jump disabled; a malformed file shows its parser error plus `Retry`; an
+  oversized inline parquet asks before loading. A zero-line JSONL is one centred empty state
+  with no fake row; invalid / too-large lines get a narrow chip and a truncated raw view.
+- **Binary and logical values render correctly.** Plain `BYTE_ARRAY` values show exact hex
+  (`0x00 01 02 ff`) instead of decoded control characters; UTF8/STRING still decode, UUID bytes
+  become canonical UUID text, `DATE` drops the midnight timestamp, and `ENUM` is no longer
+  classified numeric.
+- **JSONL handles UTF-8 BOM, CRLF and empty entries**, and an empty/unreadable entry request
+  terminates instead of leaving the detail pane spinning.
+
+Performance:
+
+Measured against a 1M-row single-row-group parquet
+(PyArrow's default shape) in the built webview:
+
+- **First paint reads the file once, not twice.** The visible page and its prefetch computed
+  the same read plan in the same tick; identical in-flight range requests now share one fetch,
+  and the byte cache is interval-based. 26.9 MB → 13.7 MB (2.04x → 1.04x of the file), and
+  0.97 s → 0.31 s on the same machine.
+- **Whole-file search is a single pass.** 5000-row batches re-decoded the data page that
+  contained each batch. 1M rows: 28 s → ~1.4 s; 200k × 60 columns: 40 s → ~1.5 s.
+- **Wide-table page turns no longer wait for the next page's decode.** The prefetch is
+  idle-scheduled now; a cache hit on a 60-column file went from 1.2–1.9 s to ~0.5 s.
+- **Virtual documents cross the webview bridge as base64, not a number array.** The host used
+  to send `Array.from(bytes)`, which a JSON `postMessage` inflates to 5-8x the file; base64 is
+  4/3. A 20 MB parquet opened from GitHub Repos or a `git:` history entry spent ~70 MB of
+  message and heap on the same bytes. Saving uses the same encoding, so a saved workbook no
+  longer travels as a number array either.
+- `pnpm verify:perf` makes the first two numbers a CI gate.
+
+Added:
+
+- **Large spreadsheets open as a read-only windowed view.** Above 8 MB, CSV/TSV are shown by
+  a viewport-rendering table instead of the editable grid: a 21 MB file paints in ~0.5 s with
+  33 MB of heap, where the grid path needs seconds and hundreds of megabytes. Editing large
+  files intentionally stays with the text editor (`Open in VS Code`). The read-only view can
+  find across the whole file and jump to a row without materialising the sheet. Because the
+  windowed view costs a file's bytes rather than nine times them, the local CSV/TSV size limit
+  moves from 25 MB to 200 MB; virtual workspaces keep 25 MB (inline bridge payload) and
+  workbooks keep 15 MB. `.xlsx`/`.xlsm` above 8 MB also open in the read-only window (parsed as
+  row text instead of one object per cell, with a sheet picker); older `.xls`/`.ods` keep the
+  SheetJS grid. See [ADR-0017](docs/adr/0017-windowed-spreadsheet.md).
+
+- **Oversized spreadsheets are not parsed automatically.** Above 25 MB (CSV/TSV) or 15 MB
+  (xlsx/xlsm/xls/ods) — and above 50 MB for a parquet that arrives inline instead of being
+  range-read — the viewer shows the size and an "Open anyway" button: a 152 MB CSV used to cost
+  9.7 s and 1.36 GB of heap. See
+  [ADR-0016](docs/adr/0016-preview-size-guard.md).
+
 # 6.0.1 2026-11-09
 
 Fixed:
