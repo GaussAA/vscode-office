@@ -227,6 +227,8 @@ export default {
     codecWarningBody:
       "This file stores its columns as {codecs}. Saving writes every column back as SNAPPY, so the encoding changes even though the data does not.",
     saveAnyway: "Save anyway",
+    unsupportedSave:
+      "Cannot save: this file contains nested or structural columns ({columns}). Saving is only supported for flat scalar columns.",
   },
   jsonl: {
     entriesCount: "{count} entries",

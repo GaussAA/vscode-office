@@ -222,6 +222,7 @@ export default {
     codecWarningBody:
       "该文件的列以 {codecs} 存储。保存会把所有列写回 SNAPPY —— 数据不变，但编码会变。",
     saveAnyway: "仍然保存",
+    unsupportedSave: "无法保存：该文件包含嵌套或结构列（{columns}）。仅支持保存扁平标量列。",
   },
   jsonl: {
     entriesCount: "共 {count} 条",

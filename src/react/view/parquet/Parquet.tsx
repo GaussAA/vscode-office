@@ -16,6 +16,7 @@ import {
   openParquetFile,
   parseCellInput,
   readParquetRows,
+  UnsupportedColumnsError,
   writeParquetBuffer,
   type ColumnCategory,
   type ParquetColumnInfo,
@@ -193,7 +194,12 @@ function ParquetViewer() {
       } catch (e) {
         savingRef.current = false;
         setSaving(false);
-        const errMessage = e instanceof Error ? e.message : "Failed to serialize parquet file";
+        const errMessage =
+          e instanceof UnsupportedColumnsError
+            ? $t("parquet.unsupportedSave", { columns: e.columns.join(", ") })
+            : e instanceof Error
+              ? e.message
+              : "Failed to serialize parquet file";
         setError(errMessage);
         message.error(errMessage);
       }

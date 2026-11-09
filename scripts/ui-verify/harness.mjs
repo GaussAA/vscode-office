@@ -241,7 +241,10 @@ function parquetStub() {
     postMessage(msg) {
       if (!msg || msg.type !== 'init') return;
       const params = new URLSearchParams(location.search);
-      const file = params.get('big') === '1' ? '/big.parquet' : params.get('mixed') === '1' ? '/mixed.parquet' : '/sample.parquet';
+      const file = params.get('big') === '1' ? '/big.parquet'
+        : params.get('mixed') === '1' ? '/mixed.parquet'
+        : params.get('nested') === '1' ? '/nested.parquet'
+        : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
       setTimeout(function () {
         window.postMessage({ type: 'open', content: { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo', readOnly: false } }, '*');
@@ -406,13 +409,20 @@ export function startHarness(fixtures, port = 0) {
       return;
     }
 
-    if (path === "/sample.parquet" || path === "/mixed.parquet" || path === "/big.parquet") {
+    if (
+      path === "/sample.parquet" ||
+      path === "/mixed.parquet" ||
+      path === "/big.parquet" ||
+      path === "/nested.parquet"
+    ) {
       const file =
         path === "/sample.parquet"
           ? fixtures.sample
           : path === "/mixed.parquet"
             ? fixtures.mixed
-            : fixtures.big;
+            : path === "/nested.parquet"
+              ? fixtures.nested
+              : fixtures.big;
       serveParquet(req, res, file, stats, url.searchParams.get("range") !== "off");
       return;
     }

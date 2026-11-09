@@ -267,6 +267,35 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-nested-columns",
+    async run({ page, base }) {
+      await openParquet(page, base, "?nested=1");
+
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                names: [...document.querySelectorAll('.parquet-viewer__list-name')].map(n => n.textContent),
+                firstRow: [...document.querySelectorAll('.parquet-table tbody tr:nth-child(2) .parquet-viewer__cell')].map(n => n.textContent),
+                editable: document.querySelectorAll('.parquet-viewer__cell--editable').length,
+            })`),
+      );
+      expect(
+        state.names.join(",") === "id,tags,meta",
+        `nested column names: ${state.names.join(",")}`,
+      );
+      expect(
+        !state.names.some((name) => name.includes(".list.element")),
+        "a physical leaf path leaked into the column list",
+      );
+      expect(
+        state.firstRow.join("|").includes('["ko","en"]'),
+        `LIST cell did not render JSON: ${state.firstRow.join("|")}`,
+      );
+      // Two rows, one editable scalar column; LIST/STRUCT must stay read-only.
+      expect(state.editable === 2, `nested cells stayed editable: ${state.editable}`);
+      return "top-level names + JSON cell + read-only nested columns";
+    },
+  },
+  {
     name: "parquet-restore-page",
     docs: "parquet-restore-page.png",
     async run({ page, base }) {

@@ -199,4 +199,8 @@ export default {
     commit: "commit",
     branch: "branch",
   },
+  parquet: {
+    unsupportedSave:
+      "Não é possível salvar: este arquivo contém colunas aninhadas ou estruturais ({columns}). O salvamento só é suportado para colunas escalares planas.",
+  },
 };

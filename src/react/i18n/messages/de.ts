@@ -198,4 +198,8 @@ export default {
     commit: "Commit",
     branch: "Branch",
   },
+  parquet: {
+    unsupportedSave:
+      "Speichern nicht möglich: Diese Datei enthält verschachtelte oder strukturelle Spalten ({columns}). Speichern wird nur für flache skalare Spalten unterstützt.",
+  },
 };

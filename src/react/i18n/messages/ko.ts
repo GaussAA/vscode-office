@@ -198,4 +198,8 @@ export default {
     commit: "커밋",
     branch: "브랜치",
   },
+  parquet: {
+    unsupportedSave:
+      "저장할 수 없습니다: 이 파일에는 중첩되거나 구조적인 열({columns})이 있습니다. 저장은 평면 스칼라 열만 지원합니다.",
+  },
 };
