@@ -87,6 +87,8 @@ CI runs both on every push, together with `pnpm build` and `pnpm run package`. A
 - Whole-file parquet search on a very large file is I/O bound because it reads every row
   group it visits.
 - Parquet is read-only; there is no writer.
+- Spreadsheets above 8 MB open in a read-only windowed view (viewport rows only); above
+  25 MB (CSV/TSV) or 15 MB (xlsx/xlsm/xls/ods) the viewer asks before loading at all.
 - JSONL search matches raw text, not JSON paths.
 - Upstream telemetry has been removed entirely.
 

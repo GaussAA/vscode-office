@@ -155,6 +155,7 @@ export default {
     saveSuccess: "保存成功",
     protectedCell: "被保护单元格不支持此功能",
     readonlyBanner: "只读模式 — 可浏览与查找，请使用「另存为」保存更改",
+    windowedBanner: "只读预览 — 大文件不提供编辑",
     tooLargeTitle: "文件较大，未自动预览",
     tooLargeBody:
       "{} 有 {}，超过预览上限 {}。解析这种体积的文件可能要几十秒并占用上千兆内存，所以暂不自动加载。",

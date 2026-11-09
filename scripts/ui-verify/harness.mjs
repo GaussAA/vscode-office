@@ -392,6 +392,36 @@ function excelGuardStub() {
 </script>`;
 }
 
+/**
+ * Bridge for the large-file windowed view: a `file:` payload just under the size guard, so the
+ * viewer picks the read-only window instead of the editable grid.
+ */
+function excelWindowStub() {
+  return `<script>
+(function () {
+  const api = {
+    postMessage(msg) {
+      if (!msg || msg.type !== 'init') return;
+      setTimeout(function () {
+        window.postMessage({ type: 'open', content: {
+          ext: '.csv',
+          fileName: 'window.csv',
+          path: '/window.csv',
+          scheme: 'file',
+          size: 12 * 1024 * 1024,
+          readOnly: true,
+          documentCacheId: 'demo:window',
+        } }, '*');
+      }, 60);
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
+
 export function startHarness(fixtures, port = 0) {
   if (!existsSync(join(WEBVIEW_ROOT, "index.html"))) {
     throw new Error("out/webview/index.html is missing — run `pnpm build` first");
@@ -419,13 +449,16 @@ export function startHarness(fixtures, port = 0) {
             : "jsonl";
       const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
       const guard = path === "/harness-route" && url.searchParams.get("guard") === "1";
+      const windowed = path === "/harness-route" && url.searchParams.get("window") === "1";
       const stub = guard
         ? excelGuardStub()
-        : path === "/harness-route"
-          ? smokeStub(url.searchParams.get("route") ?? "html")
-          : route === "parquet"
-            ? parquetStub(fixtures)
-            : jsonlStub(entries);
+        : windowed
+          ? excelWindowStub()
+          : path === "/harness-route"
+            ? smokeStub(url.searchParams.get("route") ?? "html")
+            : route === "parquet"
+              ? parquetStub(fixtures)
+              : jsonlStub(entries);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;
@@ -477,6 +510,18 @@ export function startHarness(fixtures, port = 0) {
     if (path === "/huge.csv") {
       res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
       res.end("a,b,c\n1,2,3\n4,5,6\n");
+      return;
+    }
+
+    // The windowed view's document: 5000 rows, so "only the viewport is in the DOM" and
+    // "scrolling reaches the last row" are both observable.
+    if (path === "/window.csv") {
+      const lines = ["id,a,b,c,d,e,f,g"];
+      for (let row = 0; row < 5000; row++) {
+        lines.push(`r${row},1,2,3,4,5,6,7`);
+      }
+      res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+      res.end(lines.join("\n"));
       return;
     }
 

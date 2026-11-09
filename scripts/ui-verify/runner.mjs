@@ -726,6 +726,45 @@ const scenarios = [
     },
   },
   {
+    name: "excel-windowed-large-file",
+    docs: "excel-windowed.png",
+    async run({ page, base }) {
+      // 12 MB of CSV: above the 8 MB window threshold, below the size guard. The editable grid
+      // would build 5000 x 8 cell objects; the windowed view renders only the viewport.
+      await page.navigate(`${base}/harness-route?route=excel&window=1`);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 15000);
+      expect(ready, "the windowed view did not render");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                grid: !!document.querySelector('#container .x-spreadsheet'),
+                rows: document.querySelectorAll('.windowed-sheet__row').length,
+                total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
+                banner: document.querySelector('.windowed-sheet__banner')?.innerText ?? '',
+                first: document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText ?? '',
+            })`),
+      );
+      expect(!state.grid, "the editable grid mounted for a large file");
+      // The served file is a header row plus 5000 data rows; the window shows every record,
+      // like the grid does, so the header is row 1.
+      expect(state.total === 5001, `unexpected row count: ${state.total}`);
+      expect(state.rows > 0 && state.rows < 80, `rendered ${state.rows} rows, expected a viewport`);
+      expect(/Read-only/.test(state.banner), `missing the read-only banner: ${state.banner}`);
+      expect(state.first === "id", `unexpected first cell: ${state.first}`);
+
+      await page.evaluate(`(() => {
+                const scroller = document.querySelector('.windowed-sheet__scroller');
+                scroller.scrollTop = scroller.scrollHeight;
+                scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+            })()`);
+      const reachedEnd = await page.waitFor(
+        `[...document.querySelectorAll('.windowed-sheet__cell')].some(cell => cell.textContent === 'r4999')`,
+        15000,
+      );
+      expect(reachedEnd, "scrolling to the end never rendered the last row");
+      return `5001 records, ${state.rows} rows in the DOM, last row reachable`;
+    },
+  },
+  {
     name: "remaining-routes-smoke",
     async run({ page, base }) {
       // The routes without a behavioural scenario of their own: the spreadsheet viewer and the

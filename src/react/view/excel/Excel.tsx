@@ -22,6 +22,9 @@ import Spreadsheet from "./x-spreadsheet/index";
 import FindReplacePanel, { type FindReplacePanelHandle } from "./FindReplacePanel";
 import { parseSpreadsheetLink } from "./excel_hyperlink";
 import { initExcelLocale, t } from "./excel_i18n";
+import WindowedSheet from "./WindowedSheet";
+import { createTextSheetSource, type TextSheetSource } from "./sheetSource";
+import { sheetViewFor } from "./sheetView";
 
 initExcelLocale();
 
@@ -123,6 +126,13 @@ function ExcelViewer() {
     name: string;
     ext: string;
   } | null>(null);
+  /**
+   * Set when a large text file is shown as a read-only window instead of the editable grid.
+   * `null` means the grid path is in charge.
+   */
+  const [windowSource, setWindowSource] = useState<TextSheetSource | null>(null);
+  /** Bumped per document; the windowed view keys on it so a new file starts at the top. */
+  const [windowLoad, setWindowLoad] = useState(0);
   const [saveAsVisible, setSaveAsVisible] = useState(false);
   const [saveAsFormat, setSaveAsFormat] = useState("xlsx");
   const [activeSpreadsheet, setActiveSpreadsheet] = useState<Spreadsheet | null>(null);
@@ -486,9 +496,18 @@ function ExcelViewer() {
     };
 
     const loadPayload = (payload: ExcelOpenPayload) => {
+      setWindowSource(null);
       loadOfficeBuffer(payload)
         .then(async (buffer) => {
           try {
+            // A big text file is rendered by the windowed view: the grid would build one
+            // object per cell and hold the whole sheet (ADR-0017).
+            if (sheetViewFor(payload.ext ?? "", payload.size) === "window") {
+              setWindowSource(createTextSheetSource(buffer));
+              setWindowLoad((load) => load + 1);
+              setLoading(false);
+              return;
+            }
             await initSpreadsheet(buffer, payload);
           } catch (e) {
             const msg = (e as Error).message || String(e);
@@ -626,7 +645,7 @@ function ExcelViewer() {
           </div>
         </div>
       )}
-      {readOnly && !loading && !loadError && !tooLarge && (
+      {readOnly && !loading && !loadError && !tooLarge && !windowSource && (
         <div className="excel-readonly-banner">{t("viewer.readonlyBanner")}</div>
       )}
       {findPanel && !loading && !loadError && !tooLarge && (
@@ -698,6 +717,14 @@ function ExcelViewer() {
         </div>
       </Modal>
       <div id="container"></div>
+      {windowSource && (
+        <WindowedSheet
+          key={windowLoad}
+          source={windowSource}
+          fileName={pendingPayloadRef.current?.fileName ?? ""}
+          onOpenInVSCode={() => handler.emit("editInVSCode", true)}
+        />
+      )}
       {!loading && !loadError && (
         <button
           type="button"
