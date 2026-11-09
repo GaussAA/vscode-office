@@ -102,7 +102,7 @@ editor title bar, the editor context menu, or the file explorer context menu.
 
 - YAML: document outline and anchor navigation (Go to Definition for alias references)
 - XML: document formatting
-- Icon theme: 25 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons
+- Icon theme: 8 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons for spreadsheets, parquet and JSONL
 
 ## Development
 

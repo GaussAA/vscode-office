@@ -42,3 +42,4 @@ GLOSSARY.md
 .vscode-test.mjs
 index.html
 .git-blame-ignore-revs
+.review-tmp/**

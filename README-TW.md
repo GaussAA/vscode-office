@@ -88,7 +88,7 @@ CI 在每次 push 時都會跑這兩項，以及 `pnpm build` 和 `pnpm run pack
 
 - YAML：文件大綱與錨點導覽（別名引用可跳轉到定義）
 - XML：文件格式化
-- 圖示主題：25 個 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 圖示
+- 圖示主題：8 個 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 圖示，涵蓋試算表、parquet 與 JSONL
 
 ## 開發
 
