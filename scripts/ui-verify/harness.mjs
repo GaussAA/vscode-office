@@ -306,10 +306,8 @@ function smokeStub(route) {
       archive: "smoke.zip",
       image: "smoke.png",
       html: "smoke.html",
-      markdown: "smoke.md",
       font: "smoke.ttf",
       svg: "smoke.svg",
-      mermaid: "smoke.mmd",
     }[route] ?? "smoke.bin";
   return `<script>
 (function () {
@@ -424,18 +422,6 @@ export function startHarness(fixtures, port = 0) {
               ? fixtures.nested
               : fixtures.big;
       serveParquet(req, res, file, stats, url.searchParams.get("range") !== "off");
-      return;
-    }
-
-    // The Markdown editor is not a React route: it is `resource/markdown/index.html` plus the
-    // prebuilt vditor bundle in `resource/markdown/dist`. Serving it needs the host's two
-    // placeholders filled in, which `Util.buildPath` does in production.
-    if (path === "/resource/markdown/index.html") {
-      const html = readFileSync(join(repoRoot, path), "utf8")
-        .replace("{{csp}}", buildWebviewCsp(`http://${req.headers.host}`))
-        .replace("{{baseUrl}}", "/resource/markdown");
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(html);
       return;
     }
 

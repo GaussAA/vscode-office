@@ -60,9 +60,6 @@
     "vscode": {
       "iconPath": "./../icons/vscode.svg"
     },
-    "markdown": {
-      "iconPath": "./../icons/markdown.svg"
-    },
     "html": {
       "iconPath": "./../icons/html.svg"
     },
@@ -125,8 +122,6 @@
     "pjpeg": "image",
     "pjp": "image",
     "webp": "image",
-    "md": "markdown",
-    "markdown": "markdown",
     "htm": "html",
     "html": "html",
     "xhtml": "html",

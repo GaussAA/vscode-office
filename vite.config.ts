@@ -2,7 +2,6 @@ import { rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { vditorDevPlugin, vditorProdBuildPlugin } from "./vite/vditorPlugin";
 
 const cwd = process.cwd();
 const argv = process.argv;
@@ -18,7 +17,7 @@ if (argv.join(",").includes("mode")) {
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => ({
-  plugins: [react(), command === "serve" ? vditorDevPlugin() : vditorProdBuildPlugin()],
+  plugins: [react()],
   define: {
     global: "globalThis",
   },

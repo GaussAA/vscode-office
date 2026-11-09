@@ -1,5 +1,24 @@
 # Change log
 
+# 6.0.0 2026-11-09
+
+A de-duplication release: when VS Code already renders a format well, this extension stops
+shipping a second implementation of it. Read [ADR-0014](docs/adr/0014-deduplicate-native-formats.md)
+for the rule and the boundary calls.
+
+Removed:
+
+- **The Markdown editor.** `GaussAA.markdownViewer`, the vendored `vditor/` workspace package
+  (19 MB), the `resource/markdown` webview (9.9 MB), the PDF/DOCX/HTML export chain
+  (`puppeteer-core`, `chrome-launcher`, `vscode-html-to-docx`), its nine settings, and the
+  `Ctrl+V` / `Ctrl+Alt+E` keybindings are gone. VS Code's built-in Markdown preview covers the
+  same ground, so `.md` now opens in the text editor — press `Ctrl+Shift+V` for the built-in
+  preview. If you relied on the WYSIWYG editor or on exporting Markdown to PDF, stay on 5.x.
+- **Parquet editing.** The viewer is read-only now; saving parquet is gone. Reading is unchanged
+  (ZSTD/GZIP/BROTLI/LZ4, paging, range requests, nested columns). The three limitations that only
+  existed because of the writer — non-SNAPPY files being rewritten as SNAPPY, the 200k-row
+  read-only fallback, and the full re-read before saving — are gone with it.
+
 # 5.0.0 2026-11-06
 
 A modernization release: three features removed, the platform floor raised to VS Code 1.125

@@ -11,17 +11,14 @@
 src/**
 test/**
 out/test/**
-template/**
 **/tsconfig.json
 **/*.map
 **/*.ts
 
-# Two pnpm workspace packages and the scripts that build them.
+# pnpm scaffolding and the scripts that build the extension.
 node_modules/
-vditor/
 pnpm-lock.yaml
 pnpm-workspace.yaml
-vite/
 scripts/**
 public/**
 

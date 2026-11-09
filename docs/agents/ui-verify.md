@@ -75,23 +75,14 @@ It waits for the mount (`page.waitFor`) rather than sleeping a fixed delay: the 
 epub chunks are ~1 MB, and a fixed 900 ms per route both flaked under load and wasted
 ~8 s per run.
 
-`markdown-editor` is the one viewer that is **not** a React route: it is
-`resource/markdown/index.html` plus the prebuilt vditor bundle in `resource/markdown/dist`.
-The harness serves it from the repo root and fills in the two placeholders the host normally
-replaces (`{{csp}}` with the real `buildWebviewCsp`, `{{baseUrl}}` with the route), then the
-scenario posts the same `{type: 'open', content}` message the extension host sends. Until
-this scenario existed, no gate looked at the Markdown editor's DOM at all — which is how a
-retired context-menu item could stay in the HTML for a year.
-
 Two routes are not in the smoke list because they have their own scenarios:
 `parquet` (`parquet-*`) and `jsonl` (`jsonl-*`). `test/unit/viewer-registry.test.mjs`asserts that every route in `main.tsx` is covered one way or the other, so adding a route
 without coverage fails the build instead of silently shrinking the suite.
 
-Three viewers are not React routes and are therefore not in the smoke list:
+Two viewers are not React routes and are therefore not in the smoke list:
 
 - `html` and `pdf` are served by the extension provider as standalone HTML documents
   (`loadWorkspaceHtml` / `loadPdfViewer`), so there is no bundle to mount.
-- `markdown` ships its own Vditor-based editor bundle, not the `out/webview` entry.
 
 If you touch those paths, verify them manually in VS Code; extending the harness to cover
 them means faking their own host protocols, which is a separate piece of work.

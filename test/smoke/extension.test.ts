@@ -197,10 +197,6 @@ describe("custom editors", () => {
 
   const cases: Array<{ viewType: string; fixture: () => Promise<vscode.Uri> }> = [
     {
-      viewType: "GaussAA.markdownViewer",
-      fixture: async () => vscode.Uri.joinPath(workspaceRoot(), "sample.md"),
-    },
-    {
       viewType: "GaussAA.htmlViewer",
       fixture: async () => vscode.Uri.joinPath(workspaceRoot(), "sample.html"),
     },

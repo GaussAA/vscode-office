@@ -31,7 +31,7 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 1. **需要上游的修复就读它的 diff，自己重写一遍**，不要 `git merge upstream/main`，也不要 rebase 到上游。`upstream` remote 保留，仅用于对照和可选的单点 `cherry-pick`。
 2. **上游文件可以改写**。「能新增就不改写」不再是规则，取而代之的是：**一次改动只做一件事，且这个提交能单独回退**；不要把重构和功能混进同一个提交。
 3. **继承来的债是我们的债**：上游代码的类型错误、死代码、残留配置都可以修。`pnpm typecheck` 的目标是零错误，不是给历史错误建永久白名单。
-4. **风格**：整个树由 `oxfmt` 统一（`.oxfmtrc.json`，printWidth 100 / 双引号 / 2 空格）。`vditor/` 是唯一的例外 —— 它是独立的 workspace 包，保持与上游 Vditor 可对照，不要格式化它。
+4. **风格**：整个树由 `oxfmt` 统一（`.oxfmtrc.json`，printWidth 100 / 双引号 / 2 空格）。
 
 ## 代码结构（沿用上游布局）
 
@@ -42,7 +42,6 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 - `src/react/view/<viewer>/` —— webview 内的 React 视图。解析器与组件分文件（如 `parquet/parquetParser.ts` + `parquet/Parquet.tsx`）
 - `src/service/` —— 跨视图服务（如 `officeViewType.ts`、`csvService.ts`）
 - `vite.config.ts` + `build.ts` —— 构建，产出 `out/`；webview 每个视图一个 Vite 入口。根是 `"type": "module"`，但 `build.ts` 会给 `out/` 生成一个 `{"type":"commonjs"}` 的 `package.json` —— 扩展宿主跑的是 CJS（见 ADR-0012），不要删它
-- `vditor/` —— vendored 的 Markdown 编辑器，**独立的 pnpm workspace 包**，有自己的 `dependencies` 和自己的 Vite 构建。它的依赖不写在根 manifest 里；根 `pnpm outdated` / Dependabot 看不到它们在用它
 - `package.json` 的 `contributes.customEditors` —— viewer 与文件模式的唯一登记处
 
 ## 常用命令

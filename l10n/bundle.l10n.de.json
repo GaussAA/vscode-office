@@ -9,16 +9,5 @@
   "ext.git.notInRepo": "Die Datei befindet sich in keinem Git-Repository im aktuellen Arbeitsbereich.",
   "ext.git.openFileFirst": "Öffnen Sie eine Datei, um deren Git-Verlauf anzuzeigen.",
   "ext.git.statusBarTooltip": "Git-Verlauf öffnen",
-  "ext.html.noFile": "Keine HTML-Datei zur Vorschau vorhanden.",
-  "ext.markdown.exportStart": "Markdown wird nach {0} exportiert...",
-  "ext.markdown.exportSuccess": "Markdown erfolgreich nach {0} exportiert!",
-  "ext.markdown.noChromium": "Chromium nicht gefunden, Export fehlgeschlagen.",
-  "ext.markdown.noClipboardImage": "Kein Bild in der Zwischenablage.",
-  "ext.markdown.noPasteDirectory": "Einfügen von Verzeichnissen wird nicht unterstützt.",
-  "ext.markdown.installXclip": "Sie müssen zuerst den Befehl xclip installieren.",
-  "ext.markdown.wikilinkNotFound": "Wikilink-Ziel nicht gefunden: {0}",
-  "ext.markdown.linkFileNotFound": "Datei nicht gefunden: {0}",
-  "ext.markdown.linkOpenFailed": "Datei {0} konnte nicht geöffnet werden: {1}",
-  "ext.markdown.selectImage": "Bild auswählen",
-  "ext.markdown.statusBar": "Zeile {0} Zeichen {1}"
+  "ext.html.noFile": "Keine HTML-Datei zur Vorschau vorhanden."
 }

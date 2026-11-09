@@ -9,16 +9,5 @@
   "ext.git.notInRepo": "このファイルは現在のワークスペースの Git リポジトリに含まれていません。",
   "ext.git.openFileFirst": "Git 履歴を表示するには、まずファイルを開いてください。",
   "ext.git.statusBarTooltip": "Git 履歴を開く",
-  "ext.html.noFile": "プレビューする HTML ファイルがありません。",
-  "ext.markdown.exportStart": "Markdown を {0} にエクスポートしています...",
-  "ext.markdown.exportSuccess": "Markdown の {0} へのエクスポートに成功しました！",
-  "ext.markdown.noChromium": "Chromium が見つかりません。エクスポートに失敗しました。",
-  "ext.markdown.noClipboardImage": "クリップボードに画像がありません。",
-  "ext.markdown.noPasteDirectory": "ディレクトリの貼り付けはサポートされていません。",
-  "ext.markdown.installXclip": "先に xclip コマンドをインストールしてください。",
-  "ext.markdown.wikilinkNotFound": "ウィキリンクのターゲットが見つかりません: {0}",
-  "ext.markdown.linkFileNotFound": "ファイルが見つかりません: {0}",
-  "ext.markdown.linkOpenFailed": "ファイル {0} を開けません: {1}",
-  "ext.markdown.selectImage": "画像を選択",
-  "ext.markdown.statusBar": "行 {0} 文字数 {1}"
+  "ext.html.noFile": "プレビューする HTML ファイルがありません。"
 }

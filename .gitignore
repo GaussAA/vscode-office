@@ -31,3 +31,6 @@ yarn.lock
 # ui verification output
 .ui-verify/
 
+# local review scratch (audit reports, one-off scripts)
+.review-tmp/
+

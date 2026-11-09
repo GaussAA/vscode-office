@@ -9,7 +9,6 @@
   "arrowParens": "always",
   "sortPackageJson": false,
   "ignorePatterns": [
-    "vditor/",
     "pnpm-lock.yaml",
     "package-lock.json",
     "npm-shrinkwrap.json",
@@ -18,6 +17,7 @@
     "out/",
     "coverage/",
     ".vscode-test/",
-    ".ui-verify/"
+    ".ui-verify/",
+    ".review-tmp/"
   ]
 }

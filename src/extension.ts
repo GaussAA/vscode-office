@@ -2,13 +2,11 @@ import * as vscode from "vscode";
 import { customEditorOptions } from "@/common/customEditorOptions";
 import { Global } from "./common/global";
 import { JavaDecompilerProvider } from "./provider/javaDecompilerProvider";
-import { MarkdownEditorProvider } from "./provider/markdownEditorProvider";
 import { OfficeViewerProvider } from "./provider/officeViewerProvider";
 import { ArchiveViewerProvider } from "./provider/archiveViewerProvider";
 import { ClassViewerProvider } from "./provider/classViewerProvider";
 import { JsonlViewerProvider } from "./provider/jsonlViewerProvider";
 import { HtmlService } from "./service/htmlService";
-import { MarkdownService } from "./service/markdownService";
 import { switchCsvEditor } from "./service/csvService";
 import { FileUtil } from "./common/fileUtil";
 import { ReactApp } from "./common/reactApp";
@@ -31,21 +29,13 @@ export async function activate(context: vscode.ExtensionContext) {
   const viewOption = customEditorOptions;
   FileUtil.init(context);
   ReactApp.init(context);
-  const markdownService = new MarkdownService(context);
   const viewerInstance = new OfficeViewerProvider(context);
   const archiveViewerInstance = new ArchiveViewerProvider(context);
   const classViewerInstance = new ClassViewerProvider(context);
   const jsonlViewerInstance = new JsonlViewerProvider(context);
-  const markdownEditorProvider = new MarkdownEditorProvider(context);
   context.subscriptions.push(
-    vscode.commands.registerCommand("GaussAA.office.markdown.switch", (uri) => {
-      markdownService.switchEditor(uri);
-    }),
     vscode.commands.registerCommand("GaussAA.office.csv.switch", (uri) => {
       switchCsvEditor(uri);
-    }),
-    vscode.commands.registerCommand("GaussAA.office.markdown.paste", () => {
-      void markdownService.loadClipboardImage();
     }),
     vscode.commands.registerCommand("GaussAA.office.html.preview", (uri) =>
       HtmlService.previewHtml(uri, context),
@@ -53,11 +43,6 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.workspace.registerTextDocumentContentProvider(
       "decompile_java",
       new JavaDecompilerProvider(context),
-    ),
-    vscode.window.registerCustomEditorProvider(
-      "GaussAA.markdownViewer",
-      markdownEditorProvider,
-      viewOption,
     ),
     archiveViewerInstance.bindCustomEditor(viewOption),
     classViewerInstance.bindCustomEditor(viewOption),

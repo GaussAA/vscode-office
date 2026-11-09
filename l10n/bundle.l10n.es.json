@@ -9,16 +9,5 @@
   "ext.git.notInRepo": "El archivo no está en un repositorio Git del espacio de trabajo actual.",
   "ext.git.openFileFirst": "Abra un archivo para ver su historial de Git.",
   "ext.git.statusBarTooltip": "Abrir historial de Git",
-  "ext.html.noFile": "No hay archivo HTML para previsualizar.",
-  "ext.markdown.exportStart": "Iniciando exportación de Markdown a {0}.",
-  "ext.markdown.exportSuccess": "¡Exportación de Markdown a {0} exitosa!",
-  "ext.markdown.noChromium": "No se encontró Chromium, la exportación falló.",
-  "ext.markdown.noClipboardImage": "No hay imagen en el portapapeles.",
-  "ext.markdown.noPasteDirectory": "No se admite pegar directorios.",
-  "ext.markdown.installXclip": "Primero debe instalar el comando xclip.",
-  "ext.markdown.wikilinkNotFound": "Destino del wikilink no encontrado: {0}",
-  "ext.markdown.linkFileNotFound": "Archivo no encontrado: {0}",
-  "ext.markdown.linkOpenFailed": "No se pudo abrir el archivo {0}: {1}",
-  "ext.markdown.selectImage": "Seleccionar imagen",
-  "ext.markdown.statusBar": "Línea {0} Caracteres {1}"
+  "ext.html.noFile": "No hay archivo HTML para previsualizar."
 }

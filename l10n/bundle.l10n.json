@@ -9,16 +9,5 @@
   "ext.git.notInRepo": "The file is not within a Git repository in the current workspace.",
   "ext.git.openFileFirst": "Open a file to view its Git history.",
   "ext.git.statusBarTooltip": "Open Git History",
-  "ext.html.noFile": "No HTML file to preview.",
-  "ext.markdown.exportStart": "Starting export markdown to {0}.",
-  "ext.markdown.exportSuccess": "Export markdown to {0} success!",
-  "ext.markdown.noChromium": "Not chromium found, export fail.",
-  "ext.markdown.noClipboardImage": "There is not an image in the clipboard.",
-  "ext.markdown.noPasteDirectory": "Not support paste directory.",
-  "ext.markdown.installXclip": "You need to install xclip command first.",
-  "ext.markdown.wikilinkNotFound": "Wikilink target not found: {0}",
-  "ext.markdown.linkFileNotFound": "File not found: {0}",
-  "ext.markdown.linkOpenFailed": "Could not open file {0}: {1}",
-  "ext.markdown.selectImage": "Select Image",
-  "ext.markdown.statusBar": "Line {0} Count {1}"
+  "ext.html.noFile": "No HTML file to preview."
 }

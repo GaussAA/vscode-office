@@ -8,13 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const isProd = process.argv.indexOf("--mode=production") >= 0;
 
-const dependencies = [
-  "vscode-html-to-docx",
-  "highlight.js",
-  "@cantoo/pdf-lib",
-  "katex",
-  "puppeteer-core",
-];
+const dependencies = ["@cantoo/pdf-lib"];
 
 /**
  * The repo root is `"type": "module"` so every `.ts`/`.js` in `src/` and `scripts/` is ESM.
@@ -39,10 +33,6 @@ function createDesktopAssetCopyPlugins(shouldWatch: boolean) {
       resolveFrom: "out",
       watch: shouldWatch,
       assets: [
-        {
-          from: ["./template/**/*"],
-          to: ["./"],
-        },
         {
           from: ["./node_modules/node-unrar-js/dist/js/unrar.wasm"],
           to: ["./"],

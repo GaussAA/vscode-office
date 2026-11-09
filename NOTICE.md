@@ -82,16 +82,9 @@ original authors.
 
 ### Forks
 
-| Path                                  | Project                                                                                                                                                                                                                     | License | Upstream                                 | Our delta                                                                                          |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `vditor/`                             | `Vditor` — the Markdown editor the webview runs. Its own pnpm workspace package with its own build (`vite/vditorPlugin.ts`). Forked once by upstream Office Viewer (`vscode-ext-studio/vditor`), then heavily modified here | MIT     | https://github.com/Vanessa219/vditor     | ~+12k lines: CodeMirror 6 code blocks, wikilinks, editor theming, find bar, VS Code glue           |
-| `src/react/view/excel/x-spreadsheet/` | `x-data-spreadsheet` — the spreadsheet engine behind the `.xlsx/.csv/.ods` viewer (patch applied upstream in `48b10e4`)                                                                                                     | MIT     | https://github.com/myliang/x-spreadsheet | ~+3.2k/−1k lines over 45 files: toolbar icons, hyperlink/formula bar/sheet images, clipboard, find |
-
-`vditor/src/js/` also carries prebuilt third-party runtimes that Vditor ships and loads at
-runtime rather than importing: **Lute** (the Go markdown engine, `lute.min.js` 3.5 MB),
-**Mermaid** (`mermaid.min.js` 3.3 MB), **KaTeX** (JS + fonts) and `plantuml-encoder`. They are
-inside the fork because Vditor's `cdn` loading model expects files next to the bundle; they are
-not built from this repository.
+| Path                                  | Project                                                                                                                 | License | Upstream                                 | Our delta                                                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `src/react/view/excel/x-spreadsheet/` | `x-data-spreadsheet` — the spreadsheet engine behind the `.xlsx/.csv/.ods` viewer (patch applied upstream in `48b10e4`) | MIT     | https://github.com/myliang/x-spreadsheet | ~+3.2k/−1k lines over 45 files: toolbar icons, hyperlink/formula bar/sheet images, clipboard, find |
 
 ## Working with upstream
 

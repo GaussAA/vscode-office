@@ -2,7 +2,7 @@
   "name": "office-viewer-plus",
   "displayName": "Office Viewer Plus",
   "description": "Fork of Office Viewer (cweijan/vscode-office) with ZSTD parquet support and a JSONL tree viewer.",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "publisher": "GaussAA",
   "license": "MIT",
   "icon": "image/logo.png",
@@ -19,7 +19,6 @@
     "tsv",
     "powerpoint",
     "pptx",
-    "markdown",
     "epub",
     "svg",
     "psd",
@@ -64,18 +63,9 @@
     ],
     "commands": [
       {
-        "command": "GaussAA.office.markdown.switch",
-        "title": "Switch markdown editor",
-        "icon": "$(edit)"
-      },
-      {
         "command": "GaussAA.office.csv.switch",
         "title": "Switch CSV editor",
         "icon": "$(edit)"
-      },
-      {
-        "command": "GaussAA.office.markdown.paste",
-        "title": "Enhance paste in markdown"
       },
       {
         "command": "GaussAA.office.html.preview",
@@ -99,21 +89,9 @@
     ],
     "keybindings": [
       {
-        "command": "GaussAA.office.markdown.paste",
-        "key": "ctrl+v",
-        "mac": "cmd+v",
-        "when": "editorTextFocus && resourceLangId == markdown"
-      },
-      {
         "command": "GaussAA.office.html.preview",
         "key": "ctrl+shift+v",
         "when": "editorTextFocus && editorLangId == html"
-      },
-      {
-        "command": "GaussAA.office.markdown.switch",
-        "key": "ctrl+alt+e",
-        "mac": "ctrl+cmd+e",
-        "when": "editorTextFocus && editorLangId == markdown"
       }
     ],
     "menus": {
@@ -147,11 +125,6 @@
           "command": "GaussAA.office.gitHistory.viewFileHistory",
           "group": "navigation@4",
           "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file"
-        },
-        {
-          "command": "GaussAA.office.markdown.switch",
-          "when": "resourceExtname == '.md'",
-          "group": "navigation@-2"
         },
         {
           "command": "GaussAA.office.csv.switch",
@@ -347,30 +320,6 @@
         ]
       },
       {
-        "viewType": "GaussAA.markdownViewer",
-        "displayName": "Markdown Editor",
-        "selector": [
-          {
-            "filenamePattern": "file:/**/*.md"
-          },
-          {
-            "filenamePattern": "file:/**/*.markdown"
-          },
-          {
-            "filenamePattern": "vscode-vfs:/**/*.md"
-          },
-          {
-            "filenamePattern": "vscode-vfs:/**/*.markdown"
-          },
-          {
-            "filenamePattern": "vscode-remote:/**/*.md"
-          },
-          {
-            "filenamePattern": "vscode-remote:/**/*.markdown"
-          }
-        ]
-      },
-      {
         "viewType": "GaussAA.htmlViewer",
         "displayName": "Html Viewer",
         "priority": "option",
@@ -430,120 +379,6 @@
             "description": "Show Quick Sync button in Source Control (Git) title toolbar."
           }
         }
-      },
-      {
-        "title": "Markdown",
-        "order": 1,
-        "properties": {
-          "vscode-office.preventMacOptionKey": {
-            "type": "boolean",
-            "default": true,
-            "description": "Prevent MacOS option key in the markdown editor."
-          },
-          "vscode-office.editorTheme": {
-            "type": "string",
-            "enum": [
-              "Auto",
-              "Light",
-              "Solarized",
-              "Warm Light",
-              "Dim Light",
-              "One Dark",
-              "Github Dark",
-              "Nord",
-              "Monokai",
-              "Dracula"
-            ],
-            "default": "Auto",
-            "markdownDescription": "The theme for the Markdown editor."
-          },
-          "vscode-office.codeMirrorTheme": {
-            "type": "string",
-            "enum": [
-              "Auto",
-              "Github",
-              "Solarized Light",
-              "Material Light",
-              "Quiet Light",
-              "One Light",
-              "Dracula",
-              "Monokai",
-              "One Dark",
-              "Solarized Dark",
-              "Material Dark"
-            ],
-            "default": "Auto",
-            "markdownDescription": "CodeMirror syntax theme for code blocks in the Markdown editor."
-          },
-          "vscode-office.mermaidTheme": {
-            "type": "string",
-            "enum": [
-              "Auto",
-              "Light",
-              "Forest",
-              "Ocean",
-              "Sunset",
-              "Dark",
-              "Dracula",
-              "Monokai",
-              "Nord"
-            ],
-            "default": "Auto",
-            "markdownDescription": "Mermaid diagram theme in the Markdown editor. Auto follows the editor theme."
-          },
-          "vscode-office.editMode": {
-            "type": "string",
-            "enum": [
-              "wysiwyg",
-              "ir"
-            ],
-            "default": "wysiwyg",
-            "markdownDescription": "Default edit mode for the Markdown editor."
-          },
-          "vscode-office.restoreViewState": {
-            "type": "boolean",
-            "default": true,
-            "markdownDescription": "Restore caret focus when opening a Markdown file. Scroll position is always restored."
-          },
-          "vscode-office.workspacePathAsImageBasePath": {
-            "type": "boolean",
-            "default": false,
-            "description": "Using workspace path as markdown image base path."
-          },
-          "vscode-office.pasteImageToWorkspacePath": {
-            "type": "boolean",
-            "default": false,
-            "description": "Paste markdown images into the workspace path and insert image links with a leading slash."
-          },
-          "vscode-office.pasterImgPath": {
-            "type": "string",
-            "default": "image/${fileName}/${now}.${ext}",
-            "description": "Markdown paste image path, variables: workspaceDir, fileName, now, date (YYYYMMDD), uuid, ext (file extension)."
-          }
-        }
-      },
-      {
-        "title": "Markdown PDF",
-        "order": 2,
-        "properties": {
-          "vscode-office.chromiumPath": {
-            "type": "string",
-            "description": "Set the chromium browser location for exporting markdown pdf."
-          },
-          "vscode-office.puppeteerArgs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "default": [],
-            "description": "Additional arguments to pass to Puppeteer/Chromium when exporting PDF. Example: [\"--no-sandbox\", \"--disable-setuid-sandbox\"] for Linux servers running as root."
-          },
-          "vscode-office.pdfMarginTop": {
-            "type": "integer",
-            "default": 25,
-            "description": "Printed pdf default top margin."
-          }
-        }
       }
     ]
   },
@@ -574,7 +409,6 @@
   "devDependencies": {
     "@puppeteer/browsers": "^3.2.6",
     "@types/mocha": "^10.0.10",
-    "@types/mustache": "^4.2.6",
     "@types/node": "^24.19.2",
     "@types/opentype.js": "^1.3.10",
     "@types/react": "^19.2.17",
@@ -594,6 +428,7 @@
     "oxfmt": "^0.76.0",
     "oxlint": "1.91.0",
     "oxlint-tsgolint": "^7.0.2005",
+    "puppeteer-core": "^25.1.0",
     "tsx": "^4.23.15",
     "typescript": "7.0.2",
     "vite": "^8.0.16",
@@ -611,9 +446,6 @@
     "@cweijan/exceljs": "^5.0.3",
     "@docx-editor.dev/react": "2.34.0",
     "@lezer/highlight": "^1.2.3",
-    "@mdit/plugin-katex": "^1.1.5",
-    "@mdit/plugin-plantuml": "^2.0.4",
-    "@mdit/plugin-tasklist": "^1.2.0",
     "@mind-elixir/import-xmind": "^1.0.8",
     "@vscode/codicons": "^0.0.45",
     "@zip.js/zip.js": "^2.8.26",
@@ -621,38 +453,24 @@
     "antd": "^6.7.0",
     "axios": "^1.18.1",
     "buffer": "^6.0.3",
-    "chrome-launcher": "^1.2.2",
     "epubjs": "^0.3.93",
     "file-type": "^19.6.0",
     "heic2any": "^0.0.4",
-    "highlight.js": "^11.10.0",
     "hyparquet": "^1.26.1",
     "hyparquet-compressors": "^1.1.2",
     "hyparquet-writer": "^0.15.7",
     "iconv-lite": "^0.7.3",
     "jszip": "^3.10.1",
-    "katex": "^0.19.1",
-    "markdown-it": "^15.0.3",
-    "markdown-it-anchor": "^10.0.0",
-    "markdown-it-front-matter": "^0.2.4",
-    "markdown-it-mark": "^4.0.0",
-    "markdown-it-obsidian-callouts": "^0.3.4",
-    "markdown-it-toc-done-right": "^4.2.0",
-    "mermaid": "^12.3.0",
     "mind-elixir": "^5.12.2",
-    "mustache": "^4.0.1",
-    "node-html-parser": "^9.0.6",
     "node-unrar-js": "^2.0.2",
     "opentype.js": "1.3.4",
     "pptxviewjs": "^1.1.9",
     "pretty-bytes": "^7.2.0",
-    "puppeteer-core": "^25.1.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-image-gallery": "^1.3.0",
     "tar": "^7.5.16",
     "utif2": "^4.1.0",
-    "vscode-html-to-docx": "^1.1.3",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "xml-formatter": "^3.7.0",
     "yaml": "^2.9.0"

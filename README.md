@@ -13,7 +13,6 @@ This extension lets you preview and edit common office and design files directly
 - HEIC/TIFF: `.heic`, `.heif`, `.tiff`
 - Design: `.psd`, `.xmind`, `.icns`, `.svg`
 - Font: `.ttf`, `.otf`, `.woff`, `.woff2`
-- Markdown: `.md`, `.markdown`
 - HTML: `.html`, `.htm`
 - Java: `.class` (decompiler)
 - Compressed files: `.zip`, `.jar`, `.vsix`, `.rar`, `.7z`, `.tar`, `.tar.gz`, `.tgz`, `.apk`
@@ -106,34 +105,6 @@ CI runs both on every push, together with `pnpm build` and `pnpm run package`. A
 Office Viewer includes a full Git History workspace for exploring repositories without leaving VS Code. Open it from the Source Control view, the editor title bar, the editor context menu, or the file explorer context menu.
 
 ![1783342874748](image/README/1783342874748.png)
-
-## Markdown
-
-This extension replaces the default Markdown editor with a WYSIWYG editor.
-
-To use the built-in VS Code Markdown editor instead, add this to your `settings.json`:
-
-```json
-{
-  "workbench.editorAssociations": {
-    "*.md": "default",
-    "*.markdown": "default"
-  }
-}
-```
-
-Right-click in the editor to export Markdown to PDF, DOCX, or HTML. PDF export requires Chromium; set the browser path with `vscode-office.chromiumPath`.
-
-![Export Markdown](image/README-CN/1685418034035.png)
-
-Shortcuts: Based on [shortcut.md](shortcut.md), plus:
-
-- New line: `Ctrl+Enter` / `⌘ Enter`
-- Hard line break: `Shift+Enter` / `⇧ Enter`
-- Edit hyperlink: `Alt+Enter` / `^ Enter`
-- Set CodeMirror language: `Alt+Enter` / `^ Enter`
-- Edit in VS Code: `Ctrl Alt E` / `⌘ ^ E`
-- Paste as plain text: `Ctrl+Shift+V` / `⌘ ⇧ V`
 
 ## Other features
 
@@ -228,5 +199,4 @@ If you build and publish this extension yourself, see [docs/telemetry.md](docs/t
 - HEIC conversion: [heic2any](https://github.com/alexcorvi/heic2any)
 - Java decompiler: [JetBrains/java-decompiler](https://github.com/JetBrains/intellij-community/tree/master/plugins/java-decompiler/engine)
 - HTTP: [REST Client](https://github.com/Huachao/vscode-restclient)
-- Markdown: [Vanessa219/vditor](https://github.com/Vanessa219/vditor)
 - Material Icon theme: [PKief/vscode-material-icon-theme](https://github.com/PKief/vscode-material-icon-theme)

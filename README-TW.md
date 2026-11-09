@@ -17,7 +17,6 @@
 - HEIC/TIFF: `.heic`、`.heif`、`.tiff`
 - 設計檔案: `.psd`、`.xmind`、`.icns`、`.svg`
 - 字型: `.ttf`、`.otf`、`.woff`、`.woff2`
-- Markdown: `.md`、`.markdown`
 - HTML: `.html`、`.htm`
 - Java: `.class`（反編譯）
 - 壓縮檔案: `.zip`、`.jar`、`.vsix`、`.rar`、`.7z`、`.tar`、`.tar.gz`、`.tgz`、`.apk`
@@ -85,34 +84,6 @@ CI 在每次 push 時都會跑這兩項，以及 `pnpm build` 和 `pnpm run pack
 Office Viewer 內建完整的 Git 歷史工作區，讓你無需離開 VS Code 即可瀏覽儲存庫。可從原始碼控制檢視、編輯器標題列、編輯器右鍵選單或檔案總管右鍵選單開啟。
 
 ![1783342874748](image/README/1783342874748.png)
-
-## Markdown
-
-整合 Markdown 所見即所得編輯器。
-
-如需使用 VS Code 原生 Markdown 編輯器，請在 `settings.json` 中新增以下設定：
-
-```json
-{
-  "workbench.editorAssociations": {
-    "*.md": "default",
-    "*.markdown": "default"
-  }
-}
-```
-
-在編輯器中按右鍵，可將 Markdown 匯出為 PDF、DOCX 或 HTML。PDF 匯出依賴 Chromium，可透過 `vscode-office.chromiumPath` 設定瀏覽器路徑。
-
-![匯出 Markdown](image/README-CN/1685418034035.png)
-
-快捷鍵：基於 [shortcut.md](shortcut.md)，以及：
-
-- 新行: `Ctrl+Enter` / `⌘ Enter`
-- 硬換行: `Shift+Enter` / `⇧ Enter`
-- 編輯超連結: `Alt+Enter` / `^ Enter`
-- 設定 CodeMirror 語言: `Alt+Enter` / `^ Enter`
-- 在 VS Code 中編輯: `Ctrl Alt E` / `⌘ ^ E`
-- 貼上為純文字: `Ctrl+Shift+V` / `⌘ ⇧ V`
 
 ## 其他功能
 
@@ -207,5 +178,4 @@ Office Viewer 會收集**匿名使用資料**，用於了解各預覽功能的�
 - HEIC conversion: [heic2any](https://github.com/alexcorvi/heic2any)
 - Java decompiler: [JetBrains/java-decompiler](https://github.com/JetBrains/intellij-community/tree/master/plugins/java-decompiler/engine)
 - HTTP: [REST Client](https://github.com/Huachao/vscode-restclient)
-- Markdown: [Vanessa219/vditor](https://github.com/Vanessa219/vditor)
 - Material Icon theme: [PKief/vscode-material-icon-theme](https://github.com/PKief/vscode-material-icon-theme)
