@@ -382,6 +382,10 @@ const scenarios = [
     docs: "parquet-inspector.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
+      const hint = await page.evaluate(
+        `document.querySelector('.parquet-viewer__inspector-hint')?.innerText ?? null`,
+      );
+      expect(hint === "Select a cell to inspect it", `inspector hint: ${hint}`);
       await page.evaluate(`(() => {
                 const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
                 cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -398,6 +402,30 @@ const scenarios = [
       );
       expect(/name · row 1/.test(state.label ?? ""), `unexpected inspector label: ${state.label}`);
       expect((state.value ?? "").length > 0, "inspector showed no value");
+
+      // The inspector must not sit on top of the table scroll area: that is what hid the
+      // horizontal scrollbar and the last rows when it was an overlay.
+      const layout = json(
+        await page.evaluate(`JSON.stringify({
+                insideTable: !!document.querySelector('.parquet-viewer__table-wrap .parquet-viewer__inspector'),
+                tableBodyBottom: document.querySelector('.parquet-table .ant-table-body')?.getBoundingClientRect().bottom ?? -1,
+                inspectorTop: document.querySelector('.parquet-viewer__inspector')?.getBoundingClientRect().top ?? -1,
+                inspectorBottom: document.querySelector('.parquet-viewer__inspector')?.getBoundingClientRect().bottom ?? -1,
+                footerTop: document.querySelector('.parquet-viewer__footer')?.getBoundingClientRect().top ?? -1,
+            })`),
+      );
+      expect(layout.tableBodyBottom > 0, "table body not found");
+      expect(layout.inspectorTop >= 0, "inspector not found");
+      expect(!layout.insideTable, "inspector is inside the table scroll area");
+      expect(
+        layout.inspectorTop >= layout.tableBodyBottom - 1,
+        `inspector overlaps the table body: ${layout.tableBodyBottom} > ${layout.inspectorTop}`,
+      );
+      expect(
+        layout.footerTop < 0 || layout.inspectorBottom <= layout.footerTop + 1,
+        `inspector overlaps the footer: ${layout.inspectorBottom} > ${layout.footerTop}`,
+      );
+
       await clickNextPage(page);
       const cleared = await page.evaluate(`!document.querySelector('.parquet-viewer__inspector')`);
       expect(cleared, "inspector survived a page change");
@@ -446,8 +474,8 @@ const scenarios = [
         `/name · row 2/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,
       );
       expect(inspected, "Enter did not inspect the cursor cell (name · row 2)");
-      // The overlay must not reflow the grid: reflow is what made double-click-to-edit
-      // land on a different cell when the inspector squeezed the table.
+      // The inspector must not reflow the grid: reflow is what made double-click-to-edit
+      // land on a different cell when it squeezed the table.
       const heightAfter = await page.evaluate(
         `document.querySelector('.parquet-table')?.getBoundingClientRect().height ?? 0`,
       );
