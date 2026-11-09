@@ -35,6 +35,21 @@ Removed:
   In an SVG, press `Ctrl+Shift+V`-style "Reopen Editor With… → Text Editor" if you need the
   markup.
 
+Fixed:
+
+- Parquet columns whose `LIST` / `MAP` / `STRUCT` type is declared only through
+  `logical_type` (the modern parquet form) no longer render as NULL or as flat fields.
+  Legacy repeated primitives and plain groups go through the same top-level column model.
+- The parquet grid is keyboard-navigable: cells are real focus targets with a roving
+  tabindex, arrow keys move the cursor, and screen readers get the column, row and value.
+- The cell inspector occupies a fixed row below the grid instead of overlaying rows, so
+  selecting a cell cannot reflow the table or move the row under the pointer.
+- Sidebar statistics are borderless; the pager arrows have tooltips; leaving an empty row
+  input no longer shows the "invalid row" warning.
+- The whole-file search cap is formatted from `SEARCH_MAX_ROWS` instead of hard-coding
+  `5,000` in ten locales, and the webview restore map is capped at 20 documents instead of
+  growing forever.
+
 # 5.0.0 2026-11-06
 
 A modernization release: three features removed, the platform floor raised to VS Code 1.125
