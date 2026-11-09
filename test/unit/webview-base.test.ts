@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { applyWebviewBase } from "@/common/webviewBase";
+import { applyWebviewBase, applyWebviewConfig } from "@/common/webviewBase";
 
 /**
  * The regression these pin: `reactApp.buildPath` matched `<base href="/">` byte for byte, a
@@ -65,4 +65,33 @@ test("webviewBase: the real shell can still be rewritten", () => {
   const shell = readFileSync(join(root, "index.html"), "utf8");
   const result = applyWebviewBase(shell, hosted);
   assert.ok(result.includes(`<base href="${hosted}/"`), "the shipped index.html was not rewritten");
+});
+
+function decodeAttribute(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+test("webviewConfig: escapes JSON before it enters the double-quoted attribute", () => {
+  const shell = '<meta id="office-configs" data-config="{{configs}}" />';
+  const configs = { route: "parquet", fileName: 'a"b&c<d>e' };
+  const result = applyWebviewConfig(shell, configs);
+  const attr = result.match(/data-config="([^"]*)"/)?.[1];
+
+  assert.ok(attr, result);
+  assert.deepEqual(JSON.parse(decodeAttribute(attr)), configs);
+  assert.ok(!result.includes('data-config="{"'), "raw JSON leaked into the attribute");
+});
+
+test("webviewConfig: the shipped shell's config attribute still parses", () => {
+  const shell = readFileSync(join(root, "index.html"), "utf8");
+  const configs = { route: "parquet", fileName: 'quote" amp& angle<' };
+  const result = applyWebviewConfig(shell, configs);
+  const attr = result.match(/id="office-configs"\s+data-config="([^"]*)"/)?.[1];
+
+  assert.ok(attr, "the shipped shell did not expose data-config");
+  assert.deepEqual(JSON.parse(decodeAttribute(attr)), configs);
 });
