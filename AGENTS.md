@@ -20,6 +20,10 @@ issue 与 spec 用 GitHub Issues，目标仓库是 fork `GaussAA/vscode-office`�
 
 webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-verify.md。
 
+### Performance gate
+
+parquet 首屏字节数与全文件搜索耗时是不变量，由 `pnpm verify:perf` 守住，见 docs/agents/perf.md。
+
 ### Domain docs
 
 单 context：根目录 `GLOSSARY.md` + `docs/adr/`。见 `docs/agents/domain.md`。
@@ -59,10 +63,11 @@ pnpm test:smoke       # 集成 smoke：真实 VS Code（stable）里验证激活
 pnpm test:smoke:min   # 同上，但跑在 engines.vscode 的下限上 —— 下限只有被执行过才算数
 pnpm check:baseline   # 断言 engines / @types / 运行时依赖的 engines.node 三者与宿主自洽
 pnpm check            # lint + baseline + typecheck + typecheck:self-test + test（pre-commit 跑这个）
-pnpm check:full       # check + build + check-bundled-imports + test:smoke + verify:ui（CI 跑这个）
+pnpm check:full       # check + build + check-bundled-imports + test:smoke + verify:ui + verify:perf（CI 跑这个）
 pnpm verify:ui        # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
+pnpm verify:perf      # 无头浏览器性能闸门：首屏字节数、全文件搜索耗时（大文件在 .perf/，缓存）
 ```
 
-**三层测试各管一件事**：`pnpm test` 管纯逻辑（用 `tsx` 直接导入 `src` 的 `.ts`，不经打包），`pnpm test:smoke` 管真实宿主里的激活与 custom editor 路由，`pnpm verify:ui` 管 webview 的 DOM。三者的失败模式不重叠——`verify:ui` 渲染的是 webview 的 HTML，它看不见「VS Code 有没有激活这个扩展」，所以升 `engines`、改激活事件、动 CSP 这类改动必须靠 smoke 兜。
+**四层测试各管一件事**：`pnpm test` 管纯逻辑（用 `tsx` 直接导入 `src` 的 `.ts`，不经打包），`pnpm test:smoke` 管真实宿主里的激活与 custom editor 路由，`pnpm verify:ui` 管 webview 的 DOM，`pnpm verify:perf` 管大文件下的字节数与耗时。四者的失败模式不重叠——`verify:ui` 渲染的是 webview 的 HTML，它看不见「VS Code 有没有激活这个扩展」，所以升 `engines`、改激活事件、动 CSP 这类改动必须靠 smoke 兜；而 DOM 全绿也说明不了「打开一个 1M 行的 parquet 要下载两倍文件大小」，那只有字节计数能看见。
 
 **闸门是 fail-closed 的**：`scripts/typecheck.mjs` 把每个类型错误按「文件 + 错误码 + 消息」与 `scripts/typecheck-baseline.json` 比对，出现基线外的错误就红。基线已经清空（继承来的 75 条全部修掉），所以现在的规则很简单：**任何类型错误都会让构建失败**。不要用 `typecheck:update` 把新错误塞进基线 —— 那是这个闸门唯一能欺骗自己的方式。

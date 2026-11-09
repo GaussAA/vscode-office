@@ -615,6 +615,14 @@ const scenarios = [
         15000,
       );
       expect(done, "whole-file search did not report a match");
+      // The count renders as soon as the scan finishes, but the match sits on another page:
+      // the jump is a page load, so the highlighted cell arrives one read later. Waiting for
+      // the count alone raced that load (the scan got fast enough for the count to win).
+      const highlighted = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__hit').length > 0`,
+        15000,
+      );
+      expect(highlighted, "the matched cell never got highlighted");
       const state = json(
         await page.evaluate(`JSON.stringify({
                 count: document.querySelector('.parquet-viewer__find-count')?.innerText ?? null,

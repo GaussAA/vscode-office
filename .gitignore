@@ -31,6 +31,9 @@ yarn.lock
 # ui verification output
 .ui-verify/
 
+# performance gate output (generated fixtures + last run)
+.perf/
+
 # local review scratch (audit reports, one-off scripts)
 .review-tmp/
 
