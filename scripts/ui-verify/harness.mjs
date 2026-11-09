@@ -249,18 +249,34 @@ function parquetStub(fixtures) {
 (function () {
   const api = {
     postMessage(msg) {
-      if (!msg || msg.type !== 'init') return;
+      if (!msg) return;
       const params = new URLSearchParams(location.search);
+      const guard = params.get('guard') === '1';
+      // "Open anyway" for a gated virtual document: the host reads it and sends it inline.
+      if (guard && msg.type === 'openForce') {
+        setTimeout(function () {
+          window.postMessage({ type: 'open', content: { path: '', fileName: 'big-virtual.parquet', documentCacheId: 'demo-guard', size: 80 * 1024 * 1024, bufferBase64: ${JSON.stringify(inlineBase64)} } }, '*');
+        }, 40);
+        return;
+      }
+      if (msg.type !== 'init') return;
       const file = params.get('big') === '1' ? '/big.parquet'
         : params.get('mixed') === '1' ? '/mixed.parquet'
         : params.get('nested') === '1' ? '/nested.parquet'
         : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
       const inline = params.get('inline') === '1';
+      const payload = inline
+        ? { path: '', fileName: 'inline-mixed.parquet', documentCacheId: 'demo-inline', bufferBase64: ${JSON.stringify(inlineBase64)} }
+        : { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo' };
+      if (guard) {
+        setTimeout(function () {
+          window.postMessage({ type: 'open', content: { path: '', fileName: 'big-virtual.parquet', documentCacheId: 'demo-guard', size: 80 * 1024 * 1024, tooLarge: true } }, '*');
+        }, 80);
+        return;
+      }
       setTimeout(function () {
-        window.postMessage({ type: 'open', content: inline
-          ? { path: '', fileName: 'inline-mixed.parquet', documentCacheId: 'demo-inline', bufferBase64: ${JSON.stringify(inlineBase64)} }
-          : { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo' } }, '*');
+        window.postMessage({ type: 'open', content: payload }, '*');
       }, 80);
     },
     getState() { return undefined; },

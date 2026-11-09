@@ -20,6 +20,17 @@ export const SPREADSHEET_PREVIEW_LIMITS = {
 
 export type SpreadsheetKind = keyof typeof SPREADSHEET_PREVIEW_LIMITS;
 
+/**
+ * Parquet is gated only when it has to travel inline.
+ *
+ * A local parquet is paged with `Range` requests, so its size is irrelevant to the viewer —
+ * only the footer and the row group in view are read. A *virtual* document (GitHub Repos, a
+ * `git:` history entry) cannot be fetched by the webview, so the host sends the whole file as
+ * one base64 string and the viewer keeps it in memory: at 4/3 inflation plus the decoded
+ * buffer, 50 MB is where that stops being a couple of seconds.
+ */
+export const PARQUET_PREVIEW_LIMIT = 50 * 1024 * 1024;
+
 /** Extensions include the dot, because that is what `extname` and the payload both carry. */
 const TEXT_EXTENSIONS = new Set([".csv", ".tsv"]);
 const WORKBOOK_EXTENSIONS = new Set([".xlsx", ".xlsm", ".xls", ".ods"]);
@@ -31,8 +42,9 @@ export function spreadsheetKind(ext: string | undefined): SpreadsheetKind | null
   return null;
 }
 
-/** Infinity for anything this module does not know: only spreadsheets are gated here. */
+/** Infinity for anything this module does not know: unstaged formats are never refused. */
 export function previewLimitBytes(ext: string | undefined): number {
+  if ((ext ?? "").toLowerCase() === ".parquet") return PARQUET_PREVIEW_LIMIT;
   const kind = spreadsheetKind(ext);
   return kind ? SPREADSHEET_PREVIEW_LIMITS[kind] : Number.POSITIVE_INFINITY;
 }
@@ -42,9 +54,9 @@ export function isOverPreviewLimit(
   ext: string | undefined,
   size: number | undefined | null,
 ): boolean {
-  const kind = spreadsheetKind(ext);
-  if (!kind || !size || size <= 0) return false;
-  return size > SPREADSHEET_PREVIEW_LIMITS[kind];
+  if (!size || size <= 0) return false;
+  const limit = previewLimitBytes(ext);
+  return Number.isFinite(limit) && size > limit;
 }
 
 /**

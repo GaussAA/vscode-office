@@ -147,4 +147,9 @@ export default {
     cappedSuffix: " · bei {max} gestoppt",
     invalidRow: "Bitte eine gültige Zeilennummer eingeben",
   },
+  previewGuard: {
+    title: "Datei zu groß für die automatische Vorschau",
+    body: "{file} ist {size} groß. Über {limit} muss eine Parquet-Datei in einem Stück über die Erweiterungs-Bridge laufen, deshalb wird sie erst auf Anfrage geladen.",
+    open: "Trotzdem öffnen",
+  },
 };

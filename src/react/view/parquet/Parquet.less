@@ -683,3 +683,46 @@ body:has(.parquet-app) {
 .parquet-table tbody tr.parquet-viewer__row--target > td {
   background: color-mix(in srgb, var(--vscode-button-background, #0078d4) 25%, transparent);
 }
+
+// Refusal shown when a virtual document is over the inline limit: same idea as the
+// spreadsheet guard, so "not loaded" looks like a decision rather than a failure.
+.parquet-viewer__too-large {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--pv-bg);
+
+  &-panel {
+    width: min(560px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 24px;
+    border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+    border-radius: 8px;
+    background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
+  }
+
+  &-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+  }
+
+  &-body {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--vscode-descriptionForeground);
+  }
+
+  &-open {
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+}

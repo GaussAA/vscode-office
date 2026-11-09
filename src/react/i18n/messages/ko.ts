@@ -146,4 +146,9 @@ export default {
     cappedSuffix: " · {max}에서 중단",
     invalidRow: "유효한 행 번호를 입력하세요",
   },
+  previewGuard: {
+    title: "파일이 커서 자동으로 미리 보지 않습니다",
+    body: "{file} 크기는 {size}입니다. {limit}를 넘는 parquet은 확장 브리지로 한 번에 전송해야 하므로 자동으로 불러오지 않습니다.",
+    open: "그래도 열기",
+  },
 };

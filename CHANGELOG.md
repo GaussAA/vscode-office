@@ -22,8 +22,9 @@ Performance work on the parquet viewer, measured against a 1M-row single-row-gro
 Added:
 
 - **Oversized spreadsheets are not parsed automatically.** Above 25 MB (CSV/TSV) or 15 MB
-  (xlsx/xlsm/xls/ods) the viewer shows the size and an "Open anyway" button instead of loading
-  it: a 152 MB CSV used to cost 9.7 s and 1.36 GB of heap. See
+  (xlsx/xlsm/xls/ods) — and above 50 MB for a parquet that arrives inline instead of being
+  range-read — the viewer shows the size and an "Open anyway" button: a 152 MB CSV used to cost
+  9.7 s and 1.36 GB of heap. See
   [ADR-0016](docs/adr/0016-preview-size-guard.md).
 
 # 6.0.1 2026-11-09

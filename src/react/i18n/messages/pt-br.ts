@@ -148,4 +148,9 @@ export default {
     cappedSuffix: " · parou em {max}",
     invalidRow: "Insira um número de linha válido",
   },
+  previewGuard: {
+    title: "Arquivo grande demais para pré-visualização automática",
+    body: "{file} tem {size}. Acima de {limit}, um parquet precisa trafegar de uma vez pelo bridge da extensão, então não é carregado até você pedir.",
+    open: "Abrir mesmo assim",
+  },
 };

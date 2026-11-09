@@ -194,4 +194,9 @@ export default {
     tree: "树",
     raw: "原文",
   },
+  previewGuard: {
+    title: "文件较大，未自动预览",
+    body: "{file} 有 {size}。超过 {limit} 的 parquet 无法在预览里按需分块读取，要整份经扩展桥传过来，所以暂不自动加载。",
+    open: "仍然打开",
+  },
 };

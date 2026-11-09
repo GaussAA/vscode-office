@@ -694,6 +694,38 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-large-virtual-guard",
+    async run({ page, base }) {
+      // A virtual document over the limit: the host sends no bytes, only the refusal.
+      await page.navigate(`${base}/harness-parquet?guard=1`);
+      const panel = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__too-large')`,
+        15000,
+      );
+      expect(panel, "the parquet size guard did not render");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                text: document.querySelector('.parquet-viewer__too-large')?.innerText ?? '',
+                table: !!document.querySelector('.parquet-viewer__cell'),
+            })`),
+      );
+      expect(/big-virtual\.parquet/.test(state.text), `does not name the file: ${state.text}`);
+      expect(/80\.0 MB/.test(state.text), `does not show the size: ${state.text}`);
+      expect(/50\.0 MB/.test(state.text), `does not show the limit: ${state.text}`);
+      expect(!state.table, "the table rendered — nothing should have been loaded");
+
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__too-large-open')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const loaded = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '').includes('1–50 of 300')`,
+        15000,
+      );
+      expect(loaded, "the viewer never loaded the document after confirming");
+      return "refused 80 MB virtual parquet, loaded after confirm";
+    },
+  },
+  {
     name: "remaining-routes-smoke",
     async run({ page, base }) {
       // The routes without a behavioural scenario of their own: the spreadsheet viewer and the

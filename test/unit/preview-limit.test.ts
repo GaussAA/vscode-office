@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  PARQUET_PREVIEW_LIMIT,
   SPREADSHEET_PREVIEW_LIMITS,
   formatBytes,
   isOverPreviewLimit,
@@ -48,6 +49,12 @@ test("limit: workbooks are held to a smaller size than text", () => {
   const over = SPREADSHEET_PREVIEW_LIMITS.workbook + 1;
   assert.equal(isOverPreviewLimit(".xlsx", over), true);
   assert.equal(isOverPreviewLimit(".csv", over), false);
+});
+
+test("limit: parquet is gated only for the inline path, and higher", () => {
+  assert.ok(PARQUET_PREVIEW_LIMIT > SPREADSHEET_PREVIEW_LIMITS.text);
+  assert.equal(isOverPreviewLimit(".parquet", PARQUET_PREVIEW_LIMIT), false);
+  assert.equal(isOverPreviewLimit(".parquet", PARQUET_PREVIEW_LIMIT + 1), true);
 });
 
 test("formatBytes: readable at both ends of the range", () => {

@@ -16,6 +16,7 @@ import { getVscodeThemeColor, useVscodeDarkTheme } from "../../util/vscodeTheme.
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
+import { formatBytes, previewLimitBytes } from "@/common/previewLimit";
 import { highlightRuns } from "../../common/highlight.ts";
 import { savePersistedState } from "../../common/persistedState.ts";
 import { ParquetSession } from "./parquetSession.ts";
@@ -84,7 +85,12 @@ const COLUMN_ICONS: Record<ColumnCategory, string> = {
 type TableRow = Record<string, unknown> & { key: string };
 
 /** A virtual document arrives as inline base64; a local one as a fetchable path. */
-type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBase64">;
+type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBase64"> & {
+  fileName?: string;
+  ext?: string;
+  size?: number;
+  tooLarge?: boolean;
+};
 
 /** Keyboard cursor into the visible page: row is page-local, col indexes fileInfo.columns. */
 interface CellCursor {
@@ -203,6 +209,15 @@ function ParquetViewer() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set when the host refused to inline an oversized virtual document. */
+  const [tooLarge, setTooLarge] = useState<{
+    size: number;
+    name: string;
+    ext: string;
+  } | null>(null);
+  /** True once the user answered "open anyway": the retry must not be gated again. */
+  const forcedRef = useRef(false);
+  const lastPathRef = useRef<string | undefined>(undefined);
   /** Keyboard cursor into the grid; null until an arrow key (or a click) lands somewhere. */
   const [cursor, setCursor] = useState<CellCursor | null>(null);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
@@ -543,11 +558,36 @@ function ParquetViewer() {
 
   useEffect(() => {
     handler
-      .on("open", (payload) => {
+      .on("open", (payload: ParquetOpenPayload) => {
+        if (payload.path !== lastPathRef.current) {
+          // A different document: "open anyway" never carries over to it.
+          forcedRef.current = false;
+          lastPathRef.current = payload.path;
+        }
+        // Only virtual documents are gated: a local file is paged with range requests, so its
+        // size is irrelevant; one that arrives inline pays for the whole file at once.
+        if (!forcedRef.current && payload.tooLarge) {
+          setTooLarge({
+            size: payload.size ?? 0,
+            name: payload.fileName ?? "",
+            ext: payload.ext ?? ".parquet",
+          });
+          setLoading(false);
+          return;
+        }
+        setTooLarge(null);
         void loadParquet(payload);
       })
       .emit("init");
   }, [loadParquet]);
+
+  /** The host refused to inline an oversized virtual document; ask it to read it anyway. */
+  const handleOpenAnyway = useCallback(() => {
+    forcedRef.current = true;
+    setTooLarge(null);
+    setLoading(true);
+    handler.emit("openForce");
+  }, []);
 
   // The inspector sits below the table scroll area in a fixed-height row. The scroll height
   // is the same whether or not the inspector is open, so opening it never reflows the grid;
@@ -556,6 +596,27 @@ function ParquetViewer() {
 
   return (
     <div className="parquet-viewer">
+      {tooLarge && !loading && (
+        <div className="parquet-viewer__too-large">
+          <div className="parquet-viewer__too-large-panel">
+            <h2 className="parquet-viewer__too-large-title">{$t("previewGuard.title")}</h2>
+            <p className="parquet-viewer__too-large-body">
+              {$t("previewGuard.body", {
+                file: tooLarge.name,
+                size: formatBytes(tooLarge.size),
+                limit: formatBytes(previewLimitBytes(tooLarge.ext)),
+              })}
+            </p>
+            <button
+              type="button"
+              className="parquet-viewer__pager-btn parquet-viewer__too-large-open"
+              onClick={handleOpenAnyway}
+            >
+              {$t("previewGuard.open")}
+            </button>
+          </div>
+        </div>
+      )}
       {loading && (
         <div className="parquet-viewer__overlay">
           <span className="codicon codicon-loading codicon-modifier-spin" />
