@@ -13,8 +13,21 @@ export class SimpleEventEmitter {
     return this;
   }
 
-  removeListener(event: string, listener: Listener): this {
-    this.listenerMap.get(event)?.delete(listener);
+  removeListener(event: string, listener: Listener): boolean {
+    const deleted = this.listenerMap.get(event)?.delete(listener) ?? false;
+    // Clean up empty sets
+    if (this.listenerMap.get(event)?.size === 0) {
+      this.listenerMap.delete(event);
+    }
+    return deleted;
+  }
+
+  removeAllListeners(event?: string): this {
+    if (event) {
+      this.listenerMap.delete(event);
+    } else {
+      this.listenerMap.clear();
+    }
     return this;
   }
 
