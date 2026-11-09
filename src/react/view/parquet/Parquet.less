@@ -634,8 +634,10 @@ body:has(.parquet-app) {
   color: var(--pv-muted, rgba(204, 204, 204, 0.7));
 }
 
-/* keyboard cursor cell (arrows on the focused table area) */
-.parquet-viewer__cell--cursor {
+/* keyboard cursor cell (arrows on the focused table area); the :focus-visible half keeps
+   a visible ring even if the class paint lands a frame after the focus move */
+.parquet-viewer__cell--cursor,
+.parquet-viewer__cell:focus-visible {
   outline: 1px solid var(--vscode-focusBorder, #0078d4);
   outline-offset: -1px;
   border-radius: 2px;
