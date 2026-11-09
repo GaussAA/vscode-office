@@ -26,8 +26,10 @@ Added:
   a viewport-rendering table instead of the editable grid: a 21 MB file paints in ~0.5 s with
   33 MB of heap, where the grid path needs seconds and hundreds of megabytes. Editing large
   files intentionally stays with the text editor (`Open in VS Code`). The read-only view can
-  find across the whole file and jump to a row without materialising the sheet. See
-  [ADR-0017](docs/adr/0017-windowed-spreadsheet.md).
+  find across the whole file and jump to a row without materialising the sheet. Because the
+  windowed view costs a file's bytes rather than nine times them, the local CSV/TSV size limit
+  moves from 25 MB to 200 MB; virtual workspaces keep 25 MB (inline bridge payload) and
+  workbooks keep 15 MB. See [ADR-0017](docs/adr/0017-windowed-spreadsheet.md).
 
 - **Oversized spreadsheets are not parsed automatically.** Above 25 MB (CSV/TSV) or 15 MB
   (xlsx/xlsm/xls/ods) — and above 50 MB for a parquet that arrives inline instead of being

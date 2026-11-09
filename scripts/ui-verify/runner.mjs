@@ -668,7 +668,7 @@ const scenarios = [
       );
       expect(/huge\.csv/.test(state.text), `panel does not name the file: ${state.text}`);
       expect(/900\.0 MB/.test(state.text), `panel does not show the file size: ${state.text}`);
-      expect(/25\.0 MB/.test(state.text), `panel does not show the limit: ${state.text}`);
+      expect(/200\.0 MB/.test(state.text), `panel does not show the limit: ${state.text}`);
       expect(!state.grid, "the grid rendered anyway — the guard must not parse the file");
       expect(
         state.buttons.includes("Open anyway"),

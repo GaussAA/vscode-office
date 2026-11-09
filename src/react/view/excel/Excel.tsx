@@ -6,7 +6,7 @@ import { handler, vscodeApi } from "../../util/vscode.ts";
 import { isVscodeEditorDark, observeVscodeThemeChange } from "../../util/vscodeTheme.ts";
 import { loadOfficeBuffer } from "../../util/loadOfficeContent.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
-import { formatBytes, isOverPreviewLimit, previewLimitBytes } from "@/common/previewLimit";
+import { formatBytes } from "@/common/previewLimit";
 import SponsorBar from "../components/SponsorBar";
 import "./Excel.less";
 import { MIN_VIEW_COLS, MIN_VIEW_ROWS } from "./excel_meta.ts";
@@ -24,7 +24,7 @@ import { parseSpreadsheetLink } from "./excel_hyperlink";
 import { initExcelLocale, t } from "./excel_i18n";
 import WindowedSheet from "./WindowedSheet";
 import { createTextSheetSource, type TextSheetSource } from "./sheetSource";
-import { sheetViewFor } from "./sheetView";
+import { limitForView, sheetViewFor } from "./sheetView";
 
 initExcelLocale();
 
@@ -125,6 +125,8 @@ function ExcelViewer() {
     size: number;
     name: string;
     ext: string;
+    /** The limit this file missed; local text and virtual text have different ones. */
+    limit: number;
   } | null>(null);
   /**
    * Set when a large text file is shown as a read-only window instead of the editable grid.
@@ -502,7 +504,10 @@ function ExcelViewer() {
           try {
             // A big text file is rendered by the windowed view: the grid would build one
             // object per cell and hold the whole sheet (ADR-0017).
-            if (sheetViewFor(payload.ext ?? "", payload.size) === "window") {
+            const view = sheetViewFor(payload.ext ?? "", payload.size, {
+              virtual: payload.scheme !== "file",
+            });
+            if (view === "window") {
               setWindowSource(createTextSheetSource(buffer));
               setWindowLoad((load) => load + 1);
               setLoading(false);
@@ -538,16 +543,17 @@ function ExcelViewer() {
         readOnlyRef.current = fileReadOnly;
         setReadOnly(fileReadOnly);
         pendingPayloadRef.current = payload;
-        if (
-          !forcedRef.current &&
-          (payload.tooLarge || isOverPreviewLimit(payload.ext, payload.size))
-        ) {
+        const view = sheetViewFor(payload.ext ?? "", payload.size, {
+          virtual: payload.scheme !== "file",
+        });
+        if (!forcedRef.current && (payload.tooLarge || view === "refused")) {
           // Refuse before fetching anything: on a remote workspace the download is already
           // half the cost, and the parse is what takes the renderer down.
           setTooLarge({
             size: payload.size ?? 0,
             name: payload.fileName ?? "",
             ext: payload.ext ?? "",
+            limit: limitForView(payload.ext ?? "", { virtual: payload.scheme !== "file" }),
           });
           setLoadError(null);
           setLoading(false);
@@ -629,7 +635,7 @@ function ExcelViewer() {
                 "viewer.tooLargeBody",
                 tooLarge.name,
                 formatBytes(tooLarge.size),
-                formatBytes(previewLimitBytes(tooLarge.ext)),
+                formatBytes(tooLarge.limit),
               )}
             </p>
             <div className="excel-too-large-actions">

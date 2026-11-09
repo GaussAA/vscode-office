@@ -11,28 +11,58 @@ import { isOverPreviewLimit, previewLimitBytes } from "@/common/previewLimit";
 /** Above this, CSV/TSV are rendered by the windowed view instead of parsed into cells. */
 export const WINDOW_THRESHOLD_BYTES = 8 * 1024 * 1024;
 
+/**
+ * Sanity bound for the windowed text path. The windowed view cannot die on a *parse* — it reads
+ * one block — so the only remaining cost is the file bytes plus 8 bytes of offset per row. This
+ * is where that stops being reasonable, not where a performance cliff is.
+ */
+export const TEXT_WINDOW_MAX_BYTES = 200 * 1024 * 1024;
+
 /** The windowed view renders text formats only; workbooks need the store from phase 4. */
 const WINDOW_EXTENSIONS = new Set([".csv", ".tsv"]);
+
+export interface SheetViewOptions {
+  /**
+   * A virtual document (GitHub Repos, `git:` history) crosses the webview bridge inline, so the
+   * 25 MB guard still applies to it even though the windowed view could render more.
+   */
+  virtual?: boolean;
+}
 
 export type SheetView = "grid" | "window" | "refused";
 
 /**
  * Pick the view for a spreadsheet.
  *
- * - `refused`: over the size guard (ADR-0016) — the user has to ask before anything is read.
+ * - `refused`: over a limit — the user has to ask before anything is read.
  * - `window`: text format above the window threshold — read-only, viewport rows only.
  * - `grid`: everything else, including workbooks of any size the guard allows.
+ *
+ * The guards differ by *why* they exist: a workbook is refused at 15 MB because parsing it means
+ * one cell object per value (ADR-0016), while a local text file only pays for its own bytes in
+ * the windowed view and is therefore allowed up to `TEXT_WINDOW_MAX_BYTES`. A virtual text file
+ * keeps the 25 MB guard because crossing the bridge inline is the expensive part there.
  */
-export function sheetViewFor(ext: string, size: number | undefined): SheetView {
+export function sheetViewFor(
+  ext: string,
+  size: number | undefined,
+  options: SheetViewOptions = {},
+): SheetView {
   const lower = (ext ?? "").toLowerCase();
-  if (isOverPreviewLimit(lower, size)) return "refused";
-  if (!size || size <= WINDOW_THRESHOLD_BYTES) return "grid";
-  return WINDOW_EXTENSIONS.has(lower) ? "window" : "grid";
+  if (!size || size <= 0) return "grid";
+  if (WINDOW_EXTENSIONS.has(lower)) {
+    const limit = options.virtual ? previewLimitBytes(lower) : TEXT_WINDOW_MAX_BYTES;
+    if (size > limit) return "refused";
+    return size > WINDOW_THRESHOLD_BYTES ? "window" : "grid";
+  }
+  return isOverPreviewLimit(lower, size) ? "refused" : "grid";
 }
 
-/** True when the chosen view must show the size guard instead of content. */
-export function isRefusedView(ext: string, size: number | undefined): boolean {
-  return isOverPreviewLimit(ext, size);
+/** The size the refusal panel compares against, so its message matches the decision above. */
+export function limitForView(ext: string, options: SheetViewOptions = {}): number {
+  const lower = (ext ?? "").toLowerCase();
+  if (WINDOW_EXTENSIONS.has(lower) && !options.virtual) return TEXT_WINDOW_MAX_BYTES;
+  return previewLimitBytes(lower);
 }
 
 /**

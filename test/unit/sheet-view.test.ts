@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  TEXT_WINDOW_MAX_BYTES,
   WINDOW_THRESHOLD_BYTES,
   cellText,
   headerCells,
-  isRefusedView,
+  limitForView,
   sheetViewFor,
 } from "@/react/view/excel/sheetView";
 import { SPREADSHEET_PREVIEW_LIMITS } from "@/common/previewLimit";
@@ -26,12 +27,27 @@ test("view: a big text file gets the read-only window", () => {
   assert.equal(sheetViewFor(".CSV", 20 * 1024 * 1024), "window", "extension case is irrelevant");
 });
 
-test("view: over the guard the file is refused, not windowed", () => {
+test("view: a local text file is windowed well past the old guard", () => {
+  // The windowed path pays for the file's bytes and one offset per row, not a cell object per
+  // value, so 50 MB is a normal case and the old 25 MB refusal no longer applies locally.
+  assert.equal(sheetViewFor(".csv", 50 * 1024 * 1024), "window");
+  assert.equal(sheetViewFor(".csv", TEXT_WINDOW_MAX_BYTES - 1), "window");
+  assert.equal(sheetViewFor(".csv", TEXT_WINDOW_MAX_BYTES + 1), "refused");
+  assert.equal(limitForView(".csv"), TEXT_WINDOW_MAX_BYTES, "the panel must show this limit");
+});
+
+test("view: a virtual text file keeps the bridge guard", () => {
   const over = SPREADSHEET_PREVIEW_LIMITS.text + 1;
-  assert.equal(sheetViewFor(".csv", over), "refused");
-  assert.equal(isRefusedView(".csv", over), true);
-  assert.equal(isRefusedView(".csv", 1024), false);
+  assert.equal(sheetViewFor(".csv", over, { virtual: true }), "refused");
+  assert.equal(sheetViewFor(".csv", 20 * 1024 * 1024, { virtual: true }), "window");
+  assert.equal(limitForView(".csv", { virtual: true }), SPREADSHEET_PREVIEW_LIMITS.text);
   assert.equal(sheetViewFor(".csv", undefined), "grid", "an unknown size is never refused");
+});
+
+test("view: workbooks keep their own limit", () => {
+  const over = SPREADSHEET_PREVIEW_LIMITS.workbook + 1;
+  assert.equal(sheetViewFor(".xlsx", over), "refused");
+  assert.equal(limitForView(".xlsx"), SPREADSHEET_PREVIEW_LIMITS.workbook);
 });
 
 test("view: what is not a text spreadsheet never takes the window", () => {

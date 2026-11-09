@@ -74,8 +74,8 @@ CI 在每次 push 時都會跑這兩項，以及 `pnpm build` 和 `pnpm run pack
 
 - 超大檔案的 parquet 全檔案搜尋受 I/O 限制（會讀取走訪到的每個 row group）。
 - parquet 唯讀，沒有寫入端。
-- 表格超過 8 MB 時進入唯讀視窗檢視（只渲染視窗內的行）；CSV/TSV 超過 25 MB、
-  xlsx/xlsm/xls/ods 超過 15 MB 時，檢視器會先詢問再載入。
+- 表格超過 8 MB 時進入唯讀視窗檢視（只渲染視窗內的行）。活頁簿超過 15 MB、虛擬工作區裡的
+  CSV/TSV 超過 25 MB 時先詢問再載入；本機 CSV/TSV 最多可視窗化到 200 MB。
 - JSONL 搜尋比對原始文字，不理解 JSON 路徑。
 - 上游的遙測已完全移除。
 
