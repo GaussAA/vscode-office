@@ -224,7 +224,7 @@ export default {
     saveAnyway: "仍要儲存",
     unsupportedSave: "無法儲存：此檔包含巢狀或結構欄位（{columns}）。僅支援儲存扁平純量欄位。",
     inspectHint: "點擊儲存格查看完整值",
-    cappedSuffix: " · 已停在 5,000",
+    cappedSuffix: " · 已停在 {max}",
     invalidRow: "請輸入有效行號",
     saveTimeout: "儲存耗時過長——修改仍已記錄，請重試。",
   },

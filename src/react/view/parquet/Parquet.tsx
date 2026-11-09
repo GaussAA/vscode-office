@@ -940,7 +940,11 @@ function ParquetViewer() {
                             : $t("parquet.matchCountMany", {
                                 count: matchRows.size.toLocaleString(),
                               })}
-                          {searchCapped ? $t("parquet.cappedSuffix") : ""}
+                          {searchCapped
+                            ? $t("parquet.cappedSuffix", {
+                                max: SEARCH_MAX_ROWS.toLocaleString(),
+                              })
+                            : ""}
                         </span>
                         <button
                           type="button"
