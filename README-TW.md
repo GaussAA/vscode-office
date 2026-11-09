@@ -15,7 +15,7 @@
 - PowerPoint: `.pptx`、`.pptm`
 - PDF 與電子書: `.pdf`、`.epub`
 - HEIC/TIFF: `.heic`、`.heif`、`.tiff`
-- 設計檔案: `.psd`、`.xmind`、`.icns`、`.svg`
+- 設計檔案: `.psd`、`.xmind`、`.icns`
 - 字型: `.ttf`、`.otf`、`.woff`、`.woff2`
 - HTML: `.html`、`.htm`
 - Java: `.class`（反編譯）

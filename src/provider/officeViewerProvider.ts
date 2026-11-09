@@ -5,7 +5,6 @@ import * as vscode from "vscode";
 import { Handler } from "../common/handler";
 import { Util } from "../common/util";
 import { handleImage, isImage } from "./handlers/imageHanlder";
-import { handleSvg } from "./handlers/svgHandler";
 import { isVirtualUri, readUriText } from "./handlers/officeContent";
 import { handleCommonEvent } from "./compress/commonHandler";
 import {
@@ -53,12 +52,8 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
 
     let route: string | undefined;
     const suffix = getFileSuffix(uri.fsPath);
-    const isSvg = /\.svg$/i.test(suffix);
-    handleCommonEvent(uri, handler, isSvg ? { skipOpen: true } : undefined);
-    if (isSvg) {
-      route = "svg";
-      handleSvg(handler, uri);
-    } else if (isImage(suffix)) {
+    handleCommonEvent(uri, handler);
+    if (isImage(suffix)) {
       handleImage(handler, uri, webview);
       route = "image";
     }

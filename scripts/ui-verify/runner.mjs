@@ -512,7 +512,6 @@ const scenarios = [
       // React routes only: html/pdf are provider-served static pages.
       const routes = [
         "image",
-        "svg",
         "excel",
         "zip",
         "word",

@@ -18,6 +18,11 @@ Removed:
   (ZSTD/GZIP/BROTLI/LZ4, paging, range requests, nested columns). The three limitations that only
   existed because of the writer — non-SNAPPY files being rewritten as SNAPPY, the 200k-row
   read-only fallback, and the full re-read before saving — are gone with it.
+- **The SVG viewer.** `.svg` no longer opens in this extension: VS Code's built-in image preview
+  renders it by default and offers "Reopen as Text". The 922-line toolbox (format, fill colour,
+  PNG export, zoom, code editor) went with it, along with its six CodeMirror/Lezer dependencies.
+  In an SVG, press `Ctrl+Shift+V`-style "Reopen Editor With… → Text Editor" if you need the
+  markup.
 
 # 5.0.0 2026-11-06
 

@@ -11,7 +11,7 @@ This extension lets you preview and edit common office and design files directly
 - PowerPoint: `.pptx`, `.pptm`
 - PDF & eBook: `.pdf`, `.epub`
 - HEIC/TIFF: `.heic`, `.heif`, `.tiff`
-- Design: `.psd`, `.xmind`, `.icns`, `.svg`
+- Design: `.psd`, `.xmind`, `.icns`
 - Font: `.ttf`, `.otf`, `.woff`, `.woff2`
 - HTML: `.html`, `.htm`
 - Java: `.class` (decompiler)

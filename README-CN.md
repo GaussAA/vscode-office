@@ -11,7 +11,7 @@
 - PowerPoint: `.pptx`、`.pptm`
 - PDF 与电子书: `.pdf`、`.epub`
 - HEIC/TIFF: `.heic`、`.heif`、`.tiff`
-- 设计文件: `.psd`、`.xmind`、`.icns`、`.svg`
+- 设计文件: `.psd`、`.xmind`、`.icns`
 - 字体: `.ttf`、`.otf`、`.woff`、`.woff2`
 - HTML: `.html`、`.htm`
 - Java: `.class`（反编译）

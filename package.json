@@ -20,7 +20,6 @@
     "powerpoint",
     "pptx",
     "epub",
-    "svg",
     "psd",
     "xmind",
     "parquet",
@@ -216,9 +215,6 @@
           },
           {
             "filenamePattern": "*.otf"
-          },
-          {
-            "filenamePattern": "*.svg"
           },
           {
             "filenamePattern": "*.icns"
@@ -439,14 +435,8 @@
     "7z-wasm": "^1.2.0",
     "@ant-design/icons": "^6.3.4",
     "@cantoo/pdf-lib": "^2.11.1",
-    "@codemirror/commands": "^6.10.3",
-    "@codemirror/lang-html": "^6.4.12",
-    "@codemirror/language": "^6.12.3",
-    "@codemirror/state": "^6.6.0",
-    "@codemirror/view": "^6.43.1",
     "@cweijan/exceljs": "^5.0.3",
     "@docx-editor.dev/react": "2.34.0",
-    "@lezer/highlight": "^1.2.3",
     "@mind-elixir/import-xmind": "^1.0.8",
     "@vscode/codicons": "^0.0.45",
     "@zip.js/zip.js": "^2.8.26",

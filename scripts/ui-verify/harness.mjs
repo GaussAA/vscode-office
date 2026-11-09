@@ -314,7 +314,6 @@ function smokeStub(route) {
       image: "smoke.png",
       html: "smoke.html",
       font: "smoke.ttf",
-      svg: "smoke.svg",
     }[route] ?? "smoke.bin";
   return `<script>
 (function () {
