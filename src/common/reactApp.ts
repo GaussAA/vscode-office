@@ -2,7 +2,7 @@ import axios from "axios";
 import * as vscode from "vscode";
 import { extensionResource, getExtensionUri, readExtensionText } from "./extensionResource";
 import { IconService } from "../service/icon/iconService";
-import { applyWebviewBase } from "./webviewBase";
+import { applyWebviewBase, applyWebviewConfig } from "./webviewBase";
 import { buildWebviewCsp } from "./webviewCsp";
 
 interface ViewOption {
@@ -30,18 +30,16 @@ export class ReactApp {
     const sponsorBaseUrl = webview
       .asWebviewUri(extensionResource(this.context, "resource", "sponsor"))
       .toString();
-    webview.html = this.buildPath(html, webview)
-      .replace(`{{csp}}`, buildWebviewCsp(webview.cspSource))
-      .replace(
-        `{{configs}}`,
-        JSON.stringify({
-          ...option,
-          ...iconConfig,
-          sponsorBaseUrl,
-          language: vscode.env.language,
-          config: vscode.workspace.getConfiguration("vscode-office"),
-        }),
-      );
+    webview.html = applyWebviewConfig(
+      this.buildPath(html, webview).replace(`{{csp}}`, buildWebviewCsp(webview.cspSource)),
+      {
+        ...option,
+        ...iconConfig,
+        sponsorBaseUrl,
+        language: vscode.env.language,
+        config: vscode.workspace.getConfiguration("vscode-office"),
+      },
+    );
   }
 
   private static async readContent(): Promise<string> {
