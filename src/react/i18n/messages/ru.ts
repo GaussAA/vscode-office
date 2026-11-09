@@ -143,7 +143,8 @@ export default {
     branch: "ветка",
   },
   parquet: {
-    cappedSuffix: " · остановлено на 5 000",
+    inspectHint: "Выберите ячейку, чтобы увидеть значение",
+    cappedSuffix: " · остановлено на {max}",
     invalidRow: "Введите действительный номер строки",
   },
 };

@@ -251,6 +251,25 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-zstd",
+    docs: "parquet-zstd.png",
+    async run({ page, base }) {
+      // No query: the harness serves `sample.parquet`, the committed ZSTD fixture. Rendering
+      // it at all proves hyparquet-compressors decoded the columns.
+      await openParquet(page, base, "");
+      const state = await pagerState(page);
+      expect(state.range === "1–50 of 300", `zstd range: ${state.range}`);
+      expect(state.first === "1", `zstd first row: ${state.first}`);
+      const names = json(
+        await page.evaluate(
+          `JSON.stringify([...document.querySelectorAll('.parquet-viewer__list-name')].map(n => n.textContent))`,
+        ),
+      );
+      expect(names.join(",") === "f32,f64", `zstd columns: ${names.join(",")}`);
+      return `ZSTD sample: ${state.range}, ${names.join("/")}`;
+    },
+  },
+  {
     name: "parquet-paging",
     docs: "parquet-types.png",
     async run({ page, base }) {
@@ -262,7 +281,41 @@ const scenarios = [
       const second = await pagerState(page);
       expect(second.range === "51–100 of 300", `page 2 range: ${second.range}`);
       expect(second.first === "51", `page 2 first row: ${second.first}`);
+      const pagerTitles = json(
+        await page.evaluate(`JSON.stringify({
+                previous: document.querySelector('button[aria-label="Previous page"]')?.getAttribute('title') ?? null,
+                next: document.querySelector('button[aria-label="Next page"]')?.getAttribute('title') ?? null,
+            })`),
+      );
+      expect(
+        pagerTitles.previous === "Previous page" && pagerTitles.next === "Next page",
+        `pager titles: ${JSON.stringify(pagerTitles)}`,
+      );
       return `1–50 then 51–100 of 300`;
+    },
+  },
+  {
+    name: "parquet-sidebar",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                stats: [...document.querySelectorAll('.parquet-viewer__stat')].map((element) => {
+                    const style = getComputedStyle(element);
+                    return { border: style.borderTopWidth, shadow: style.boxShadow };
+                }),
+            })`),
+      );
+      expect(state.stats.length === 3, `stat rows: ${state.stats.length}`);
+      expect(
+        state.stats.every((stat) => stat.border === "0px"),
+        `stat borders: ${JSON.stringify(state.stats)}`,
+      );
+      expect(
+        state.stats.every((stat) => stat.shadow === "none"),
+        `stat shadows: ${JSON.stringify(state.stats)}`,
+      );
+      return `${state.stats.length} borderless stat rows`;
     },
   },
   {
@@ -325,6 +378,21 @@ const scenarios = [
       await openParquet(page, base, "?big=1");
       const state = await pagerState(page);
       expect(state.range === "1–50 of 250,000", `large range: ${state.range}`);
+
+      // A blur applies the jump too: the Go button is optional.
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__row-jump input');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, '100');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.focus();
+                input.blur();
+            })()`);
+      const blurred = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '51–100 of 250,000'`,
+      );
+      expect(blurred, "blur did not apply the row jump");
+
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__row-jump input');
                 const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -341,7 +409,7 @@ const scenarios = [
       const jumped = await pagerState(page);
       expect(jumped.range === "239,951–240,000 of 250,000", `jump range: ${jumped.range}`);
       expect(jumped.first === "239951", `jump first row: ${jumped.first}`);
-      return "jump to row 240,000 in a 250k-row file";
+      return "read-only + blur and Go jumps";
     },
   },
   {
@@ -377,6 +445,10 @@ const scenarios = [
     docs: "parquet-inspector.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
+      const hint = await page.evaluate(
+        `document.querySelector('.parquet-viewer__inspector-hint')?.innerText ?? null`,
+      );
+      expect(hint === "Select a cell to inspect it", `inspector hint: ${hint}`);
       await page.evaluate(`(() => {
                 const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
                 cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -393,10 +465,49 @@ const scenarios = [
       );
       expect(/name · row 1/.test(state.label ?? ""), `unexpected inspector label: ${state.label}`);
       expect((state.value ?? "").length > 0, "inspector showed no value");
+
+      // The inspector must not sit on top of the table scroll area: that is what hid the
+      // horizontal scrollbar and the last rows when it was an overlay.
+      const layout = json(
+        await page.evaluate(`JSON.stringify({
+                insideTable: !!document.querySelector('.parquet-viewer__table-wrap .parquet-viewer__inspector'),
+                tableBodyBottom: document.querySelector('.parquet-table .ant-table-body')?.getBoundingClientRect().bottom ?? -1,
+                inspectorTop: document.querySelector('.parquet-viewer__inspector')?.getBoundingClientRect().top ?? -1,
+                inspectorBottom: document.querySelector('.parquet-viewer__inspector')?.getBoundingClientRect().bottom ?? -1,
+                footerTop: document.querySelector('.parquet-viewer__footer')?.getBoundingClientRect().top ?? -1,
+            })`),
+      );
+      expect(layout.tableBodyBottom > 0, "table body not found");
+      expect(layout.inspectorTop >= 0, "inspector not found");
+      expect(!layout.insideTable, "inspector is inside the table scroll area");
+      expect(
+        layout.inspectorTop >= layout.tableBodyBottom - 1,
+        `inspector overlaps the table body: ${layout.tableBodyBottom} > ${layout.inspectorTop}`,
+      );
+      expect(
+        layout.footerTop < 0 || layout.inspectorBottom <= layout.footerTop + 1,
+        `inspector overlaps the footer: ${layout.inspectorBottom} > ${layout.footerTop}`,
+      );
+
+      return `${state.label} = ${state.value}`;
+    },
+  },
+  {
+    name: "parquet-inspector-clears",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      await page.evaluate(`(() => {
+                const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
+                cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      const inspected = await page.waitFor(
+        `/name · row 1/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,
+      );
+      expect(inspected, "inspector never opened before the page change");
       await clickNextPage(page);
       const cleared = await page.evaluate(`!document.querySelector('.parquet-viewer__inspector')`);
       expect(cleared, "inspector survived a page change");
-      return `${state.label} = ${state.value}`;
+      return "inspector cleared on page change";
     },
   },
   {
@@ -433,16 +544,29 @@ const scenarios = [
         `!!document.querySelector('.parquet-viewer__cell--cursor')`,
       );
       expect(cursorShown, "keyboard cursor never appeared");
+      const focused = await page.waitFor(
+        `document.activeElement?.classList.contains('parquet-viewer__cell--cursor')`,
+      );
+      expect(focused, "cursor cell did not take focus");
+      const focusState = json(
+        await page.evaluate(`JSON.stringify({
+                tabIndex: document.activeElement?.getAttribute('tabindex'),
+                label: document.activeElement?.getAttribute('aria-label') ?? '',
+                tabStops: document.querySelectorAll('.parquet-viewer__cell[tabindex="0"]').length,
+            })`),
+      );
+      expect(focusState.tabIndex === "0", `cursor cell tabindex: ${focusState.tabIndex}`);
+      expect(/name, row 2/.test(focusState.label), `cursor cell aria-label: ${focusState.label}`);
+      expect(focusState.tabStops === 1, `roving tab stops: ${focusState.tabStops}`);
       await page.evaluate(
-        `document.querySelector('.parquet-viewer__table-wrap')
-            .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`,
+        `document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`,
       );
       const inspected = await page.waitFor(
         `/name · row 2/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,
       );
       expect(inspected, "Enter did not inspect the cursor cell (name · row 2)");
-      // The overlay must not reflow the grid: reflow is what made double-click-to-edit
-      // land on a different cell when the inspector squeezed the table.
+      // The inspector must not reflow the grid: reflow is what made double-click-to-edit
+      // land on a different cell when it squeezed the table.
       const heightAfter = await page.evaluate(
         `document.querySelector('.parquet-table')?.getBoundingClientRect().height ?? 0`,
       );
