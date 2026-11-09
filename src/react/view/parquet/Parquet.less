@@ -8,26 +8,46 @@ body:has(.parquet-app) {
 
 .parquet-viewer {
   --pv-bg: var(--vscode-editor-background, #1e1e1e);
-  --pv-sider-bg: var(--vscode-sideBar-background, #252526);
-  --pv-header-bg: var(
-    --vscode-editorGroupHeader-tabsBackground,
-    var(--vscode-tab-inactiveBackground, #2d2d2d)
+  --pv-panel: color-mix(in srgb, var(--vscode-sideBar-background, #252526) 92%, var(--pv-fg) 8%);
+  --pv-panel-strong: color-mix(
+    in srgb,
+    var(--vscode-editorGroupHeader-tabsBackground, #2d2d2d) 92%,
+    var(--pv-fg) 8%
   );
-  --pv-border: var(--vscode-panel-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
   --pv-fg: var(--vscode-foreground, #cccccc);
-  --pv-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
-  --pv-hover: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.31));
+  --pv-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.72));
+  --pv-hover: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.3));
   --pv-active-bg: var(--vscode-list-activeSelectionBackground, #094771);
   --pv-active-fg: var(--vscode-list-activeSelectionForeground, #ffffff);
   --pv-accent: var(--vscode-button-background, #0e639c);
   --pv-accent-hover: var(--vscode-button-hoverBackground, #1177bb);
+  --pv-focus: var(--vscode-focusBorder, #0078d4);
   --pv-error: var(--vscode-errorForeground, #f48771);
-  --pv-shadow: none;
-  --pv-radius: 6px;
-  --pv-type-bg: color-mix(in srgb, var(--pv-fg) 10%, transparent);
-  --pv-type-fg: var(--pv-muted);
-  --pv-scrollbar-thumb: var(--vscode-scrollbarSlider-background, #79797966);
-  --pv-scrollbar-track: var(--pv-bg);
+  --pv-control: color-mix(in srgb, var(--pv-fg) 8%, var(--pv-panel));
+  --pv-control-hover: color-mix(in srgb, var(--pv-fg) 13%, var(--pv-panel));
+  --pv-control-active: color-mix(in srgb, var(--pv-fg) 18%, var(--pv-panel));
+  --pv-row-alt: color-mix(in srgb, var(--pv-fg) 3.5%, var(--pv-bg));
+  --pv-row-match: color-mix(
+    in srgb,
+    var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33)) 18%,
+    var(--pv-bg)
+  );
+  --pv-row-target: color-mix(in srgb, var(--pv-accent) 18%, var(--pv-bg));
+  --pv-scroll-thumb: color-mix(in srgb, var(--pv-fg) 22%, transparent);
+  --pv-scroll-thumb-hover: color-mix(in srgb, var(--pv-fg) 38%, transparent);
+  --pv-type-bg: color-mix(in srgb, var(--pv-fg) 8%, transparent);
+  --pv-radius: 8px;
+  --pv-radius-sm: 6px;
+  --pv-font: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  --pv-mono: var(
+    --vscode-editor-font-family,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace
+  );
   --pv-icon-rows: var(--vscode-charts-blue, #3794ff);
   --pv-icon-columns: var(--vscode-charts-yellow, #cca700);
   --pv-icon-author: var(--vscode-charts-purple, #b180d7);
@@ -44,11 +64,50 @@ body:has(.parquet-app) {
   flex-direction: column;
   height: 100vh;
   min-height: 100vh;
-  background: var(--pv-bg);
   color: var(--pv-fg);
-  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  background: var(--pv-bg);
+  font-family: var(--pv-font);
   font-size: var(--vscode-font-size, 13px);
   overflow: hidden;
+  scrollbar-color: var(--pv-scroll-thumb) transparent;
+}
+
+.parquet-viewer *,
+.parquet-viewer *::before,
+.parquet-viewer *::after {
+  scrollbar-color: var(--pv-scroll-thumb) transparent;
+}
+
+.parquet-viewer ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.parquet-viewer ::-webkit-scrollbar-track,
+.parquet-viewer ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.parquet-viewer ::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: var(--pv-scroll-thumb);
+  background-clip: padding-box;
+}
+
+.parquet-viewer ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--pv-scroll-thumb-hover);
+}
+
+.parquet-viewer ::selection {
+  color: var(--pv-active-fg);
+  background: color-mix(in srgb, var(--pv-accent) 55%, transparent);
+}
+
+.parquet-viewer input[type="checkbox"],
+.parquet-viewer input[type="radio"] {
+  accent-color: var(--pv-accent);
 }
 
 .parquet-icon {
@@ -70,118 +129,237 @@ body:has(.parquet-app) {
   }
 }
 
+/* The only full-width rows are the top command bar and the bottom status bar. */
+.parquet-viewer__topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-height: 52px;
+  padding: 8px 16px;
+  background: var(--pv-panel-strong);
+}
+
+.parquet-viewer__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 340px;
+  min-width: 180px;
+  height: 32px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--pv-radius);
+  background: var(--vscode-input-background, var(--pv-control));
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:focus-within {
+    background: var(--vscode-input-background, var(--pv-control));
+    box-shadow: inset 0 0 0 1px var(--pv-focus);
+  }
+}
+
+.parquet-viewer__search-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--pv-muted);
+}
+
+.parquet-viewer__find-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  color: var(--pv-fg);
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+
+  &::placeholder {
+    color: var(--pv-muted);
+  }
+}
+
+.parquet-viewer__find-clear,
+.parquet-viewer__find-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
+  color: var(--pv-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+
+  .codicon {
+    font-size: 14px;
+  }
+
+  &:hover:not(:disabled) {
+    color: var(--pv-fg);
+    background: var(--pv-control-hover);
+  }
+
+  &:active:not(:disabled) {
+    background: var(--pv-control-active);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--pv-focus);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.parquet-viewer__find-btn {
+  color: var(--pv-fg);
+}
+
+.parquet-viewer__find-state {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--pv-muted);
+}
+
+.parquet-viewer__find-count {
+  padding: 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--pv-muted);
+}
+
+.parquet-viewer__meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.parquet-viewer__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.parquet-viewer__meta-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--pv-fg);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.parquet-viewer__meta-label {
+  color: var(--pv-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.parquet-viewer__meta-item--author {
+  min-width: 0;
+  max-width: 220px;
+
+  .parquet-viewer__meta-value {
+    font-weight: 500;
+    color: var(--pv-muted);
+  }
+}
+
 .parquet-viewer__body {
   display: flex;
   flex: 1;
   min-height: 0;
-  height: 100%;
 }
 
 .parquet-viewer__sider {
-  width: 272px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--pv-border);
-  background: var(--pv-sider-bg);
-  overflow: hidden;
-}
-
-.parquet-viewer__sider-inner {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 0 0 auto;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
+  background: var(--pv-panel);
 }
 
-.parquet-viewer__sider-header {
+.parquet-viewer__sider-heading {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 12px 14px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--pv-muted);
-  border-bottom: 1px solid var(--pv-border);
-  background: var(--pv-header-bg);
   flex-shrink: 0;
+  padding: 13px 14px 8px;
+}
+
+.parquet-viewer__sider-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--pv-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
 
   .parquet-icon--schema {
-    font-size: 15px;
+    font-size: 14px;
   }
 }
 
-.parquet-viewer__meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 12px;
-  border-bottom: 1px solid var(--pv-border);
-  flex-shrink: 0;
-}
-
-.parquet-viewer__stat {
-  padding: 2px 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  min-width: 0;
-}
-
-.parquet-viewer__stat-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.parquet-viewer__sider-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
   color: var(--pv-muted);
-  margin-bottom: 4px;
-}
-
-.parquet-viewer__stat-value {
-  display: block;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--pv-fg);
+  background: var(--pv-control);
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.parquet-viewer__stat--wide {
-  grid-column: 1 / -1;
 }
 
 .parquet-viewer__list {
   flex: 1;
   min-height: 0;
+  padding: 0 6px 10px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 6px 0;
-  scrollbar-color: var(--pv-scrollbar-thumb) var(--pv-scrollbar-track);
-
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--pv-scrollbar-thumb);
-    border-radius: 4px;
-  }
 }
 
 .parquet-viewer__list-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 8px 2px;
-  padding: 7px 10px;
-  font-size: 12px;
-  border-radius: var(--pv-radius);
+  min-height: 32px;
+  padding: 6px 8px;
+  margin-bottom: 1px;
+  border-radius: var(--pv-radius-sm);
   transition: background 0.12s ease;
 
   &:hover {
@@ -220,90 +398,70 @@ body:has(.parquet-app) {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--pv-fg);
+  font-size: 12px;
   font-weight: 500;
 }
 
 .parquet-viewer__list-type {
   flex-shrink: 0;
-  max-width: 88px;
+  max-width: 94px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 1px 6px;
-  border-radius: 10px;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--pv-type-fg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--pv-muted);
   background: var(--pv-type-bg);
-  font-family: var(
-    --vscode-editor-font-family,
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    monospace
-  );
+  font-family: var(--pv-mono);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.parquet-viewer__resizer {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 7px;
+  margin: 0 -3px;
+  cursor: col-resize;
+  touch-action: none;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 10px 2.5px;
+    border-radius: 999px;
+    background: transparent;
+    transition: background 0.15s ease;
+  }
+
+  &:hover::after,
+  &:focus-visible::after {
+    background: color-mix(in srgb, var(--pv-accent) 55%, transparent);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
 }
 
 .parquet-viewer__main {
   display: flex;
-  flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  background: var(--pv-bg);
   overflow: hidden;
-}
-
-.parquet-viewer__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--pv-border);
-  background: var(--pv-header-bg);
-  flex-shrink: 0;
-  box-shadow: var(--pv-shadow);
-}
-
-.parquet-viewer__toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.parquet-theme-toggle {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--pv-border);
-  border-radius: var(--pv-radius);
   background: var(--pv-bg);
-  color: var(--pv-fg);
-  cursor: pointer;
-  transition: background 0.12s ease;
-  font-size: 14px;
-
-  &:hover {
-    background: var(--pv-hover);
-  }
 }
 
 .parquet-viewer__table-wrap {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: 0;
   outline: none;
 
   &:focus-visible {
-    outline: 1px solid var(--vscode-focusBorder, #0078d4);
+    outline: 1px solid var(--pv-focus);
     outline-offset: -1px;
   }
 
@@ -317,24 +475,28 @@ body:has(.parquet-app) {
 
   .ant-table-body {
     overflow: auto !important;
-    scrollbar-color: var(--pv-scrollbar-thumb) var(--pv-scrollbar-track);
+    scrollbar-gutter: stable;
   }
 
   .ant-table {
-    background: transparent;
     color: var(--pv-fg);
+    background: transparent;
     font-size: 12px;
   }
 
+  .ant-table-header {
+    background: var(--pv-panel);
+  }
+
   .ant-table-thead > tr > th {
-    background: var(--pv-header-bg) !important;
+    padding: 8px 12px !important;
+    border: 0 !important;
     color: var(--pv-muted) !important;
-    border-bottom: 1px solid var(--pv-border) !important;
+    background: var(--pv-panel) !important;
+    font-size: 10px;
     font-weight: 600;
-    font-size: 11px;
-    padding: 8px 10px !important;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
 
     &::before {
       display: none !important;
@@ -342,27 +504,47 @@ body:has(.parquet-app) {
   }
 
   .ant-table-tbody > tr > td {
-    border-bottom: 1px solid var(--pv-border) !important;
-    padding: 5px 10px !important;
-    font-family: var(
-      --vscode-editor-font-family,
-      ui-monospace,
-      SFMono-Regular,
-      Menlo,
-      Monaco,
-      Consolas,
-      monospace
-    );
-    font-size: 12px;
+    padding: 6px 12px !important;
+    border: 0 !important;
+    color: var(--pv-fg);
+    background: var(--pv-bg) !important;
+    font-family: var(--pv-mono);
+    font-size: 11.5px;
+    transition: background 0.1s ease;
+  }
+
+  .ant-table-tbody > tr.parquet-viewer__row--alt > td {
+    background: var(--pv-row-alt) !important;
+  }
+
+  .ant-table-tbody > tr:hover > td,
+  .ant-table-tbody > tr.ant-table-row-hover > td,
+  .ant-table-cell-row-hover {
+    background: var(--pv-hover) !important;
+  }
+
+  .ant-table-tbody > tr.parquet-viewer__row--match > td {
+    background: var(--pv-row-match) !important;
+  }
+
+  .ant-table-tbody > tr.parquet-viewer__row--target > td {
+    background: var(--pv-row-target) !important;
+  }
+
+  .ant-table-cell-fix-left,
+  .ant-table-cell-fix-right {
     background: var(--pv-bg) !important;
   }
 
-  .ant-table-tbody > tr:hover > td {
-    background: var(--pv-hover) !important;
+  .ant-table-tbody > tr.parquet-viewer__row--alt > td.ant-table-cell-fix-left,
+  .ant-table-tbody > tr.parquet-viewer__row--alt > td.ant-table-cell-fix-right {
+    background: var(--pv-row-alt) !important;
   }
 
-  .ant-table-cell-row-hover {
-    background: var(--pv-hover) !important;
+  .ant-table-placeholder > td,
+  .ant-table-placeholder:hover > td {
+    background: var(--pv-bg) !important;
+    border: 0 !important;
   }
 
   .ant-empty-description {
@@ -370,9 +552,14 @@ body:has(.parquet-app) {
   }
 }
 
+.parquet-viewer__index-cell {
+  color: var(--pv-muted) !important;
+  font-variant-numeric: tabular-nums;
+}
+
 .parquet-viewer__cell {
   display: block;
-  max-width: 360px;
+  max-width: 420px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -380,62 +567,198 @@ body:has(.parquet-app) {
   line-height: 22px;
 }
 
-.parquet-viewer__footer {
-  flex-shrink: 0;
+.parquet-viewer__cell--numeric {
+  margin-left: auto;
+  color: var(--vscode-charts-blue, #4ea1ff);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.parquet-viewer__cell--string {
+  color: var(--vscode-charts-green, #89d185);
+}
+
+.parquet-viewer__cell--bool-true {
+  color: var(--vscode-charts-orange, #f0a45e);
+}
+
+.parquet-viewer__cell--bool-false {
+  color: var(--pv-muted);
+}
+
+.parquet-viewer__cell--datetime {
+  color: var(--vscode-charts-purple, #c586c0);
+}
+
+.parquet-viewer__cell--null {
+  color: var(--vscode-disabledForeground, #8a8a8a);
+  font-style: italic;
+}
+
+.parquet-viewer__cell--cursor,
+.parquet-viewer__cell:focus-visible {
+  outline: 1px solid var(--pv-focus);
+  outline-offset: -1px;
+  border-radius: 3px;
+}
+
+.parquet-viewer__bottombar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 14px;
-  border-top: 1px solid var(--pv-border);
-  background: var(--pv-header-bg);
+  gap: 16px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 6px 16px;
+  background: var(--pv-panel-strong);
 }
 
-.parquet-viewer__footer-total {
-  font-size: 12px;
+.parquet-viewer__selection {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+}
+
+.parquet-viewer__selection-label {
+  flex: 0 0 auto;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--pv-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.parquet-viewer__selection-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pv-fg);
+  font-family: var(--pv-mono);
+  font-size: 11.5px;
+  line-height: 32px;
+}
+
+.parquet-viewer__selection-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pv-muted);
+  font-size: 11.5px;
 }
 
 .parquet-viewer__pager {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.parquet-viewer__pager-loading {
+  margin-right: 2px;
+  color: var(--pv-muted);
+  font-size: 12px;
 }
 
 .parquet-viewer__pager-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  min-width: 28px;
   height: 28px;
-  padding: 0;
-  border: 1px solid var(--pv-border);
-  border-radius: var(--pv-radius);
-  background: var(--pv-bg);
+  padding: 0 5px;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
   color: var(--pv-fg);
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease,
+    opacity 0.12s ease;
 
   .codicon {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   &:hover:not(:disabled) {
-    background: var(--pv-hover);
+    background: var(--pv-control-hover);
+  }
+
+  &:active:not(:disabled) {
+    background: var(--pv-control-active);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--pv-focus);
+    outline-offset: 1px;
   }
 
   &:disabled {
     opacity: 0.35;
-    cursor: not-allowed;
+    cursor: default;
+  }
+}
+
+.parquet-viewer__pager-btn--text {
+  padding: 0 10px;
+  background: var(--pv-control);
+
+  &:hover:not(:disabled) {
+    background: var(--pv-control-hover);
   }
 }
 
 .parquet-viewer__pager-info {
-  min-width: 80px;
-  text-align: center;
-  font-size: 12px;
+  min-width: 106px;
+  padding: 0 4px;
   color: var(--pv-fg);
+  text-align: center;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.parquet-viewer__row-jump.ant-input-number {
+  width: 92px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
+  background: var(--vscode-input-background, var(--pv-control));
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 11px;
+
+  .ant-input-number-input {
+    height: 26px;
+    padding: 0 8px;
+    color: var(--pv-fg);
+    background: transparent;
+    font-family: inherit;
+    font-size: 11px;
+  }
+
+  .ant-input-number-input::placeholder {
+    color: var(--pv-muted);
+  }
+
+  &:hover {
+    background: var(--vscode-input-background, var(--pv-control-hover));
+  }
+
+  &.ant-input-number-focused {
+    background: var(--vscode-input-background, var(--pv-control));
+    box-shadow: inset 0 0 0 1px var(--pv-focus);
+  }
 }
 
 .parquet-viewer__empty {
@@ -453,12 +776,11 @@ body:has(.parquet-app) {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  max-width: 520px;
+  max-width: 560px;
   padding: 14px 16px;
-  border: 1px solid var(--pv-error);
   border-radius: var(--pv-radius);
-  background: color-mix(in srgb, var(--pv-error) 10%, transparent);
   color: var(--pv-error);
+  background: color-mix(in srgb, var(--pv-error) 10%, transparent);
   font-size: 13px;
   line-height: 1.5;
 
@@ -478,9 +800,9 @@ body:has(.parquet-app) {
   align-items: center;
   justify-content: center;
   gap: 12px;
+  color: var(--pv-muted);
   background: color-mix(in srgb, var(--pv-bg) 78%, transparent);
   backdrop-filter: blur(2px);
-  color: var(--pv-muted);
   font-size: 13px;
 
   .codicon {
@@ -503,183 +825,79 @@ body:has(.parquet-app) {
   .office-sponsor-bar {
     position: static;
     padding: 4px 8px;
+    border: 0;
     border-radius: var(--pv-radius);
-    background: color-mix(in srgb, var(--pv-bg) 88%, transparent);
-    border: 1px solid var(--pv-border);
-    backdrop-filter: blur(8px);
+    background: color-mix(in srgb, var(--pv-panel) 90%, transparent);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     --sponsor-bar-muted: var(--pv-muted);
     --sponsor-bar-accent: var(--vscode-textLink-foreground, #3794ff);
   }
 }
 
+.parquet-table tbody tr.parquet-viewer__row--match > td {
+  background: var(--pv-row-match) !important;
+}
+
+.parquet-table tbody tr.parquet-viewer__row--target > td {
+  background: var(--pv-row-target) !important;
+}
+
+@media (max-width: 1080px) {
+  .parquet-viewer__meta {
+    gap: 12px;
+  }
+
+  .parquet-viewer__meta-label {
+    display: none;
+  }
+
+  .parquet-viewer__search {
+    flex-basis: 280px;
+  }
+}
+
+@media (max-width: 860px) {
+  .parquet-viewer__meta-item--author {
+    display: none;
+  }
+
+  .parquet-viewer__selection-label {
+    max-width: 120px;
+  }
+
+  .parquet-viewer__pager-info {
+    min-width: 88px;
+  }
+}
+
 @media (max-width: 720px) {
   .parquet-viewer__sider {
-    width: 220px;
+    max-width: 40vw;
+  }
+
+  .parquet-viewer__topbar {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .parquet-viewer__search {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .parquet-viewer__meta {
+    display: none;
+  }
+
+  .parquet-viewer__bottombar {
+    padding: 6px 12px;
+  }
+
+  .parquet-viewer__selection-label {
+    display: none;
   }
 
   .parquet-viewer__corner-actions .office-sponsor-bar {
     display: none;
   }
-}
-
-.parquet-viewer__row-jump {
-  width: 84px;
-}
-
-/* fork: type-aware cell rendering */
-.parquet-viewer__cell--numeric {
-  font-variant-numeric: tabular-nums;
-  color: var(--vscode-charts-blue, #4ea1ff);
-}
-
-.parquet-viewer__cell--string {
-  color: var(--vscode-charts-green, #89d185);
-}
-
-/* true keeps the accent; false steps back to the muted foreground so a dense boolean
-   column stops reading as a wall of colour, and the two states are told apart at all. */
-.parquet-viewer__cell--bool-true {
-  color: var(--vscode-charts-orange, #f0a45e);
-}
-
-.parquet-viewer__cell--bool-false {
-  color: var(--pv-muted, rgba(204, 204, 204, 0.7));
-}
-
-/* keyboard cursor cell (arrows on the focused table area); the :focus-visible half keeps
-   a visible ring even if the class paint lands a frame after the focus move */
-.parquet-viewer__cell--cursor,
-.parquet-viewer__cell:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder, #0078d4);
-  outline-offset: -1px;
-  border-radius: 2px;
-}
-
-.parquet-viewer__cell--datetime {
-  color: var(--vscode-charts-purple, #c586c0);
-}
-
-.parquet-viewer__cell--null {
-  color: var(--vscode-disabledForeground, #8a8a8a);
-  font-style: italic;
-}
-
-/* fork: the inspector's row is always reserved below the table scroll area. Keeping the
-   slot in the layout means opening the inspector cannot reflow the grid, and placing the
-   inspector outside the scroll area leaves the horizontal scrollbar uncovered. */
-.parquet-viewer__inspector-slot {
-  flex: 0 0 64px;
-  height: 64px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.parquet-viewer__inspector-hint {
-  display: flex;
-  align-items: center;
-  height: 100%;
-  padding: 0 12px;
-  font-size: 12px;
-  color: var(--pv-muted);
-}
-
-.parquet-viewer__inspector {
-  flex: 1 1 auto;
-  height: 100%;
-  max-height: 64px;
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  border-top: 1px solid var(--vscode-panel-border, #2b2b2b);
-  background: var(--vscode-editorWidget-background, #202020);
-}
-
-.parquet-viewer__inspector-label {
-  flex: 0 0 auto;
-  padding-top: 2px;
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground, #9d9d9d);
-  white-space: nowrap;
-}
-
-.parquet-viewer__inspector-value {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  max-height: 48px;
-  overflow: auto;
-  font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 12px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--vscode-foreground, #cccccc);
-}
-
-/* fork: whole-file search */
-.parquet-viewer__find {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 12px;
-}
-
-.parquet-viewer__find-input {
-  width: 180px;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--vscode-input-border, #3c3c3c);
-  border-radius: 3px;
-  background: var(--vscode-input-background, #313131);
-  color: var(--vscode-input-foreground, #cccccc);
-  font-family: inherit;
-  font-size: 12px;
-  outline: none;
-}
-
-.parquet-viewer__find-input:focus {
-  border-color: var(--vscode-focusBorder, #0078d4);
-}
-
-.parquet-viewer__find-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--vscode-foreground, #cccccc);
-  cursor: pointer;
-}
-
-.parquet-viewer__find-btn:hover:not(:disabled) {
-  background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
-}
-
-.parquet-viewer__find-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.parquet-viewer__find-count {
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground, #9d9d9d);
-  font-variant-numeric: tabular-nums;
-}
-
-.parquet-table tbody tr.parquet-viewer__row--match > td {
-  background: color-mix(
-    in srgb,
-    var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33)) 22%,
-    transparent
-  );
-}
-
-/* fork: the row the footer jump aimed at, highlighted until the next navigation */
-.parquet-table tbody tr.parquet-viewer__row--target > td {
-  background: color-mix(in srgb, var(--vscode-button-background, #0078d4) 25%, transparent);
 }
