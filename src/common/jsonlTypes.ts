@@ -108,7 +108,8 @@ export type JsonlEntryDetail =
 export interface JsonlEntryPayload {
   requestId: number;
   index: number;
-  entry: JsonlEntryDetail;
+  /** Null when the line no longer exists (empty file, truncated/reloaded). */
+  entry: JsonlEntryDetail | null;
 }
 
 /* ---------- search ---------- */

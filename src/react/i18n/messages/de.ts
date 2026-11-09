@@ -8,6 +8,7 @@ export default {
     copied: "Kopiert",
     save: "Speichern",
     close: "Schließen",
+    retry: "Erneut versuchen",
     delete: "Löschen",
     loading: "Wird geladen...",
     officeViewer: "Office Viewer",
@@ -143,6 +144,9 @@ export default {
     branch: "Branch",
   },
   parquet: {
+    columnOne: "Spalte",
+    rowOne: "Zeile",
+    noRows: "Keine Zeilen",
     inspectHint: "Zelle auswählen, um den Wert zu sehen",
     cappedSuffix: " · bei {max} gestoppt",
     invalidRow: "Bitte eine gültige Zeilennummer eingeben",

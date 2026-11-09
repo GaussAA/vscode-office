@@ -72,6 +72,16 @@ body:has(.parquet-app) {
   scrollbar-color: var(--pv-scroll-thumb) transparent;
 }
 
+/* Chart colours are tuned for graphics on both themes; text at 12px needs more weight
+   against white. These overrides keep the same hue families with normal-text contrast. */
+.parquet-viewer--light {
+  --pv-cell-numeric: #0451a5;
+  --pv-cell-string: #2e7d32;
+  --pv-cell-bool: #9a5b00;
+  --pv-cell-datetime: #6f2d8a;
+  --pv-error: #b00000;
+}
+
 .parquet-viewer *,
 .parquet-viewer *::before,
 .parquet-viewer *::after {
@@ -493,9 +503,9 @@ body:has(.parquet-app) {
     border: 0 !important;
     color: var(--pv-muted) !important;
     background: var(--pv-panel) !important;
-    font-size: 10px;
+    font-size: 10.5px;
     font-weight: 600;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.045em;
     text-transform: uppercase;
 
     &::before {
@@ -509,7 +519,7 @@ body:has(.parquet-app) {
     color: var(--pv-fg);
     background: var(--pv-bg) !important;
     font-family: var(--pv-mono);
-    font-size: 11.5px;
+    font-size: 12px;
     transition: background 0.1s ease;
   }
 
@@ -569,17 +579,17 @@ body:has(.parquet-app) {
 
 .parquet-viewer__cell--numeric {
   margin-left: auto;
-  color: var(--vscode-charts-blue, #4ea1ff);
+  color: var(--pv-cell-numeric, var(--vscode-charts-blue, #4ea1ff));
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 .parquet-viewer__cell--string {
-  color: var(--vscode-charts-green, #89d185);
+  color: var(--pv-cell-string, var(--vscode-charts-green, #89d185));
 }
 
 .parquet-viewer__cell--bool-true {
-  color: var(--vscode-charts-orange, #f0a45e);
+  color: var(--pv-cell-bool, var(--vscode-charts-orange, #f0a45e));
 }
 
 .parquet-viewer__cell--bool-false {
@@ -587,7 +597,7 @@ body:has(.parquet-app) {
 }
 
 .parquet-viewer__cell--datetime {
-  color: var(--vscode-charts-purple, #c586c0);
+  color: var(--pv-cell-datetime, var(--vscode-charts-purple, #c586c0));
 }
 
 .parquet-viewer__cell--null {
@@ -772,6 +782,24 @@ body:has(.parquet-app) {
   font-size: 13px;
 }
 
+.parquet-viewer__no-rows {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 200px;
+  color: var(--pv-muted);
+  background: var(--pv-bg);
+  font-size: 13px;
+
+  .codicon {
+    font-size: 28px;
+    opacity: 0.65;
+  }
+}
+
 .parquet-viewer__error {
   display: flex;
   align-items: flex-start;
@@ -788,6 +816,12 @@ body:has(.parquet-app) {
     flex-shrink: 0;
     margin-top: 2px;
     font-size: 16px;
+  }
+
+  button {
+    flex-shrink: 0;
+    align-self: center;
+    margin-left: auto;
   }
 }
 

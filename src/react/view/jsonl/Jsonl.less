@@ -63,6 +63,16 @@ body:has(.jsonl-viewer) {
   scrollbar-color: var(--jl-scroll-thumb) transparent;
 }
 
+.jsonl-viewer--light {
+  --jl-key: #0451a5;
+  --jl-string: #2e7d32;
+  --jl-number: #005cc5;
+  --jl-boolean: #9a5b00;
+  --jl-null: #9a5b00;
+  --jl-error: #b00000;
+  --jl-warn: #7a5200;
+}
+
 .jsonl-viewer *,
 .jsonl-viewer *::before,
 .jsonl-viewer *::after {
@@ -500,6 +510,7 @@ body:has(.jsonl-viewer) {
 .jsonl-detail__error {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 10px;
   height: 100%;
   padding: 14px 18px;
@@ -713,6 +724,19 @@ body:has(.jsonl-viewer) {
   min-height: 120px;
   color: var(--jl-muted);
   font-size: 12px;
+}
+
+.jsonl-empty--viewer {
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--jl-bg);
+  font-size: 13px;
+}
+
+.jsonl-empty--viewer .codicon {
+  font-size: 28px;
+  opacity: 0.65;
 }
 
 /* wrapping mode: variable row height, so the virtual list is off. */

@@ -107,7 +107,7 @@ function ParquetCell({
   const isCursor = cursor?.row === pageIndex && cursor?.col === position;
   const kind = column.category;
   const isNull = value === null || value === undefined;
-  const displayText = isNull ? $t("parquet.nullLabel") : formatCellValue(value);
+  const displayText = isNull ? $t("parquet.nullLabel") : formatCellValue(value, column.type);
   const classes = [
     "parquet-viewer__cell",
     isNull ? "parquet-viewer__cell--null" : kind === "bool" ? "" : `parquet-viewer__cell--${kind}`,
@@ -165,7 +165,7 @@ function savePersistedPage(key: string | undefined, page: number) {
   savePersistedState(PERSIST_PREFIX, key, { page });
 }
 
-function ParquetViewer() {
+function ParquetViewer({ dark }: { dark: boolean }) {
   const { message } = App.useApp();
   const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
   const [pageRows, setPageRows] = useState<Record<string, unknown>[]>([]);
@@ -271,7 +271,8 @@ function ParquetViewer() {
         sessionRef.current = new ParquetSession(
           {
             rowCount: info.rowCount,
-            readRows: (start, end) => readParquetRows(info.file, info.metadata, start, end),
+            readRows: (start, end) =>
+              readParquetRows(info.file, info.metadata, start, end, { utf8: false }),
           },
           { pageSize: PAGE_SIZE },
         );
@@ -391,6 +392,10 @@ function ParquetViewer() {
     (warnWhenEmpty = true) => {
       const info = fileInfoRef.current;
       if (!info) return;
+      if (info.rowCount === 0) {
+        if (warnWhenEmpty) message.warning($t("parquet.invalidRow"));
+        return;
+      }
       // Fail loud on an explicit Enter/Go; a blur with an empty box is just a no-op.
       if (rowJump == null) {
         if (warnWhenEmpty) message.warning($t("parquet.invalidRow"));
@@ -412,6 +417,7 @@ function ParquetViewer() {
 
   const rowRange = useMemo(() => {
     if (!fileInfo) return "";
+    if (fileInfo.rowCount === 0) return $t("parquet.noRows");
     const start = page * PAGE_SIZE + 1;
     const end = Math.min(fileInfo.rowCount, (page + 1) * PAGE_SIZE);
     return `${start.toLocaleString()}–${end.toLocaleString()} of ${fileInfo.rowCount.toLocaleString()}`;
@@ -443,7 +449,7 @@ function ParquetViewer() {
         for (let offset = 0; offset < rows.length; offset++) {
           const row = rows[offset];
           const hit = info.columns.some((column) =>
-            formatCellValue(row[column.name]).toLowerCase().includes(needle),
+            formatCellValue(row[column.name], column.type).toLowerCase().includes(needle),
           );
           if (hit) found.add(start + offset);
         }
@@ -631,16 +637,17 @@ function ParquetViewer() {
       .emit("init");
   }, [loadParquet]);
 
+  const inspectedType = inspected
+    ? fileInfo?.columns.find((column) => column.name === inspected.column)?.type
+    : undefined;
   const inspectedText = inspected
     ? inspected.value === null || inspected.value === undefined
       ? $t("parquet.nullLabel")
-      : typeof inspected.value === "string"
-        ? inspected.value
-        : formatCellValue(inspected.value)
+      : formatCellValue(inspected.value, inspectedType)
     : "";
 
   return (
-    <div className="parquet-viewer">
+    <div className={`parquet-viewer${dark ? "" : " parquet-viewer--light"}`}>
       {loading && (
         <div className="parquet-viewer__overlay">
           <span className="codicon codicon-loading codicon-modifier-spin" />
@@ -652,6 +659,13 @@ function ParquetViewer() {
           <div className="parquet-viewer__error">
             <span className="codicon codicon-error" />
             <span>{error}</span>
+            <button
+              type="button"
+              className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
+              onClick={() => handler.emit("init")}
+            >
+              {$t("common.retry")}
+            </button>
           </div>
         </div>
       ) : fileInfo ? (
@@ -746,12 +760,18 @@ function ParquetViewer() {
                 <span className="parquet-viewer__meta-value">
                   {fileInfo.rowCount.toLocaleString()}
                 </span>
-                <span className="parquet-viewer__meta-label">{$t("parquet.rows")}</span>
+                <span className="parquet-viewer__meta-label">
+                  {fileInfo.rowCount === 1 ? $t("parquet.rowOne") : $t("parquet.rows")}
+                </span>
               </span>
               <span className="parquet-viewer__meta-item" title={$t("parquet.columnsLabel")}>
                 <span className="codicon codicon-symbol-field parquet-icon parquet-icon--columns" />
                 <span className="parquet-viewer__meta-value">{fileInfo.columns.length}</span>
-                <span className="parquet-viewer__meta-label">{$t("parquet.columnsLabel")}</span>
+                <span className="parquet-viewer__meta-label">
+                  {fileInfo.columns.length === 1
+                    ? $t("parquet.columnOne")
+                    : $t("parquet.columnsLabel")}
+                </span>
               </span>
               {fileInfo.createdBy && (
                 <span
@@ -826,36 +846,44 @@ function ParquetViewer() {
               }}
             />
             <main className="parquet-viewer__main">
-              <div
-                className="parquet-viewer__table-wrap"
-                ref={tableWrapRef}
-                tabIndex={cursor ? -1 : 0}
-                onKeyDown={handleTableKeyDown}
-              >
-                <CursorContext.Provider value={cursor}>
-                  <Table<TableRow>
-                    className="parquet-table"
-                    dataSource={tableRows}
-                    columns={tableColumns}
-                    pagination={false}
-                    size="small"
-                    scroll={{ y: tableBodyHeight, x: "max-content" }}
-                    rowClassName={(_row, index) => {
-                      const absolute = page * PAGE_SIZE + index;
-                      const classes: string[] = [];
-                      if (index % 2 === 1) classes.push("parquet-viewer__row--alt");
-                      if (matchRows.has(absolute)) classes.push("parquet-viewer__row--match");
-                      if (targetRow === absolute) classes.push("parquet-viewer__row--target");
-                      return classes.join(" ");
-                    }}
-                  />
-                </CursorContext.Provider>
-              </div>
+              {fileInfo.rowCount === 0 ? (
+                <div className="parquet-viewer__no-rows">
+                  <span className="codicon codicon-table" />
+                  <span>{$t("parquet.noRows")}</span>
+                </div>
+              ) : (
+                <div
+                  className="parquet-viewer__table-wrap"
+                  ref={tableWrapRef}
+                  tabIndex={cursor ? -1 : 0}
+                  onKeyDown={handleTableKeyDown}
+                >
+                  <CursorContext.Provider value={cursor}>
+                    <Table<TableRow>
+                      className="parquet-table"
+                      dataSource={tableRows}
+                      columns={tableColumns}
+                      locale={{ emptyText: $t("parquet.noRows") }}
+                      pagination={false}
+                      size="small"
+                      scroll={{ y: tableBodyHeight, x: "max-content" }}
+                      rowClassName={(_row, index) => {
+                        const absolute = page * PAGE_SIZE + index;
+                        const classes: string[] = [];
+                        if (index % 2 === 1) classes.push("parquet-viewer__row--alt");
+                        if (matchRows.has(absolute)) classes.push("parquet-viewer__row--match");
+                        if (targetRow === absolute) classes.push("parquet-viewer__row--target");
+                        return classes.join(" ");
+                      }}
+                    />
+                  </CursorContext.Provider>
+                </div>
+              )}
             </main>
           </div>
           <footer className="parquet-viewer__bottombar">
             <div className="parquet-viewer__selection" aria-live="polite">
-              {inspected ? (
+              {fileInfo.rowCount === 0 ? null : inspected ? (
                 <>
                   <span className="parquet-viewer__selection-label">
                     {inspected.column} · row {inspected.row + 1}
@@ -867,13 +895,7 @@ function ParquetViewer() {
                     type="button"
                     className="parquet-viewer__pager-btn"
                     onClick={() => {
-                      const text =
-                        inspected.value === null || inspected.value === undefined
-                          ? "null"
-                          : typeof inspected.value === "string"
-                            ? inspected.value
-                            : JSON.stringify(inspected.value);
-                      void navigator.clipboard.writeText(text).catch(() => undefined);
+                      void navigator.clipboard.writeText(inspectedText).catch(() => undefined);
                     }}
                     title={$t("parquet.copyValue")}
                     aria-label={$t("parquet.copyValue")}
@@ -919,6 +941,7 @@ function ParquetViewer() {
                 className="parquet-viewer__row-jump"
                 min={1}
                 max={fileInfo.rowCount}
+                disabled={fileInfo.rowCount === 0}
                 precision={0}
                 value={rowJump}
                 placeholder={$t("parquet.rowLabel")}
@@ -936,6 +959,7 @@ function ParquetViewer() {
                 type="button"
                 className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
                 data-row-jump-go
+                disabled={fileInfo.rowCount === 0}
                 onClick={() => jumpToRow()}
                 title={$t("parquet.goToRow")}
               >
@@ -1008,7 +1032,7 @@ export default function Parquet() {
   return (
     <ConfigProvider theme={antTheme}>
       <App className="parquet-app">
-        <ParquetViewer />
+        <ParquetViewer dark={dark} />
       </App>
     </ConfigProvider>
   );

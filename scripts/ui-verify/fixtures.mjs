@@ -72,6 +72,35 @@ export function createFixtures(cacheDir) {
     });
   });
 
+  const empty = writeIfMissing(join(cacheDir, "empty.parquet"), () =>
+    parquetWriteBuffer({
+      columnData: [{ name: "id", data: new Int32Array(0), type: "INT32" }],
+    }),
+  );
+
+  const types = writeIfMissing(join(cacheDir, "types.parquet"), () => {
+    const longName = "a very long column name with spaces 中文";
+    return parquetWriteBuffer({
+      statistics: false,
+      columnData: [
+        { name: "id", data: [1, 2, 3], type: "INT32" },
+        { name: "missing", data: [null, null, null], type: "STRING", nullable: true },
+        { name: "when", data: [0, 1_700_000_000_000, 1_700_000_100_000], type: "TIMESTAMP" },
+        { name: longName, data: ["alpha", "beta", "gamma"], type: "STRING" },
+        {
+          name: "blob",
+          data: [new Uint8Array([0, 1, 2, 255]), new Uint8Array([9]), new Uint8Array(0)],
+          type: "BYTE_ARRAY",
+        },
+      ],
+    });
+  });
+
+  const bad = writeIfMissing(join(cacheDir, "bad.parquet"), () => {
+    const text = new TextEncoder().encode("this is not a parquet file\n");
+    return text.buffer.slice(text.byteOffset, text.byteOffset + text.byteLength);
+  });
+
   const big = writeIfMissing(join(cacheDir, "big.parquet"), () => {
     const ids = new Int32Array(BIG_ROWS);
     const values = new Float64Array(BIG_ROWS);
@@ -93,6 +122,9 @@ export function createFixtures(cacheDir) {
     docx: docxSample,
     nested: nestedSample,
     mixed,
+    empty,
+    types,
+    bad,
     big,
     bigRows: BIG_ROWS,
     editLimit: EDIT_LIMIT,

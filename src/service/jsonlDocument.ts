@@ -82,7 +82,11 @@ interface DecodedLine {
 /** Decode one line to text. Exported so the searcher can scan without re-parsing. */
 export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: number): DecodedLine {
   const slice = lineBytes(bytes, index, line);
-  const text = decoder.decode(slice).replace(/[\r\n]+$/, "");
+  // A UTF-8 BOM at byte 0 would otherwise make the first line invalid JSON.
+  const text = decoder
+    .decode(slice)
+    .replace(/^\uFEFF/, "")
+    .replace(/[\r\n]+$/, "");
   // size excludes the line terminator
   const size = Math.max(
     0,

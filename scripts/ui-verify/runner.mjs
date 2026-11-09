@@ -75,6 +75,12 @@ const expectedProbe = /evaluating a string as JavaScript/i;
 const unexpected = (list) => list.filter((text) => !expectedProbe.test(text));
 
 async function openJsonl(page, base, theme = "dark") {
+  // JSONL restores the selected entry per document. Scenarios share one profile, so
+  // without clearing it the next scenario could start on L11 (too-large) instead of L1.
+  await page.navigate(`${base}/stats`);
+  await page.evaluate(`Object.keys(localStorage)
+        .filter(key => key.startsWith('jsonl-state:'))
+        .forEach(key => localStorage.removeItem(key))`);
   await page.navigate(`${base}/harness?theme=${theme}`);
   const ready = await page.waitFor(
     `!!document.querySelector('.jsonl-index__tree .ant-tree-treenode')`,
@@ -88,6 +94,16 @@ async function openJsonl(page, base, theme = "dark") {
     })`);
     expect(false, `JSONL directory did not render: ${diagnostic}`);
   }
+}
+
+async function openEmptyJsonl(page, base) {
+  await page.navigate(`${base}/stats`);
+  await page.evaluate(`Object.keys(localStorage)
+        .filter(key => key.startsWith('jsonl-state:'))
+        .forEach(key => localStorage.removeItem(key))`);
+  await page.navigate(`${base}/harness?empty=1`);
+  const ready = await page.waitFor(`!!document.querySelector('.jsonl-empty--viewer')`);
+  expect(ready, "empty JSONL file did not render its empty state");
 }
 
 async function jumpJsonl(page, entry) {
@@ -119,8 +135,16 @@ async function openParquet(page, base, query = "") {
         .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width')
         .forEach(key => localStorage.removeItem(key))`);
   await page.navigate(`${base}/harness-parquet${query}`);
-  // antd renders a No data row before the first page arrives, so wait for a real cell
-  const ready = await page.waitFor(`!!document.querySelector('.parquet-viewer__cell')`);
+  // A real page has cells; an empty file renders antd's empty state; a broken one renders
+  // the error panel. All three are successful mounts and each has its own assertions.
+  const ready = await page.waitFor(
+    query.includes("bad=1")
+      ? `!!document.querySelector('.parquet-viewer__error')`
+      : query.includes("empty=1")
+        ? `!!document.querySelector('.parquet-viewer__no-rows')`
+        : `!!document.querySelector('.parquet-viewer__cell')
+            && !!document.querySelector('.parquet-table tbody .ant-table-row')`,
+  );
   expect(ready, "parquet table did not render");
 }
 
@@ -143,6 +167,40 @@ const luminance = (page, selector) =>
     const alpha = match[4] === undefined ? 1 : Number(match[4]);
     if (alpha < 0.5) return null;
     return (0.299 * Number(match[1]) + 0.587 * Number(match[2]) + 0.114 * Number(match[3])) / 255;
+})()`);
+
+/** WCAG contrast of an element's text against its nearest painted background. */
+const contrastRatio = (page, selector) =>
+  page.evaluate(`(() => {
+    const element = document.querySelector(${JSON.stringify(selector)});
+    if (!element) return null;
+    const parse = (value) => {
+      const match = value.match(/rgba?\\(\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)(?:\\s*,\\s*([\\d.]+))?/i);
+      return match ? [Number(match[1]), Number(match[2]), Number(match[3]), match[4] === undefined ? 1 : Number(match[4])] : null;
+    };
+    const luminance = ([r, g, b]) => {
+      const channel = (value) => {
+        const v = value / 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    };
+    const fg = parse(getComputedStyle(element).color);
+    if (!fg) return null;
+    let node = element;
+    let bg = null;
+    while (node) {
+      const candidate = parse(getComputedStyle(node).backgroundColor);
+      if (candidate && candidate[3] >= 0.5) {
+        bg = candidate;
+        break;
+      }
+      node = node.parentElement;
+    }
+    if (!bg) bg = [255, 255, 255, 1];
+    const light = Math.max(luminance(fg), luminance(bg));
+    const dark = Math.min(luminance(fg), luminance(bg));
+    return (light + 0.05) / (dark + 0.05);
 })()`);
 
 async function clickNextPage(page) {
@@ -252,6 +310,170 @@ const scenarios = [
       expect(/(\d+) match/.test(state.status ?? ""), `unexpected status: ${state.status}`);
       expect(state.hits > 0, "no match highlighting rendered");
       return `${state.status}, ${state.hits} highlighted runs`;
+    },
+  },
+  {
+    name: "jsonl-empty",
+    async run({ page, base }) {
+      await openEmptyJsonl(page, base);
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                meta: document.querySelector('.jsonl-meta')?.innerText ?? null,
+                empty: document.querySelector('.jsonl-empty--viewer')?.innerText ?? null,
+                split: !!document.querySelector('.jsonl-splitter'),
+                bar: !!document.querySelector('.jsonl-bottombar'),
+                jumpDisabled: document.querySelector('.jsonl-jump input')?.disabled ?? null,
+                goDisabled: [...document.querySelectorAll('.jsonl-toolbar button')]
+                    .find(b => b.textContent.trim() === 'Go')?.disabled ?? null,
+            })`),
+      );
+      expect(/0 entries/.test(state.meta ?? ""), `unexpected empty meta: ${state.meta}`);
+      expect(state.empty === "No entries", `unexpected empty state: ${state.empty}`);
+      expect(!state.split, "empty file still rendered a two-pane split");
+      expect(!state.bar, "empty file still rendered a bottom bar");
+      expect(state.jumpDisabled === true, "jump accepted input with no lines");
+      expect(state.goDisabled === true, "Go stayed enabled with no lines");
+      return "empty file: one empty state, no row identity, jump disabled";
+    },
+  },
+  {
+    name: "jsonl-no-matches",
+    async run({ page, base }) {
+      await openJsonl(page, base);
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.jsonl-search input');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                input.focus();
+                setter.call(input, 'zzzz-no-such-entry');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            })()`);
+      const status = await page.waitFor(`(() => {
+                const text = document.querySelector('.jsonl-search-status')?.innerText ?? '';
+                return text.includes('No matches');
+            })()`);
+      expect(status, "no-match status never settled");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                status: document.querySelector('.jsonl-search-status')?.innerText ?? null,
+                left: document.querySelector('.jsonl-index .jsonl-empty')?.innerText ?? null,
+                hits: document.querySelectorAll('.jsonl-hit').length,
+            })`),
+      );
+      expect(state.left === "No matches", `directory empty state is ${state.left}`);
+      expect(state.hits === 0, `unexpected ${state.hits} highlighted hits`);
+      return "no matches: status + empty directory";
+    },
+  },
+  {
+    name: "jsonl-invalid-entry",
+    async run({ page, base }) {
+      await openJsonl(page, base);
+      await jumpJsonl(page, 3);
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                error: document.querySelector('.jsonl-detail__error .jsonl-chip--error')?.innerText ?? null,
+                raw: document.querySelector('.jsonl-detail__error .jsonl-detail__raw')?.innerText ?? null,
+                chip: document.querySelector('.jsonl-detail__header .jsonl-chip--error')?.innerText ?? null,
+            })`),
+      );
+      expect(
+        /Invalid JSON/i.test(state.error ?? ""),
+        `missing invalid-JSON explanation: ${state.error}`,
+      );
+      expect(/broken/.test(state.raw ?? ""), "invalid raw line was not shown");
+      expect(/^invalid/.test(state.chip ?? ""), `directory/bottom chip is ${state.chip}`);
+      return "invalid line: error chip + raw text";
+    },
+  },
+  {
+    name: "jsonl-too-large",
+    async run({ page, base }) {
+      await openJsonl(page, base);
+      await jumpJsonl(page, 11);
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                warn: document.querySelector('.jsonl-detail__error .jsonl-chip--warn')?.innerText ?? null,
+                directory: document.querySelector('.jsonl-index .jsonl-chip--warn')?.innerText ?? null,
+                raw: document.querySelector('.jsonl-detail__error .jsonl-detail__raw')?.innerText.length ?? 0,
+            })`),
+      );
+      expect(/too large/i.test(state.warn ?? ""), `missing too-large explanation: ${state.warn}`);
+      expect(
+        /too large/i.test(state.directory ?? ""),
+        `missing directory warn chip: ${state.directory}`,
+      );
+      expect(state.raw > 0 && state.raw < 1000, `too-large raw text is ${state.raw} chars`);
+      return "too-large line: warn chip, truncated raw text";
+    },
+  },
+  {
+    name: "parquet-empty",
+    async run({ page, base }) {
+      await openParquet(page, base, "?empty=1");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
+                empty: document.querySelector('.parquet-viewer__no-rows')?.innerText ?? null,
+                columns: document.querySelectorAll('.parquet-viewer__list-item').length,
+                jumpDisabled: document.querySelector('.parquet-viewer__row-jump input')?.disabled ?? null,
+                goDisabled: document.querySelector('[data-row-jump-go]')?.disabled ?? null,
+                cells: document.querySelectorAll('.parquet-viewer__cell').length,
+            })`),
+      );
+      expect(state.range === "No rows", `empty pager says ${state.range}`);
+      expect(state.empty === "No rows", `table empty text is ${state.empty}`);
+      expect(state.columns === 1, `sidebar rendered ${state.columns} columns`);
+      expect(state.cells === 0, `empty file rendered ${state.cells} cells`);
+      expect(state.jumpDisabled === true, "jump accepted a row in an empty file");
+      expect(state.goDisabled === true, "Go stayed enabled in an empty file");
+      return "0 rows: explicit empty state, sized chrome";
+    },
+  },
+  {
+    name: "parquet-edge-types",
+    async run({ page, base }) {
+      await openParquet(page, base, "?types=1");
+      const state = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const headers = [...document.querySelectorAll('.parquet-table thead th')];
+                const longHeader = headers.find(h => h.innerText.toLowerCase().includes('very long column'));
+                const cells = [...document.querySelectorAll('.parquet-table tbody tr:nth-child(2) td')];
+                return {
+                    headers: headers.map(h => h.innerText),
+                    longHeaderHeight: longHeader ? Math.round(longHeader.getBoundingClientRect().height) : 0,
+                    longHeaderTitle: longHeader?.getAttribute('title') ?? null,
+                    missing: cells[2]?.innerText ?? null,
+                    when: cells[3]?.innerText ?? null,
+                    blob: cells[5]?.innerText ?? null,
+                };
+            })())`),
+      );
+      expect(state.headers.length === 6, `rendered ${state.headers.length} headers`);
+      expect(/very long column name/i.test(state.headers.join(" ")), "long unicode header missing");
+      expect(state.longHeaderHeight <= 40, `long header wrapped to ${state.longHeaderHeight}px`);
+      expect(state.longHeaderTitle, "long header has no title for the full name");
+      expect(/^null$/i.test(state.missing ?? ""), `null cell rendered as ${JSON.stringify(state)}`);
+      expect(/^\d{4}-\d{2}-\d{2}T/.test(state.when ?? ""), `timestamp rendered as ${state.when}`);
+      expect(state.blob === "0x00 01 02 ff", `binary rendered as ${state.blob}`);
+      return "null / timestamp / binary / long unicode header";
+    },
+  },
+  {
+    name: "parquet-error",
+    async run({ page, base }) {
+      await openParquet(page, base, "?bad=1");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                error: document.querySelector('.parquet-viewer__error span:nth-child(2)')?.innerText ?? null,
+                retry: [...document.querySelectorAll('.parquet-viewer__error button')]
+                    .some(b => b.textContent.trim() === 'Retry'),
+                table: !!document.querySelector('.parquet-table'),
+            })`),
+      );
+      expect(/parquet/i.test(state.error ?? ""), `unexpected error copy: ${state.error}`);
+      expect(state.retry, "error state has no way to try again");
+      expect(!state.table, "a broken file still rendered a table");
+      return "malformed file: message + retry";
     },
   },
   {
@@ -462,6 +684,40 @@ const scenarios = [
         `row input stayed dark in a light theme (luminance ${lightRow})`,
       );
       return "antd + native inputs follow the VS Code theme";
+    },
+  },
+  {
+    name: "semantic-contrast",
+    async run({ page, base }) {
+      // Chart hues are for graphics, not 12px text on white. The viewer has its own
+      // light-theme overrides; this is the check that keeps them above WCAG AA.
+      await openParquet(page, base, "?mixed=1&theme=light");
+      const parquet = {};
+      for (const [key, selector] of [
+        ["numeric", ".parquet-viewer__cell--numeric"],
+        ["string", ".parquet-viewer__cell--string"],
+        ["bool", ".parquet-viewer__cell--bool-true"],
+      ]) {
+        parquet[key] = await contrastRatio(page, selector);
+      }
+      for (const [kind, ratio] of Object.entries(parquet)) {
+        expect(ratio !== null && ratio >= 4.5, `parquet ${kind} contrast is ${ratio}:1`);
+      }
+
+      await openJsonl(page, base, "light");
+      await page.waitFor(`!!document.querySelector('.jsonl-val--number')`);
+      const jsonl = {};
+      for (const [key, selector] of [
+        ["numeric", ".jsonl-val--number"],
+        ["string", ".jsonl-val--string"],
+        ["bool", ".jsonl-val--boolean"],
+      ]) {
+        jsonl[key] = await contrastRatio(page, selector);
+      }
+      for (const [kind, ratio] of Object.entries(jsonl)) {
+        expect(ratio !== null && ratio >= 4.5, `jsonl ${kind} contrast is ${ratio}:1`);
+      }
+      return `light text ≥ 4.5:1 (parquet min ${Math.min(...Object.values(parquet)).toFixed(1)}, jsonl min ${Math.min(...Object.values(jsonl)).toFixed(1)})`;
     },
   },
   {

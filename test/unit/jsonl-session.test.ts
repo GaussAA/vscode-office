@@ -74,6 +74,7 @@ test("readEntry: echoes the request id, and rejects an out-of-range line", async
 
   const payload = await session.readEntry(9, 0);
   assert.ok(payload, "a valid line must come back");
+  assert.ok(payload.entry, "a valid line must carry an entry");
   assert.equal(payload.requestId, 9);
   assert.equal(payload.index, 0);
   assert.equal(labelOf(payload.entry), "a");
@@ -88,6 +89,7 @@ test("readEntry: works for the last line of a file without a trailing newline", 
 
   const payload = await session.readEntry(5, 1);
   assert.ok(payload, "the last line must come back");
+  assert.ok(payload.entry, "the last line must carry an entry");
   assert.equal(payload.index, 1);
   assert.equal(labelOf(payload.entry), "b");
 });
