@@ -108,16 +108,6 @@ test("reset: a prefetch from the previous file never lands in the new cache", as
   assert.equal(pageOneReads, 2, "the post-reset read must hit the source again");
 });
 
-test("search: readRange reads the requested window", async () => {
-  const session = new ParquetSession(makeSource(120));
-  await session.showPage(0);
-
-  const rows = await session.readRange(0, 120);
-
-  assert.equal(rows.length, 120);
-  assert.equal(rows[60].name, "row-60");
-});
-
 test("prefetch: warms the next page so showing it costs no read", async () => {
   const source = makeSource(300);
   const session = new ParquetSession(source);

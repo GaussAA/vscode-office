@@ -122,14 +122,6 @@ export class ParquetSession {
     void this.loadRaw(target, start, end).catch(() => undefined);
   }
 
-  /** Read an arbitrary range — what whole-file search scans. */
-  async readRange(start: number, end: number): Promise<ParquetRow[]> {
-    const from = Math.max(0, Math.min(start, this.rowCount));
-    const to = Math.max(from, Math.min(end, this.rowCount));
-    if (to <= from) return [];
-    return this.source.readRows(from, to);
-  }
-
   /** Drop every cached page and pending load. In-flight work becomes stale. */
   reset(): void {
     this.generation++;

@@ -18,6 +18,7 @@ import { openParquetSource } from "../../util/parquetSource.ts";
 import { highlightRuns } from "../../common/highlight.ts";
 import { savePersistedState } from "../../common/persistedState.ts";
 import { ParquetSession } from "./parquetSession.ts";
+import { searchParquetValues } from "./parquetSearch.ts";
 import SponsorBar from "../components/SponsorBar.tsx";
 import {
   formatCellValue,
@@ -31,8 +32,6 @@ import {
 import "./Parquet.less";
 
 const PAGE_SIZE = PARQUET_PAGE_SIZE;
-/** Rows read per batch while searching the whole file. */
-const SEARCH_BATCH = 5_000;
 /** Cap on matched rows kept in memory (highlight + navigation). */
 const SEARCH_MAX_ROWS = 5_000;
 
@@ -331,48 +330,34 @@ function ParquetViewer() {
 
   const runSearch = useCallback(async () => {
     const info = fileInfoRef.current;
-    const session = sessionRef.current;
     const needle = query.trim().toLowerCase();
     const seq = ++searchSeq.current;
     setMatchRows(new Set());
     setSearchCapped(false);
-    if (!info || !session || !needle) {
+    if (!info || !needle) {
       setSearching(false);
       setSearchProgress(null);
       return;
     }
     setSearching(true);
     setSearchProgress({ scanned: 0, total: info.rowCount, matches: 0 });
-    const found = new Set<number>();
     try {
-      // Batch by batch, so a 250k-row file never lands in memory at once and the
-      // scan can be cancelled by a newer query. Reading through the session means the
-      // scan sees edited cells, exactly like the table does.
-      for (let start = 0; start < info.rowCount; start += SEARCH_BATCH) {
-        if (seq !== searchSeq.current) return;
-        const end = Math.min(info.rowCount, start + SEARCH_BATCH);
-        const rows = await session.readRange(start, end);
-        for (let offset = 0; offset < rows.length; offset++) {
-          const row = rows[offset];
-          const hit = info.columns.some((column) =>
-            formatCellValue(row[column.name]).toLowerCase().includes(needle),
-          );
-          if (hit) found.add(start + offset);
-        }
-        setSearchProgress({ scanned: end, total: info.rowCount, matches: found.size });
-        if (found.size >= SEARCH_MAX_ROWS) {
-          // JSONL shows the same kind of suffix; stopping silently would read as "that
-          // was every match" when it was only the first 5,000.
-          setSearchCapped(true);
-          break;
-        }
-        await new Promise((resolve) => window.setTimeout(resolve, 0));
-      }
-      if (seq !== searchSeq.current) return;
-      setMatchRows(found);
-      if (found.size > 0) {
-        const first = found.values().next().value as number;
-        const target = Math.floor(first / PAGE_SIZE);
+      // One page-aligned pass over the file, column by column, instead of a read per
+      // 5000-row batch: without an offset index every batch re-decoded the data page that
+      // contained it, which made a 1M-row file take ~28 s. See parquetSearch.ts.
+      const result = await searchParquetValues(info, needle, {
+        maxRows: SEARCH_MAX_ROWS,
+        isCancelled: () => seq !== searchSeq.current,
+        onProgress: (scanned, matches) => {
+          if (seq === searchSeq.current)
+            setSearchProgress({ scanned, total: info.rowCount, matches });
+        },
+      });
+      if (seq !== searchSeq.current || result.cancelled) return;
+      setMatchRows(new Set(result.rows));
+      setSearchCapped(result.capped);
+      if (result.rows.length > 0) {
+        const target = Math.floor(result.rows[0] / PAGE_SIZE);
         goToPage((current) => (current === target ? current : target));
       }
     } catch (e) {
