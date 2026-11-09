@@ -353,7 +353,6 @@ body:has(.parquet-app) {
 }
 
 .parquet-viewer__table-wrap {
-  position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -661,23 +660,37 @@ body:has(.parquet-app) {
   border-radius: 2px;
 }
 
-/* fork: full value of the selected cell, for text too long to read in a cell.
-   An overlay pinned to the bottom of the table area: opening it must not reflow the
-   grid, or the second click of a double-click-to-edit lands on a different cell. */
+/* fork: the inspector's row is always reserved below the table scroll area. Keeping the
+   slot in the layout means opening the inspector cannot reflow the grid, and placing the
+   inspector outside the scroll area leaves the horizontal scrollbar uncovered. */
+.parquet-viewer__inspector-slot {
+  flex: 0 0 64px;
+  height: 64px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.parquet-viewer__inspector-hint {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--pv-muted);
+}
+
 .parquet-viewer__inspector {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 64px;
+  min-width: 0;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 6px 12px;
-  max-height: 120px;
   border-top: 1px solid var(--vscode-panel-border, #2b2b2b);
   background: var(--vscode-editorWidget-background, #202020);
-  box-shadow: 0 -2px 8px color-mix(in srgb, var(--vscode-widget-shadow, #000000) 35%, transparent);
 }
 
 .parquet-viewer__inspector-label {
@@ -690,8 +703,9 @@ body:has(.parquet-app) {
 
 .parquet-viewer__inspector-value {
   flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
-  max-height: 108px;
+  max-height: 48px;
   overflow: auto;
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 12px;

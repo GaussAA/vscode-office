@@ -201,6 +201,7 @@ export default {
   parquet: {
     unsupportedSave:
       "Speichern nicht möglich: Diese Datei enthält verschachtelte oder strukturelle Spalten ({columns}). Speichern wird nur für flache skalare Spalten unterstützt.",
+    inspectHint: "Zelle auswählen, um den Wert zu sehen",
     cappedSuffix: " · bei 5.000 gestoppt",
     invalidRow: "Bitte eine gültige Zeilennummer eingeben",
     saveTimeout:

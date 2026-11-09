@@ -754,9 +754,10 @@ function ParquetViewer() {
       .emit("init");
   }, [loadParquet, message]);
 
-  // The inspector overlays the bottom of the table area instead of squeezing it: a fixed
-  // table height means opening it never reflows the grid under an in-progress double-click.
-  const tableHeight = "calc(100vh - 132px)";
+  // The inspector sits below the table scroll area in a fixed-height row. The scroll height
+  // is the same whether or not the inspector is open, so opening it never reflows the grid;
+  // keeping it outside the scroll area also leaves the horizontal scrollbar reachable.
+  const tableHeight = "calc(100vh - 196px)";
 
   return (
     <div className="parquet-viewer">
@@ -947,7 +948,9 @@ function ParquetViewer() {
                     return classes.join(" ");
                   }}
                 />
-                {inspected && (
+              </div>
+              <div className="parquet-viewer__inspector-slot">
+                {inspected ? (
                   <div className="parquet-viewer__inspector">
                     <span className="parquet-viewer__inspector-label">
                       {inspected.column} · row {inspected.row + 1}
@@ -985,6 +988,10 @@ function ParquetViewer() {
                       <span className="codicon codicon-close" />
                     </button>
                   </div>
+                ) : (
+                  <span className="parquet-viewer__inspector-hint">
+                    {$t("parquet.inspectHint")}
+                  </span>
                 )}
               </div>
               <div className="parquet-viewer__footer">
