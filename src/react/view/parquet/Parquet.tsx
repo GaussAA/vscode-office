@@ -345,6 +345,9 @@ function ParquetViewer() {
       }
       setPageRows([...session.rows]);
       setEditedCells(new Set(session.editedCells));
+      // Editing is a new navigation intent: drop the jump highlight so the target-row
+      // effect does not snap the grid back to an old jump when pageRows changes.
+      setTargetRow(null);
       cancelEdit();
       markDirty();
     },
