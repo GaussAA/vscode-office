@@ -116,7 +116,7 @@ async function openParquet(page, base, query = "") {
   // `parquet-restore-page` proves the restoring half deliberately.
   await page.navigate(`${base}/stats`);
   await page.evaluate(`Object.keys(localStorage)
-        .filter(key => key.startsWith('parquet-state:'))
+        .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width')
         .forEach(key => localStorage.removeItem(key))`);
   await page.navigate(`${base}/harness-parquet${query}`);
   // antd renders a No data row before the first page arrives, so wait for a real cell
@@ -266,6 +266,17 @@ const scenarios = [
         ),
       );
       expect(names.join(",") === "f32,f64", `zstd columns: ${names.join(",")}`);
+      const align = json(
+        await page.evaluate(`JSON.stringify({
+                header: getComputedStyle(document.querySelectorAll('.ant-table-thead th')[1]).textAlign,
+                cell: getComputedStyle(document.querySelector('.ant-table-tbody tr:nth-child(2) td:nth-child(2)')).textAlign,
+                value: getComputedStyle(document.querySelector('.ant-table-tbody tr:nth-child(2) td:nth-child(2) .parquet-viewer__cell')).textAlign,
+            })`),
+      );
+      expect(
+        align.header === "right" && align.cell === "right" && align.value === "right",
+        `numeric alignment: ${JSON.stringify(align)}`,
+      );
       return `ZSTD sample: ${state.range}, ${names.join("/")}`;
     },
   },
@@ -300,22 +311,31 @@ const scenarios = [
       await openParquet(page, base, "?mixed=1");
       const state = json(
         await page.evaluate(`JSON.stringify({
-                stats: [...document.querySelectorAll('.parquet-viewer__stat')].map((element) => {
-                    const style = getComputedStyle(element);
-                    return { border: style.borderTopWidth, shadow: style.boxShadow };
-                }),
+                meta: [...document.querySelectorAll('.parquet-viewer__meta-item')].map((element) => element.innerText.trim()),
+                siderBorder: getComputedStyle(document.querySelector('.parquet-viewer__sider')).borderRightWidth,
+                topbarBorder: getComputedStyle(document.querySelector('.parquet-viewer__topbar')).borderBottomWidth,
+                footerBorder: getComputedStyle(document.querySelector('.parquet-viewer__bottombar')).borderTopWidth,
             })`),
       );
-      expect(state.stats.length === 3, `stat rows: ${state.stats.length}`);
+      expect(state.meta.length === 3, `topbar meta items: ${JSON.stringify(state.meta)}`);
       expect(
-        state.stats.every((stat) => stat.border === "0px"),
-        `stat borders: ${JSON.stringify(state.stats)}`,
+        state.siderBorder === "0px" && state.topbarBorder === "0px" && state.footerBorder === "0px",
+        `region borders: ${JSON.stringify(state)}`,
       );
-      expect(
-        state.stats.every((stat) => stat.shadow === "none"),
-        `stat shadows: ${JSON.stringify(state.stats)}`,
+
+      const before = await page.evaluate(
+        `document.querySelector('.parquet-viewer__sider').getBoundingClientRect().width`,
       );
-      return `${state.stats.length} borderless stat rows`;
+      await page.evaluate(`(() => {
+                const handle = document.querySelector('.parquet-viewer__resizer');
+                handle.focus();
+                handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+            })()`);
+      const after = await page.evaluate(
+        `document.querySelector('.parquet-viewer__sider').getBoundingClientRect().width`,
+      );
+      expect(after === before + 16, `resizer width: ${before} -> ${after}`);
+      return `${state.meta.length} inline meta items, borderless regions, resizer works`;
     },
   },
   {
@@ -427,11 +447,11 @@ const scenarios = [
 
       // Light: a native input used to keep the dark VS Code var while the page went light.
       await openParquet(page, base, "?mixed=1&theme=light");
-      const lightFind = await luminance(page, ".parquet-viewer__find-input");
+      const lightFind = await luminance(page, ".parquet-viewer__search");
       const lightRow = await luminance(page, ".parquet-viewer__row-jump");
       expect(
         lightFind !== null && lightFind > 0.5,
-        `find input stayed dark in a light theme (luminance ${lightFind})`,
+        `search field stayed dark in a light theme (luminance ${lightFind})`,
       );
       expect(
         lightRow !== null && lightRow > 0.5,
@@ -446,47 +466,42 @@ const scenarios = [
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
       const hint = await page.evaluate(
-        `document.querySelector('.parquet-viewer__inspector-hint')?.innerText ?? null`,
+        `document.querySelector('.parquet-viewer__selection-hint')?.innerText ?? null`,
       );
-      expect(hint === "Select a cell to inspect it", `inspector hint: ${hint}`);
+      expect(hint === "Select a cell to inspect it", `selection hint: ${hint}`);
       await page.evaluate(`(() => {
                 const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
                 cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const inspected = await page.waitFor(
-        `/name · row 1/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,
+        `/name · row 1/.test(document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '')`,
       );
-      expect(inspected, "inspector never showed name · row 1");
+      expect(inspected, "selection never showed name · row 1");
       const state = json(
         await page.evaluate(`JSON.stringify({
-                label: document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? null,
-                value: document.querySelector('.parquet-viewer__inspector-value')?.innerText ?? null,
+                label: document.querySelector('.parquet-viewer__selection-label')?.innerText ?? null,
+                value: document.querySelector('.parquet-viewer__selection-value')?.innerText ?? null,
             })`),
       );
-      expect(/name · row 1/.test(state.label ?? ""), `unexpected inspector label: ${state.label}`);
-      expect((state.value ?? "").length > 0, "inspector showed no value");
+      expect(/name · row 1/.test(state.label ?? ""), `unexpected selection label: ${state.label}`);
+      expect((state.value ?? "").length > 0, "selection showed no value");
 
-      // The inspector must not sit on top of the table scroll area: that is what hid the
-      // horizontal scrollbar and the last rows when it was an overlay.
+      // The selected value lives inside the bottom bar; there is no extra full-width row
+      // between the table and the footer.
       const layout = json(
         await page.evaluate(`JSON.stringify({
-                insideTable: !!document.querySelector('.parquet-viewer__table-wrap .parquet-viewer__inspector'),
+                insideFooter: !!document.querySelector('.parquet-viewer__bottombar .parquet-viewer__selection'),
+                extraRow: !!document.querySelector('.parquet-viewer__inspector-slot, .parquet-viewer__inspector'),
                 tableBodyBottom: document.querySelector('.parquet-table .ant-table-body')?.getBoundingClientRect().bottom ?? -1,
-                inspectorTop: document.querySelector('.parquet-viewer__inspector')?.getBoundingClientRect().top ?? -1,
-                inspectorBottom: document.querySelector('.parquet-viewer__inspector')?.getBoundingClientRect().bottom ?? -1,
-                footerTop: document.querySelector('.parquet-viewer__footer')?.getBoundingClientRect().top ?? -1,
+                footerTop: document.querySelector('.parquet-viewer__bottombar')?.getBoundingClientRect().top ?? -1,
             })`),
       );
       expect(layout.tableBodyBottom > 0, "table body not found");
-      expect(layout.inspectorTop >= 0, "inspector not found");
-      expect(!layout.insideTable, "inspector is inside the table scroll area");
+      expect(layout.insideFooter, "selection is not inside the bottom bar");
+      expect(!layout.extraRow, "a separate inspector row came back");
       expect(
-        layout.inspectorTop >= layout.tableBodyBottom - 1,
-        `inspector overlaps the table body: ${layout.tableBodyBottom} > ${layout.inspectorTop}`,
-      );
-      expect(
-        layout.footerTop < 0 || layout.inspectorBottom <= layout.footerTop + 1,
-        `inspector overlaps the footer: ${layout.inspectorBottom} > ${layout.footerTop}`,
+        layout.tableBodyBottom <= layout.footerTop + 1,
+        `table body overlaps the bottom bar: ${layout.tableBodyBottom} > ${layout.footerTop}`,
       );
 
       return `${state.label} = ${state.value}`;
@@ -501,13 +516,15 @@ const scenarios = [
                 cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const inspected = await page.waitFor(
-        `/name · row 1/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,
+        `/name · row 1/.test(document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '')`,
       );
-      expect(inspected, "inspector never opened before the page change");
+      expect(inspected, "selection never opened before the page change");
       await clickNextPage(page);
-      const cleared = await page.evaluate(`!document.querySelector('.parquet-viewer__inspector')`);
-      expect(cleared, "inspector survived a page change");
-      return "inspector cleared on page change";
+      const cleared = await page.evaluate(
+        `!!document.querySelector('.parquet-viewer__selection-hint') && !document.querySelector('.parquet-viewer__selection-value')`,
+      );
+      expect(cleared, "selection survived a page change");
+      return "selection cleared on page change";
     },
   },
   {
@@ -562,11 +579,10 @@ const scenarios = [
         `document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`,
       );
       const inspected = await page.waitFor(
-        `/name · row 2/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,
+        `/name · row 2/.test(document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '')`,
       );
-      expect(inspected, "Enter did not inspect the cursor cell (name · row 2)");
-      // The inspector must not reflow the grid: reflow is what made double-click-to-edit
-      // land on a different cell when it squeezed the table.
+      expect(inspected, "Enter did not select the cursor cell (name · row 2)");
+      // The in-bar selection must not reflow the grid.
       const heightAfter = await page.evaluate(
         `document.querySelector('.parquet-table')?.getBoundingClientRect().height ?? 0`,
       );
@@ -594,7 +610,7 @@ const scenarios = [
         `document.querySelector('.parquet-viewer__pager-info')?.innerText ?? ''`,
       );
       expect(range === "101–150 of 300", `jump page range: ${range}`);
-      return "bool split + keyboard cursor + overlay inspector + target row";
+      return "bool split + keyboard cursor + in-bar selection + target row";
     },
   },
   {
