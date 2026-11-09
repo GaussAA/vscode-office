@@ -1,0 +1,6 @@
+id,mixed_column,note
+1,100,number
+2,text,string
+3,2024-01-01,date
+4,true,boolean
+5,,empty

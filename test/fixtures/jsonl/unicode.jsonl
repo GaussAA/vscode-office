@@ -1,0 +1,5 @@
+{"id":1,"emoji":"🎉🚀💻","chinese":"中文测试内容","english":"English content"}
+{"id":2,"japanese":"日本語のテスト","korean":"한국어 테스트","russian":"Русский текст"}
+{"id":3,"special":"tab\there\nnewline","quote":"He said \"Hello\""}
+{"id":4,"unicode_escape":"\u4e2d\u6587","mixed":"emoji🌟and中文andEnglish"}
+{"id":5,"array":["emoji🔥","中文","English","日本語"],"nested":{"value":"mixed内容🎈"}}
