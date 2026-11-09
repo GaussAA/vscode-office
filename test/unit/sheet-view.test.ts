@@ -18,7 +18,9 @@ import { SPREADSHEET_PREVIEW_LIMITS } from "@/common/previewLimit";
 test("view: normal files keep the editable grid", () => {
   assert.equal(sheetViewFor(".csv", 1024), "grid");
   assert.equal(sheetViewFor(".csv", WINDOW_THRESHOLD_BYTES), "grid");
-  assert.equal(sheetViewFor(".xlsx", 12 * 1024 * 1024), "grid", "workbooks need phase 4");
+  assert.equal(sheetViewFor(".xlsx", 12 * 1024 * 1024), "window", "phase 4 windowed workbooks");
+  assert.equal(sheetViewFor(".xls", 12 * 1024 * 1024), "grid", "legacy xls stays on SheetJS");
+  assert.equal(sheetViewFor(".ods", 12 * 1024 * 1024), "grid", "ods stays on SheetJS");
 });
 
 test("view: a big text file gets the read-only window", () => {

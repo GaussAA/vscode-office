@@ -11,7 +11,7 @@ import SponsorBar from "../components/SponsorBar";
 import "./Excel.less";
 import { MIN_VIEW_COLS, MIN_VIEW_ROWS } from "./excel_meta.ts";
 import { detectCsvEncoding } from "./csvEncoding.ts";
-import { loadSheets } from "./excel_reader.ts";
+import { loadSheets, loadWorkbookRows } from "./excel_reader.ts";
 import {
   export_xlsx,
   exportSaveAs,
@@ -23,7 +23,8 @@ import FindReplacePanel, { type FindReplacePanelHandle } from "./FindReplacePane
 import { parseSpreadsheetLink } from "./excel_hyperlink";
 import { initExcelLocale, t } from "./excel_i18n";
 import WindowedSheet from "./WindowedSheet";
-import { createTextSheetSource, type TextSheetSource } from "./sheetSource";
+import { createTextSheetSource, type SheetSource } from "./sheetSource";
+import { createWorkbookSheetSource, type WorkbookSheetSource } from "./workbookSource";
 import { limitForView, sheetViewFor } from "./sheetView";
 
 initExcelLocale();
@@ -132,7 +133,11 @@ function ExcelViewer() {
    * Set when a large text file is shown as a read-only window instead of the editable grid.
    * `null` means the grid path is in charge.
    */
-  const [windowSource, setWindowSource] = useState<TextSheetSource | null>(null);
+  const [windowSource, setWindowSource] = useState<SheetSource | null>(null);
+  /** Present only when the windowed document is a workbook; drives the sheet picker. */
+  const workbookRef = useRef<WorkbookSheetSource | null>(null);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [activeSheet, setActiveSheet] = useState(0);
   /** Bumped per document; the windowed view keys on it so a new file starts at the top. */
   const [windowLoad, setWindowLoad] = useState(0);
   const [saveAsVisible, setSaveAsVisible] = useState(false);
@@ -216,7 +221,16 @@ function ExcelViewer() {
   /**
    * The user answered the size guard. A local file is fetched by this webview, so the retry
    * is immediate; a virtual document was never read by the host, so ask for it.
-   */
+   */ const handleSelectSheet = useCallback((index: number) => {
+    const source = workbookRef.current;
+    if (!source) return;
+    const next = source.selectSheet(index);
+    workbookRef.current = next;
+    setWindowSource(next);
+    setActiveSheet(next.sheetIndex);
+    setWindowLoad((load) => load + 1);
+  }, []);
+
   const handleOpenAnyway = useCallback(() => {
     const payload = pendingPayloadRef.current;
     if (!payload) return;
@@ -508,7 +522,20 @@ function ExcelViewer() {
               virtual: payload.scheme !== "file",
             });
             if (view === "window") {
-              setWindowSource(createTextSheetSource(buffer));
+              if (/\.(xlsx|xlsm)$/i.test(payload.ext ?? "")) {
+                // ExcelJS parses the whole workbook (a zip cannot be seeked), but into plain
+                // row text instead of the grid's cell-object graph.
+                const source = createWorkbookSheetSource(await loadWorkbookRows(buffer));
+                workbookRef.current = source;
+                setSheetNames(source.sheetNames);
+                setActiveSheet(source.sheetIndex);
+                setWindowSource(source);
+              } else {
+                workbookRef.current = null;
+                setSheetNames([]);
+                setActiveSheet(0);
+                setWindowSource(createTextSheetSource(buffer));
+              }
               setWindowLoad((load) => load + 1);
               setLoading(false);
               return;
@@ -727,6 +754,9 @@ function ExcelViewer() {
         <WindowedSheet
           key={windowLoad}
           source={windowSource}
+          sheetNames={sheetNames}
+          activeSheet={activeSheet}
+          onSelectSheet={handleSelectSheet}
           fileName={pendingPayloadRef.current?.fileName ?? ""}
           onOpenInVSCode={() => handler.emit("editInVSCode", true)}
         />

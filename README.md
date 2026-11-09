@@ -89,7 +89,8 @@ CI runs both on every push, together with `pnpm build` and `pnpm run package`. A
 - Parquet is read-only; there is no writer.
 - Spreadsheets above 8 MB open in a read-only windowed view (viewport rows only). Workbooks
   above 15 MB, and CSV/TSV from a virtual workspace above 25 MB, ask before loading at all;
-  a local CSV/TSV may be windowed up to 200 MB.
+  a local CSV/TSV may be windowed up to 200 MB. Workbooks are windowed as row text, so they
+  are read-only above 8 MB too.
 - JSONL search matches raw text, not JSON paths.
 - Upstream telemetry has been removed entirely.
 

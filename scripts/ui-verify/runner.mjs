@@ -821,6 +821,48 @@ const scenarios = [
     },
   },
   {
+    name: "excel-windowed-workbook",
+    docs: "excel-windowed-workbook.png",
+    async run({ page, base }) {
+      // Phase 4: a workbook is parsed whole (zip is not seekable) but into row text, then
+      // rendered by the same windowed view. Two sheets prove the picker switches slices.
+      await page.navigate(`${base}/harness-route?route=excel&workbook=1`);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 20000);
+      expect(ready, "the windowed workbook did not render");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                grid: !!document.querySelector('#container .x-spreadsheet'),
+                rows: document.querySelectorAll('.windowed-sheet__row').length,
+                total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
+                sheets: [...document.querySelectorAll('.windowed-sheet__select option')].map(o => o.textContent),
+                first: document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText ?? '',
+            })`),
+      );
+      expect(!state.grid, "the editable grid mounted for a workbook");
+      expect(state.total === 201, `unexpected row count: ${state.total}`);
+      expect(state.rows > 0 && state.rows < 80, `rendered ${state.rows} rows`);
+      expect(state.first === "id", `unexpected first cell: ${state.first}`);
+      expect(state.sheets.join(",") === "Data,Extra", `sheet picker: ${state.sheets.join(",")}`);
+
+      await page.evaluate(`(() => {
+                const select = document.querySelector('.windowed-sheet__select');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+                setter.call(select, '1');
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            })()`);
+      const switched = await page.waitFor(
+        `document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText === 'a'`,
+        15000,
+      );
+      expect(switched, "switching sheets did not show the second sheet");
+      const total = await page.evaluate(
+        `Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0)`,
+      );
+      expect(total === 3, `second sheet has ${total} rows`);
+      return "201-row workbook windowed, sheet switch works";
+    },
+  },
+  {
     name: "remaining-routes-smoke",
     async run({ page, base }) {
       // The routes without a behavioural scenario of their own: the spreadsheet viewer and the

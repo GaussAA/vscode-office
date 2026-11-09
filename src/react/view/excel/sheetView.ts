@@ -18,8 +18,10 @@ export const WINDOW_THRESHOLD_BYTES = 8 * 1024 * 1024;
  */
 export const TEXT_WINDOW_MAX_BYTES = 200 * 1024 * 1024;
 
-/** The windowed view renders text formats only; workbooks need the store from phase 4. */
+/** The windowed view renders text formats and workbooks; both now have a `SheetSource`. */
 const WINDOW_EXTENSIONS = new Set([".csv", ".tsv"]);
+/** Workbooks the windowed view can parse: `.xlsx`/`.xlsm` go through ExcelJS. */
+const WORKBOOK_EXTENSIONS = new Set([".xlsx", ".xlsm"]);
 
 export interface SheetViewOptions {
   /**
@@ -55,9 +57,12 @@ export function sheetViewFor(
     if (size > limit) return "refused";
     return size > WINDOW_THRESHOLD_BYTES ? "window" : "grid";
   }
+  if (WORKBOOK_EXTENSIONS.has(lower)) {
+    if (isOverPreviewLimit(lower, size)) return "refused";
+    return size > WINDOW_THRESHOLD_BYTES ? "window" : "grid";
+  }
   return isOverPreviewLimit(lower, size) ? "refused" : "grid";
 }
-
 /** The size the refusal panel compares against, so its message matches the decision above. */
 export function limitForView(ext: string, options: SheetViewOptions = {}): number {
   const lower = (ext ?? "").toLowerCase();

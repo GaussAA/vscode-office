@@ -29,9 +29,20 @@ export interface WindowedSheetProps {
   source: SheetSource;
   fileName: string;
   onOpenInVSCode: () => void;
+  /** Workbook sources expose their sheets; the picker appears only when there is a choice. */
+  sheetNames?: string[];
+  activeSheet?: number;
+  onSelectSheet?: (index: number) => void;
 }
 
-export default function WindowedSheet({ source, fileName, onOpenInVSCode }: WindowedSheetProps) {
+export default function WindowedSheet({
+  source,
+  fileName,
+  onOpenInVSCode,
+  sheetNames,
+  activeSheet,
+  onSelectSheet,
+}: WindowedSheetProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef(0);
   const latestTopRef = useRef(0);
@@ -208,6 +219,20 @@ export default function WindowedSheet({ source, fileName, onOpenInVSCode }: Wind
         </button>
       </div>
       <div className="windowed-sheet__tools">
+        {sheetNames && sheetNames.length > 1 && (
+          <select
+            className="windowed-sheet__input windowed-sheet__select"
+            value={activeSheet ?? 0}
+            aria-label="Sheet"
+            onChange={(event) => onSelectSheet?.(Number(event.target.value))}
+          >
+            {sheetNames.map((name, index) => (
+              <option key={`${name}-${index}`} value={index}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
         <input
           className="windowed-sheet__input"
           value={query}

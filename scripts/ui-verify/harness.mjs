@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
+import * as XLSX from "xlsx";
 import { repoRoot } from "./fixtures.mjs";
 
 const WEBVIEW_ROOT = join(repoRoot, "out", "webview");
@@ -422,6 +423,54 @@ function excelWindowStub() {
 </script>`;
 }
 
+/**
+ * The windowed view's workbook: two sheets, generated once with SheetJS.
+ *
+ * Committing a binary fixture would hide what the test depends on; generating it here keeps the
+ * row contents visible next to the assertions.
+ */
+function windowXlsx() {
+  const data = [["id", "name", "score", "ok"]];
+  for (let row = 0; row < 200; row++)
+    data.push([String(row), `row-${row}`, String(row / 2), String(row % 2 === 0)]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Data");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["a"], ["b"], ["c"]]), "Extra");
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
+
+const WINDOW_XLSX = windowXlsx();
+
+/**
+ * Bridge for a workbook that must open in the windowed view: 12 MB claimed, just under the
+ * 15 MB workbook guard and over the 8 MB window threshold.
+ */
+function excelWorkbookStub() {
+  return `<script>
+(function () {
+  const api = {
+    postMessage(msg) {
+      if (!msg || msg.type !== 'init') return;
+      setTimeout(function () {
+        window.postMessage({ type: 'open', content: {
+          ext: '.xlsx',
+          fileName: 'window.xlsx',
+          path: '/window.xlsx',
+          scheme: 'file',
+          size: 12 * 1024 * 1024,
+          readOnly: true,
+          documentCacheId: 'demo:window-xlsx',
+        } }, '*');
+      }, 60);
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
+
 export function startHarness(fixtures, port = 0) {
   if (!existsSync(join(WEBVIEW_ROOT, "index.html"))) {
     throw new Error("out/webview/index.html is missing — run `pnpm build` first");
@@ -450,15 +499,18 @@ export function startHarness(fixtures, port = 0) {
       const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
       const guard = path === "/harness-route" && url.searchParams.get("guard") === "1";
       const windowed = path === "/harness-route" && url.searchParams.get("window") === "1";
+      const workbookView = path === "/harness-route" && url.searchParams.get("workbook") === "1";
       const stub = guard
         ? excelGuardStub()
-        : windowed
-          ? excelWindowStub()
-          : path === "/harness-route"
-            ? smokeStub(url.searchParams.get("route") ?? "html")
-            : route === "parquet"
-              ? parquetStub(fixtures)
-              : jsonlStub(entries);
+        : workbookView
+          ? excelWorkbookStub()
+          : windowed
+            ? excelWindowStub()
+            : path === "/harness-route"
+              ? smokeStub(url.searchParams.get("route") ?? "html")
+              : route === "parquet"
+                ? parquetStub(fixtures)
+                : jsonlStub(entries);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;
@@ -510,6 +562,14 @@ export function startHarness(fixtures, port = 0) {
     if (path === "/huge.csv") {
       res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
       res.end("a,b,c\n1,2,3\n4,5,6\n");
+      return;
+    }
+
+    if (path === "/window.xlsx") {
+      res.writeHead(200, {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      res.end(WINDOW_XLSX);
       return;
     }
 

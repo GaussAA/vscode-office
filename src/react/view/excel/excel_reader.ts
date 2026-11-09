@@ -21,6 +21,7 @@ import {
 } from "./excel_protection";
 import type { CellData, SheetData } from "./x-spreadsheet/index";
 import { toDisplayText } from "@/common/displayText";
+import { workbookRows, type WorkbookSheetRows } from "./workbookRows";
 
 type RowMap = NonNullable<SheetData["rows"]>;
 
@@ -340,6 +341,19 @@ const loadWithExcelJs = async (buffer: ArrayBuffer): Promise<ExcelData> => {
   const sortStateXmlMap = await readWorkbookSortStateXml(buffer);
   return convertExcelJsWorkbook(workbook, sortStateXmlMap);
 };
+
+/**
+ * Rows-only load for the windowed view (ADR-0017 phase 4).
+ *
+ * Deliberately separate from `loadWithExcelJs`: that path builds one object per cell with
+ * style/link/validation fields because the editable grid needs them. Here we keep only display
+ * text, which is what makes a 19 MB workbook cost tens of megabytes instead of hundreds.
+ */
+export async function loadWorkbookRows(buffer: ArrayBuffer): Promise<WorkbookSheetRows[]> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  return workbookRows(workbook);
+}
 
 const sheetJsColWidthToPx = (col?: XLSX.ColInfo) => {
   if (!col) return null;
