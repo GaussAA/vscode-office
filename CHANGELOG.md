@@ -1,5 +1,15 @@
 # Change log
 
+# 6.0.1 2026-11-09
+
+Fixed:
+
+- **All three viewers no longer open blank.** 6.0.0 inlined the webview config JSON into a
+  double-quoted `data-config` attribute without escaping it. The browser ended the attribute at
+  the first JSON quote, `JSON.parse` threw, and the React root never mounted — parquet,
+  spreadsheet and JSONL all showed an empty editor. The config is now HTML-escaped before it
+  enters the attribute, and the real `index.html` path is covered by unit tests.
+
 # 6.0.0 2026-11-09
 
 A scope-narrowing release. The extension keeps only the three formats its maintainer actually
