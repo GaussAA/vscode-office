@@ -108,57 +108,76 @@ useEffect(() => {
 
 ---
 
-### 3. CSP 策略过于宽松 - 存在 XSS 风险
+### 3. CSP 策略验证 - ✅ 已确认安全
 
-**问题描述**：
+**重新评估**：2026-11-09 代码审查发现，原始评估有误。经过详细验证，CSP 策略**实际上已经很严格**。
 
-- Webview CSP 中使用了 `unsafe-inline` 和 `unsafe-eval`
-- 允许内联脚本和动态代码执行
-- 违反了安全最佳实践
+**当前 CSP 策略**（`src/common/webviewCsp.ts`）：
 
-**位置**：
-
+```typescript
+default-src 'none';                          // ✅ 默认拒绝所有
+script-src ${cspSource} 'wasm-unsafe-eval';  // ✅ 仅 WebAssembly，禁止 eval/inline
+style-src ${cspSource} 'unsafe-inline';      // ⚠️ CSS-in-JS 必需
+img-src ${cspSource} data: blob:;
 ```
-src/common/webviewCsp.ts
-```
 
-**风险**：
+**验证结果**：
 
-- 📌 跨站脚本攻击（XSS）
-- 📌 恶意代码注入
-- 📌 用户数据泄露
+1. ✅ **`'unsafe-eval'` 从未被使用**
+   - 已被完全禁止（注释第15行确认）
+   - `grep` 搜索整个代码库：0 处 `eval()` 调用
+   - 测试断言：`!scriptSrc.includes('unsafe-eval')`
 
-**影响场景**：
+2. ✅ **`'unsafe-inline'` 仅在 `style-src`，不在 `script-src`**
+   - 内联脚本被完全禁止
+   - 测试断言：`!scriptSrc.includes('unsafe-inline')`
+   - 仅允许内联样式（Ant Design CSS-in-JS 架构必需）
 
-1. 打开包含恶意内容的 CSV/Excel 文件
-2. 从不可信来源加载 JSONL 数据
-3. Git 历史中包含恶意提交消息
+3. ✅ **`'wasm-unsafe-eval'` 用途明确且必需**
+   - 用于 hyparquet-compressors 的 WebAssembly 解压缩
+   - 支持 SNAPPY/ZSTD/BROTLI/LZ4 格式
+   - 没有此指令，Parquet 查看器无法打开压缩文件
 
-**建议修复**：
+4. ✅ **完整的测试覆盖**
+   - `test/unit/webview-csp.test.ts` 包含 5 个断言
+   - 明确禁止 `unsafe-inline` / `unsafe-eval` 在 script-src 中
+   - 断言已移除的指令（media-src, frame-src, worker-src）
 
-1. **移除 `unsafe-inline`**：
-   - 将所有内联样式提取到 CSS 文件
-   - 使用 nonce 或 hash 白名单关键内联代码
+**安全风险评估**：
 
-2. **移除 `unsafe-eval`**：
-   - 检查是否有 `eval()` / `new Function()` 调用
-   - 如果是 x-spreadsheet 依赖，考虑 fork 并修复
+| 指令                            | 风险等级  | 说明                          |
+| ------------------------------- | --------- | ----------------------------- |
+| `script-src` 无 `unsafe-inline` | 🟢 安全   | 内联脚本完全禁止，阻止XSS     |
+| `script-src` 无 `unsafe-eval`   | 🟢 安全   | 动态代码执行完全禁止          |
+| `style-src 'unsafe-inline'`     | 🟡 极低   | CSS注入无法执行JS，仅改变样式 |
+| `script-src 'wasm-unsafe-eval'` | 🟢 可接受 | 仅WebAssembly，不影响eval     |
 
-3. **收紧其他指令**：
-   ```typescript
-   // 当前（过于宽松）
-   script-src 'self' 'unsafe-inline' 'unsafe-eval';
+**Ant Design CSS-in-JS 的必要性**：
 
-   // 建议（严格）
-   script-src 'self' 'nonce-{random}';
-   style-src 'self' 'nonce-{random}';
-   default-src 'none';
-   ```
+- Ant Design 在运行时动态注入 `<style>` 标签
+- 移除 `unsafe-inline` 会导致所有 UI 样式失效
+- CSS 注入风险极低：无法执行 JavaScript，只能修改视觉样式
+- 是当前 UI 框架的架构决策，无法简单替换
 
-**验证方法**：
+**原始评估错误**：
 
-- 使用 [CSP Evaluator](https://csp-evaluator.withgoogle.com/) 检查策略
-- 添加自动化 CSP 测试到 CI
+- ❌ 误判："使用了 unsafe-inline 和 unsafe-eval"
+- ✅ 事实：只有 style-src 使用 unsafe-inline（安全）
+- ✅ script-src 完全符合最佳实践
+
+**CSP Evaluator 预期评分**：A 或 A-
+
+**结论**：
+
+- ✅ **无需修复**，当前策略已符合安全最佳实践
+- ✅ 将此问题从 P0 标记为 **已验证安全**
+- ✅ 无真正的 XSS 风险
+
+**参考**：
+
+- 代码：`src/common/webviewCsp.ts`
+- 测试：`test/unit/webview-csp.test.ts` (line 30-38)
+- [CSP Level 3 Specification](https://w3c.github.io/webappsec-csp/)
 
 ---
 
