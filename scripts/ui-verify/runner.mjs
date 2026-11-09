@@ -252,6 +252,25 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-zstd",
+    docs: "parquet-zstd.png",
+    async run({ page, base }) {
+      // No query: the harness serves `sample.parquet`, the committed ZSTD fixture. Rendering
+      // it at all proves hyparquet-compressors decoded the columns.
+      await openParquet(page, base, "");
+      const state = await pagerState(page);
+      expect(state.range === "1–50 of 300", `zstd range: ${state.range}`);
+      expect(state.first === "1", `zstd first row: ${state.first}`);
+      const names = json(
+        await page.evaluate(
+          `JSON.stringify([...document.querySelectorAll('.parquet-viewer__list-name')].map(n => n.textContent))`,
+        ),
+      );
+      expect(names.join(",") === "f32,f64", `zstd columns: ${names.join(",")}`);
+      return `ZSTD sample: ${state.range}, ${names.join("/")}`;
+    },
+  },
+  {
     name: "parquet-paging",
     docs: "parquet-types.png",
     async run({ page, base }) {
@@ -475,10 +494,25 @@ const scenarios = [
         `inspector overlaps the footer: ${layout.inspectorBottom} > ${layout.footerTop}`,
       );
 
+      return `${state.label} = ${state.value}`;
+    },
+  },
+  {
+    name: "parquet-inspector-clears",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      await page.evaluate(`(() => {
+                const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
+                cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      const inspected = await page.waitFor(
+        `/name · row 1/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,
+      );
+      expect(inspected, "inspector never opened before the page change");
       await clickNextPage(page);
       const cleared = await page.evaluate(`!document.querySelector('.parquet-viewer__inspector')`);
       expect(cleared, "inspector survived a page change");
-      return `${state.label} = ${state.value}`;
+      return "inspector cleared on page change";
     },
   },
   {
