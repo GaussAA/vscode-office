@@ -30,6 +30,7 @@ yarn.lock
 # Agent-facing docs, screenshots and release material.
 docs/**
 .ui-verify/**
+.perf/**
 AGENTS.md
 CLAUDE.md
 GLOSSARY.md
