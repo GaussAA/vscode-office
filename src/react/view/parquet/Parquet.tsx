@@ -538,19 +538,22 @@ function ParquetViewer() {
     savePersistedPage(documentKeyRef.current, page);
   }, [page, fileInfo]);
 
-  const jumpToRow = useCallback(() => {
-    const info = fileInfoRef.current;
-    if (!info) return;
-    // Fail loud: an empty or half-typed box tells the user, it does not silently no-op.
-    if (rowJump == null) {
-      message.warning($t("parquet.invalidRow"));
-      return;
-    }
-    const row = Math.max(0, Math.min(info.rowCount - 1, Math.round(rowJump) - 1));
-    cancelEdit();
-    goToPage(Math.floor(row / PAGE_SIZE));
-    setTargetRow(row);
-  }, [rowJump, cancelEdit, goToPage, message]);
+  const jumpToRow = useCallback(
+    (warnWhenEmpty = true) => {
+      const info = fileInfoRef.current;
+      if (!info) return;
+      // Fail loud on an explicit Enter/Go; a blur with an empty box is just a no-op.
+      if (rowJump == null) {
+        if (warnWhenEmpty) message.warning($t("parquet.invalidRow"));
+        return;
+      }
+      const row = Math.max(0, Math.min(info.rowCount - 1, Math.round(rowJump) - 1));
+      cancelEdit();
+      goToPage(Math.floor(row / PAGE_SIZE));
+      setTargetRow(row);
+    },
+    [rowJump, cancelEdit, goToPage, message],
+  );
 
   // Bring the jumped-to row into view once its page has rendered; without this the right
   // page loads but the target row can sit below the fold and the user hunts for it.
@@ -1078,6 +1081,7 @@ function ParquetViewer() {
                       cancelEdit();
                       goToPage((p) => Math.max(0, p - 1));
                     }}
+                    title={$t("parquet.previousPage")}
                     aria-label={$t("parquet.previousPage")}
                   >
                     <span className="codicon codicon-chevron-left" />
@@ -1091,12 +1095,19 @@ function ParquetViewer() {
                     value={rowJump}
                     placeholder={$t("parquet.rowLabel")}
                     onChange={(value) => setRowJump(typeof value === "number" ? value : null)}
-                    onPressEnter={jumpToRow}
+                    onPressEnter={() => jumpToRow()}
+                    onBlur={(event) => {
+                      const next = event.relatedTarget;
+                      // The Go button below handles the click itself; do not jump twice.
+                      if (next instanceof HTMLElement && next.closest("[data-row-jump-go]")) return;
+                      if (rowJump != null) jumpToRow(false);
+                    }}
                   />
                   <button
                     type="button"
                     className="parquet-viewer__pager-btn"
-                    onClick={jumpToRow}
+                    data-row-jump-go
+                    onClick={() => jumpToRow()}
                     title={$t("parquet.goToRow")}
                   >
                     {$t("parquet.go")}
@@ -1110,6 +1121,7 @@ function ParquetViewer() {
                       cancelEdit();
                       goToPage((p) => Math.min(totalPages - 1, p + 1));
                     }}
+                    title={$t("parquet.nextPage")}
                     aria-label={$t("parquet.nextPage")}
                   >
                     <span className="codicon codicon-chevron-right" />

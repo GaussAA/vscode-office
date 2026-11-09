@@ -263,7 +263,41 @@ const scenarios = [
       const second = await pagerState(page);
       expect(second.range === "51–100 of 300", `page 2 range: ${second.range}`);
       expect(second.first === "51", `page 2 first row: ${second.first}`);
+      const pagerTitles = json(
+        await page.evaluate(`JSON.stringify({
+                previous: document.querySelector('button[aria-label="Previous page"]')?.getAttribute('title') ?? null,
+                next: document.querySelector('button[aria-label="Next page"]')?.getAttribute('title') ?? null,
+            })`),
+      );
+      expect(
+        pagerTitles.previous === "Previous page" && pagerTitles.next === "Next page",
+        `pager titles: ${JSON.stringify(pagerTitles)}`,
+      );
       return `1–50 then 51–100 of 300`;
+    },
+  },
+  {
+    name: "parquet-sidebar",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                stats: [...document.querySelectorAll('.parquet-viewer__stat')].map((element) => {
+                    const style = getComputedStyle(element);
+                    return { border: style.borderTopWidth, shadow: style.boxShadow };
+                }),
+            })`),
+      );
+      expect(state.stats.length === 3, `stat rows: ${state.stats.length}`);
+      expect(
+        state.stats.every((stat) => stat.border === "0px"),
+        `stat borders: ${JSON.stringify(state.stats)}`,
+      );
+      expect(
+        state.stats.every((stat) => stat.shadow === "none"),
+        `stat shadows: ${JSON.stringify(state.stats)}`,
+      );
+      return `${state.stats.length} borderless stat rows`;
     },
   },
   {
@@ -330,6 +364,21 @@ const scenarios = [
       const state = await pagerState(page);
       expect(/Read-only/.test(state.banner ?? ""), `missing read-only banner: ${state.banner}`);
       expect(state.range === "1–50 of 250,000", `large range: ${state.range}`);
+
+      // A blur applies the jump too: the Go button is optional.
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__row-jump input');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, '100');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.focus();
+                input.blur();
+            })()`);
+      const blurred = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '51–100 of 250,000'`,
+      );
+      expect(blurred, "blur did not apply the row jump");
+
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__row-jump input');
                 const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -346,7 +395,7 @@ const scenarios = [
       const jumped = await pagerState(page);
       expect(jumped.range === "239,951–240,000 of 250,000", `jump range: ${jumped.range}`);
       expect(jumped.first === "239951", `jump first row: ${jumped.first}`);
-      return "read-only + jump to row 240,000";
+      return "read-only + blur and Go jumps";
     },
   },
   {
