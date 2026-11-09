@@ -203,4 +203,9 @@ export default {
     tree: "Tree",
     raw: "Raw",
   },
+  previewGuard: {
+    title: "This file is too large to preview automatically",
+    body: "{file} is {size}. Above {limit}, a parquet file has to travel through the extension bridge in one piece, so it is not loaded until you ask.",
+    open: "Open anyway",
+  },
 };

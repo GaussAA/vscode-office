@@ -155,6 +155,16 @@ export default {
     saveSuccess: "Save done",
     protectedCell: "Protected cells do not support this function",
     readonlyBanner: "Read-only — browse and find; use Save As to save changes",
+    windowedBanner: "Read-only preview — large files open without editing",
+    matchesOne: "{} match",
+    matchesMany: "{} matches",
+    goToRow: "Go to row",
+    go: "Go",
+    tooLargeTitle: "This file is too large to preview automatically",
+    tooLargeBody:
+      "{} is {}. Previews above {} are not loaded until you ask: parsing a file this size can take many seconds and more than a gigabyte of memory.",
+    tooLargeOpen: "Open anyway",
+    tooLargeOpenInVSCode: "Open in VS Code",
     formatCannotPreserveTitle: "Formatting cannot be preserved",
     formatCannotPreserveContent:
       "{} cannot preserve styles, merges, formulas, etc. Save as xlsx instead?",

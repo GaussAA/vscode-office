@@ -5,11 +5,13 @@ import { createPortal } from "react-dom";
 import { handler, vscodeApi } from "../../util/vscode.ts";
 import { isVscodeEditorDark, observeVscodeThemeChange } from "../../util/vscodeTheme.ts";
 import { loadOfficeBuffer } from "../../util/loadOfficeContent.ts";
+import type { OfficeOpenMessage } from "@/common/openPayload";
+import { formatBytes } from "@/common/previewLimit";
 import SponsorBar from "../components/SponsorBar";
 import "./Excel.less";
 import { MIN_VIEW_COLS, MIN_VIEW_ROWS } from "./excel_meta.ts";
 import { detectCsvEncoding } from "./csvEncoding.ts";
-import { loadSheets } from "./excel_reader.ts";
+import { loadSheets, loadWorkbookRows } from "./excel_reader.ts";
 import {
   export_xlsx,
   exportSaveAs,
@@ -20,6 +22,10 @@ import Spreadsheet from "./x-spreadsheet/index";
 import FindReplacePanel, { type FindReplacePanelHandle } from "./FindReplacePanel";
 import { parseSpreadsheetLink } from "./excel_hyperlink";
 import { initExcelLocale, t } from "./excel_i18n";
+import WindowedSheet from "./WindowedSheet";
+import { createTextSheetSource, type SheetSource } from "./sheetSource";
+import { createWorkbookSheetSource, type WorkbookSheetSource } from "./workbookSource";
+import { limitForView, sheetViewFor } from "./sheetView";
 
 initExcelLocale();
 
@@ -98,6 +104,9 @@ function isCsvLikeExt(ext: string): boolean {
   return /^(csv|tsv)$/i.test(ext.replace(/^\./, ""));
 }
 
+/** What the host sends on `open`, plus the fields the size guard needs. */
+type ExcelOpenPayload = OfficeOpenMessage;
+
 function ExcelViewer() {
   const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(true);
@@ -108,6 +117,29 @@ function ExcelViewer() {
   const findPanelRef = useRef<"find" | "replace" | null>(null);
   const findReplacePanelRef = useRef<FindReplacePanelHandle>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * Set when the payload was refused by the size guard. The viewer then shows the refusal
+   * instead of parsing; nothing is fetched, because the fetch is already half the cost of a
+   * large CSV on a remote workspace.
+   */
+  const [tooLarge, setTooLarge] = useState<{
+    size: number;
+    name: string;
+    ext: string;
+    /** The limit this file missed; local text and virtual text have different ones. */
+    limit: number;
+  } | null>(null);
+  /**
+   * Set when a large text file is shown as a read-only window instead of the editable grid.
+   * `null` means the grid path is in charge.
+   */
+  const [windowSource, setWindowSource] = useState<SheetSource | null>(null);
+  /** Present only when the windowed document is a workbook; drives the sheet picker. */
+  const workbookRef = useRef<WorkbookSheetSource | null>(null);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [activeSheet, setActiveSheet] = useState(0);
+  /** Bumped per document; the windowed view keys on it so a new file starts at the top. */
+  const [windowLoad, setWindowLoad] = useState(0);
   const [saveAsVisible, setSaveAsVisible] = useState(false);
   const [saveAsFormat, setSaveAsFormat] = useState("xlsx");
   const [activeSpreadsheet, setActiveSpreadsheet] = useState<Spreadsheet | null>(null);
@@ -119,6 +151,12 @@ function ExcelViewer() {
   const csvEncodingRef = useRef<"utf8" | "gbk">("utf8");
   const csvDelimiterRef = useRef(",");
   const initialFormattingRef = useRef("");
+  /** True once the user answered "open anyway": the retry must not be gated again. */
+  const forcedRef = useRef(false);
+  /** The payload the guard refused, kept so the retry does not need another round trip. */
+  const pendingPayloadRef = useRef<ExcelOpenPayload | null>(null);
+  /** Wired inside the boot effect; the guard panel lives outside it. */
+  const loadPayloadRef = useRef<((payload: ExcelOpenPayload) => void) | null>(null);
 
   useEffect(() => {
     findPanelRef.current = findPanel;
@@ -178,6 +216,32 @@ function ExcelViewer() {
 
   const handleSaveAs = useCallback(() => {
     setSaveAsVisible(true);
+  }, []);
+
+  /**
+   * The user answered the size guard. A local file is fetched by this webview, so the retry
+   * is immediate; a virtual document was never read by the host, so ask for it.
+   */ const handleSelectSheet = useCallback((index: number) => {
+    const source = workbookRef.current;
+    if (!source) return;
+    const next = source.selectSheet(index);
+    workbookRef.current = next;
+    setWindowSource(next);
+    setActiveSheet(next.sheetIndex);
+    setWindowLoad((load) => load + 1);
+  }, []);
+
+  const handleOpenAnyway = useCallback(() => {
+    const payload = pendingPayloadRef.current;
+    if (!payload) return;
+    forcedRef.current = true;
+    setTooLarge(null);
+    setLoading(true);
+    if (payload.scheme === "file" || payload.bufferBase64 || payload.buffer?.length) {
+      loadPayloadRef.current?.(payload);
+      return;
+    }
+    handler.emit("openForce");
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -447,30 +511,83 @@ function ExcelViewer() {
       initialFormattingRef.current = buildFormattingSnapshot(spreadSheet.getData());
     };
 
+    const loadPayload = (payload: ExcelOpenPayload) => {
+      setWindowSource(null);
+      loadOfficeBuffer(payload)
+        .then(async (buffer) => {
+          try {
+            // A big text file is rendered by the windowed view: the grid would build one
+            // object per cell and hold the whole sheet (ADR-0017).
+            const view = sheetViewFor(payload.ext ?? "", payload.size, {
+              virtual: payload.scheme !== "file",
+            });
+            if (view === "window") {
+              if (/\.(xlsx|xlsm)$/i.test(payload.ext ?? "")) {
+                // ExcelJS parses the whole workbook (a zip cannot be seeked), but into plain
+                // row text instead of the grid's cell-object graph.
+                const source = createWorkbookSheetSource(await loadWorkbookRows(buffer));
+                workbookRef.current = source;
+                setSheetNames(source.sheetNames);
+                setActiveSheet(source.sheetIndex);
+                setWindowSource(source);
+              } else {
+                workbookRef.current = null;
+                setSheetNames([]);
+                setActiveSheet(0);
+                setWindowSource(createTextSheetSource(buffer));
+              }
+              setWindowLoad((load) => load + 1);
+              setLoading(false);
+              return;
+            }
+            await initSpreadsheet(buffer, payload);
+          } catch (e) {
+            const msg = (e as Error).message || String(e);
+            console.error(`Failed to load Excel file: ${msg}`, e);
+            setLoadError(msg);
+            setLoading(false);
+          }
+        })
+        .catch((error) => {
+          const msg = (error as Error).message || String(error);
+          console.error(`Failed to load Excel file: ${msg}`, error);
+          setLoadError(msg);
+          setLoading(false);
+        });
+    };
+    loadPayloadRef.current = loadPayload;
+
     handler
-      .on("open", (payload) => {
+      .on("open", (payload: ExcelOpenPayload) => {
+        const nextCacheId = payload.documentCacheId ?? "";
+        if (nextCacheId !== documentCacheIdRef.current) {
+          // A different document: "open anyway" does not carry over to it.
+          forcedRef.current = false;
+        }
+        documentCacheIdRef.current = nextCacheId;
         extRef.current = payload.ext ?? "";
-        documentCacheIdRef.current = payload.documentCacheId ?? "";
         const fileReadOnly = payload.readOnly === true;
         readOnlyRef.current = fileReadOnly;
         setReadOnly(fileReadOnly);
-        loadOfficeBuffer(payload)
-          .then(async (buffer) => {
-            try {
-              await initSpreadsheet(buffer, payload);
-            } catch (e) {
-              const msg = (e as Error).message || String(e);
-              console.error(`Failed to load Excel file: ${msg}`, e);
-              setLoadError(msg);
-              setLoading(false);
-            }
-          })
-          .catch((error) => {
-            const msg = (error as Error).message || String(error);
-            console.error(`Failed to load Excel file: ${msg}`, error);
-            setLoadError(msg);
-            setLoading(false);
+        pendingPayloadRef.current = payload;
+        const view = sheetViewFor(payload.ext ?? "", payload.size, {
+          virtual: payload.scheme !== "file",
+        });
+        if (!forcedRef.current && (payload.tooLarge || view === "refused")) {
+          // Refuse before fetching anything: on a remote workspace the download is already
+          // half the cost, and the parse is what takes the renderer down.
+          setTooLarge({
+            size: payload.size ?? 0,
+            name: payload.fileName ?? "",
+            ext: payload.ext ?? "",
+            limit: limitForView(payload.ext ?? "", { virtual: payload.scheme !== "file" }),
           });
+          setLoadError(null);
+          setLoading(false);
+          return;
+        }
+        setTooLarge(null);
+        loadPayload(payload);
       })
       .on("saveDone", () => {})
       .emit("init");
@@ -518,10 +635,53 @@ function ExcelViewer() {
           </div>
         </div>
       )}
-      {readOnly && !loading && !loadError && (
+      {tooLarge && !loading && (
+        <div className="excel-too-large">
+          <div className="excel-too-large-panel">
+            <svg
+              className="excel-too-large-icon"
+              width="44"
+              height="44"
+              viewBox="0 0 44 44"
+              fill="none"
+              aria-hidden
+            >
+              <circle cx="22" cy="22" r="20" stroke="currentColor" strokeWidth="1.8" />
+              <path
+                d="M15 27l6-12 6 12"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path d="M18.5 23h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <h2 className="excel-too-large-title">{t("viewer.tooLargeTitle")}</h2>
+            <p className="excel-too-large-body">
+              {t(
+                "viewer.tooLargeBody",
+                tooLarge.name,
+                formatBytes(tooLarge.size),
+                formatBytes(tooLarge.limit),
+              )}
+            </p>
+            <div className="excel-too-large-actions">
+              <Button type="primary" onClick={handleOpenAnyway}>
+                {t("viewer.tooLargeOpen")}
+              </Button>
+              {isCsvLikeExt(tooLarge.ext) && (
+                <Button onClick={() => handler.emit("editInVSCode", true)}>
+                  {t("viewer.tooLargeOpenInVSCode")}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {readOnly && !loading && !loadError && !tooLarge && !windowSource && (
         <div className="excel-readonly-banner">{t("viewer.readonlyBanner")}</div>
       )}
-      {findPanel && !loading && !loadError && (
+      {findPanel && !loading && !loadError && !tooLarge && (
         <FindReplacePanel
           ref={findReplacePanelRef}
           spreadSheet={activeSpreadsheet}
@@ -590,6 +750,17 @@ function ExcelViewer() {
         </div>
       </Modal>
       <div id="container"></div>
+      {windowSource && (
+        <WindowedSheet
+          key={windowLoad}
+          source={windowSource}
+          sheetNames={sheetNames}
+          activeSheet={activeSheet}
+          onSelectSheet={handleSelectSheet}
+          fileName={pendingPayloadRef.current?.fileName ?? ""}
+          onOpenInVSCode={() => handler.emit("editInVSCode", true)}
+        />
+      )}
       {!loading && !loadError && (
         <button
           type="button"

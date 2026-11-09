@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
+import * as XLSX from "xlsx";
 import { repoRoot } from "./fixtures.mjs";
 
 const WEBVIEW_ROOT = join(repoRoot, "out", "webview");
@@ -241,13 +242,25 @@ function jsonlStub(fixtures) {
 </script>`;
 }
 
-function parquetStub() {
+function parquetStub(fixtures) {
+  // A virtual document arrives inline; the host sends it base64-encoded because a `number[]`
+  // costs 5-8x the file on the JSON bridge. `?inline=1` exercises that decode path.
+  const inlineBase64 = readFileSync(fixtures.mixed).toString("base64");
   return `<script>
 (function () {
   const api = {
     postMessage(msg) {
-      if (!msg || msg.type !== 'init') return;
+      if (!msg) return;
       const params = new URLSearchParams(location.search);
+      const guard = params.get('guard') === '1';
+      // "Open anyway" for a gated virtual document: the host reads it and sends it inline.
+      if (guard && msg.type === 'openForce') {
+        setTimeout(function () {
+          window.postMessage({ type: 'open', content: { path: '', fileName: 'big-virtual.parquet', documentCacheId: 'demo-guard', size: 80 * 1024 * 1024, bufferBase64: ${JSON.stringify(inlineBase64)} } }, '*');
+        }, 40);
+        return;
+      }
+      if (msg.type !== 'init') return;
       const file = params.get('big') === '1' ? '/big.parquet'
         : params.get('mixed') === '1' ? '/mixed.parquet'
         : params.get('nested') === '1' ? '/nested.parquet'
@@ -256,8 +269,18 @@ function parquetStub() {
         : params.get('bad') === '1' ? '/bad.parquet'
         : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
+      const inline = params.get('inline') === '1';
+      const payload = inline
+        ? { path: '', fileName: 'inline-mixed.parquet', documentCacheId: 'demo-inline', bufferBase64: ${JSON.stringify(inlineBase64)} }
+        : { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo' };
+      if (guard) {
+        setTimeout(function () {
+          window.postMessage({ type: 'open', content: { path: '', fileName: 'big-virtual.parquet', documentCacheId: 'demo-guard', size: 80 * 1024 * 1024, tooLarge: true } }, '*');
+        }, 80);
+        return;
+      }
       setTimeout(function () {
-        window.postMessage({ type: 'open', content: { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo' } }, '*');
+        window.postMessage({ type: 'open', content: payload }, '*');
       }, 80);
     },
     getState() { return undefined; },
@@ -340,6 +363,117 @@ function smokeStub(route) {
 </script>`;
 }
 
+/**
+ * Bridge for the spreadsheet size guard: a `file:` payload that claims to be 900 MB.
+ *
+ * The guard is a payload decision, not a file decision — the viewer must refuse before it
+ * fetches anything — so a stub that lies about `size` tests it without committing a large
+ * fixture. `/huge.csv` is a three-line CSV, so "Open anyway" can prove it really loads.
+ */
+function excelGuardStub() {
+  return `<script>
+(function () {
+  const api = {
+    postMessage(msg) {
+      if (!msg || msg.type !== 'init') return;
+      setTimeout(function () {
+        window.postMessage({ type: 'open', content: {
+          ext: '.csv',
+          fileName: 'huge.csv',
+          path: '/huge.csv',
+          scheme: 'file',
+          size: 900 * 1024 * 1024,
+          readOnly: true,
+          documentCacheId: 'demo:huge',
+        } }, '*');
+      }, 60);
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
+
+/**
+ * Bridge for the large-file windowed view: a `file:` payload just under the size guard, so the
+ * viewer picks the read-only window instead of the editable grid.
+ */
+function excelWindowStub() {
+  return `<script>
+(function () {
+  const api = {
+    postMessage(msg) {
+      if (!msg || msg.type !== 'init') return;
+      setTimeout(function () {
+        window.postMessage({ type: 'open', content: {
+          ext: '.csv',
+          fileName: 'window.csv',
+          path: '/window.csv',
+          scheme: 'file',
+          size: 12 * 1024 * 1024,
+          readOnly: true,
+          documentCacheId: 'demo:window',
+        } }, '*');
+      }, 60);
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
+
+/**
+ * The windowed view's workbook: two sheets, generated once with SheetJS.
+ *
+ * Committing a binary fixture would hide what the test depends on; generating it here keeps the
+ * row contents visible next to the assertions.
+ */
+function windowXlsx() {
+  const data = [["id", "name", "score", "ok"]];
+  for (let row = 0; row < 200; row++)
+    data.push([String(row), `row-${row}`, String(row / 2), String(row % 2 === 0)]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Data");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["a"], ["b"], ["c"]]), "Extra");
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
+
+const WINDOW_XLSX = windowXlsx();
+
+/**
+ * Bridge for a workbook that must open in the windowed view: 12 MB claimed, just under the
+ * 15 MB workbook guard and over the 8 MB window threshold.
+ */
+function excelWorkbookStub() {
+  return `<script>
+(function () {
+  const api = {
+    postMessage(msg) {
+      if (!msg || msg.type !== 'init') return;
+      setTimeout(function () {
+        window.postMessage({ type: 'open', content: {
+          ext: '.xlsx',
+          fileName: 'window.xlsx',
+          path: '/window.xlsx',
+          scheme: 'file',
+          size: 12 * 1024 * 1024,
+          readOnly: true,
+          documentCacheId: 'demo:window-xlsx',
+        } }, '*');
+      }, 60);
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
+
 export function startHarness(fixtures, port = 0) {
   if (!existsSync(join(WEBVIEW_ROOT, "index.html"))) {
     throw new Error("out/webview/index.html is missing — run `pnpm build` first");
@@ -366,12 +500,20 @@ export function startHarness(fixtures, port = 0) {
             ? (url.searchParams.get("route") ?? "html")
             : "jsonl";
       const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
-      const stub =
-        path === "/harness-route"
-          ? smokeStub(url.searchParams.get("route") ?? "html")
-          : route === "parquet"
-            ? parquetStub()
-            : jsonlStub(url.searchParams.get("empty") === "1" ? [] : entries);
+      const guard = path === "/harness-route" && url.searchParams.get("guard") === "1";
+      const windowed = path === "/harness-route" && url.searchParams.get("window") === "1";
+      const workbookView = path === "/harness-route" && url.searchParams.get("workbook") === "1";
+      const stub = guard
+        ? excelGuardStub()
+        : workbookView
+          ? excelWorkbookStub()
+          : windowed
+            ? excelWindowStub()
+            : path === "/harness-route"
+              ? smokeStub(url.searchParams.get("route") ?? "html")
+              : route === "parquet"
+                ? parquetStub(fixtures)
+                : jsonlStub(url.searchParams.get("empty") === "1" ? [] : entries);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;
@@ -415,6 +557,34 @@ export function startHarness(fixtures, port = 0) {
         "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       });
       res.end(readFileSync(fixtures.docx));
+      return;
+    }
+
+    // What the size guard's "Open anyway" loads: small enough that the grid proves the
+    // retry happened, real enough that the CSV parser runs.
+    if (path === "/huge.csv") {
+      res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+      res.end("a,b,c\n1,2,3\n4,5,6\n");
+      return;
+    }
+
+    if (path === "/window.xlsx") {
+      res.writeHead(200, {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      res.end(WINDOW_XLSX);
+      return;
+    }
+
+    // The windowed view's document: 5000 rows, so "only the viewport is in the DOM" and
+    // "scrolling reaches the last row" are both observable.
+    if (path === "/window.csv") {
+      const lines = ["id,a,b,c,d,e,f,g"];
+      for (let row = 0; row < 5000; row++) {
+        lines.push(`r${row},1,2,3,4,5,6,7`);
+      }
+      res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+      res.end(lines.join("\n"));
       return;
     }
 

@@ -151,4 +151,9 @@ export default {
     cappedSuffix: " · {max} で停止",
     invalidRow: "有効な行番号を入力してください",
   },
+  previewGuard: {
+    title: "ファイルが大きいため自動プレビューしません",
+    body: "{file} は {size} です。{limit} を超える parquet は拡張ブリッジ経由で一括転送が必要なため、自動では読み込みません。",
+    open: "それでも開く",
+  },
 };

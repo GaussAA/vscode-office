@@ -74,6 +74,9 @@ CI 在每次 push 時都會跑這兩項，以及 `pnpm build` 和 `pnpm run pack
 
 - 超大檔案的 parquet 全檔案搜尋受 I/O 限制（會讀取走訪到的每個 row group）。
 - parquet 唯讀，沒有寫入端。
+- 表格超過 8 MB 時進入唯讀視窗檢視（只渲染視窗內的行）。活頁簿超過 15 MB、虛擬工作區裡的
+  CSV/TSV 超過 25 MB 時先詢問再載入；本機 CSV/TSV 最多可視窗化到 200 MB。活頁簿以列文字
+  視窗化，所以超過 8 MB 也是唯讀。
 - JSONL 搜尋比對原始文字，不理解 JSON 路徑。
 - 上游的遙測已完全移除。
 
@@ -88,7 +91,7 @@ CI 在每次 push 時都會跑這兩項，以及 `pnpm build` 和 `pnpm run pack
 
 - YAML：文件大綱與錨點導覽（別名引用可跳轉到定義）
 - XML：文件格式化
-- 圖示主題：25 個 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 圖示
+- 圖示主題：8 個 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 圖示，涵蓋試算表、parquet 與 JSONL
 
 ## 開發
 

@@ -1,5 +1,44 @@
 # Change log
 
+# Unreleased
+
+Performance work on the parquet viewer, measured against a 1M-row single-row-group file
+(PyArrow's default shape) in the built webview:
+
+- **First paint reads the file once, not twice.** The visible page and its prefetch computed
+  the same read plan in the same tick; identical in-flight range requests now share one fetch,
+  and the byte cache is interval-based. 26.9 MB → 13.7 MB (2.04x → 1.04x of the file), and
+  0.97 s → 0.31 s on the same machine.
+- **Whole-file search is a single pass.** 5000-row batches re-decoded the data page that
+  contained each batch. 1M rows: 28 s → ~1.4 s; 200k × 60 columns: 40 s → ~1.5 s.
+- **Wide-table page turns no longer wait for the next page's decode.** The prefetch is
+  idle-scheduled now; a cache hit on a 60-column file went from 1.2–1.9 s to ~0.5 s.
+- **Virtual documents cross the webview bridge as base64, not a number array.** The host used
+  to send `Array.from(bytes)`, which a JSON `postMessage` inflates to 5-8x the file; base64 is
+  4/3. A 20 MB parquet opened from GitHub Repos or a `git:` history entry spent ~70 MB of
+  message and heap on the same bytes. Saving uses the same encoding, so a saved workbook no
+  longer travels as a number array either.
+- `pnpm verify:perf` makes the first two numbers a CI gate.
+
+Added:
+
+- **Large spreadsheets open as a read-only windowed view.** Above 8 MB, CSV/TSV are shown by
+  a viewport-rendering table instead of the editable grid: a 21 MB file paints in ~0.5 s with
+  33 MB of heap, where the grid path needs seconds and hundreds of megabytes. Editing large
+  files intentionally stays with the text editor (`Open in VS Code`). The read-only view can
+  find across the whole file and jump to a row without materialising the sheet. Because the
+  windowed view costs a file's bytes rather than nine times them, the local CSV/TSV size limit
+  moves from 25 MB to 200 MB; virtual workspaces keep 25 MB (inline bridge payload) and
+  workbooks keep 15 MB. `.xlsx`/`.xlsm` above 8 MB also open in the read-only window (parsed as
+  row text instead of one object per cell, with a sheet picker); older `.xls`/`.ods` keep the
+  SheetJS grid. See [ADR-0017](docs/adr/0017-windowed-spreadsheet.md).
+
+- **Oversized spreadsheets are not parsed automatically.** Above 25 MB (CSV/TSV) or 15 MB
+  (xlsx/xlsm/xls/ods) — and above 50 MB for a parquet that arrives inline instead of being
+  range-read — the viewer shows the size and an "Open anyway" button: a 152 MB CSV used to cost
+  9.7 s and 1.36 GB of heap. See
+  [ADR-0016](docs/adr/0016-preview-size-guard.md).
+
 # 6.0.1 2026-11-09
 
 Fixed:

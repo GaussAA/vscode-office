@@ -1,6 +1,7 @@
 import * as ExcelJS from "@cweijan/exceljs";
 import JSZip from "jszip";
 import { handler } from "../../util/vscode";
+import { bytesToSavePayload } from "@/common/saveContent";
 import * as XLSX from "xlsx";
 import Spreadsheet from "./x-spreadsheet/index";
 import type { RowData, SheetData } from "./x-spreadsheet/index";
@@ -135,12 +136,11 @@ async function writeSheetToExcelJs(
 }
 
 async function emitSave(buffer: Uint8Array, options?: ExportOptions) {
-  const content = [...buffer];
   if (options?.saveAs) {
-    handler.emit("saveAs", { content, ext: options.saveAsExt ?? "xlsx" });
+    handler.emit("saveAs", bytesToSavePayload(buffer, options.saveAsExt ?? "xlsx"));
     return;
   }
-  handler.emit("save", content);
+  handler.emit("save", bytesToSavePayload(buffer));
 }
 
 async function patchWorkbookSortStates(buffer: Uint8Array, sheets: SheetData[]) {
@@ -213,7 +213,7 @@ function exportWithSheetJs(sheets: SheetData[], bookType: XLSX.BookType) {
     );
   }
   const buffer = XLSX.write(workbook, { bookType, type: "array" });
-  handler.emit("save", [...new Uint8Array(buffer)]);
+  handler.emit("save", bytesToSavePayload(new Uint8Array(buffer)));
 }
 
 export async function exportSaveAs(
@@ -235,14 +235,14 @@ export async function exportSaveAs(
       XLSX.utils.book_append_sheet(wb, ws, s.name || `Sheet${i + 1}`);
     });
     const buf = XLSX.write(wb, { bookType: ext as XLSX.BookType, type: "array" });
-    handler.emit("saveAs", { content: [...new Uint8Array(buf)], ext });
+    handler.emit("saveAs", bytesToSavePayload(new Uint8Array(buf), ext));
     return;
   }
   if (ext === "csv" || ext === "tsv") {
     const fs = ext === "tsv" ? "\t" : csvDelimiter;
     const csvContent = XLSX.utils.sheet_to_csv(dataToSheetJs(sheets[0]), { FS: fs });
     const bytes = encodeCsvText(csvContent, csvEncoding);
-    handler.emit("saveAs", { content: [...bytes], ext });
+    handler.emit("saveAs", bytesToSavePayload(bytes, ext));
   }
 }
 
@@ -268,6 +268,6 @@ export async function export_xlsx(
     const fs = ext === "tsv" ? "\t" : csvDelimiter;
     const csvContent = XLSX.utils.sheet_to_csv(dataToSheetJs(sheets[0]), { FS: fs });
     const bytes = encodeCsvText(csvContent, csvEncoding);
-    handler.emit("save", [...bytes]);
+    handler.emit("save", bytesToSavePayload(bytes));
   }
 }

@@ -659,6 +659,18 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-inline-buffer",
+    async run({ page, base }) {
+      // A virtual document arrives as base64 in the payload (GitHub Repos, `git:` history).
+      // Rendering it at all proves the decode, and the range proves it is the same file.
+      await openParquet(page, base, "?inline=1");
+      const state = await pagerState(page);
+      expect(state.range === "1–50 of 300", `inline range: ${state.range}`);
+      expect(state.first === "1", `inline first row: ${state.first}`);
+      return `inline base64 payload: ${state.range}`;
+    },
+  },
+  {
     name: "parquet-theme-follows-vscode",
     docs: "parquet-light.png",
     async run({ page, base }) {
@@ -891,6 +903,14 @@ const scenarios = [
         15000,
       );
       expect(done, "whole-file search did not report a match");
+      // The count renders as soon as the scan finishes, but the match sits on another page:
+      // the jump is a page load, so the highlighted cell arrives one read later. Waiting for
+      // the count alone raced that load (the scan got fast enough for the count to win).
+      const highlighted = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__hit').length > 0`,
+        15000,
+      );
+      expect(highlighted, "the matched cell never got highlighted");
       const state = json(
         await page.evaluate(`JSON.stringify({
                 count: document.querySelector('.parquet-viewer__find-count')?.innerText ?? null,
@@ -904,6 +924,218 @@ const scenarios = [
       expect(state.rows === 1, `expected 1 marked row, got ${state.rows}`);
       expect(state.range === "51–100 of 300", `did not jump to the match page: ${state.range}`);
       return `${state.count} at ${state.range}, ${state.hits} highlighted cell(s)`;
+    },
+  },
+  {
+    name: "excel-large-file-guard",
+    docs: "excel-too-large.png",
+    async run({ page, base }) {
+      // The stub claims 900 MB; the guard has to refuse before fetching anything, so the
+      // grid must not be there and the panel must name the file and the limit.
+      await page.navigate(`${base}/harness-route?route=excel&guard=1`);
+      const panel = await page.waitFor(`!!document.querySelector('.excel-too-large')`, 15000);
+      expect(panel, "the size guard did not render for an oversized file");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                text: document.querySelector('.excel-too-large')?.innerText ?? '',
+                grid: !!document.querySelector('#container .x-spreadsheet'),
+                buttons: [...document.querySelectorAll('.excel-too-large button')].map(b => b.textContent.trim()),
+            })`),
+      );
+      expect(/huge\.csv/.test(state.text), `panel does not name the file: ${state.text}`);
+      expect(/900\.0 MB/.test(state.text), `panel does not show the file size: ${state.text}`);
+      expect(/200\.0 MB/.test(state.text), `panel does not show the limit: ${state.text}`);
+      expect(!state.grid, "the grid rendered anyway — the guard must not parse the file");
+      expect(
+        state.buttons.includes("Open anyway"),
+        `missing the retry button: ${state.buttons.join(" / ")}`,
+      );
+
+      // Answering "open anyway" really does load it.
+      await page.evaluate(`[...document.querySelectorAll('.excel-too-large button')]
+                .find(b => b.textContent.trim() === 'Open anyway')?.click()`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the viewer never loaded the file after confirming");
+      const cells = await page.evaluate(
+        `document.querySelectorAll('#container .x-spreadsheet').length`,
+      );
+      expect(
+        await page.evaluate(`!document.querySelector('.excel-too-large')`),
+        "the guard stayed up",
+      );
+      return `refused 900 MB, loaded after confirm (${cells} grid)`;
+    },
+  },
+  {
+    name: "parquet-large-virtual-guard",
+    async run({ page, base }) {
+      // A virtual document over the limit: the host sends no bytes, only the refusal.
+      await page.navigate(`${base}/harness-parquet?guard=1`);
+      const panel = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__too-large')`,
+        15000,
+      );
+      expect(panel, "the parquet size guard did not render");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                text: document.querySelector('.parquet-viewer__too-large')?.innerText ?? '',
+                table: !!document.querySelector('.parquet-viewer__cell'),
+            })`),
+      );
+      expect(/big-virtual\.parquet/.test(state.text), `does not name the file: ${state.text}`);
+      expect(/80\.0 MB/.test(state.text), `does not show the size: ${state.text}`);
+      expect(/50\.0 MB/.test(state.text), `does not show the limit: ${state.text}`);
+      expect(!state.table, "the table rendered — nothing should have been loaded");
+
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__too-large-open')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const loaded = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '').includes('1–50 of 300')`,
+        15000,
+      );
+      expect(loaded, "the viewer never loaded the document after confirming");
+      return "refused 80 MB virtual parquet, loaded after confirm";
+    },
+  },
+  {
+    name: "excel-windowed-large-file",
+    docs: "excel-windowed.png",
+    async run({ page, base }) {
+      // 12 MB of CSV: above the 8 MB window threshold, below the size guard. The editable grid
+      // would build 5000 x 8 cell objects; the windowed view renders only the viewport.
+      await page.navigate(`${base}/harness-route?route=excel&window=1`);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 15000);
+      expect(ready, "the windowed view did not render");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                grid: !!document.querySelector('#container .x-spreadsheet'),
+                rows: document.querySelectorAll('.windowed-sheet__row').length,
+                total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
+                banner: document.querySelector('.windowed-sheet__banner')?.innerText ?? '',
+                first: document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText ?? '',
+            })`),
+      );
+      expect(!state.grid, "the editable grid mounted for a large file");
+      // The served file is a header row plus 5000 data rows; the window shows every record,
+      // like the grid does, so the header is row 1.
+      expect(state.total === 5001, `unexpected row count: ${state.total}`);
+      expect(state.rows > 0 && state.rows < 80, `rendered ${state.rows} rows, expected a viewport`);
+      expect(/Read-only/.test(state.banner), `missing the read-only banner: ${state.banner}`);
+      expect(state.first === "id", `unexpected first cell: ${state.first}`);
+
+      await page.evaluate(`(() => {
+                const scroller = document.querySelector('.windowed-sheet__scroller');
+                scroller.scrollTop = scroller.scrollHeight;
+                scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+            })()`);
+      const reachedEnd = await page.waitFor(
+        `[...document.querySelectorAll('.windowed-sheet__cell')].some(cell => cell.textContent === 'r4999')`,
+        15000,
+      );
+      expect(reachedEnd, "scrolling to the end never rendered the last row");
+      return `5001 records, ${state.rows} rows in the DOM, last row reachable`;
+    },
+  },
+  {
+    name: "excel-windowed-find",
+    docs: "excel-windowed-find.png",
+    async run({ page, base }) {
+      // Phase 3: the windowed view has no cell model, so find scans row blocks from the source
+      // and "go to row" only moves the scroll offset. Both must land on real rows.
+      await page.navigate(`${base}/harness-route?route=excel&window=1`);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 15000);
+      expect(ready, "the windowed view did not render");
+
+      await page.evaluate(`(() => {
+                const input = document.querySelectorAll('.windowed-sheet__input')[0];
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'r4999');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                [...document.querySelectorAll('.windowed-sheet__btn')]
+                    .find(b => b.textContent.trim() === 'Find')?.click();
+            })()`);
+      const found = await page.waitFor(
+        `(() => {
+                    const count = document.querySelector('.windowed-sheet__count')?.innerText ?? '';
+                    const cells = [...document.querySelectorAll('.windowed-sheet__cell')];
+                    return /1 match/.test(count) && cells.some(cell => cell.textContent === 'r4999');
+                })()`,
+        20000,
+      );
+      expect(found, "find did not report and jump to the single match");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                count: document.querySelector('.windowed-sheet__count')?.innerText ?? '',
+                marks: document.querySelectorAll('.windowed-sheet__hit').length,
+                matchedRows: document.querySelectorAll('.windowed-sheet__row--match').length,
+                targeted: [...document.querySelectorAll('.windowed-sheet__row--target .windowed-sheet__cell')]
+                    .map(cell => cell.textContent).slice(0, 2),
+            })`),
+      );
+      expect(state.marks > 0, "the matched cell was not highlighted");
+      expect(state.matchedRows === 1, `expected 1 marked row, got ${state.matchedRows}`);
+      expect(state.targeted.includes("r4999"), `target row: ${state.targeted.join(",")}`);
+
+      await page.evaluate(`(() => {
+                const input = document.querySelectorAll('.windowed-sheet__input--row')[0];
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, '3000');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                [...document.querySelectorAll('.windowed-sheet__btn')]
+                    .find(b => b.textContent.trim() === 'Go')?.click();
+            })()`);
+      const jumped = await page.waitFor(
+        `[...document.querySelectorAll('.windowed-sheet__cell')].some(cell => cell.textContent === 'r2999')`,
+        15000,
+      );
+      expect(jumped, "go-to-row never scrolled to row 3000");
+      return `find: ${state.count}, ${state.marks} mark(s); jump: row 3000 visible`;
+    },
+  },
+  {
+    name: "excel-windowed-workbook",
+    docs: "excel-windowed-workbook.png",
+    async run({ page, base }) {
+      // Phase 4: a workbook is parsed whole (zip is not seekable) but into row text, then
+      // rendered by the same windowed view. Two sheets prove the picker switches slices.
+      await page.navigate(`${base}/harness-route?route=excel&workbook=1`);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 20000);
+      expect(ready, "the windowed workbook did not render");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                grid: !!document.querySelector('#container .x-spreadsheet'),
+                rows: document.querySelectorAll('.windowed-sheet__row').length,
+                total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
+                sheets: [...document.querySelectorAll('.windowed-sheet__select option')].map(o => o.textContent),
+                first: document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText ?? '',
+            })`),
+      );
+      expect(!state.grid, "the editable grid mounted for a workbook");
+      expect(state.total === 201, `unexpected row count: ${state.total}`);
+      expect(state.rows > 0 && state.rows < 80, `rendered ${state.rows} rows`);
+      expect(state.first === "id", `unexpected first cell: ${state.first}`);
+      expect(state.sheets.join(",") === "Data,Extra", `sheet picker: ${state.sheets.join(",")}`);
+
+      await page.evaluate(`(() => {
+                const select = document.querySelector('.windowed-sheet__select');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+                setter.call(select, '1');
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            })()`);
+      const switched = await page.waitFor(
+        `document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText === 'a'`,
+        15000,
+      );
+      expect(switched, "switching sheets did not show the second sheet");
+      const total = await page.evaluate(
+        `Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0)`,
+      );
+      expect(total === 3, `second sheet has ${total} rows`);
+      return "201-row workbook windowed, sheet switch works";
     },
   },
   {
@@ -933,6 +1165,9 @@ const scenarios = [
     name: "parquet-prefetch",
     async run({ page, base, stats }) {
       await openParquet(page, base, "?mixed=1");
+      // The prefetch is idle-scheduled now (it used to start in the same tick as the visible
+      // page and delay it), so give the idle callback a chance before asserting on it.
+      await page.sleep(300);
       const before = await stats();
       await clickNextPage(page);
       const after = await stats();

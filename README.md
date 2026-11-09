@@ -87,6 +87,10 @@ CI runs both on every push, together with `pnpm build` and `pnpm run package`. A
 - Whole-file parquet search on a very large file is I/O bound because it reads every row
   group it visits.
 - Parquet is read-only; there is no writer.
+- Spreadsheets above 8 MB open in a read-only windowed view (viewport rows only). Workbooks
+  above 15 MB, and CSV/TSV from a virtual workspace above 25 MB, ask before loading at all;
+  a local CSV/TSV may be windowed up to 200 MB. Workbooks are windowed as row text, so they
+  are read-only above 8 MB too.
 - JSONL search matches raw text, not JSON paths.
 - Upstream telemetry has been removed entirely.
 
@@ -102,7 +106,7 @@ editor title bar, the editor context menu, or the file explorer context menu.
 
 - YAML: document outline and anchor navigation (Go to Definition for alias references)
 - XML: document formatting
-- Icon theme: 25 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons
+- Icon theme: 8 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons for spreadsheets, parquet and JSONL
 
 ## Development
 
