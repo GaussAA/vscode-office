@@ -1,0 +1,6 @@
+id,text,note
+1,"Simple text",normal
+2,"Text with ""nested quotes""",quoted
+3,"Multi-line
+text here",newline
+4,"Comma, in text",comma

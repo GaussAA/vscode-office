@@ -1,0 +1,7 @@
+{"id":1,"status":"valid","message":"first entry"}
+{broken json without closing brace
+{"id":2,"status":"valid","message":"after error"}
+not json at all
+{"id":3,"status":"valid","nested":{"deep":{"value":true}}}
+
+{"id":4,"status":"valid","empty_line_above":true}

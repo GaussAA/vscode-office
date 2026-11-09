@@ -1,0 +1,4 @@
+{"id":1,"value":"string"}
+{"id":"string-id","value":100}
+{"id":true,"value":null}
+{"id":{"nested":"object"},"value":["array"]}
