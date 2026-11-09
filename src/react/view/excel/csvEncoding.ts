@@ -42,6 +42,24 @@ export function decodeCsvBuffer(buffer: ArrayBuffer): string {
   return iconv.decode(toUint8Array(buffer) as unknown as IconvInput, "gbk");
 }
 
+/**
+ * Decode once and report which encoding won.
+ *
+ * The old path decoded the whole file with `fatal: true` to test it, threw that string away and
+ * decoded again: on a 152 MB CSV, 108 ms and a second full-size string for nothing.
+ */
+export function decodeCsvBufferWithEncoding(buffer: ArrayBuffer): {
+  text: string;
+  encoding: CsvEncoding;
+} {
+  const bytes = stripUtf8Bom(toUint8Array(buffer));
+  try {
+    return { text: new TextDecoder("utf-8", { fatal: true }).decode(bytes), encoding: "utf8" };
+  } catch {
+    return { text: iconv.decode(bytes as unknown as IconvInput, "gbk"), encoding: "gbk" };
+  }
+}
+
 export function encodeCsvText(text: string, encoding: CsvEncoding): Uint8Array {
   if (encoding === "utf8") {
     return new TextEncoder().encode(text);

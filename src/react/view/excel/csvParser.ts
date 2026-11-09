@@ -124,6 +124,11 @@ function readRows(csvStr: string, colDelim: string, limit = Infinity): string[][
   return rows;
 }
 
+/** Records of one already-decoded window; by then the delimiter is known. */
+export function parseCsvRecords(text: string, delimiter: string, limit = Infinity): string[][] {
+  return readRows(text, delimiter, limit);
+}
+
 export function parseCsv(
   text: string,
   delimiter?: string,
