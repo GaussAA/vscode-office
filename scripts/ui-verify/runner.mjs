@@ -466,9 +466,22 @@ const scenarios = [
         `!!document.querySelector('.parquet-viewer__cell--cursor')`,
       );
       expect(cursorShown, "keyboard cursor never appeared");
+      const focused = await page.waitFor(
+        `document.activeElement?.classList.contains('parquet-viewer__cell--cursor')`,
+      );
+      expect(focused, "cursor cell did not take focus");
+      const focusState = json(
+        await page.evaluate(`JSON.stringify({
+                tabIndex: document.activeElement?.getAttribute('tabindex'),
+                label: document.activeElement?.getAttribute('aria-label') ?? '',
+                tabStops: document.querySelectorAll('.parquet-viewer__cell[tabindex="0"]').length,
+            })`),
+      );
+      expect(focusState.tabIndex === "0", `cursor cell tabindex: ${focusState.tabIndex}`);
+      expect(/name, row 2/.test(focusState.label), `cursor cell aria-label: ${focusState.label}`);
+      expect(focusState.tabStops === 1, `roving tab stops: ${focusState.tabStops}`);
       await page.evaluate(
-        `document.querySelector('.parquet-viewer__table-wrap')
-            .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`,
+        `document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`,
       );
       const inspected = await page.waitFor(
         `/name · row 2/.test(document.querySelector('.parquet-viewer__inspector-label')?.innerText ?? '')`,

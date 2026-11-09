@@ -8,7 +8,15 @@ import {
   Table,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import "@vscode/codicons/dist/codicon.css";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { handler } from "../../util/vscode.ts";
@@ -109,6 +117,75 @@ function CellEditor({
         if (event.key === "Escape") onCancel();
       }}
     />
+  );
+}
+
+const CursorContext = createContext<CellCursor | null>(null);
+
+/**
+ * One data cell. It reads the cursor from context instead of receiving it through the
+ * memoised column definitions, so moving the cursor re-renders the cells without
+ * rebuilding every column definition.
+ *
+ * The cell is a roving tab stop: only the cursor cell has `tabIndex=0`. Arrow keys move
+ * real focus here, and the aria-label gives screen readers the column, row and value.
+ */
+function ParquetCell({
+  value,
+  rowIndex,
+  pageIndex,
+  position,
+  column,
+  edited,
+  readOnly,
+  query,
+  onActivate,
+  onEdit,
+}: {
+  value: unknown;
+  rowIndex: number;
+  pageIndex: number;
+  position: number;
+  column: ParquetColumnInfo;
+  edited: boolean;
+  readOnly: boolean;
+  query: string;
+  onActivate: () => void;
+  onEdit: () => void;
+}) {
+  const cursor = useContext(CursorContext);
+  const isCursor = cursor?.row === pageIndex && cursor?.col === position;
+  const kind = column.category;
+  const isNull = value === null || value === undefined;
+  const displayText = isNull ? $t("parquet.nullLabel") : formatCellValue(value);
+  const classes = [
+    "parquet-viewer__cell",
+    isNull ? "parquet-viewer__cell--null" : kind === "bool" ? "" : `parquet-viewer__cell--${kind}`,
+    kind === "bool" && !isNull
+      ? value === true
+        ? "parquet-viewer__cell--bool-true"
+        : "parquet-viewer__cell--bool-false"
+      : "",
+    isCursor ? "parquet-viewer__cell--cursor" : "",
+    edited ? "parquet-viewer__cell--edited" : "",
+    !readOnly && column.editable ? "parquet-viewer__cell--editable" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const labelText = displayText.length > 160 ? `${displayText.slice(0, 160)}…` : displayText;
+
+  return (
+    <span
+      className={classes}
+      data-cell={`${pageIndex}:${position}`}
+      tabIndex={isCursor ? 0 : -1}
+      aria-label={`${column.name}, row ${rowIndex + 1}: ${labelText}`}
+      title={isNull ? "null" : displayText}
+      onDoubleClick={onEdit}
+      onClick={onActivate}
+    >
+      {isNull ? $t("parquet.nullLabel") : highlightCell(displayText, query.trim())}
+    </span>
   );
 }
 
@@ -220,6 +297,7 @@ function ParquetViewer() {
   const [editedCells, setEditedCells] = useState<Set<string>>(() => new Set());
   /** Keyboard cursor into the grid; null until an arrow key (or a click) lands somewhere. */
   const [cursor, setCursor] = useState<CellCursor | null>(null);
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
   /** Absolute row the footer jump aimed at, highlighted until the next navigation. */
   const [targetRow, setTargetRow] = useState<number | null>(null);
   /** True when the whole-file search stopped at SEARCH_MAX_ROWS instead of finishing. */
@@ -586,6 +664,7 @@ function ParquetViewer() {
       }
       if (event.key === "Escape") {
         setCursor(null);
+        tableWrapRef.current?.focus();
         return;
       }
       const column = cursor ? fileInfo.columns[cursor.col] : undefined;
@@ -633,11 +712,15 @@ function ParquetViewer() {
     [cursor, editingRow, fileInfo, page, pageRows, readOnly, startEdit],
   );
 
+  // Move real focus with the cursor. A focusable cell is what makes the roving tabindex
+  // work for assistive tech; the scroll keeps the focused cell in view.
   useEffect(() => {
     if (!cursor) return;
-    document
-      .querySelector(".parquet-viewer__cell--cursor")
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const cell = tableWrapRef.current?.querySelector<HTMLElement>(
+      `[data-cell="${cursor.row}:${cursor.col}"]`,
+    );
+    cell?.focus({ preventScroll: true });
+    cell?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [cursor, pageRows]);
 
   const tableColumns = useMemo<ColumnsType<TableRow>>(() => {
@@ -673,42 +756,22 @@ function ParquetViewer() {
               />
             );
           }
-          const isNull = value === null || value === undefined;
-          const edited = editedCells.has(`${rowIndex}:${column.name}`);
-          const classes = [
-            "parquet-viewer__cell",
-            isNull
-              ? "parquet-viewer__cell--null"
-              : kind === "bool"
-                ? ""
-                : `parquet-viewer__cell--${kind}`,
-            kind === "bool" && !isNull
-              ? value === true
-                ? "parquet-viewer__cell--bool-true"
-                : "parquet-viewer__cell--bool-false"
-              : "",
-            cursor && cursor.row === index && cursor.col === position
-              ? "parquet-viewer__cell--cursor"
-              : "",
-            edited ? "parquet-viewer__cell--edited" : "",
-            !readOnly && column.editable ? "parquet-viewer__cell--editable" : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
           return (
-            <span
-              className={classes}
-              title={isNull ? "null" : formatCellValue(value)}
-              onDoubleClick={() => startEdit(rowIndex, column)}
-              onClick={() => {
+            <ParquetCell
+              value={value}
+              rowIndex={rowIndex}
+              pageIndex={index}
+              position={position}
+              column={column}
+              edited={editedCells.has(`${rowIndex}:${column.name}`)}
+              readOnly={readOnly}
+              query={query}
+              onActivate={() => {
                 setCursor({ row: index, col: position });
                 setInspected({ row: rowIndex, column: column.name, value });
               }}
-            >
-              {isNull
-                ? $t("parquet.nullLabel")
-                : highlightCell(formatCellValue(value), query.trim())}
-            </span>
+              onEdit={() => startEdit(rowIndex, column)}
+            />
           );
         },
       });
@@ -717,7 +780,6 @@ function ParquetViewer() {
   }, [
     cancelEdit,
     commitEdit,
-    cursor,
     editedCells,
     editingColumn,
     editingRow,
@@ -930,24 +992,27 @@ function ParquetViewer() {
               </div>
               <div
                 className="parquet-viewer__table-wrap"
-                tabIndex={0}
+                ref={tableWrapRef}
+                tabIndex={cursor ? -1 : 0}
                 onKeyDown={handleTableKeyDown}
               >
-                <Table<TableRow>
-                  className="parquet-table"
-                  dataSource={tableRows}
-                  columns={tableColumns}
-                  pagination={false}
-                  size="small"
-                  scroll={{ y: tableHeight, x: "max-content" }}
-                  rowClassName={(_row, index) => {
-                    const absolute = page * PAGE_SIZE + index;
-                    const classes: string[] = [];
-                    if (matchRows.has(absolute)) classes.push("parquet-viewer__row--match");
-                    if (targetRow === absolute) classes.push("parquet-viewer__row--target");
-                    return classes.join(" ");
-                  }}
-                />
+                <CursorContext.Provider value={cursor}>
+                  <Table<TableRow>
+                    className="parquet-table"
+                    dataSource={tableRows}
+                    columns={tableColumns}
+                    pagination={false}
+                    size="small"
+                    scroll={{ y: tableHeight, x: "max-content" }}
+                    rowClassName={(_row, index) => {
+                      const absolute = page * PAGE_SIZE + index;
+                      const classes: string[] = [];
+                      if (matchRows.has(absolute)) classes.push("parquet-viewer__row--match");
+                      if (targetRow === absolute) classes.push("parquet-viewer__row--target");
+                      return classes.join(" ");
+                    }}
+                  />
+                </CursorContext.Provider>
               </div>
               <div className="parquet-viewer__inspector-slot">
                 {inspected ? (
