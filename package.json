@@ -1,7 +1,7 @@
 {
   "name": "office-viewer-plus",
   "displayName": "Office Viewer Plus",
-  "description": "Fork of Office Viewer (cweijan/vscode-office) with ZSTD parquet support and a JSONL tree viewer.",
+  "description": "Fork of Office Viewer narrowed to what its maintainer actually opens: spreadsheets (xls/xlsx/xlsm/csv/tsv/ods), parquet with ZSTD support, and a JSONL tree viewer.",
   "version": "6.0.0",
   "publisher": "GaussAA",
   "license": "MIT",
@@ -10,27 +10,18 @@
     "vscode": "^1.125.0"
   },
   "keywords": [
-    "pdf",
-    "word",
-    "docx",
     "excel",
     "xlsx",
+    "xls",
     "csv",
     "tsv",
-    "powerpoint",
-    "pptx",
-    "epub",
-    "psd",
-    "xmind",
+    "ods",
     "parquet",
-    "zip",
-    "archive",
-    "font",
-    "toml",
-    "yaml",
-    "xml",
+    "jsonl",
+    "ndjson",
     "git",
-    "git-history"
+    "git-history",
+    "spreadsheet"
   ],
   "categories": [
     "Visualization",
@@ -67,10 +58,6 @@
         "icon": "$(edit)"
       },
       {
-        "command": "GaussAA.office.html.preview",
-        "title": "Preview HTML"
-      },
-      {
         "command": "GaussAA.office.gitHistory.view",
         "title": "View Git History",
         "icon": "$(history)"
@@ -84,13 +71,6 @@
         "command": "GaussAA.office.gitHistory.quickSync",
         "title": "Git: Quick Sync",
         "icon": "$(sync)"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "GaussAA.office.html.preview",
-        "key": "ctrl+shift+v",
-        "when": "editorTextFocus && editorLangId == html"
       }
     ],
     "menus": {
@@ -136,11 +116,6 @@
           "command": "GaussAA.office.gitHistory.viewFileHistory",
           "group": "git",
           "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file"
-        },
-        {
-          "command": "GaussAA.office.html.preview",
-          "group": "navigation@1",
-          "when": "editorTextFocus && editorLangId == html"
         }
       ],
       "explorer/context": [
@@ -179,155 +154,6 @@
           },
           {
             "filenamePattern": "*.ods"
-          },
-          {
-            "filenamePattern": "file:/**/*.docx"
-          },
-          {
-            "filenamePattern": "vscode-vfs:/**/*.docx"
-          },
-          {
-            "filenamePattern": "vscode-remote:/**/*.docx"
-          },
-          {
-            "filenamePattern": "*.dotx"
-          },
-          {
-            "filenamePattern": "*.pptx"
-          },
-          {
-            "filenamePattern": "*.pptm"
-          },
-          {
-            "filenamePattern": "*.pdf"
-          },
-          {
-            "filenamePattern": "*.epub"
-          },
-          {
-            "filenamePattern": "*.ttf"
-          },
-          {
-            "filenamePattern": "*.woff"
-          },
-          {
-            "filenamePattern": "*.woff2"
-          },
-          {
-            "filenamePattern": "*.otf"
-          },
-          {
-            "filenamePattern": "*.icns"
-          },
-          {
-            "filenamePattern": "*.psd"
-          },
-          {
-            "filenamePattern": "*.xmind"
-          },
-          {
-            "filenamePattern": "*.tiff"
-          },
-          {
-            "filenamePattern": "*.tif"
-          },
-          {
-            "filenamePattern": "*.heif"
-          },
-          {
-            "filenamePattern": "*.heic"
-          }
-        ]
-      },
-      {
-        "viewType": "GaussAA.archiveViewer",
-        "displayName": "Archive Viewer",
-        "selector": [
-          {
-            "filenamePattern": "*.jar"
-          },
-          {
-            "filenamePattern": "*.zip"
-          },
-          {
-            "filenamePattern": "*.7z"
-          },
-          {
-            "filenamePattern": "*.rar"
-          },
-          {
-            "filenamePattern": "*.tar.gz"
-          },
-          {
-            "filenamePattern": "*.tgz"
-          },
-          {
-            "filenamePattern": "*.tar"
-          },
-          {
-            "filenamePattern": "*.apk"
-          },
-          {
-            "filenamePattern": "*.vsix"
-          },
-          {
-            "filenamePattern": "*.crx"
-          }
-        ]
-      },
-      {
-        "viewType": "GaussAA.imageViewer",
-        "displayName": "Image Preview (Office Viewer)",
-        "priority": "option",
-        "selector": [
-          {
-            "filenamePattern": "*.jpg"
-          },
-          {
-            "filenamePattern": "*.png"
-          },
-          {
-            "filenamePattern": "*.gif"
-          },
-          {
-            "filenamePattern": "*.apng"
-          },
-          {
-            "filenamePattern": "*.bmp"
-          },
-          {
-            "filenamePattern": "*.ico"
-          },
-          {
-            "filenamePattern": "*.cur"
-          },
-          {
-            "filenamePattern": "*.jpeg"
-          },
-          {
-            "filenamePattern": "*.pjpeg"
-          },
-          {
-            "filenamePattern": "*.pjp"
-          },
-          {
-            "filenamePattern": "*.webp"
-          }
-        ]
-      },
-      {
-        "viewType": "GaussAA.htmlViewer",
-        "displayName": "Html Viewer",
-        "priority": "option",
-        "selector": [
-          {
-            "filenamePattern": "*.htm"
-          },
-          {
-            "filenamePattern": "*.html"
-          },
-          {
-            "filenamePattern": "*.xhtml"
           }
         ]
       },
@@ -338,15 +164,6 @@
         "selector": [
           {
             "filenamePattern": "*.parquet"
-          }
-        ]
-      },
-      {
-        "viewType": "GaussAA.classViewer",
-        "displayName": "Java Decompiler",
-        "selector": [
-          {
-            "filenamePattern": "file:/**/*.class"
           }
         ]
       },
@@ -406,10 +223,8 @@
     "@puppeteer/browsers": "^3.2.6",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.19.2",
-    "@types/opentype.js": "^1.3.10",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@types/react-image-gallery": "^1.2.4",
     "@types/vscode": "~1.125.0",
     "@vitejs/plugin-react": "^6.0.2",
     "@vscode/test-cli": "^0.0.15",
@@ -417,7 +232,6 @@
     "@vscode/vsce": "^4.1.0",
     "chokidar": "^5.0.0",
     "esbuild": "^0.28.1",
-    "esbuild-plugin-copy": "2.1.1",
     "husky": "^9.1.7",
     "hyparquet-writer": "^0.15.7",
     "less": "^4.2.0",
@@ -428,39 +242,21 @@
     "puppeteer-core": "^25.1.0",
     "tsx": "^4.23.15",
     "typescript": "7.0.2",
-    "vite": "^8.0.16",
-    "vite-plugin-static-copy": "^4.1.1"
+    "vite": "^8.0.16"
   },
   "dependencies": {
-    "7z-wasm": "^1.2.0",
     "@ant-design/icons": "^6.3.4",
-    "@cantoo/pdf-lib": "^2.11.1",
     "@cweijan/exceljs": "^5.0.3",
-    "@docx-editor.dev/react": "2.34.0",
-    "@mind-elixir/import-xmind": "^1.0.8",
     "@vscode/codicons": "^0.0.45",
-    "@zip.js/zip.js": "^2.8.26",
-    "ag-psd": "^30.1.1",
     "antd": "^6.7.0",
     "axios": "^1.18.1",
     "buffer": "^6.0.3",
-    "epubjs": "^0.3.93",
-    "file-type": "^19.6.0",
-    "heic2any": "^0.0.4",
     "hyparquet": "^1.26.1",
     "hyparquet-compressors": "^1.1.2",
     "iconv-lite": "^0.7.3",
     "jszip": "^3.10.1",
-    "mind-elixir": "^5.12.2",
-    "node-unrar-js": "^2.0.2",
-    "opentype.js": "1.3.4",
-    "pptxviewjs": "^1.1.9",
-    "pretty-bytes": "^7.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-image-gallery": "^1.3.0",
-    "tar": "^7.5.16",
-    "utif2": "^4.1.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "xml-formatter": "^3.7.0",
     "yaml": "^2.9.0"

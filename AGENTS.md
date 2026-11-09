@@ -4,7 +4,7 @@
 
 ## 这是什么
 
-[cweijan/vscode-office](https://github.com/cweijan/vscode-office)（Office Viewer）的 fork，MIT。我们在上游基础上继续开发：补 zstd 压缩的 parquet、新增 JSONL 树视图。身份是 `GaussAA.office-viewer-plus`，与原版可共存。理由与后果见 [docs/adr/0001-fork-office-viewer.md](./docs/adr/0001-fork-office-viewer.md)。
+[cweijan/vscode-office](https://github.com/cweijan/vscode-office)（Office Viewer）的 fork，MIT。我们在上游基础上继续开发：补 zstd 压缩的 parquet、新增 JSONL 树视图。6.0.0 起只保留三个 viewer——表格、parquet、JSONL（[ADR-0015](./docs/adr/0015-narrow-to-three-viewers.md)）。身份是 `GaussAA.office-viewer-plus`，与原版可共存。理由与后果见 [docs/adr/0001-fork-office-viewer.md](./docs/adr/0001-fork-office-viewer.md)。
 
 ## Agent skills
 
@@ -63,6 +63,6 @@ pnpm check:full       # check + build + check-bundled-imports + test:smoke + ver
 pnpm verify:ui        # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
 ```
 
-**三层测试各管一件事**：`pnpm test` 管纯逻辑（用 `tsx` 直接导入 `src` 的 `.ts`，不经打包；导出链之所以能测，是因为 `markdown-pdf.ts` 不再依赖 `vscode`），`pnpm test:smoke` 管真实宿主里的激活与 custom editor 路由，`pnpm verify:ui` 管 webview 的 DOM（含 `resource/markdown/index.html` 这个非 React 路由）。三者的失败模式不重叠——`verify:ui` 渲染的是 webview 的 HTML，它看不见「VS Code 有没有激活这个扩展」，所以升 `engines`、改激活事件、动 CSP 这类改动必须靠 smoke 兜。
+**三层测试各管一件事**：`pnpm test` 管纯逻辑（用 `tsx` 直接导入 `src` 的 `.ts`，不经打包），`pnpm test:smoke` 管真实宿主里的激活与 custom editor 路由，`pnpm verify:ui` 管 webview 的 DOM。三者的失败模式不重叠——`verify:ui` 渲染的是 webview 的 HTML，它看不见「VS Code 有没有激活这个扩展」，所以升 `engines`、改激活事件、动 CSP 这类改动必须靠 smoke 兜。
 
 **闸门是 fail-closed 的**：`scripts/typecheck.mjs` 把每个类型错误按「文件 + 错误码 + 消息」与 `scripts/typecheck-baseline.json` 比对，出现基线外的错误就红。基线已经清空（继承来的 75 条全部修掉），所以现在的规则很简单：**任何类型错误都会让构建失败**。不要用 `typecheck:update` 把新错误塞进基线 —— 那是这个闸门唯一能欺骗自己的方式。

@@ -3,18 +3,15 @@ import { ReactApp } from "@/common/reactApp";
 import { getFileSuffix } from "@/common/fileSuffix";
 import * as vscode from "vscode";
 import { Handler } from "../common/handler";
-import { Util } from "../common/util";
-import { handleImage, isImage } from "./handlers/imageHanlder";
-import { isVirtualUri, readUriText } from "./handlers/officeContent";
-import { handleCommonEvent } from "./compress/commonHandler";
-import {
-  extensionResource,
-  getExtensionResourceRoots,
-  readExtensionText,
-} from "@/common/extensionResource";
+import { getExtensionResourceRoots } from "@/common/extensionResource";
+import { handleCommonEvent } from "./commonHandler";
 
 /**
- * support view office files
+ * Spreadsheet and parquet viewers.
+ *
+ * Word, PowerPoint, PDF, ePub, fonts, images, PSD, ICNS, XMind, HTML and archives were removed
+ * in 6.0.0 (ADR-0015): the extension only keeps the three formats its maintainer actually opens,
+ * and everything else is either covered by VS Code or by a better dedicated reader.
  */
 export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider {
   constructor(private context: vscode.ExtensionContext) {}
@@ -22,8 +19,6 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
   bindCustomEditors(viewOption: CustomEditorOptions) {
     return [
       vscode.window.registerCustomEditorProvider("GaussAA.officeViewer", this, viewOption),
-      vscode.window.registerCustomEditorProvider("GaussAA.htmlViewer", this, viewOption),
-      vscode.window.registerCustomEditorProvider("GaussAA.imageViewer", this, viewOption),
       vscode.window.registerCustomEditorProvider("GaussAA.parquetViewer", this, viewOption),
     ];
   }
@@ -35,6 +30,7 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
   ): vscode.CustomDocument | Thenable<vscode.CustomDocument> {
     return { uri, dispose: (): void => {} };
   }
+
   public resolveCustomEditor(
     document: vscode.CustomDocument,
     webviewPanel: vscode.WebviewPanel,
@@ -49,15 +45,10 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
     };
 
     const handler = Handler.bind(webviewPanel, uri);
-
-    let route: string | undefined;
-    const suffix = getFileSuffix(uri.fsPath);
     handleCommonEvent(uri, handler);
-    if (isImage(suffix)) {
-      handleImage(handler, uri, webview);
-      route = "image";
-    }
-    switch (suffix) {
+
+    let route: string;
+    switch (getFileSuffix(uri.fsPath)) {
       case ".xlsx":
       case ".xlsm":
       case ".xls":
@@ -66,95 +57,13 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
       case ".ods":
         route = "excel";
         break;
-      case ".docx":
-      case ".dotx":
-        route = "word";
-        break;
-      case ".pptx":
-      case ".pptm":
-        route = "ppt";
-        break;
-      case ".ttf":
-      case ".woff":
-      case ".woff2":
-      case ".otf":
-        route = "font";
-        break;
-      case ".pdf":
-        void this.loadPdfViewer(webview);
-        break;
-      case ".epub":
-        route = "epub";
-        break;
-      case ".icns":
-        route = "icns";
-        break;
-      case ".psd":
-        route = "psd";
-        break;
-      case ".xmind":
-        route = "xmind";
-        break;
       case ".parquet":
         route = "parquet";
         break;
-      case ".htm":
-      case ".html":
-      case ".xhtml":
-        if (isVirtualUri(uri)) {
-          void this.loadVirtualHtml(webviewPanel, uri, folderPath);
-        } else {
-          void this.loadWorkspaceHtml(webviewPanel, uri, folderPath);
-        }
-        break;
       default:
-        if (route) break;
-        vscode.commands.executeCommand("vscode.openWith", uri, "default");
+        void vscode.commands.executeCommand("vscode.openWith", uri, "default");
+        return;
     }
-    if (route) return ReactApp.view(webview, { route });
-  }
-
-  private async loadPdfViewer(webview: vscode.Webview) {
-    const html = await readExtensionText(this.context, "resource", "pdf", "viewer.html");
-    webview.html = html.replace("{{baseUrl}}", this.getBaseUrl(webview, "pdf"));
-  }
-
-  private async loadWorkspaceHtml(
-    webviewPanel: vscode.WebviewPanel,
-    uri: vscode.Uri,
-    folderPath: vscode.Uri,
-  ) {
-    const webview = webviewPanel.webview;
-    const render = async () => {
-      const content = await readUriText(uri);
-      webview.html = Util.buildPath(content, webview, folderPath);
-    };
-    await render();
-    Util.listen(webviewPanel, uri, () => {
-      void render();
-    });
-  }
-
-  private async loadVirtualHtml(
-    webviewPanel: vscode.WebviewPanel,
-    uri: vscode.Uri,
-    folderPath: vscode.Uri,
-  ) {
-    try {
-      const content = await readUriText(uri);
-      webviewPanel.webview.html = Util.buildPath(content, webviewPanel.webview, folderPath);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to read HTML";
-      webviewPanel.webview.html = `<pre>${message}</pre>`;
-    }
-  }
-
-  private getBaseUrl(webview: vscode.Webview, path: string) {
-    const baseUrl = webview
-      .asWebviewUri(extensionResource(this.context, "resource", path))
-      .toString()
-      .replace(/\?.+$/, "")
-      .replace("https://git", "https://file");
-    return baseUrl;
+    return ReactApp.view(webview, { route });
   }
 }

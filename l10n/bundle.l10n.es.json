@@ -1,13 +1,8 @@
 {
   "ext.common.yes": "SÍ",
   "ext.common.no": "NO",
-  "ext.compress.startExtract": "Iniciando extracción...",
-  "ext.compress.extractSuccess": "¡Extracción exitosa!",
-  "ext.compress.wrongPassword": "Contraseña incorrecta",
-  "ext.compress.passwordProtected": "Este archivo está protegido con contraseña.",
   "ext.git.unableToFindGit": "No se encontró Git. Instale Git o configure \"git.path\" en los ajustes de VS Code.",
   "ext.git.notInRepo": "El archivo no está en un repositorio Git del espacio de trabajo actual.",
   "ext.git.openFileFirst": "Abra un archivo para ver su historial de Git.",
-  "ext.git.statusBarTooltip": "Abrir historial de Git",
-  "ext.html.noFile": "No hay archivo HTML para previsualizar."
+  "ext.git.statusBarTooltip": "Abrir historial de Git"
 }

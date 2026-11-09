@@ -20,8 +20,8 @@ status: accepted
 三处边界，逐条记录裁决：
 
 - **SVG**：原生图片预览默认就渲染 `.svg`，并提供 `reopenAsText`。我们那 922 行工具箱（格式化、改色、导 PNG、代码编辑）全是写侧能力，删掉不损失「看」，所以整块删除——`*.svg` 选择器、`svg` 路由、`svgHandler`、`src/react/view/svg/` 与 6 个独占的 CodeMirror/Lezer 依赖一起走。需要看源码时，原生提供「Reopen With… → Text Editor」。
-- **HTML 保留**：原生只有面板级入口（Simple Browser / Integrated Browser），没有与文件类型关联的预览，双击 `.html` 仍是文本编辑器。我们的 `htmlViewer` 是 `option` 级、不抢默认，是当前唯一「在编辑器里看 HTML」的路径。等宿主把 HTML 预览关联到文件类型，这条再复议。
-- **imageViewer 暂不动**：它的 11 条模式里 9 条原生已支持，但 `priority: option` 意味着不抢默认打开；且 `handleImage` 与 `tiff`/`heic`（原生不支持）共用，拆它等于同时去掉两个真实缺口。列为下一轮独立提交。
+- **HTML 保留**：原生只有面板级入口（Simple Browser / Integrated Browser），没有与文件类型关联的预览，双击 `.html` 仍是文本编辑器。我们的 `htmlViewer` 是 `option` 级、不抢默认，是当前唯一「在编辑器里看 HTML」的路径。等宿主把 HTML 预览关联到文件类型，这条再复议。**（已被 [ADR-0015](./0015-narrow-to-three-viewers.md) 推翻：HTML 在 6.0.0 整块删除。）**
+- **imageViewer 暂不动**：它的 11 条模式里 9 条原生已支持，但 `priority: option` 意味着不抢默认打开；且 `handleImage` 与 `tiff`/`heic`（原生不支持）共用，拆它等于同时去掉两个真实缺口。列为下一轮独立提交。**（已被 ADR-0015 推翻：图片预览随范围收窄一并删除。）**
 
 ## Considered Options
 

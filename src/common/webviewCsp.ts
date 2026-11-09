@@ -6,20 +6,15 @@
  * for specific reasons:
  *
  * - `style-src 'unsafe-inline'`: antd is CSS-in-JS and injects `<style>` at runtime.
- * - `script-src 'wasm-unsafe-eval'`: the font viewer's woff2 decompressor is an Emscripten
- *   module; without it the font route cannot decode woff2 at all.
- * - `frame-src`: the EPUB viewer renders chapters in an iframe.
- * - `data:` / `blob:` on `img-src`, `media-src` and `connect-src`: converted images, archived
- *   entries and `readRange` responses are all served from blob or data URLs.
+ * - `script-src 'wasm-unsafe-eval'`: `hyparquet-compressors` compiles a WebAssembly module to
+ *   decode SNAPPY/ZSTD/BROTLI/LZ4 column chunks. Without it the parquet viewer cannot open a
+ *   compressed file at all.
+ * - `data:` / `blob:` on `img-src` and `connect-src`: spreadsheet images and the parquet
+ *   viewer's `readRange` responses are served from blob or data URLs.
  *
- * The HTML preview panel is *not* covered by this: an `about:srcdoc` document inherits the
- * embedder's policy, so any `script-src` here would also block the page being previewed.
- * That panel isolates with the iframe sandbox instead — see `htmlPreviewShell.ts`.
- *
- * `'unsafe-eval'` is deliberately absent. epubjs bundles a `globalThis` polyfill that probes
- * with `new Function("return this")` and falls back to `window` when CSP blocks it, so the
- * probe is expected and harmless; `scripts/ui-verify/runner.mjs` filters exactly that one
- * violation and keeps every other one fatal.
+ * `'unsafe-eval'` stays blocked. `frame-src`, `media-src` and `worker-src` used to exist for the
+ * HTML preview panel, the archive viewer and pdf.js; all three were removed in 6.0.0, and
+ * `webview-csp.test.ts` now asserts those directives are absent so they cannot quietly return.
  */
 export function buildWebviewCsp(cspSource: string): string {
   return [
@@ -28,9 +23,6 @@ export function buildWebviewCsp(cspSource: string): string {
     `style-src ${cspSource} 'unsafe-inline'`,
     `img-src ${cspSource} data: blob:`,
     `font-src ${cspSource} data:`,
-    `media-src ${cspSource} data: blob:`,
-    `frame-src ${cspSource} data: blob:`,
     `connect-src ${cspSource} data: blob:`,
-    `worker-src ${cspSource} blob:`,
   ].join("; ");
 }

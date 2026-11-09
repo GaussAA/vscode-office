@@ -118,42 +118,6 @@ describe("contributed commands", () => {
   });
 });
 
-describe("html preview", () => {
-  afterEach(async () => {
-    await closeAllEditors();
-  });
-
-  // The preview renders an untrusted document, and it does so in its own panel with its
-  // own origin. This only proves the panel opens; that the document lands in a sandboxed
-  // frame is pinned by test/unit/html-preview-shell.test.mjs, which a browser-side test
-  // could not do here anyway.
-  it("opens its own webview panel for a file", async () => {
-    const uri = vscode.Uri.joinPath(workspaceRoot(), "sample.html");
-    await vscode.commands.executeCommand("GaussAA.office.html.preview", uri);
-
-    const deadline = Date.now() + 30000;
-    while (Date.now() < deadline) {
-      for (const group of vscode.window.tabGroups.all) {
-        for (const tab of group.tabs) {
-          const input = tab.input;
-          // VS Code prefixes panel view types with `mainThreadWebview-`, so compare
-          // on the suffix rather than on an exact match.
-          if (
-            input instanceof vscode.TabInputWebview &&
-            String(input.viewType).includes("office-viewer.viewHtml")
-          ) {
-            return;
-          }
-        }
-      }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    throw new Error(
-      `no webview panel appeared for office-viewer.viewHtml; tabs: ${describeTabs()}`,
-    );
-  });
-});
-
 describe("multiple editors per document", () => {
   afterEach(async () => {
     await closeAllEditors();
@@ -196,10 +160,6 @@ describe("custom editors", () => {
   });
 
   const cases: Array<{ viewType: string; fixture: () => Promise<vscode.Uri> }> = [
-    {
-      viewType: "GaussAA.htmlViewer",
-      fixture: async () => vscode.Uri.joinPath(workspaceRoot(), "sample.html"),
-    },
     {
       viewType: "GaussAA.officeViewer",
       fixture: async () => vscode.Uri.joinPath(workspaceRoot(), "sample.csv"),

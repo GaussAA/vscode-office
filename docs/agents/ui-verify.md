@@ -65,24 +65,17 @@ Rules that keep this suite useful:
 
 ## Route smoke vs. real scenarios
 
-`upstream-viewers-smoke` walks every **React** route (`image`, `svg`, `excel`, `zip`,
-`word`, `ppt`, `font`, `epub`, `icns`, `psd`, `xmind`, `gitHistory`)
-with a minimal `open` payload and asserts that something mounted and nothing threw. Its job
-is to catch fork-wide breakage (entry, provider, shared utilities), **not** rendering
-correctness.
+`remaining-routes-smoke` walks the two **React** routes without a behavioural scenario of
+their own — `excel` and `gitHistory` — with a minimal `open` payload and asserts that
+something mounted and nothing threw. Its job is to catch fork-wide breakage (entry, provider,
+shared utilities), **not** rendering correctness. It polls for the mount (`page.waitFor`)
+rather than sleeping a fixed delay: the excel chunk is ~1.3 MB and mounts slower on a loaded
+machine than any fixed delay we would pick.
 
-It waits for the mount (`page.waitFor`) rather than sleeping a fixed delay: the excel and
-epub chunks are ~1 MB, and a fixed 900 ms per route both flaked under load and wasted
-~8 s per run.
+`parquet` (`parquet-*`) and `jsonl` (`jsonl-*`) have their own scenarios instead.
+`test/unit/viewer-registry.test.ts` asserts that every route in `main.tsx` is covered one way
+or the other, so adding a route without coverage fails the build instead of silently shrinking
+the suite.
 
-Two routes are not in the smoke list because they have their own scenarios:
-`parquet` (`parquet-*`) and `jsonl` (`jsonl-*`). `test/unit/viewer-registry.test.mjs`asserts that every route in `main.tsx` is covered one way or the other, so adding a route
-without coverage fails the build instead of silently shrinking the suite.
-
-Two viewers are not React routes and are therefore not in the smoke list:
-
-- `html` and `pdf` are served by the extension provider as standalone HTML documents
-  (`loadWorkspaceHtml` / `loadPdfViewer`), so there is no bundle to mount.
-
-If you touch those paths, verify them manually in VS Code; extending the harness to cover
-them means faking their own host protocols, which is a separate piece of work.
+No viewer is served outside the React route table anymore: the HTML preview panel and the PDF
+viewer were the last two, and both were removed in 6.0.0.

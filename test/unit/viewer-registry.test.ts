@@ -129,7 +129,7 @@ test("no viewType declares the same file pattern twice", () => {
 test("every React route is covered by the smoke list or a dedicated scenario", () => {
   const mainRouteText = read("src/react/main.tsx");
   const routes = [...mainRouteText.matchAll(/case\s+['"]([^'"]+)['"]:/g)].map((match) => match[1]);
-  assert.ok(routes.length >= 10, "the route switch should still have its cases");
+  assert.ok(routes.length >= 4, "the route switch should still have its cases");
 
   const runner = read("scripts/ui-verify/runner.mjs");
   const smokeBlock = /const routes = \[([\s\S]*?)\]/.exec(runner);

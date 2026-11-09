@@ -2,12 +2,23 @@
 
 # 6.0.0 2026-11-09
 
-A de-duplication release: when VS Code already renders a format well, this extension stops
-shipping a second implementation of it. Read [ADR-0014](docs/adr/0014-deduplicate-native-formats.md)
-for the rule and the boundary calls.
+A scope-narrowing release. The extension keeps only the three formats its maintainer actually
+opens — spreadsheets, parquet and JSONL — and drops every second implementation it was
+maintaining for formats someone else already covers. Read
+[ADR-0015](docs/adr/0015-narrow-to-three-viewers.md) for the range decision and
+[ADR-0014](docs/adr/0014-deduplicate-native-formats.md) for the de-duplication rule.
 
 Removed:
 
+- **Every viewer except spreadsheets, parquet and JSONL.** Word (`.docx`, `.dotx`), PowerPoint
+  (`.pptx`, `.pptm`), PDF, ePub, fonts (`.ttf`, `.otf`, `.woff`, `.woff2`), all images including
+  TIFF/HEIC, PSD, ICNS, XMind, HTML and Java `.class`, plus the archive browser
+  (`.zip`, `.jar`, `.7z`, `.rar`, `.tar`, `.tar.gz`, `.tgz`, `.apk`, `.vsix`, `.crx`). Open those
+  files in VS Code's own preview or in a dedicated reader. 17 runtime dependencies leave with
+  them (`@docx-editor.dev/react`, `pptxviewjs`, `epubjs`, `opentype.js`, `ag-psd`, `mind-elixir`,
+  `7z-wasm`, `node-unrar-js`, `tar`, `@zip.js/zip.js`, `@cantoo/pdf-lib`, `heic2any`, `utif2`,
+  `react-image-gallery`, `file-type`, `pretty-bytes`), together with the 5.66 MB pdf.js copy, the
+  1.4 MB Java decompiler and the 334 KB woff2 decoder.
 - **The Markdown editor.** `GaussAA.markdownViewer`, the vendored `vditor/` workspace package
   (19 MB), the `resource/markdown` webview (9.9 MB), the PDF/DOCX/HTML export chain
   (`puppeteer-core`, `chrome-launcher`, `vscode-html-to-docx`), its nine settings, and the

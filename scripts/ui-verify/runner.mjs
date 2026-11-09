@@ -507,28 +507,16 @@ const scenarios = [
     },
   },
   {
-    name: "upstream-viewers-smoke",
+    name: "remaining-routes-smoke",
     async run({ page, base }) {
-      // React routes only: html/pdf are provider-served static pages.
-      const routes = [
-        "image",
-        "excel",
-        "zip",
-        "word",
-        "ppt",
-        "font",
-        "epub",
-        "icns",
-        "psd",
-        "xmind",
-        "gitHistory",
-      ];
+      // The routes without a behavioural scenario of their own: the spreadsheet viewer and the
+      // Git History panel. Mount-only is enough — their real assertions live in unit tests
+      // (excel_find) and in the smoke suite's routing checks.
+      const routes = ["excel", "gitHistory"];
       const failures = [];
       for (const route of routes) {
         page.clearExceptions();
         await page.navigate(`${base}/harness-route?route=${route}`);
-        // Poll instead of sleeping: the excel/epub chunks are ~1 MB and mount slower on
-        // a loaded machine than any fixed delay we would pick (this used to flake).
         const mounted = await page.waitFor(
           `!!document.querySelector('#root')?.children.length`,
           6000,
@@ -539,38 +527,6 @@ const scenarios = [
       }
       expect(failures.length === 0, failures.join(" | "));
       return `${routes.length} routes mounted without uncaught errors`;
-    },
-  },
-  {
-    name: "word-viewer",
-    docs: "word-viewer.png",
-    async run({ page, base }) {
-      await page.navigate(`${base}/harness-route?route=word`);
-      // "something is in #root" would accept the loading spinner, and the upstream smoke
-      // cannot tell a rendered document from a failed open. Require both the editor's own
-      // DOM and the paragraph text from the fixture (`scripts/ui-verify/fixtures/smoke.docx`).
-      const paragraph = "Smoke fixture paragraph";
-      const mounted = await page.waitFor(
-        `document.querySelectorAll('[class*="docx-"]').length > 0`,
-        30000,
-      );
-      const textRendered = await page.waitFor(
-        `(document.body.innerText || '').includes(${JSON.stringify(paragraph)})`,
-        20000,
-      );
-      const state = json(
-        await page.evaluate(`JSON.stringify({
-                docxNodes: document.querySelectorAll('[class*="docx-"]').length,
-                canvases: document.querySelectorAll('canvas').length,
-                text: (document.body.innerText || '').replace(/\\s+/g, ' ').slice(0, 160),
-            })`),
-      );
-      expect(mounted, `the Word editor never rendered: ${JSON.stringify(state)}`);
-      expect(
-        textRendered,
-        `the document text is missing from the rendered page: ${JSON.stringify(state)}`,
-      );
-      return `${state.docxNodes} editor nodes, fixture paragraph rendered`;
     },
   },
   {

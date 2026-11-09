@@ -1,32 +1,29 @@
-# Office Viewer
+# Office Viewer Plus
 
 English | [简体中文](README-CN.md) | [繁體中文](README-TW.md)
 
 ## Introduction
 
-This extension lets you preview and edit common office and design files directly in VS Code.
+This extension previews **three things** in VS Code:
 
-- Excel: `.xls`, `.xlsx`, `.xlsm`, `.csv`, `.ods`
-- Word: `.docx`, `.dotx`
-- PowerPoint: `.pptx`, `.pptm`
-- PDF & eBook: `.pdf`, `.epub`
-- HEIC/TIFF: `.heic`, `.heif`, `.tiff`
-- Design: `.psd`, `.xmind`, `.icns`
-- Font: `.ttf`, `.otf`, `.woff`, `.woff2`
-- HTML: `.html`, `.htm`
-- Java: `.class` (decompiler)
-- Compressed files: `.zip`, `.jar`, `.vsix`, `.rar`, `.7z`, `.tar`, `.tar.gz`, `.tgz`, `.apk`
+| Format                                                         | What you get                                                                 |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Spreadsheets: `.xls`, `.xlsx`, `.xlsm`, `.csv`, `.tsv`, `.ods` | A grid you can edit and save back, plus find/replace                         |
+| Parquet: `.parquet`                                            | ZSTD/GZIP/BROTLI/LZ4 columns, lazy paging, whole-file search, read-only      |
+| JSONL / NDJSON: `.jsonl`, `.ndjson`                            | A directory of entries on the left, the selected entry as a tree or raw text |
 
-## This fork: Office Viewer Plus
+That is the whole list. Everything else this fork inherited — Word, PowerPoint, PDF, ePub,
+fonts, images, PSD, ICNS, XMind, HTML, Java `.class`, archives — was removed in **6.0.0**:
+VS Code already covers some of them, and the rest have better dedicated readers. The rationale
+is in [ADR-0015](docs/adr/0015-narrow-to-three-viewers.md); the upgrade notes are in
+[CHANGELOG.md](CHANGELOG.md).
 
-> **Upgrading from 4.x?** 5.0.0 is a breaking release: the `.http` client, AI Polish and the
-> bundled themes are gone, and VS Code 1.125+ is now required. Read
-> [docs/upgrading-to-5.md](docs/upgrading-to-5.md) first — two minutes, and it lists exactly what
-> you need to do (usually nothing).
+## This fork
 
 This repository is a fork of [cweijan/vscode-office](https://github.com/cweijan/vscode-office)
 (MIT, see [NOTICE.md](NOTICE.md)). It builds as `GaussAA.office-viewer-plus` and installs
-alongside the original, so everything above still works. The fork adds:
+alongside the original. The fork is maintained for one person's data work, which is why it only
+keeps the formats that work involves.
 
 ### Parquet: the files upstream cannot open
 
@@ -52,9 +49,7 @@ Reading is lazy and stays usable on big files:
 ![Parquet types](docs/screenshots/parquet-types.png)
 
 **Find in file** scans in 5,000-row batches with progress, marks matching rows, highlights
-the matching text inside cells, and jumps to the first hit. Matches are marked with an opaque
-amber chip rather than a translucent wash, so a hit stays readable on top of the coloured
-values underneath.
+the matching text inside cells, and jumps to the first hit.
 
 The viewer follows the VS Code theme — including the antd widgets, which used to stay light
 under a dark view. There is no separate light/dark switch.
@@ -85,113 +80,54 @@ pnpm verify:ui   # headless DOM scenarios; screenshots land in .ui-verify/shots
 ```
 
 CI runs both on every push, together with `pnpm build` and `pnpm run package`. Add
-`-- --docs` to `verify:ui` to refresh the screenshots above. Design rationale lives in
-[docs/adr/0001-fork-office-viewer.md](docs/adr/0001-fork-office-viewer.md).
+`-- --docs` to `verify:ui` to refresh the screenshots above.
 
 ### Known limits
 
 - Whole-file parquet search on a very large file is I/O bound because it reads every row
   group it visits.
+- Parquet is read-only; there is no writer.
 - JSONL search matches raw text, not JSON paths.
 - Upstream telemetry has been removed entirely.
 
 ## Git History
 
-Office Viewer includes a full Git History workspace for exploring repositories without leaving VS Code. Open it from the Source Control view, the editor title bar, the editor context menu, or the file explorer context menu.
+The extension still ships the Git History workspace (it is a commit browser, not a file
+preview, so the 6.0.0 narrowing did not touch it). Open it from the Source Control view, the
+editor title bar, the editor context menu, or the file explorer context menu.
 
-![1783342874748](image/README/1783342874748.png)
+![Git history](image/README/1783342874748.png)
 
 ## Other features
 
-- HTML: live preview while editing; press `Ctrl+Shift+V` to open the live view
 - YAML: document outline and anchor navigation (Go to Definition for alias references)
-- Icon theme: 26 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons. The two bundled color themes and the five extra syntax themes were removed in 5.0.0 — see [CHANGELOG.md](CHANGELOG.md)
-- Excel: preview and save `.xlsx`, `.xls`, `.xlsm`, `.csv`, and `.ods` files
-- Java: decompile and view `.class` files
+- XML: document formatting
+- Icon theme: 25 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons
+
+## Development
+
+```bash
+pnpm install
+pnpm build        # production build into out/
+pnpm run package  # create the .vsix (build first)
+pnpm check        # format + lint + baseline + typecheck + unit tests
+pnpm check:full   # check + build + smoke + verify:ui
+```
+
+Press `F5` in VS Code and choose **Extension** to run the local build.
+
+## Credits
+
+- Spreadsheet parsing: [SheetJS/sheetjs](https://github.com/SheetJS/sheetjs)
+- Spreadsheet rendering: [myliang/x-spreadsheet](https://github.com/myliang/x-spreadsheet)
+- Parquet: [hyparquet](https://github.com/hyparam/hyparquet) and
+  [hyparquet-compressors](https://github.com/hyparam/hyparquet-compressors)
+- Material Icon theme: [PKief/vscode-material-icon-theme](https://github.com/PKief/vscode-material-icon-theme)
 
 ## Sponsor
 
 [![Database Client](https://doc.database-client.com/public/logo.png)](https://marketplace.visualstudio.com/items?itemName=cweijan.vscode-database-client2)
 
-Database Client for Visual Studio Code, supporting the management of **MySQL/MariaDB, PostgreSQL, SQLite, Redis**, and **ElasticSearch**, and works as an **SSH** client to boost your productivity! [Get it now](https://marketplace.visualstudio.com/items?itemName=cweijan.vscode-database-client2).
-
-## Development Guide
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) 24+ (the host runtime of VS Code 1.125)
-- [VS Code](https://code.visualstudio.com/) 1.125+
-
-### Getting started
-
-```bash
-git clone https://github.com/cweijan/vscode-office.git
-cd vscode-office
-npm install
-```
-
-### Development
-
-**Desktop extension** (full feature set):
-
-```bash
-npm run dev
-```
-
-Press `F5` in VS Code, or choose **Extension** from Run and Debug.
-
-**Web extension** (Markdown, HTML, YAML in the browser):
-
-```bash
-npm run dev:web
-```
-
-Choose **Extension (Web)** from Run and Debug.
-
-### Build & package
-
-```bash
-npm run build    # production build
-npm run package  # create .vsix
-```
-
-## Usage data
-
-Office Viewer collects **anonymous usage data** to understand which preview features are used, so we can improve the extension. Data is sent to [Azure Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) via the official [`@vscode/extension-telemetry`](https://www.npmjs.com/package/@vscode/extension-telemetry) module.
-
-### What we collect
-
-| Event       | When                              | Properties                                                                                   |
-| ----------- | --------------------------------- | -------------------------------------------------------------------------------------------- |
-| `view.open` | A custom preview/editor is opened | `viewType` (e.g. `excel`, `markdown`, `pdf`), `fileType` (extension only, e.g. `xlsx`, `md`) |
-
-We **do not** collect file paths, file names, URLs, repository names, request contents, or other personally identifiable information.
-
-### How to opt out
-
-Telemetry is sent only when **both** of the following allow it:
-
-1. VS Code global telemetry is enabled (`telemetry.telemetryLevel` is not `off`, or `telemetry.enableTelemetry` is `true` on older versions).
-2. Extension telemetry is enabled: set `vscode-office.enableTelemetry` to `false` in Settings.
-
-You can also disable all VS Code telemetry in **Settings → Application → Telemetry**.
-
-### Maintainer setup
-
-If you build and publish this extension yourself, see [docs/telemetry.md](docs/telemetry.md) for Azure Application Insights setup and sample queries.
-
-## Credits
-
-- PDF rendering: [mozilla/pdf.js](https://github.com/mozilla/pdf.js/)
-- DOCX rendering: [VolodymyrBaydalka/docxjs](https://github.com/VolodymyrBaydalka/docxjs)
-- PPTX rendering: [pptxviewjs](https://www.npmjs.com/package/pptxviewjs)
-- XLSX rendering:
-  - [SheetJS/sheetjs](https://github.com/SheetJS/sheetjs): XLSX parsing
-  - [myliang/x-spreadsheet](https://github.com/myliang/x-spreadsheet): XLSX rendering
-- EPUB: [futurepress/epub.js](https://github.com/futurepress/epub.js)
-- PSD: [ag-psd](https://github.com/Agamnentzar/ag-psd)
-- XMind: [mind-elixir](https://github.com/ssshooter/mind-elixir-core), [@mind-elixir/import-xmind](https://github.com/ssshooter/mind-elixir-core)
-- HEIC conversion: [heic2any](https://github.com/alexcorvi/heic2any)
-- Java decompiler: [JetBrains/java-decompiler](https://github.com/JetBrains/intellij-community/tree/master/plugins/java-decompiler/engine)
-- HTTP: [REST Client](https://github.com/Huachao/vscode-restclient)
-- Material Icon theme: [PKief/vscode-material-icon-theme](https://github.com/PKief/vscode-material-icon-theme)
+Database Client for Visual Studio Code, supporting **MySQL/MariaDB, PostgreSQL, SQLite, Redis**
+and **ElasticSearch**, and working as an **SSH** client.
+[Get it now](https://marketplace.visualstudio.com/items?itemName=cweijan.vscode-database-client2).
