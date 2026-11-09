@@ -60,6 +60,8 @@ export interface ParquetColumnInfo {
   type: string;
   /** Derived once, so the icon, alignment and editability cannot disagree. */
   category: ColumnCategory;
+  /** Groups and legacy repeated primitives: the writer only handles flat scalar columns. */
+  nested: boolean;
   editable: boolean;
 }
 
@@ -94,33 +96,37 @@ function formatSchemaType(element: SchemaElement): string {
 }
 
 /**
- * Whether this schema element is a group (LIST / MAP / STRUCT), not a physical leaf.
- *
- * `hyparquet` stores a LIST's logical type keyed by its union member, and a plain
- * STRUCT group carries neither `type` nor `converted_type` — so check `num_children`
- * first and only then look at the declared types.
+ * Display type for a top-level column. `hasChildren` is authoritative for groups: a LIST
+ * or MAP group may carry only `logical_type` (converted_type is deprecated), a plain
+ * STRUCT carries neither, and none of them has a physical `element.type`.
  */
-function isGroupElement(element: SchemaElement): boolean {
-  if ((element.num_children ?? 0) > 0) return true;
-  const logical = element.logical_type as Record<string, unknown> | undefined;
-  if (logical) {
-    const key = Object.keys(logical)[0];
-    if (key === "LIST" || key === "MAP" || key === "STRUCT") return true;
+function formatColumnType(element: SchemaElement, hasChildren: boolean): string {
+  if (hasChildren) {
+    return element.converted_type ?? element.logical_type?.type ?? "STRUCT";
   }
-  return element.converted_type === "LIST" || element.converted_type === "MAP";
+  return formatSchemaType(element);
 }
 
 /**
- * Display type for a top-level column. Groups never have a physical `element.type`,
- * so without this branch every nested column rendered as UNKNOWN and stayed editable.
+ * Build the column model from one top-level schema element.
+ *
+ * Exported for unit tests: a hand-built SchemaElement is the only way to cover a
+ * logical-type-only LIST without committing a second binary fixture.
  */
-function formatColumnType(element: SchemaElement): string {
-  if (isGroupElement(element)) {
-    const logical = element.logical_type as Record<string, unknown> | undefined;
-    const logicalKey = logical ? Object.keys(logical)[0] : undefined;
-    return element.converted_type ?? logicalKey ?? "STRUCT";
-  }
-  return formatSchemaType(element);
+export function describeColumn(element: SchemaElement, hasChildren: boolean): ParquetColumnInfo {
+  const nested = hasChildren || element.repetition_type === "REPEATED";
+  const type = formatColumnType(element, hasChildren);
+  // A nested column is one cell of JSON, so it gets the structure icon and alignment.
+  // `category` also drives the save guard: the writer only handles flat columns, and a
+  // legacy repeated primitive is just as unwritable as a LIST.
+  const category = nested ? "structure" : categorizeType(type);
+  return {
+    name: element.name,
+    type,
+    category,
+    nested,
+    editable: !nested && category !== "structure",
+  };
 }
 
 function isAsyncBuffer(source: ArrayBuffer | AsyncBuffer): source is AsyncBuffer {
@@ -135,16 +141,9 @@ export async function openParquetFile(source: ArrayBuffer | AsyncBuffer): Promis
   // Top-level columns only. `getPhysicalColumns` returns leaf paths, so a LIST column
   // named `tags` came out as three "columns" (`tags.list.element`…), while the row
   // objects are keyed by the top-level name — the lookup missed and rendered NULL.
-  const columns: ParquetColumnInfo[] = schemaTree.children.map((child) => {
-    const type = formatColumnType(child.element);
-    const category = categorizeType(type);
-    return {
-      name: child.element.name,
-      type,
-      category,
-      editable: category !== "structure",
-    };
-  });
+  const columns: ParquetColumnInfo[] = schemaTree.children.map((child) =>
+    describeColumn(child.element, child.children.length > 0),
+  );
   return {
     file,
     metadata,
@@ -243,18 +242,30 @@ function normalizeParquetValue(value: unknown, type: BasicType): unknown {
   return toDisplayText(value);
 }
 
+/**
+ * Raised when a save would write a column this viewer cannot represent: a group (LIST /
+ * MAP / STRUCT), a legacy repeated primitive, or a structural leaf such as JSON.
+ */
+export class UnsupportedColumnsError extends Error {
+  readonly columns: string[];
+
+  constructor(columns: string[]) {
+    super(`Cannot save: the file contains nested or structural columns (${columns.join(", ")}).`);
+    this.name = "UnsupportedColumnsError";
+    this.columns = columns;
+  }
+}
+
 export function writeParquetBuffer(
   columns: ParquetColumnInfo[],
   rows: Record<string, unknown>[],
 ): ArrayBuffer {
-  // hyparquet-writer only writes flat columns; serialising a LIST/STRUCT would either
-  // throw or silently downgrade it to a JSON string column. Refuse with a clear message.
-  const nested = columns.filter((column) => column.category === "structure");
-  if (nested.length > 0) {
-    const names = nested.map((column) => column.name).join(", ");
-    throw new Error(
-      `Cannot save: nested columns (${names}) are read-only in this viewer. Edit a copy without them.`,
-    );
+  // hyparquet-writer only writes flat scalar columns; serialising a LIST/STRUCT would
+  // either throw or silently downgrade it to a JSON string column. Refuse with a
+  // structured error so the view can translate it and name the offending columns.
+  const unsupported = columns.filter((column) => column.nested || column.category === "structure");
+  if (unsupported.length > 0) {
+    throw new UnsupportedColumnsError(unsupported.map((column) => column.name));
   }
   const columnData: ColumnSource[] = [];
   for (const column of columns) {

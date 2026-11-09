@@ -1,18 +1,22 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { parquetMetadataAsync, type SchemaElement } from "hyparquet";
 import {
+  describeColumn,
   formatCellValue,
   openParquetFile,
   readParquetRows,
+  UnsupportedColumnsError,
   writeParquetBuffer,
+  type ParquetColumnInfo,
 } from "@/react/view/parquet/parquetParser";
 
 /**
  * A tiny file with every shape the column model must survive: a scalar, a LIST and a
- * STRUCT (see the fixture's generator note in the PR). The old `openParquetFile` listed
- * *physical leaf* columns — `tags.list.element` — while `parquetReadObjects` keys rows
- * by the top-level name, so every nested column rendered as all-NULL.
+ * STRUCT (see `test/fixtures/README.md`). The old `openParquetFile` listed *physical
+ * leaf* columns — `tags.list.element` — while `parquetReadObjects` keys rows by the
+ * top-level name, so every nested column rendered as all-NULL.
  */
 const FIXTURE = new URL("../fixtures/parquet-list-column.parquet", import.meta.url);
 
@@ -39,7 +43,19 @@ test("openParquetFile: a LIST column is a structure, so it is not editable", asy
   assert.ok(tags, "tags column must be listed");
   assert.equal(tags.type, "LIST");
   assert.equal(tags.category, "structure");
+  assert.equal(tags.nested, true);
   assert.equal(tags.editable, false);
+});
+
+test("openParquetFile: a plain STRUCT is structural and read-only", async () => {
+  const info = await openFixture();
+
+  const meta = info.columns.find((column) => column.name === "meta");
+  assert.ok(meta, "meta column must be listed");
+  assert.equal(meta.type, "STRUCT");
+  assert.equal(meta.category, "structure");
+  assert.equal(meta.nested, true);
+  assert.equal(meta.editable, false);
 });
 
 test("readParquetRows: list values are reachable under the column name", async () => {
@@ -58,14 +74,85 @@ test("formatCellValue renders list values instead of an empty cell", async () =>
 
   const tags = info.columns.find((column) => column.name === "tags");
   assert.ok(tags, "tags column must be listed");
-  assert.match(formatCellValue(rows[0][tags.name]), /ko/);
+  assert.equal(formatCellValue(rows[0][tags.name]), '["ko","en"]');
 });
 
-test("writeParquetBuffer refuses nested columns instead of downgrading them", async () => {
+test("describeColumn: a logical-type-only LIST is a structure, not a field", () => {
+  const list: SchemaElement = {
+    name: "tags",
+    num_children: 1,
+    logical_type: { type: "LIST" },
+  };
+
+  const column = describeColumn(list, true);
+
+  assert.equal(column.type, "LIST");
+  assert.equal(column.category, "structure");
+  assert.equal(column.nested, true);
+  assert.equal(column.editable, false);
+});
+
+test("describeColumn: a legacy repeated primitive is structural and read-only", () => {
+  const repeated: SchemaElement = {
+    name: "tags",
+    type: "BYTE_ARRAY",
+    repetition_type: "REPEATED",
+  };
+
+  const column = describeColumn(repeated, false);
+
+  assert.equal(column.category, "structure");
+  assert.equal(column.nested, true);
+  assert.equal(column.editable, false);
+});
+
+test("describeColumn: a flat scalar stays editable", () => {
+  const flat: SchemaElement = {
+    name: "id",
+    type: "BYTE_ARRAY",
+    converted_type: "UTF8",
+    logical_type: { type: "STRING" },
+  };
+
+  const column = describeColumn(flat, false);
+
+  assert.equal(column.category, "string");
+  assert.equal(column.nested, false);
+  assert.equal(column.editable, true);
+});
+
+test("writeParquetBuffer refuses unsupported columns instead of downgrading them", async () => {
   const info = await openFixture();
   const rows = await readParquetRows(info.file, info.metadata, 0, 2);
 
-  // Saving would re-encode `tags` as a JSON string column (the writer only does flat
-  // columns). A clear refusal beats silent data mangling.
-  assert.throws(() => writeParquetBuffer(info.columns, rows), /nested columns/);
+  // Saving would re-encode `tags`/`meta` as JSON string columns (the writer only does
+  // flat scalar columns). A clear refusal beats silent data mangling.
+  assert.throws(
+    () => writeParquetBuffer(info.columns, rows),
+    (error: unknown) => {
+      assert.ok(error instanceof UnsupportedColumnsError);
+      assert.deepEqual(error.columns, ["tags", "meta"]);
+      return true;
+    },
+  );
+});
+
+test("writeParquetBuffer still writes flat scalar columns", async () => {
+  const columns: ParquetColumnInfo[] = [
+    { name: "id", type: "STRING", category: "string", nested: false, editable: true },
+    { name: "n", type: "INT32", category: "numeric", nested: false, editable: true },
+  ];
+  const buffer = writeParquetBuffer(columns, [
+    { id: "a", n: 1 },
+    { id: "b", n: 2 },
+  ]);
+  const file = {
+    byteLength: buffer.byteLength,
+    slice(start: number, end?: number) {
+      return buffer.slice(start, end ?? buffer.byteLength);
+    },
+  };
+
+  const metadata = await parquetMetadataAsync(file);
+  assert.equal(Number(metadata.num_rows), 2);
 });

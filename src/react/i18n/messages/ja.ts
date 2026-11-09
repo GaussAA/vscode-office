@@ -199,4 +199,8 @@ export default {
     commit: "コミット",
     branch: "ブランチ",
   },
+  parquet: {
+    unsupportedSave:
+      "保存できません: このファイルにはネストされた列または構造列（{columns}）が含まれています。保存はフラットなスカラー列のみ対応しています。",
+  },
 };

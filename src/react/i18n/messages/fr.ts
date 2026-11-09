@@ -200,4 +200,8 @@ export default {
     commit: "commit",
     branch: "branche",
   },
+  parquet: {
+    unsupportedSave:
+      "Enregistrement impossible : ce fichier contient des colonnes imbriquées ou structurelles ({columns}). L'enregistrement n'est pris en charge que pour les colonnes scalaires plates.",
+  },
 };

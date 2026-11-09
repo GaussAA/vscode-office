@@ -3,7 +3,8 @@
  *
  * Everything except the committed zstd sample is generated locally, so the suite has no
  * network dependency: the zstd file is the one upstream couldn't read (the reason this
- * fork exists), and the big/mixed files are written by hyparquet-writer.
+ * fork exists), and the big/mixed files are written by hyparquet-writer. The nested
+ * sample is the unit-test fixture, served as-is so both layers cover the same file.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -24,6 +25,9 @@ const zstdSample = join(here, "fixtures", "zstd.parquet");
  */
 const docxSample = join(here, "fixtures", "smoke.docx");
 
+/** Committed unit-test fixture: one scalar, one LIST<UTF8>, one plain STRUCT. */
+const nestedSample = join(repoRoot, "test", "fixtures", "parquet-list-column.parquet");
+
 const BIG_ROWS = 250_000;
 const EDIT_LIMIT = 200_000;
 
@@ -41,6 +45,9 @@ export function createFixtures(cacheDir) {
   }
   if (!existsSync(docxSample)) {
     throw new Error(`missing committed fixture: ${docxSample}`);
+  }
+  if (!existsSync(nestedSample)) {
+    throw new Error(`missing committed fixture: ${nestedSample}`);
   }
 
   const mixed = writeIfMissing(join(cacheDir, "mixed.parquet"), () => {
@@ -84,6 +91,7 @@ export function createFixtures(cacheDir) {
     sample: zstdSample,
     sampleBytes: readFileSync(zstdSample).byteLength,
     docx: docxSample,
+    nested: nestedSample,
     mixed,
     big,
     bigRows: BIG_ROWS,

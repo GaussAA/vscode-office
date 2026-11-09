@@ -200,4 +200,8 @@ export default {
     commit: "commit",
     branch: "rama",
   },
+  parquet: {
+    unsupportedSave:
+      "No se puede guardar: este archivo contiene columnas anidadas o estructurales ({columns}). Solo se admite guardar columnas escalares planas.",
+  },
 };
