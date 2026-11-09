@@ -189,7 +189,8 @@ export default {
     branch: "rama",
   },
   parquet: {
-    cappedSuffix: " · detenido en 5.000",
+    inspectHint: "Selecciona una celda para ver su valor",
+    cappedSuffix: " · detenido en {max}",
     invalidRow: "Introduce un número de fila válido",
   },
 };

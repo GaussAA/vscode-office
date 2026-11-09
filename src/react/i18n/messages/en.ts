@@ -206,7 +206,8 @@ export default {
     rowLabel: "row",
     copyValue: "Copy value",
     nullLabel: "NULL",
-    cappedSuffix: " · stopped at 5,000",
+    inspectHint: "Select a cell to inspect it",
+    cappedSuffix: " · stopped at {max}",
     invalidRow: "Enter a valid row number",
   },
   jsonl: {

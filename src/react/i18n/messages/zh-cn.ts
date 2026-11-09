@@ -202,7 +202,8 @@ export default {
     rowLabel: "行号",
     copyValue: "复制值",
     nullLabel: "NULL",
-    cappedSuffix: " · 已停在 5,000",
+    inspectHint: "点击单元格查看完整值",
+    cappedSuffix: " · 已停在 {max}",
     invalidRow: "请输入有效行号",
   },
   jsonl: {

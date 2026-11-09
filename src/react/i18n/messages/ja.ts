@@ -188,7 +188,8 @@ export default {
     branch: "ブランチ",
   },
   parquet: {
-    cappedSuffix: " · 5,000 で停止",
+    inspectHint: "セルを選択すると値を表示します",
+    cappedSuffix: " · {max} で停止",
     invalidRow: "有効な行番号を入力してください",
   },
 };

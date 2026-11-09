@@ -187,7 +187,8 @@ export default {
     branch: "Branch",
   },
   parquet: {
-    cappedSuffix: " · bei 5.000 gestoppt",
+    inspectHint: "Zelle auswählen, um den Wert zu sehen",
+    cappedSuffix: " · bei {max} gestoppt",
     invalidRow: "Bitte eine gültige Zeilennummer eingeben",
   },
 };

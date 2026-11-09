@@ -187,7 +187,8 @@ export default {
     branch: "브랜치",
   },
   parquet: {
-    cappedSuffix: " · 5,000에서 중단",
+    inspectHint: "셀을 선택하면 값을 표시합니다",
+    cappedSuffix: " · {max}에서 중단",
     invalidRow: "유효한 행 번호를 입력하세요",
   },
 };

@@ -188,7 +188,8 @@ export default {
     branch: "branch",
   },
   parquet: {
-    cappedSuffix: " · parou em 5.000",
+    inspectHint: "Selecione uma célula para ver o valor",
+    cappedSuffix: " · parou em {max}",
     invalidRow: "Insira um número de linha válido",
   },
 };
