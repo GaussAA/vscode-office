@@ -73,6 +73,15 @@ raise the budget in the same commit and say why.
   heap. Those numbers are why oversized files now hit a size guard instead of a budget
   ([ADR-0016](../adr/0016-preview-size-guard.md)); parsing inside a size limit is still
   all-at-once, so there is nothing stable to assert until the grid is windowed.
+- **Two spreadsheet micro-optimisations that were measured and dropped** (on the 152 MB CSV):
+  the double UTF-8 decode is 108 ms of a 9.7 s load, and the extra JSZip pass for a workbook's
+  sort state is 15-41 ms of a 10 s load — about 1% each. The time is in `parseCsv` (1.5 s) and
+  then in one object per cell plus the grid; windowing is the only fix that moves it. The
+  decode is still worth collapsing for the transient allocation, but it is not a performance
+  project.
+- **Inline bytes over the bridge** are base64 now, not a `number[]` (5-8x the file on a JSON
+  message vs 4/3). `parquet-inline-buffer` renders a virtual document from a base64 payload, so
+  the decode path is covered; nothing measures the message size itself.
 - **Open latency itself** (1-3 s for 1M rows x 5 columns, dominated by decoding the first data
   page per column plus loading the ~430 KB parquet bundle) is not asserted either: it moves
   with bundle size, and the byte budget above already catches the failure mode that mattered.

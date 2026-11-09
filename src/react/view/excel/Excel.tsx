@@ -211,7 +211,7 @@ function ExcelViewer() {
     forcedRef.current = true;
     setTooLarge(null);
     setLoading(true);
-    if (payload.scheme === "file" || payload.buffer?.length) {
+    if (payload.scheme === "file" || payload.bufferBase64 || payload.buffer?.length) {
       loadPayloadRef.current?.(payload);
       return;
     }

@@ -413,6 +413,18 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-inline-buffer",
+    async run({ page, base }) {
+      // A virtual document arrives as base64 in the payload (GitHub Repos, `git:` history).
+      // Rendering it at all proves the decode, and the range proves it is the same file.
+      await openParquet(page, base, "?inline=1");
+      const state = await pagerState(page);
+      expect(state.range === "1–50 of 300", `inline range: ${state.range}`);
+      expect(state.first === "1", `inline first row: ${state.first}`);
+      return `inline base64 payload: ${state.range}`;
+    },
+  },
+  {
     name: "parquet-theme-follows-vscode",
     docs: "parquet-light.png",
     async run({ page, base }) {

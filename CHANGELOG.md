@@ -13,6 +13,10 @@ Performance work on the parquet viewer, measured against a 1M-row single-row-gro
   contained each batch. 1M rows: 28 s → ~1.4 s; 200k × 60 columns: 40 s → ~1.5 s.
 - **Wide-table page turns no longer wait for the next page's decode.** The prefetch is
   idle-scheduled now; a cache hit on a 60-column file went from 1.2–1.9 s to ~0.5 s.
+- **Virtual documents cross the webview bridge as base64, not a number array.** The host used
+  to send `Array.from(bytes)`, which a JSON `postMessage` inflates to 5-8x the file; base64 is
+  4/3. A 20 MB parquet opened from GitHub Repos or a `git:` history entry spent ~70 MB of
+  message and heap on the same bytes.
 - `pnpm verify:perf` makes the first two numbers a CI gate.
 
 Added:

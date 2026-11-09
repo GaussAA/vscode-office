@@ -4,6 +4,7 @@ import { extensions, Uri, workspace, type Webview } from "vscode";
 import { Handler } from "@/common/handler";
 import { isUriReadOnly } from "@/common/fileReadOnly";
 import { isOverPreviewLimit } from "@/common/previewLimit";
+import { encodeBase64 } from "@/common/base64";
 import type { OfficeOpenMessage } from "@/common/openPayload";
 
 export function isVirtualUri(uri: Uri): boolean {
@@ -203,7 +204,7 @@ export async function emitVirtualOfficeOpen(
   }
   try {
     const data = await readUriBytes(uri);
-    handler.emit("open", { ...payload, buffer: bytesToPayloadBuffer(data) });
+    handler.emit("open", { ...payload, bufferBase64: encodeBase64(data) });
   } catch (error) {
     handler.emit("open", {
       ...payload,

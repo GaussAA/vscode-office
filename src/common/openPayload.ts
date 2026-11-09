@@ -20,7 +20,13 @@ export interface OfficeOpenMessage {
   size?: number;
   /** Set when the host refused to read an oversized virtual document. */
   tooLarge?: boolean;
-  /** Inline bytes, used for virtual documents instead of a fetchable path. */
+  /**
+   * Inline bytes for a virtual document, base64-encoded.
+   *
+   * A `number[]` costs 5-8x the file on the JSON bridge; base64 costs 4/3.
+   */
+  bufferBase64?: string;
+  /** Legacy inline bytes (harness stubs and older senders). Prefer `bufferBase64`. */
   buffer?: number[];
   /** Read failure, rendered instead of the file. */
   error?: string;

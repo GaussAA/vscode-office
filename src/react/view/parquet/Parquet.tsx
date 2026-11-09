@@ -15,6 +15,7 @@ import { handler } from "../../util/vscode.ts";
 import { getVscodeThemeColor, useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
+import type { OfficeOpenMessage } from "@/common/openPayload";
 import { highlightRuns } from "../../common/highlight.ts";
 import { savePersistedState } from "../../common/persistedState.ts";
 import { ParquetSession } from "./parquetSession.ts";
@@ -81,6 +82,9 @@ const COLUMN_ICONS: Record<ColumnCategory, string> = {
 };
 
 type TableRow = Record<string, unknown> & { key: string };
+
+/** A virtual document arrives as inline base64; a local one as a fetchable path. */
+type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBase64">;
 
 /** Keyboard cursor into the visible page: row is page-local, col indexes fileInfo.columns. */
 interface CellCursor {
@@ -225,7 +229,7 @@ function ParquetViewer() {
     }));
   }, [pageRows, page]);
 
-  const loadParquet = useCallback(async (payload: { path?: string; buffer?: number[] }) => {
+  const loadParquet = useCallback(async (payload: ParquetOpenPayload) => {
     setLoading(true);
     setError(null);
     setFileInfo(null);
@@ -250,9 +254,10 @@ function ParquetViewer() {
       // Files arrive either as an inline byte array (virtual documents) or as a
       // fetchable URI. For URIs we probe Range support so hyparquet pulls only the
       // footer and the pages it needs, instead of the whole file.
-      const info = payload.buffer?.length
-        ? await openParquetFile(arrayBufferFromPayload(payload))
-        : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
+      const info =
+        payload.bufferBase64 || payload.buffer?.length
+          ? await openParquetFile(arrayBufferFromPayload(payload))
+          : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
       fileInfoRef.current = info;
       setFileInfo(info);
       // Come back to the page this document was left on, clamped: the file may have

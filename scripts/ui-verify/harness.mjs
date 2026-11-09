@@ -241,7 +241,10 @@ function jsonlStub(fixtures) {
 </script>`;
 }
 
-function parquetStub() {
+function parquetStub(fixtures) {
+  // A virtual document arrives inline; the host sends it base64-encoded because a `number[]`
+  // costs 5-8x the file on the JSON bridge. `?inline=1` exercises that decode path.
+  const inlineBase64 = readFileSync(fixtures.mixed).toString("base64");
   return `<script>
 (function () {
   const api = {
@@ -253,8 +256,11 @@ function parquetStub() {
         : params.get('nested') === '1' ? '/nested.parquet'
         : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
+      const inline = params.get('inline') === '1';
       setTimeout(function () {
-        window.postMessage({ type: 'open', content: { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo' } }, '*');
+        window.postMessage({ type: 'open', content: inline
+          ? { path: '', fileName: 'inline-mixed.parquet', documentCacheId: 'demo-inline', bufferBase64: ${JSON.stringify(inlineBase64)} }
+          : { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo' } }, '*');
       }, 80);
     },
     getState() { return undefined; },
@@ -402,7 +408,7 @@ export function startHarness(fixtures, port = 0) {
         : path === "/harness-route"
           ? smokeStub(url.searchParams.get("route") ?? "html")
           : route === "parquet"
-            ? parquetStub()
+            ? parquetStub(fixtures)
             : jsonlStub(entries);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
