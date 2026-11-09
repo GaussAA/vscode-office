@@ -38,11 +38,13 @@ const SEARCH_BUDGET_FLAT_MS = 12_000;
 /** Milliseconds for a full scan of the 200k-row x 60-column file. Measured: ~1.2-2.4 s; the batched version takes ~40 s. */
 const SEARCH_BUDGET_WIDE_MS = 12_000;
 /**
- * Milliseconds for a 21 MB CSV to paint its first windowed row. Measured: ~0.3-0.6 s.
+ * Milliseconds for a 21 MB CSV to paint its first windowed row. Measured: ~0.5-1.4 s (the
  * The full-parse path this replaces needed ~2.6 s for 37 MB and would have climbed with size;
- * the window path's cost is a byte scan plus one block read, so the budget stays flat.
+ * the window path's cost is a byte scan plus one block read, so the budget stays flat. The
+ * headroom covers a loaded CI box; the regression it guards is the full parse, which needs
+ * >5 s for this file.
  */
-const SHEET_WINDOW_BUDGET_MS = 2_000;
+const SHEET_WINDOW_BUDGET_MS = 3_000;
 /** The windowed path must not hold the sheet: bytes + offsets + one block, not one cell per value. */
 const SHEET_WINDOW_HEAP_MB = 200;
 
