@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { basename, join, parse } from "path";
 import { Handler } from "@/common/handler";
 import { isUriReadOnly } from "@/common/fileReadOnly";
+import { bytesToSavePayload, saveContentToBytes } from "@/common/saveContent";
 import { Uri, workspace } from "vscode";
 import {
   emitFileOfficeOpen,
@@ -65,11 +66,9 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
       }
     })
     .on("save", async (content) => {
-      const res = Array.isArray(content)
-        ? new Uint8Array(content)
-        : new TextEncoder().encode(content);
+      const res = saveContentToBytes(content);
       if (readOnly) {
-        handler.emit("saveAs", { content: [...res] });
+        handler.emit("saveAs", bytesToSavePayload(res));
         return;
       }
       fileSaveTimes[uri.toString()] = Date.now();
@@ -78,8 +77,8 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
       setDirty(handler, uri, false);
       handler.emit("saveDone");
     })
-    .on("saveAs", async (payload: { content: number[]; ext?: string }) => {
-      const res = new Uint8Array(payload.content);
+    .on("saveAs", async (payload: { contentBase64?: string; content?: number[]; ext?: string }) => {
+      const res = saveContentToBytes(payload as Parameters<typeof saveContentToBytes>[0]);
       const ext = (payload.ext ?? "xlsx").toLowerCase();
       const { dir, name } = parse(uri.fsPath);
       const defaultFileName = `${name}.${ext}`;

@@ -16,7 +16,8 @@ Performance work on the parquet viewer, measured against a 1M-row single-row-gro
 - **Virtual documents cross the webview bridge as base64, not a number array.** The host used
   to send `Array.from(bytes)`, which a JSON `postMessage` inflates to 5-8x the file; base64 is
   4/3. A 20 MB parquet opened from GitHub Repos or a `git:` history entry spent ~70 MB of
-  message and heap on the same bytes.
+  message and heap on the same bytes. Saving uses the same encoding, so a saved workbook no
+  longer travels as a number array either.
 - `pnpm verify:perf` makes the first two numbers a CI gate.
 
 Added:
