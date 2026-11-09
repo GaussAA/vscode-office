@@ -63,6 +63,16 @@ const getVscodeEvent = () => {
     emit(event: string, data?: any) {
       postMessage({ type: event, content: data });
     },
+    off(event: string) {
+      delete events[event];
+      return this;
+    },
+    removeAllListeners() {
+      for (const key in events) {
+        delete events[key];
+      }
+      return this;
+    },
   };
 };
 export const handler = getVscodeEvent();

@@ -683,6 +683,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         void loadParquet(payload);
       })
       .emit("init");
+
+    return () => {
+      handler.off("open");
+    };
   }, [loadParquet]);
 
   const inspectedType = inspected

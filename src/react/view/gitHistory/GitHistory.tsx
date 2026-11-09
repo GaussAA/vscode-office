@@ -962,6 +962,11 @@ function GitHistoryView({
     if (initialRepo) {
       loadRepositoryRef.current(initialRepo);
     }
+
+    // Cleanup: remove all event listeners when component unmounts
+    return () => {
+      handler.removeAllListeners();
+    };
   }, [applyCommitsData, clearCommitList, completeExecution, runNextBatchAction, syncRelPath]);
 
   useEffect(() => {
