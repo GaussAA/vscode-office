@@ -60,6 +60,14 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解码。
 - **长值换行**而不是截断；节点数超过 500 的条目自动退回固定行高虚拟列表，避免极端行卡死界面。
 - 键盘：`←`/`→` 折叠展开，`Space` 切换，`Enter` 复制值，`Ctrl+Shift+C` 复制路径。
 
+### 表格：大文件也能直接看
+
+超过 8 MB 后，CSV/TSV 和工作簿进入只读窗口视图：DOM 里只有视口内的行，21 MB 的 CSV 首屏
+约 0.5 s、堆约 33 MB，而可编辑网格需要数秒和数百 MB。查找按块扫全文件，跳行只改滚动偏移，
+工作簿带 sheet 选择器。阈值以上要编辑就用文本编辑器（**Open in VS Code**）。
+
+![只读窗口视图](docs/screenshots/excel-windowed.png)
+
 ### 验收方式
 
 ```bash

@@ -72,6 +72,16 @@ lists entries, the right pane renders the selected entry as a tree (or as raw te
 - Keyboard: `←`/`→` collapse/expand, `Space` toggles, `Enter` copies the value,
   `Ctrl+Shift+C` copies the path.
 
+### Spreadsheets: large files stay usable
+
+Above 8 MB, CSV/TSV and workbook files open in a read-only windowed table: only the rows the
+viewport holds are in the DOM, so a 21 MB CSV paints in ~0.5 s with ~33 MB of heap where the
+editable grid needs seconds and hundreds of megabytes. Find scans the file in blocks, "go to
+row" only moves the scroll offset, and workbooks keep a sheet picker. Editing above the
+threshold stays in the text editor (**Open in VS Code**).
+
+![Read-only windowed spreadsheet](docs/screenshots/excel-windowed.png)
+
 ### Verification
 
 ```bash

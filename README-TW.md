@@ -60,6 +60,14 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解碼。
 - **長值換行**而不是截斷；節點數超過 500 的項目自動退回固定列高虛擬清單，避免極端列卡死介面。
 - 鍵盤：`←`/`→` 折疊展開，`Space` 切換，`Enter` 複製值，`Ctrl+Shift+C` 複製路徑。
 
+### 表格：大檔案也能直接看
+
+超過 8 MB 後，CSV/TSV 與活頁簿進入唯讀視窗檢視：DOM 裡只有視窗內的行，21 MB 的 CSV 首屏
+約 0.5 s、堆約 33 MB，而可編輯網格需要數秒與數百 MB。尋找按區塊掃全檔案，跳列只改捲動偏移，
+活頁簿帶 sheet 選擇器。閾值以上要編輯就用文字編輯器（**Open in VS Code**）。
+
+![唯讀視窗檢視](docs/screenshots/excel-windowed.png)
+
 ### 驗收方式
 
 ```bash
