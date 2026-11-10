@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type HTMLAttributes,
 } from "react";
 import "@vscode/codicons/dist/codicon.css";
 import { $t } from "../../i18n/i18nConfig.ts";
@@ -49,6 +50,15 @@ const INDEX_COLUMN_WIDTH = 64;
 const DATA_COLUMN_WIDTH = 120;
 /** How long a selection must hold still before it is announced to assistive tech. */
 const ANNOUNCE_DELAY_MS = 600;
+
+/**
+ * antd renders the column header as its own `<table>`, and a `table` inside a `grid` is not a
+ * valid child of one. Dropping the table role keeps the header cells' explicit `columnheader`
+ * roles while the grid underneath owns the rows.
+ */
+function PresentationTable(props: HTMLAttributes<HTMLTableElement>) {
+  return <table {...props} role="presentation" />;
+}
 
 /**
  * Run background work when the page is idle.
@@ -837,6 +847,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         align: "center",
         fixed: "left",
         className: "parquet-viewer__index-cell",
+        onCell: () => ({ role: "rowheader", "aria-colindex": 1 }),
+        onHeaderCell: () => ({ role: "columnheader", "aria-colindex": 1 }),
         render: (_value, _row, index) => page * PAGE_SIZE + index + 1,
       },
     ];
@@ -851,6 +863,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         width: DATA_COLUMN_WIDTH,
         align: kind === "numeric" ? "right" : "left",
         className: active ? "parquet-viewer__column--active" : undefined,
+        // A grid whose header and body are separate scroll surfaces has to state the column
+        // ordinal on both sides: assistive tech maps a cell to its header by `aria-colindex`,
+        // and the header itself needs the matching number.
+        onHeaderCell: () => ({ role: "columnheader", "aria-colindex": position + 2 }),
+        onCell: () => ({ role: "gridcell", "aria-colindex": position + 2 }),
         render: (value: unknown, _row, index) => {
           const rowIndex = page * PAGE_SIZE + index;
           return (
@@ -1223,6 +1240,13 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                   ref={tableWrapRef}
                   tabIndex={cursor ? -1 : 0}
                   onKeyDown={handleTableKeyDown}
+                  // A grid, because the keyboard model is one: roving tabindex, arrow keys,
+                  // Enter to inspect. The counts are the file's, not the DOM's — only a window
+                  // of rows is rendered, which is exactly what these two attributes are for.
+                  role="grid"
+                  aria-label={fileName || undefined}
+                  aria-rowcount={fileInfo.rowCount}
+                  aria-colcount={fileInfo.columns.length + 1}
                 >
                   <CursorContext.Provider value={cursor}>
                     <Table<TableRow>
@@ -1247,6 +1271,17 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                         if (matchRows.has(absolute)) classes.push("parquet-viewer__row--match");
                         if (targetRow === absolute) classes.push("parquet-viewer__row--target");
                         return classes.join(" ");
+                      }}
+                      // The virtual body renders divs, so the row's grid role has to come from
+                      // the same prop that carries the class. `aria-rowindex` is the absolute
+                      // row, not the index within the rendered window.
+                      onRow={(_row, index) => ({
+                        role: "row",
+                        "aria-rowindex": page * PAGE_SIZE + (index ?? 0) + 1,
+                      })}
+                      components={{
+                        table: PresentationTable,
+                        header: { table: PresentationTable },
                       }}
                     />
                   </CursorContext.Provider>

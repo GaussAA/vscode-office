@@ -601,6 +601,63 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-grid-semantics",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      const state = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const wrap = document.querySelector('.parquet-viewer__table-wrap');
+                const rows = [...document.querySelectorAll('.ant-table-tbody-virtual-holder-inner > *')];
+                const cells = [...(rows[0]?.querySelectorAll('.ant-table-cell') ?? [])];
+                const header = [...document.querySelectorAll('.parquet-table thead th')];
+                return {
+                    grid: wrap?.getAttribute('role'),
+                    rowcount: wrap?.getAttribute('aria-rowcount'),
+                    colcount: wrap?.getAttribute('aria-colcount'),
+                    label: wrap?.getAttribute('aria-label'),
+                    rowRole: rows[0]?.getAttribute('role'),
+                    rowIndex: rows[0]?.getAttribute('aria-rowindex'),
+                    cellRole: cells[1]?.getAttribute('role'),
+                    cellCol: cells[1]?.getAttribute('aria-colindex'),
+                    indexRole: cells[0]?.getAttribute('role'),
+                    indexCol: cells[0]?.getAttribute('aria-colindex'),
+                    headerRoles: [...new Set(header.map(th => th.getAttribute('role')))],
+                    headerCols: header.map(th => th.getAttribute('aria-colindex')),
+                    tableRoles: [...new Set([...document.querySelectorAll('.parquet-table table')]
+                        .map(t => t.getAttribute('role')))],
+                };
+            })())`),
+      );
+      // The keyboard model is a grid: roving tabindex, arrows, Enter. Without the roles a
+      // screen reader sees a flat run of labelled spans and cannot say which column a cell is in.
+      expect(state.grid === "grid", `the table is not a grid (role=${state.grid})`);
+      expect(state.rowcount === "300", `grid row count: ${state.rowcount}`);
+      expect(state.colcount === "5", `grid column count: ${state.colcount}`);
+      expect(state.label === "parquet-sample", `grid is unnamed: ${state.label}`);
+      expect(state.rowRole === "row", `row role: ${state.rowRole}`);
+      expect(state.rowIndex === "1", `first row is not row 1: ${state.rowIndex}`);
+      expect(state.cellRole === "gridcell", `cell role: ${state.cellRole}`);
+      expect(state.cellCol === "2", `cell column index: ${state.cellCol}`);
+      expect(state.indexRole === "rowheader", `index column role: ${state.indexRole}`);
+      expect(state.indexCol === "1", `index column position: ${state.indexCol}`);
+      expect(
+        state.headerRoles.length === 1 && state.headerRoles[0] === "columnheader",
+        `header roles: ${JSON.stringify(state.headerRoles)}`,
+      );
+      expect(
+        state.headerCols[0] === "1" && state.headerCols.at(-1) === "5",
+        `header column indices: ${JSON.stringify(state.headerCols)}`,
+      );
+      // A `<table>` inside a `grid` is not a valid child; the header shell keeps its cells but
+      // loses the table role.
+      expect(
+        state.tableRoles.length === 1 && state.tableRoles[0] === "presentation",
+        `header table role: ${JSON.stringify(state.tableRoles)}`,
+      );
+      return "grid roles, row/column indices and an unnamed header shell";
+    },
+  },
+  {
     name: "parquet-nested-columns",
     async run({ page, base }) {
       await openParquet(page, base, "?nested=1");
