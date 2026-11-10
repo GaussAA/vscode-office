@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.4] - 2026-11-11
+
+### Changed
+
+- Marketplace display name is now "Data File Viewer (Parquet, JSONL, Excel)". The Marketplace
+  rejected "Office Viewer Plus" with "This extension display name is taken" on the first publish
+  attempt (6.4.3). The extension id `GaussAA.office-viewer-plus` and the project name are
+  unchanged.
+
 ## [6.4.3] - 2026-11-10
 
 ### Fixed

@@ -59,7 +59,7 @@ web
 
 ## Brand Commitments
 
-- **名字**：Office Viewer Plus；发布者 `GaussAA`；扩展 id `GaussAA.office-viewer-plus`。
+- **名字**：Office Viewer Plus（项目名）；Marketplace 显示名 `Data File Viewer (Parquet, JSONL, Excel)`（"Office Viewer Plus" 在 Marketplace 上被拒为已占用）；发布者 `GaussAA`；扩展 id `GaussAA.office-viewer-plus`。
 - **署名与许可**：MIT，fork 自 `cweijan/vscode-office`（固定来源 `forkedFrom: cweijan.vscode-office@4.2.2`），`NOTICE.md` 记录来源。
 - **语气**：具体、机制优先、不自夸。README 先说清楚上游哪里坏、我们改了什么机制，并且**主动列出 Known limits**，而不是省略它们。
 - **证据形态**：`docs/screenshots/` 下的截图即对外证据，由 `pnpm verify:ui --docs` 从真实 webview 重新生成，不手工修图。
