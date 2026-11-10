@@ -143,16 +143,28 @@ async function openParquet(page, base, query = "") {
       : query.includes("empty=1")
         ? `!!document.querySelector('.parquet-viewer__no-rows')`
         : `!!document.querySelector('.parquet-viewer__cell')
-            && !!document.querySelector('.parquet-table tbody .ant-table-row')`,
+            && !!document.querySelector('.parquet-table .ant-table-row')`,
   );
   expect(ready, "parquet table did not render");
 }
+
+/**
+ * Rows and cells without assuming the table's DOM shape.
+ *
+ * antd draws a classic `<tr>/<td>` body by default and a div-based list when `virtual` is on.
+ * Both keep `.ant-table-row` and `.ant-table-cell`, and the hidden measure row is not an
+ * `.ant-table-row` in either — so indexing by that class is stable, while
+ * `tr:nth-child(2)` ("the first data row") moves when the measure row disappears.
+ */
+const ROWS = "[...document.querySelectorAll('.parquet-table .ant-table-row')]";
+/** A cell of the first data row by column position (index column included). */
+const firstRowCell = (column) => `(${ROWS}[0])?.children[${column}]`;
 
 const pagerState = (page) =>
   page
     .evaluate(`JSON.stringify({
     range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
-    first: document.querySelector('.parquet-table tbody tr:nth-child(2) td')?.innerText ?? null,
+    first: (${ROWS}[0])?.children[0]?.innerText ?? null,
 })`)
     .then(json);
 
@@ -437,7 +449,7 @@ const scenarios = [
         await page.evaluate(`JSON.stringify((() => {
                 const headers = [...document.querySelectorAll('.parquet-table thead th')];
                 const longHeader = headers.find(h => h.innerText.toLowerCase().includes('very long column'));
-                const cells = [...document.querySelectorAll('.parquet-table tbody tr:nth-child(2) td')];
+                const cells = [...((${ROWS}[0])?.children ?? [])];
                 return {
                     headers: headers.map(h => h.innerText),
                     longHeaderHeight: longHeader ? Math.round(longHeader.getBoundingClientRect().height) : 0,
@@ -495,8 +507,8 @@ const scenarios = [
       const align = json(
         await page.evaluate(`JSON.stringify({
                 header: getComputedStyle(document.querySelectorAll('.ant-table-thead th')[1]).textAlign,
-                cell: getComputedStyle(document.querySelector('.ant-table-tbody tr:nth-child(2) td:nth-child(2)')).textAlign,
-                value: getComputedStyle(document.querySelector('.ant-table-tbody tr:nth-child(2) td:nth-child(2) .parquet-viewer__cell')).textAlign,
+                cell: getComputedStyle(${firstRowCell(1)}).textAlign,
+                value: getComputedStyle(${firstRowCell(1)}.querySelector('.parquet-viewer__cell')).textAlign,
             })`),
       );
       expect(
@@ -572,7 +584,7 @@ const scenarios = [
       const state = json(
         await page.evaluate(`JSON.stringify({
                 names: [...document.querySelectorAll('.parquet-viewer__list-name')].map(n => n.textContent),
-                firstRow: [...document.querySelectorAll('.parquet-table tbody tr:nth-child(2) .parquet-viewer__cell')].map(n => n.textContent),
+                firstRow: [...((${ROWS}[0])?.querySelectorAll('.parquet-viewer__cell') ?? [])].map(n => n.textContent),
             })`),
       );
       expect(
@@ -606,7 +618,7 @@ const scenarios = [
       await page.navigate(`${base}/harness-parquet?mixed=1`);
       const restored = await page.waitFor(
         `document.querySelector('.parquet-viewer__pager-info')?.innerText === '51–100 of 300'` +
-          ` && document.querySelector('.parquet-table tbody tr:nth-child(2) td')?.innerText === '51'`,
+          ` && (${ROWS}[0])?.children[0]?.innerText === '51'`,
         15000,
       );
       const after = await pagerState(page);
@@ -742,7 +754,7 @@ const scenarios = [
       );
       expect(hint === "Select a cell to inspect it", `selection hint: ${hint}`);
       await page.evaluate(`(() => {
-                const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
+                const cell = ${firstRowCell(2)}.querySelector('.parquet-viewer__cell');
                 cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const inspected = await page.waitFor(
@@ -784,7 +796,7 @@ const scenarios = [
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
       await page.evaluate(`(() => {
-                const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
+                const cell = ${firstRowCell(2)}.querySelector('.parquet-viewer__cell');
                 cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const inspected = await page.waitFor(
