@@ -1290,12 +1290,25 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               >
                 {$t("parquet.revealFile")}
               </button>
+              {/* Retry only where retrying can change the answer: an unsupported codec is a
+                  property of the file, so offering Retry there sends the reader in a circle. */}
+              {failure.kind !== "codec" && (
+                <button
+                  type="button"
+                  className="parquet-viewer__pager-btn"
+                  onClick={() => handler.emit("init")}
+                >
+                  {$t("common.retry")}
+                </button>
+              )}
               <button
                 type="button"
                 className="parquet-viewer__pager-btn"
-                onClick={() => handler.emit("init")}
+                onClick={() => copyValue(failure.raw)}
+                title={copied ? $t("common.copied") : $t("parquet.copyError")}
+                aria-label={copied ? $t("common.copied") : $t("parquet.copyError")}
               >
-                {$t("common.retry")}
+                <span className={`codicon ${copied ? "codicon-check" : "codicon-copy"}`} />
               </button>
             </div>
           </div>
@@ -1729,12 +1742,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 aria-label={$t("parquet.rowLabel")}
                 onChange={(value) => setRowJump(typeof value === "number" ? value : null)}
                 onPressEnter={() => jumpToRow()}
-                onBlur={(event) => {
-                  const next = event.relatedTarget;
-                  // The Go button below handles the click itself; do not jump twice.
-                  if (next instanceof HTMLElement && next.closest("[data-row-jump-go]")) return;
-                  if (rowJump != null) jumpToRow(false);
-                }}
+                // No jump on blur. Leaving a field is not a decision — retyping a number after
+                // looking at the table used to navigate away half-way through. The typed value
+                // stays in the box; only Enter (or Go) acts on it.
               />
               <button
                 type="button"

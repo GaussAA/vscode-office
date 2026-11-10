@@ -167,6 +167,7 @@ export default {
     resizeSidebar: "Redimensionner la barre de schéma",
     jumpToColumn: "Aller à la colonne {name}",
     pagePosition: "Page {page} sur {total}",
+    copyError: "Copier les détails de l'erreur",
   },
   previewGuard: {
     title: "Fichier trop volumineux pour un aperçu automatique",

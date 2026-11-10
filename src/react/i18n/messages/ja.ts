@@ -166,6 +166,7 @@ export default {
     resizeSidebar: "スキーマバーの幅を変更",
     jumpToColumn: "列 {name} へ移動",
     pagePosition: "{page} / {total} ページ",
+    copyError: "エラーの詳細をコピー",
   },
   previewGuard: {
     title: "ファイルが大きいため自動プレビューしません",

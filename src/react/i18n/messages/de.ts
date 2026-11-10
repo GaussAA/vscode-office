@@ -166,6 +166,7 @@ export default {
     resizeSidebar: "Schema-Leiste skalieren",
     jumpToColumn: "Zur Spalte {name} springen",
     pagePosition: "Seite {page} von {total}",
+    copyError: "Fehlerdetails kopieren",
   },
   previewGuard: {
     title: "Datei zu groß für die automatische Vorschau",

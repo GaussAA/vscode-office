@@ -166,6 +166,7 @@ export default {
     resizeSidebar: "Изменить ширину панели схемы",
     jumpToColumn: "Перейти к столбцу {name}",
     pagePosition: "Страница {page} из {total}",
+    copyError: "Скопировать описание ошибки",
   },
   previewGuard: {
     title: "Файл слишком велик для автоматического просмотра",

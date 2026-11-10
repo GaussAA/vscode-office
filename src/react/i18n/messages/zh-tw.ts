@@ -180,6 +180,7 @@ export default {
     resizeSidebar: "調整欄位欄寬度",
     jumpToColumn: "跳到欄 {name}",
     pagePosition: "第 {page} / {total} 頁",
+    copyError: "複製錯誤詳情",
   },
   jsonl: {
     entriesCount: "共 {count} 筆",

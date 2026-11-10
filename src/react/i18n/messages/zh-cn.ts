@@ -181,6 +181,7 @@ export default {
     resizeSidebar: "调整字段栏宽度",
     jumpToColumn: "跳到列 {name}",
     pagePosition: "第 {page} / {total} 页",
+    copyError: "复制错误详情",
   },
   jsonl: {
     entriesCount: "共 {count} 条",

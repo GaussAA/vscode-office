@@ -185,6 +185,7 @@ export default {
     resizeSidebar: "Resize schema sidebar",
     jumpToColumn: "Jump to column {name}",
     pagePosition: "Page {page} of {total}",
+    copyError: "Copy error details",
   },
   jsonl: {
     entriesCount: "{count} entries",

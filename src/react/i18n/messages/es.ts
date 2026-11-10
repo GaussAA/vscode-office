@@ -167,6 +167,7 @@ export default {
     resizeSidebar: "Redimensionar la barra de esquema",
     jumpToColumn: "Ir a la columna {name}",
     pagePosition: "Página {page} de {total}",
+    copyError: "Copiar detalles del error",
   },
   previewGuard: {
     title: "El archivo es demasiado grande para la vista previa automática",

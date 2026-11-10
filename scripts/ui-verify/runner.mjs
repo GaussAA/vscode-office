@@ -508,6 +508,19 @@ const scenarios = [
         state.buttons.includes("Retry") && state.buttons.includes("Reveal in Explorer"),
         `error state has no way out: ${JSON.stringify(state.buttons)}`,
       );
+      // The message is what a bug report needs; copying it used to be impossible.
+      const copyError = await page.evaluate(`(() => {
+                const button = document.querySelector('[aria-label="Copy error details"]');
+                if (!button) return null;
+                button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return true;
+            })()`);
+      expect(copyError, "the error pane cannot copy its own message");
+      const errorReceipt = await page.waitFor(
+        `!!document.querySelector('[aria-label="Copied"]')`,
+        4000,
+      );
+      expect(errorReceipt, "copying the error message gave no receipt");
       expect(!state.table, "a broken file still rendered a table");
       return "broken file: named, explained, escapable";
     },
@@ -950,7 +963,8 @@ const scenarios = [
       const state = await pagerState(page);
       expect(state.range === "1–50 of 250,000", `large range: ${state.range}`);
 
-      // A blur applies the jump too: the Go button is optional.
+      // Leaving the field is not a decision, and it used to be: the jump fired on blur, so
+      // looking at the table mid-edit navigated away. Only Enter and Go act now.
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__row-jump input');
                 const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -959,10 +973,26 @@ const scenarios = [
                 input.focus();
                 input.blur();
             })()`);
-      const blurred = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '51–100 of 250,000'`,
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const afterBlur = await page.evaluate(
+        `document.querySelector('.parquet-viewer__pager-info')?.innerText ?? ''`,
       );
-      expect(blurred, "blur did not apply the row jump");
+      expect(afterBlur === "1–50 of 250,000", `blur applied a row jump: ${afterBlur}`);
+      // Enter is the contract.
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__row-jump input');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, '100');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.focus();
+                input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+                input.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', bubbles: true }));
+            })()`);
+      const entered = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '51–100 of 250,000'`,
+        8000,
+      );
+      expect(entered, "Enter did not apply the row jump");
 
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__row-jump input');
@@ -1000,7 +1030,7 @@ const scenarios = [
         tints.target && tints.plain && tints.target !== tints.plain,
         "the jumped-to row carries no tint",
       );
-      return "read-only + blur and Go jumps";
+      return "read-only + Enter and Go jumps";
     },
   },
   {
@@ -1452,6 +1482,29 @@ const scenarios = [
       expect(
         heightBefore === heightAfter,
         `table reflowed when the inspector opened: ${heightBefore} -> ${heightAfter}`,
+      );
+
+      // Leaving the jump field is not a decision: typing a number and looking at the table used
+      // to navigate away mid-edit. Only Enter (or Go) acts.
+      const beforeBlur = await page.evaluate(
+        `document.querySelector('.parquet-viewer__pager-info')?.innerText ?? ''`,
+      );
+      await page.evaluate(`(() => {
+            const input = document.querySelector('.parquet-viewer__row-jump input');
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            setter.call(input, '250');
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            // blur() is a no-op on an element that is not focused, so focus first.
+            input.focus();
+            input.blur();
+        })()`);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const afterBlur = await page.evaluate(
+        `document.querySelector('.parquet-viewer__pager-info')?.innerText ?? ''`,
+      );
+      expect(
+        afterBlur === beforeBlur,
+        `blurring the row field navigated: ${beforeBlur} -> ${afterBlur}`,
       );
 
       // The footer jump lands on the right page AND highlights the target row.
