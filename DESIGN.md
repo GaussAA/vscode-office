@@ -176,6 +176,10 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 
 **The Borrowed Palette Rule.** 界面不拥有任何颜色。每个色值都写成 `var(--vscode-<token>, <兜底>)`；兜底只保证「主题变量缺失时仍然像 VS Code」，不构成一套独立配色。禁止新增与主题无关的品牌色。
 
+**The One Host Lookup Rule.** 同一个宿主变量只读一次，语义差异用别名表达。parquet 的十个图标色原本各自重复读取四个 `--vscode-charts-*`：改一次颜色要改三处，且随时可能漂移。现在六个 `--pv-chart-*` 各读一次，图标色是它们的别名（`--pv-icon-rows` → `--pv-chart-blue`），由 `verify:ui` 的 `parquet-tokens` 断言别名图真的一致 —— 设计 token 只有在解析值一致时才算单一事实来源。
+
+**The Two Token Layers Rule.** `--pv-*` 是 parquet 自己的那一层，**不引用** `--viewer-*`：后者由 `viewerTheme.css` 提供给其它视图，作用域挂在 `.office-viewer-themed` 上，且其 `--viewer-accent` 指 `textLink-foreground` 而 `--pv-accent` 指 `button-background` —— 语义不同，不是重复。跨视图合并前必须先把这两个语义分开，否则「去重」就是在悄悄改色。
+
 **The Chart-Colour Is Not Text Rule.** `--vscode-charts-*` 是为图形调过的色。12px 文本需要更高的对比度，所以浅色主题下这六个色被显式覆盖为同色相的更深值（`-on-light` 系列），并由 `verify:ui` 的 ≥4.5:1 断言守住。新增数据色必须同时给出浅色值，否则只能在图标上用。
 
 **The Thin Mix Rule.** 层次只允许用 3.5%–22% 的前景混入表达：隔行底纹 3.5%、控件底 8%（hover 13%、按下 18%）、列高亮 7%（hover 11%）、激活行底 12%（hover 16%）、目标行 18%、搜索命中 22%。超过 22% 就不再是层次，而是第二个界面。

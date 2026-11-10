@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The ten parquet icon colours read six `--vscode-charts-*` variables between them, each duplicated
+  two or three times, so a colour change had to be made in several places. There is now one
+  `--pv-chart-*` token per colour and the icons are aliases of it; `verify:ui` asserts the aliases
+  resolve to the same value, and `DESIGN.md` records why `--pv-*` is deliberately its own layer
+  rather than an alias of the other viewers' `--viewer-*` (their `accent` means a different
+  variable).
+
+### Changed
+
 - A parquet page is now one screenful. The viewer measures the body and pages by the rows that
   fit (8–200), so the pager's range describes what is actually on screen, `PageDown` moves exactly
   one page, and `1–50 of 300` no longer claims 50 rows in a table that shows 21. The position is

@@ -54,16 +54,27 @@ body:has(.parquet-app) {
     Consolas,
     monospace
   );
-  --pv-icon-rows: var(--vscode-charts-blue, #3794ff);
-  --pv-icon-columns: var(--vscode-charts-yellow, #cca700);
-  --pv-icon-author: var(--vscode-charts-purple, #b180d7);
-  --pv-icon-schema: var(--vscode-charts-teal, #4db6ac);
-  --pv-icon-bool: var(--vscode-charts-red, #f14c4c);
-  --pv-icon-numeric: var(--vscode-charts-blue, #3794ff);
-  --pv-icon-string: var(--vscode-charts-green, #89d185);
-  --pv-icon-datetime: var(--vscode-charts-purple, #b180d7);
-  --pv-icon-structure: var(--vscode-charts-teal, #4db6ac);
-  --pv-icon-field: var(--vscode-charts-orange, #d18616);
+  /* One host lookup per chart colour, then semantic aliases. Ten icon tokens previously repeated
+     the same four `var(--vscode-charts-*)` reads, so a colour change had to be made in several
+     places and could drift; the resolved values are unchanged. */
+  --pv-chart-blue: var(--vscode-charts-blue, #3794ff);
+  --pv-chart-yellow: var(--vscode-charts-yellow, #cca700);
+  --pv-chart-purple: var(--vscode-charts-purple, #b180d7);
+  --pv-chart-teal: var(--vscode-charts-teal, #4db6ac);
+  --pv-chart-red: var(--vscode-charts-red, #f14c4c);
+  --pv-chart-green: var(--vscode-charts-green, #89d185);
+  --pv-chart-orange: var(--vscode-charts-orange, #d18616);
+
+  --pv-icon-rows: var(--pv-chart-blue);
+  --pv-icon-columns: var(--pv-chart-yellow);
+  --pv-icon-author: var(--pv-chart-purple);
+  --pv-icon-schema: var(--pv-chart-teal);
+  --pv-icon-bool: var(--pv-chart-red);
+  --pv-icon-numeric: var(--pv-chart-blue);
+  --pv-icon-string: var(--pv-chart-green);
+  --pv-icon-datetime: var(--pv-chart-purple);
+  --pv-icon-structure: var(--pv-chart-teal);
+  --pv-icon-field: var(--pv-chart-orange);
 
   position: relative;
   display: flex;

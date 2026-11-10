@@ -852,6 +852,47 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-tokens",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      // Ten icon tokens used to repeat four `var(--vscode-charts-*)` reads. They are aliases of
+      // six base tokens now; a design token is only a source of truth if the aliases really
+      // resolve to it, so assert the graph instead of trusting the stylesheet.
+      const tokens = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const root = document.querySelector('.parquet-viewer');
+                const style = getComputedStyle(root);
+                const value = (name) => style.getPropertyValue(name).trim();
+                return {
+                    blue: value('--pv-chart-blue'),
+                    rows: value('--pv-icon-rows'),
+                    numeric: value('--pv-icon-numeric'),
+                    purple: value('--pv-chart-purple'),
+                    author: value('--pv-icon-author'),
+                    datetime: value('--pv-icon-datetime'),
+                    teal: value('--pv-chart-teal'),
+                    schema: value('--pv-icon-schema'),
+                    structure: value('--pv-icon-structure'),
+                };
+            })())`),
+      );
+      expect(tokens.blue === "#3794ff", `chart blue resolved to "${tokens.blue}"`);
+      expect(
+        tokens.rows === tokens.blue && tokens.numeric === tokens.blue,
+        `the blue icons do not share one token: ${JSON.stringify(tokens)}`,
+      );
+      expect(
+        tokens.author === tokens.purple && tokens.datetime === tokens.purple,
+        `the purple icons do not share one token: ${JSON.stringify(tokens)}`,
+      );
+      expect(
+        tokens.schema === tokens.teal && tokens.structure === tokens.teal,
+        `the teal icons do not share one token: ${JSON.stringify(tokens)}`,
+      );
+      return `icon tokens alias 6 chart colours (blue ${tokens.blue})`;
+    },
+  },
+  {
     name: "parquet-grid-semantics",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
