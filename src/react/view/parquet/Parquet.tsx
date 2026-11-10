@@ -50,6 +50,8 @@ const INDEX_COLUMN_WIDTH = 64;
 const DATA_COLUMN_WIDTH = 120;
 /** How long a selection must hold still before it is announced to assistive tech. */
 const ANNOUNCE_DELAY_MS = 600;
+/** Must agree with `.parquet-viewer__cell` in the stylesheet: 6px padding ×2 + 22px line-height. */
+const ROW_HEIGHT = 34;
 
 /**
  * antd renders the column header as its own `<table>`, and a `table` inside a `grid` is not a
@@ -294,6 +296,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     matches: number;
   } | null>(null);
   const [matchRows, setMatchRows] = useState<Set<number>>(() => new Set());
+  /** Position of the currently shown hit inside the sorted match list; null before any jump. */
+  const [activeMatch, setActiveMatch] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -773,6 +777,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         result.rows.map((row, at) => [row, result.columns[at] ?? 0] as const),
       );
       if (result.rows.length > 0) {
+        setActiveMatch(0);
         const target = Math.floor(result.rows[0] / PAGE_SIZE);
         goToPage((current) => (current === target ? current : target));
         // A hit is a cell, not a row: bring its column into view too. `mark` stays false so
@@ -797,11 +802,19 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           ? (sorted.find((row) => row >= pageEnd) ?? sorted[0])
           : ([...sorted].reverse().find((row) => row < pageStart) ?? sorted[sorted.length - 1]);
       goToPage(Math.floor(target / PAGE_SIZE));
+      setActiveMatch(sorted.indexOf(target));
       const column = matchColumnsRef.current.get(target);
       if (column !== undefined) focusColumn(column, false);
     },
     [matchRows, page, goToPage, focusColumn],
   );
+
+  /** Abandon a running scan. The scan checks `searchSeq` between pages, so this stops it. */
+  const cancelSearch = useCallback(() => {
+    searchSeq.current++;
+    setSearching(false);
+    setSearchProgress(null);
+  }, []);
 
   // Clearing the box drops the previous results — and so does editing it: a result set that no
   // longer matches the text in the box is a lie that Enter would act on.
@@ -813,6 +826,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     setSearchCapped(false);
     setMatchRows(new Set());
     setSearchedEmpty(false);
+    setActiveMatch(null);
     matchColumnsRef.current = new Map();
   }, []);
 
@@ -876,14 +890,20 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         turnPage(event.key === "Home" ? 0 : pageCount - 1, event.key === "Home" ? "first" : "last");
         return;
       }
+      // Page-sized jumps take the rows you can actually see, not the page size: PAGE_SIZE is 50
+      // and the body shows about 22, so a page-sized step skipped a third of the data unseen.
+      const visibleRows = Math.max(1, Math.floor(tableBodyHeight / ROW_HEIGHT));
       if (event.key === "PageDown") {
         event.preventDefault();
-        turnPage(page + 1, "first");
+        if (base.row + visibleRows <= rows - 1)
+          selectCell({ row: base.row + visibleRows, col: base.col });
+        else turnPage(page + 1, "first");
         return;
       }
       if (event.key === "PageUp") {
         event.preventDefault();
-        turnPage(page - 1, "last");
+        if (base.row - visibleRows >= 0) selectCell({ row: base.row - visibleRows, col: base.col });
+        else turnPage(page - 1, "last");
         return;
       }
       // Arrows walk off the end of a page into the next one instead of stopping dead: 50 rows is
@@ -938,7 +958,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         });
       }
     },
-    [cursor, fileInfo, page, pageRows, selectCell, goToPage],
+    [cursor, fileInfo, page, pageRows, selectCell, goToPage, tableBodyHeight],
   );
 
   // A page turned from the keyboard has to put the cursor back: `goToPage` clears it, and the
@@ -1089,6 +1109,19 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     return () => window.clearTimeout(timer);
   }, [inspected, inspectedText]);
 
+  /** The compression the file arrived in. This fork exists to open the ZSTD ones; the surface
+   *  used to say nothing about the reason it worked at all. */
+  const codecs = useMemo(() => {
+    const seen = new Set<string>();
+    for (const group of fileInfo?.metadata?.row_groups ?? []) {
+      for (const column of group.columns ?? []) {
+        const codec = column.meta_data?.codec;
+        if (codec) seen.add(String(codec));
+      }
+    }
+    return [...seen];
+  }, [fileInfo]);
+
   /** Library message → the sentence a reader can act on, plus the original for the details. */
   const failure = describeParquetFailure(error);
 
@@ -1219,14 +1252,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               <button
                 type="button"
                 className="parquet-viewer__find-btn"
-                onClick={() => void runSearch()}
-                disabled={searching}
-                title={$t("parquet.searchAllRows")}
-                aria-label={$t("parquet.searchAllRows")}
+                onClick={() => (searching ? cancelSearch() : void runSearch())}
+                title={searching ? $t("parquet.stopSearch") : $t("parquet.searchAllRows")}
+                aria-label={searching ? $t("parquet.stopSearch") : $t("parquet.searchAllRows")}
               >
-                <span
-                  className={`codicon ${searching ? "codicon-loading codicon-modifier-spin" : "codicon-refresh"}`}
-                />
+                <span className={`codicon ${searching ? "codicon-stop-circle" : "codicon-run"}`} />
               </button>
             </div>
             <div className="parquet-viewer__find-state">
@@ -1237,14 +1267,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                   {searchProgress.matches}
                 </span>
               )}
+              {!searching && query.trim() !== "" && matchRows.size === 0 && !searchedEmpty && (
+                <span className="parquet-viewer__find-count">{$t("parquet.searchHint")}</span>
+              )}
               {!searching && matchRows.size > 0 && (
                 <>
                   <span className="parquet-viewer__find-count">
-                    {matchRows.size === 1
-                      ? $t("parquet.matchCountOne", { count: "1" })
-                      : $t("parquet.matchCountMany", {
-                          count: matchRows.size.toLocaleString(),
-                        })}
+                    {$t("parquet.matchPosition", {
+                      index: (activeMatch ?? 0) + 1,
+                      count: matchRows.size.toLocaleString(),
+                    })}
                     {searchCapped
                       ? $t("parquet.cappedSuffix", {
                           max: SEARCH_MAX_ROWS.toLocaleString(),
@@ -1296,6 +1328,13 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                     : $t("parquet.columnsLabel")}
                 </span>
               </span>
+              {codecs.length > 0 && (
+                <span className="parquet-viewer__meta-item" title={$t("parquet.codec")}>
+                  <span className="codicon codicon-file-zip parquet-icon parquet-icon--codec" />
+                  <span className="parquet-viewer__meta-value">{codecs.join(" · ")}</span>
+                  <span className="parquet-viewer__meta-label">{$t("parquet.codec")}</span>
+                </span>
+              )}
               {fileInfo.createdBy && (
                 <span
                   className="parquet-viewer__meta-item parquet-viewer__meta-item--author"
@@ -1492,6 +1531,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 type="button"
                 className="parquet-viewer__pager-btn"
                 disabled={page <= 0}
+                onClick={() => goToPage(0)}
+                title={$t("parquet.firstPage")}
+                aria-label={$t("parquet.firstPage")}
+              >
+                <span className="codicon codicon-arrow-left" />
+              </button>
+              <button
+                type="button"
+                className="parquet-viewer__pager-btn"
+                disabled={page <= 0}
                 onClick={() => goToPage((p) => Math.max(0, p - 1))}
                 title={$t("parquet.previousPage")}
                 aria-label={$t("parquet.previousPage")}
@@ -1537,6 +1586,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 aria-label={$t("parquet.nextPage")}
               >
                 <span className="codicon codicon-chevron-right" />
+              </button>
+              <button
+                type="button"
+                className="parquet-viewer__pager-btn"
+                disabled={page >= totalPages - 1}
+                onClick={() => goToPage(totalPages - 1)}
+                title={$t("parquet.lastPage")}
+                aria-label={$t("parquet.lastPage")}
+              >
+                <span className="codicon codicon-arrow-right" />
               </button>
             </div>
           </footer>

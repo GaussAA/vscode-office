@@ -171,6 +171,12 @@ export default {
     errorCodec: "这个构建无法解码 {codec} 压缩。",
     errorDetail: "技术细节",
     revealFile: "在资源管理器中显示",
+    searchHint: "按 Enter 搜索",
+    stopSearch: "停止",
+    matchPosition: "{index} / {count}",
+    codec: "压缩",
+    firstPage: "第一页",
+    lastPage: "最后一页",
   },
   jsonl: {
     entriesCount: "共 {count} 条",

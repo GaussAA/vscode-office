@@ -157,6 +157,12 @@ export default {
     errorCodec: "Esta versão não consegue decodificar a compressão {codec}.",
     errorDetail: "Detalhe técnico",
     revealFile: "Revelar no Explorador",
+    searchHint: "Pressione Enter para buscar",
+    stopSearch: "Parar",
+    matchPosition: "{index} de {count}",
+    codec: "Compressão",
+    firstPage: "Primeira página",
+    lastPage: "Última página",
   },
   previewGuard: {
     title: "Arquivo grande demais para pré-visualização automática",

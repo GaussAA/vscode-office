@@ -175,6 +175,12 @@ export default {
     errorCodec: "This build cannot decode {codec} compression.",
     errorDetail: "Technical detail",
     revealFile: "Reveal in Explorer",
+    searchHint: "Press Enter to search",
+    stopSearch: "Stop",
+    matchPosition: "{index} of {count}",
+    codec: "Codec",
+    firstPage: "First page",
+    lastPage: "Last page",
   },
   jsonl: {
     entriesCount: "{count} entries",

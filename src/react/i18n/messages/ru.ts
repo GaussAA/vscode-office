@@ -156,6 +156,12 @@ export default {
     errorCodec: "Эта сборка не может декодировать сжатие {codec}.",
     errorDetail: "Технические подробности",
     revealFile: "Показать в проводнике",
+    searchHint: "Нажмите Enter для поиска",
+    stopSearch: "Остановить",
+    matchPosition: "{index} из {count}",
+    codec: "Сжатие",
+    firstPage: "Первая страница",
+    lastPage: "Последняя страница",
   },
   previewGuard: {
     title: "Файл слишком велик для автоматического просмотра",

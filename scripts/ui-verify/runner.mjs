@@ -528,6 +528,13 @@ const scenarios = [
         ),
       );
       expect(names.join(",") === "f32,f64", `zstd columns: ${names.join(",")}`);
+      // The reason this fork exists is that it decodes what upstream cannot. Say so.
+      const codec = await page.evaluate(
+        `[...document.querySelectorAll('.parquet-viewer__meta-item')]
+                .map(item => item.innerText.replace(/\\s+/g, ' ').trim())
+                .find(text => /ZSTD/i.test(text)) ?? null`,
+      );
+      expect(codec, "the ZSTD codec is not shown anywhere in the top bar");
       const align = json(
         await page.evaluate(`JSON.stringify({
                 header: getComputedStyle(document.querySelectorAll('.ant-table-thead th')[1]).textAlign,
@@ -579,7 +586,12 @@ const scenarios = [
                 footerBorder: getComputedStyle(document.querySelector('.parquet-viewer__bottombar')).borderTopWidth,
             })`),
       );
-      expect(state.meta.length === 3, `topbar meta items: ${JSON.stringify(state.meta)}`);
+      // Rows, columns, codec, author — the codec is what tells the reader this fork is why the
+      // file opened at all.
+      expect(
+        state.meta.length === 4 && state.meta.some((item) => /CODEC/i.test(item)),
+        `topbar meta items: ${JSON.stringify(state.meta)}`,
+      );
       expect(
         state.siderBorder === "0px" && state.topbarBorder === "0px" && state.footerBorder === "0px",
         `region borders: ${JSON.stringify(state)}`,
@@ -1030,18 +1042,27 @@ const scenarios = [
       );
       expect(started, `keyboard cursor did not start at 0:0 (${await cursorAt()})`);
 
-      // 300 rows at 50 per page: PageDown has to leave the page, not stop at its last row.
+      // PageDown moves by what the viewport shows, not by the 50-row page: a page-sized step
+      // dropped a third of the rows without ever displaying them.
+      await press("PageDown");
+      const stepped = await page.waitFor(
+        `(() => {
+                const cell = document.activeElement?.getAttribute('data-cell') ?? '';
+                const row = Number(cell.split(':')[0]);
+                const range = document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '';
+                return row >= 10 && range === '1–50 of 300';
+            })()`,
+        5000,
+      );
+      expect(stepped, `PageDown did not step inside the page (${await cursorAt()})`);
+      // Enough steps cross into the next page.
+      await press("PageDown");
       await press("PageDown");
       const turned = await page.waitFor(
         `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '51–100 of 300'`,
         5000,
       );
-      expect(turned, "PageDown did not turn the page");
-      const onNext = await page.waitFor(
-        `document.activeElement?.getAttribute('data-cell') === '0:0'`,
-        5000,
-      );
-      expect(onNext, `the cursor did not land on the new page (${await cursorAt()})`);
+      expect(turned, "repeated PageDown never crossed into the next page");
 
       // ArrowUp at the top of a page walks back to the previous page's last row.
       await press("ArrowUp");
@@ -1344,7 +1365,7 @@ const scenarios = [
                     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const done = await page.waitFor(
-        `document.querySelector('.parquet-viewer__find-count')?.innerText === '1 match'`,
+        `document.querySelector('.parquet-viewer__find-count')?.innerText === '1 of 1'`,
         15000,
       );
       expect(done, "whole-file search did not report a match");
@@ -1364,7 +1385,7 @@ const scenarios = [
                 range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
             })`),
       );
-      expect(state.count === "1 match", `unexpected match count: ${state.count}`);
+      expect(state.count === "1 of 1", `unexpected match count: ${state.count}`);
       expect(state.hits > 0, "matched cell was not highlighted");
       expect(state.rows === 1, `expected 1 marked row, got ${state.rows}`);
       expect(state.range === "51–100 of 300", `did not jump to the match page: ${state.range}`);
@@ -1418,10 +1439,10 @@ const scenarios = [
                     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const many = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').endsWith('matches')`,
+        `/^1 of 300$/.test((document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').trim())`,
         15000,
       );
-      expect(many, "a multi-hit scan did not report its matches");
+      expect(many, "a multi-hit scan did not report its position");
       const before = (await pagerState(page)).range;
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__find-input');
@@ -1433,6 +1454,14 @@ const scenarios = [
         15000,
       );
       expect(stepped, `Enter did not step to the next hit (still ${before})`);
+      // "N of M" has to move with the jump: a bare total left the reader guessing where they were.
+      const position = await page.evaluate(
+        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').trim()`,
+      );
+      expect(
+        /^\d+ of 300$/.test(position) && position !== "1 of 300",
+        `the match position did not advance: ${position}`,
+      );
       // A scan that finds nothing is an answer, and the bar has to say so: previously the
       // whole state block was gated on `matchRows.size > 0`, so zero hits looked identical
       // to "you never searched".
@@ -1462,10 +1491,17 @@ const scenarios = [
                 input.dispatchEvent(new Event('input', { bubbles: true }));
             })()`);
       const cleared = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '') === ''`,
+        `!/\\d+ of \\d+/.test(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '')`,
         4000,
       );
       expect(cleared, "the old match count survived a new query");
+      const hint = await page.evaluate(
+        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').trim()`,
+      );
+      expect(
+        /Press Enter/.test(hint),
+        `a query with no results yet should say what Enter does, not "${hint}"`,
+      );
       const stale = await page.evaluate(
         `document.querySelectorAll('.parquet-viewer__row--match').length`,
       );
@@ -1491,7 +1527,7 @@ const scenarios = [
                     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const again = await page.waitFor(
-        `document.querySelector('.parquet-viewer__find-count')?.innerText === '1 match'`,
+        `document.querySelector('.parquet-viewer__find-count')?.innerText === '1 of 1'`,
         15000,
       );
       expect(again, "re-running the first query did not restore its hit");

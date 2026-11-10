@@ -170,6 +170,12 @@ export default {
     errorCodec: "這個建置無法解碼 {codec} 壓縮。",
     errorDetail: "技術細節",
     revealFile: "在檔案總管中顯示",
+    searchHint: "按 Enter 搜尋",
+    stopSearch: "停止",
+    matchPosition: "{index} / {count}",
+    codec: "壓縮",
+    firstPage: "第一頁",
+    lastPage: "最後一頁",
   },
   jsonl: {
     entriesCount: "共 {count} 筆",

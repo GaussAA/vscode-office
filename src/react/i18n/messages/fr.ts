@@ -157,6 +157,12 @@ export default {
     errorCodec: "Cette version ne peut pas décoder la compression {codec}.",
     errorDetail: "Détail technique",
     revealFile: "Afficher dans l'explorateur",
+    searchHint: "Appuyez sur Entrée pour rechercher",
+    stopSearch: "Arrêter",
+    matchPosition: "{index} sur {count}",
+    codec: "Compression",
+    firstPage: "Première page",
+    lastPage: "Dernière page",
   },
   previewGuard: {
     title: "Fichier trop volumineux pour un aperçu automatique",

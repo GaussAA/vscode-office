@@ -155,6 +155,12 @@ export default {
     errorCodec: "이 빌드는 {codec} 압축을 디코딩할 수 없습니다.",
     errorDetail: "기술적 세부 정보",
     revealFile: "탐색기에 표시",
+    searchHint: "Enter 키로 검색",
+    stopSearch: "중지",
+    matchPosition: "{index} / {count}",
+    codec: "압축",
+    firstPage: "첫 페이지",
+    lastPage: "마지막 페이지",
   },
   previewGuard: {
     title: "파일이 커서 자동으로 미리 보지 않습니다",

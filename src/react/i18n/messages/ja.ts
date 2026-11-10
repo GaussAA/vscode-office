@@ -156,6 +156,12 @@ export default {
     errorCodec: "このビルドでは {codec} 圧縮をデコードできません。",
     errorDetail: "技術的な詳細",
     revealFile: "エクスプローラーで表示",
+    searchHint: "Enter で検索",
+    stopSearch: "停止",
+    matchPosition: "{index} / {count}",
+    codec: "圧縮",
+    firstPage: "最初のページ",
+    lastPage: "最後のページ",
   },
   previewGuard: {
     title: "ファイルが大きいため自動プレビューしません",
