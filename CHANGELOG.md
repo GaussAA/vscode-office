@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.3] - 2026-11-10
+
+### Fixed
+
+- `test/unit/stylesheets.test.ts` took the file name with a Windows path separator, so on Linux
+  it reported every stylesheet as unused. It now uses `path.basename`. 6.4.2 was tagged before
+  this was found and never passed CI.
+
+### Changed
+
+- Removed the three import cycles in the source tree by moving shared types out of the modules
+  that imported each other: `x-spreadsheet/data.ts` (sheet and cell types; `index.ts` re-exports
+  them) and `gitHistory/contextMenu/menuTypes.ts` (menu item and payload types). Type-only
+  changes; runtime behaviour is unchanged.
+
 ## [6.4.2] - 2026-11-10
 
 ### Fixed
