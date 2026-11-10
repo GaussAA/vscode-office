@@ -366,6 +366,28 @@ body:has(.parquet-app) {
   font-variant-numeric: tabular-nums;
 }
 
+.parquet-viewer__field-filter {
+  width: 100%;
+  height: 26px;
+  margin: 2px 0 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
+  color: var(--pv-fg);
+  background: var(--pv-control);
+  font: inherit;
+  font-size: 11px;
+
+  &::placeholder {
+    color: var(--pv-muted);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--pv-focus);
+    outline-offset: -1px;
+  }
+}
+
 .parquet-viewer__list {
   flex: 1;
   min-height: 0;
@@ -448,12 +470,17 @@ body:has(.parquet-app) {
   font-weight: 500;
 }
 
+/* Two lines instead of one clipped one: `TIMESTAMP_MILLIS` and `TIMESTAMP_MICROS` were becoming
+   the same `TIMESTAMP_MIL…`, and the badge is the thing that makes the legend unnecessary. */
 .parquet-viewer__list-type {
   flex-shrink: 0;
-  max-width: 94px;
+  max-width: 96px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  text-align: right;
   padding: 2px 6px;
   border-radius: 4px;
   color: var(--pv-muted);

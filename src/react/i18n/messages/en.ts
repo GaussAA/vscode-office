@@ -181,6 +181,9 @@ export default {
     codec: "Codec",
     firstPage: "First page",
     lastPage: "Last page",
+    filterFields: "Filter fields",
+    resizeSidebar: "Resize schema sidebar",
+    jumpToColumn: "Jump to column {name}",
   },
   jsonl: {
     entriesCount: "{count} entries",

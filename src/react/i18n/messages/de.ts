@@ -162,6 +162,9 @@ export default {
     codec: "Kompression",
     firstPage: "Erste Seite",
     lastPage: "Letzte Seite",
+    filterFields: "Felder filtern",
+    resizeSidebar: "Schema-Leiste skalieren",
+    jumpToColumn: "Zur Spalte {name} springen",
   },
   previewGuard: {
     title: "Datei zu groß für die automatische Vorschau",

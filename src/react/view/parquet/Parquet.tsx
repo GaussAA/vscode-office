@@ -522,10 +522,26 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     });
   }, []);
 
+  const [fieldFilter, setFieldFilter] = useState("");
+  /** Index into `visibleColumns` of the field that holds the list's single tab stop. */
+  const [fieldCursor, setFieldCursor] = useState(0);
+
+  /**
+   * The schema list filters by name. 60 fields in a 260px column, each name truncated and most
+   * icons the same green, is not a way to find a field — and the filter is what makes the list
+   * usable without hunting with the horizontal scrollbar.
+   */
+  const visibleColumns = useMemo(() => {
+    const all = (fileInfo?.columns ?? []).map((column, position) => ({ column, position }));
+    const needle = fieldFilter.trim().toLowerCase();
+    if (!needle) return all;
+    return all.filter(({ column }) => column.name.toLowerCase().includes(needle));
+  }, [fileInfo, fieldFilter]);
+
   const totalPages = useMemo(() => {
     if (!fileInfo?.rowCount) return 1;
     return Math.max(1, Math.ceil(fileInfo.rowCount / PAGE_SIZE));
-  }, [fileInfo?.rowCount]);
+  }, [fileInfo]);
 
   const tableRows = useMemo<TableRow[]>(() => {
     return pageRows.map((row, index) => ({
@@ -1379,10 +1395,60 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                   <span className="codicon codicon-symbol-structure parquet-icon parquet-icon--schema" />
                   {$t("parquet.schema")}
                 </span>
-                <span className="parquet-viewer__sider-count">{fileInfo.columns.length}</span>
+                <span className="parquet-viewer__sider-count">
+                  {visibleColumns.length === fileInfo.columns.length
+                    ? fileInfo.columns.length
+                    : `${visibleColumns.length}/${fileInfo.columns.length}`}
+                </span>
               </div>
-              <div className="parquet-viewer__list">
-                {fileInfo.columns.map((column, position) => {
+              <input
+                type="text"
+                className="parquet-viewer__field-filter"
+                value={fieldFilter}
+                placeholder={$t("parquet.filterFields")}
+                aria-label={$t("parquet.filterFields")}
+                spellCheck={false}
+                onChange={(event) => {
+                  setFieldFilter(event.target.value);
+                  setFieldCursor(0);
+                }}
+              />
+              <div
+                className="parquet-viewer__list"
+                role="listbox"
+                aria-label={$t("parquet.schema")}
+                onKeyDown={(event) => {
+                  // One tab stop for the whole list: 60 fields used to sit between the search
+                  // box and the grid, so reaching the table meant 60 presses of Tab.
+                  const keys: Record<string, number> = {
+                    ArrowDown: 1,
+                    ArrowUp: -1,
+                    Home: -Infinity,
+                    End: Infinity,
+                  };
+                  const move = keys[event.key];
+                  if (move === undefined) return;
+                  event.preventDefault();
+                  const last = Math.max(0, visibleColumns.length - 1);
+                  const next = Math.max(
+                    0,
+                    Math.min(
+                      last,
+                      fieldCursor + (move === -Infinity ? -last : move === Infinity ? last : move),
+                    ),
+                  );
+                  setFieldCursor(next);
+                  const target = visibleColumns[next];
+                  if (target) {
+                    focusColumn(target.position);
+                    const item = event.currentTarget.querySelectorAll<HTMLElement>(
+                      ".parquet-viewer__list-item",
+                    )[next];
+                    item?.focus();
+                  }
+                }}
+              >
+                {visibleColumns.map(({ column, position }, index) => {
                   const icon = COLUMN_ICONS[column.category];
                   const kind = column.category;
                   const active = activeColumn === position;
@@ -1390,10 +1456,13 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                     <button
                       key={column.name}
                       type="button"
+                      role="option"
                       className={`parquet-viewer__list-item${active ? " parquet-viewer__list-item--active" : ""}`}
-                      aria-pressed={active}
-                      aria-label={`Jump to column ${column.name}`}
-                      title={`Jump to ${column.name}`}
+                      aria-selected={active}
+                      aria-label={$t("parquet.jumpToColumn", { name: column.name })}
+                      title={`${column.name} · ${column.type}`}
+                      tabIndex={index === fieldCursor ? 0 : -1}
+                      onFocus={() => setFieldCursor(index)}
                       onClick={() => focusColumn(position)}
                     >
                       <span
@@ -1414,7 +1483,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               className="parquet-viewer__resizer"
               role="separator"
               aria-orientation="vertical"
-              aria-label="Resize schema sidebar"
+              aria-label={$t("parquet.resizeSidebar")}
               aria-valuemin={SIDER_MIN}
               aria-valuemax={SIDER_MAX}
               aria-valuenow={siderWidth}

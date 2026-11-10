@@ -177,6 +177,9 @@ export default {
     codec: "压缩",
     firstPage: "第一页",
     lastPage: "最后一页",
+    filterFields: "筛选字段",
+    resizeSidebar: "调整字段栏宽度",
+    jumpToColumn: "跳到列 {name}",
   },
   jsonl: {
     entriesCount: "共 {count} 条",

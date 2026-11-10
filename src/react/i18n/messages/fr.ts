@@ -163,6 +163,9 @@ export default {
     codec: "Compression",
     firstPage: "Première page",
     lastPage: "Dernière page",
+    filterFields: "Filtrer les champs",
+    resizeSidebar: "Redimensionner la barre de schéma",
+    jumpToColumn: "Aller à la colonne {name}",
   },
   previewGuard: {
     title: "Fichier trop volumineux pour un aperçu automatique",

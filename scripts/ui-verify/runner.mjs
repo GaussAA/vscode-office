@@ -609,7 +609,70 @@ const scenarios = [
         `document.querySelector('.parquet-viewer__sider').getBoundingClientRect().width`,
       );
       expect(after === before + 16, `resizer width: ${before} -> ${after}`);
-      return `${state.meta.length} inline meta items, borderless regions, resizer works`;
+
+      // 60 fields used to be 60 tab stops between the search box and the grid.
+      const stops = await page.evaluate(
+        `[...document.querySelectorAll('.parquet-viewer__list-item')].filter(b => b.tabIndex === 0).length`,
+      );
+      expect(stops === 1, `the schema list exposes ${stops} tab stops`);
+
+      // The filter narrows the list, never the table.
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__field-filter');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'na');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            })()`);
+      const filtered = json(
+        await page.evaluate(`JSON.stringify({
+                names: [...document.querySelectorAll('.parquet-viewer__list-name')].map(n => n.textContent),
+                columns: document.querySelector('.parquet-viewer__table-wrap')?.getAttribute('aria-colcount'),
+                count: document.querySelector('.parquet-viewer__sider-count')?.innerText,
+            })`),
+      );
+      expect(
+        filtered.names.join(",") === "name" && filtered.columns === "5",
+        `filter changed the wrong thing: ${JSON.stringify(filtered)}`,
+      );
+      expect(
+        filtered.count === "1/4",
+        `the heading count does not show the filter: ${filtered.count}`,
+      );
+
+      // Arrow keys walk the filtered list and bring the field into view.
+      await page.evaluate(`(() => {
+                const item = document.querySelector('.parquet-viewer__list-item');
+                item.focus();
+                item.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+            })()`);
+      const walked = await page.evaluate(
+        `document.querySelector('.parquet-viewer__list-item')?.getAttribute('aria-selected')`,
+      );
+      expect(walked === "true", `arrow keys did not activate the field: ${walked}`);
+
+      // A clipped badge made TIMESTAMP_MILLIS and TIMESTAMP_MICROS identical.
+      const clipped = json(
+        await page.evaluate(`JSON.stringify([...document.querySelectorAll('.parquet-viewer__list-type')]
+                .filter(badge => badge.scrollWidth > badge.clientWidth + 1)
+                .map(badge => badge.textContent))`),
+      );
+      expect(clipped.length === 0, `type badges are clipped: ${JSON.stringify(clipped)}`);
+
+      // Clear the filter: this scenario also produces the documentation screenshot, and a
+      // sidebar with one of four fields hidden is the wrong thing to document.
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__field-filter');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, '');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            })()`);
+      const restored = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-item').length === 4`,
+        4000,
+      );
+      expect(restored, "the field filter did not clear");
+
+      return `${state.meta.length} inline meta items, filterable schema, one tab stop`;
     },
   },
   {
@@ -786,7 +849,7 @@ const scenarios = [
                 wrapLeft: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().left ?? null,
                 wrapRight: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().right ?? null,
                 active: document.querySelectorAll('.parquet-viewer__list-item--active').length,
-                pressed: document.querySelector('.parquet-viewer__list-item--active')?.getAttribute('aria-pressed'),
+                pressed: document.querySelector('.parquet-viewer__list-item--active')?.getAttribute('aria-selected'),
                 activeHeader: document.querySelectorAll('.parquet-table th.parquet-viewer__column--active').length,
                 activeCell: document.querySelectorAll('.ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--active').length,
             })`),

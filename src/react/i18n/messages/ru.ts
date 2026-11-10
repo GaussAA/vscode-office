@@ -162,6 +162,9 @@ export default {
     codec: "Сжатие",
     firstPage: "Первая страница",
     lastPage: "Последняя страница",
+    filterFields: "Фильтр полей",
+    resizeSidebar: "Изменить ширину панели схемы",
+    jumpToColumn: "Перейти к столбцу {name}",
   },
   previewGuard: {
     title: "Файл слишком велик для автоматического просмотра",

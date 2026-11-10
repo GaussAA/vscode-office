@@ -162,6 +162,9 @@ export default {
     codec: "圧縮",
     firstPage: "最初のページ",
     lastPage: "最後のページ",
+    filterFields: "フィールドを絞り込み",
+    resizeSidebar: "スキーマバーの幅を変更",
+    jumpToColumn: "列 {name} へ移動",
   },
   previewGuard: {
     title: "ファイルが大きいため自動プレビューしません",

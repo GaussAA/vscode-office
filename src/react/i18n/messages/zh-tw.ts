@@ -176,6 +176,9 @@ export default {
     codec: "壓縮",
     firstPage: "第一頁",
     lastPage: "最後一頁",
+    filterFields: "篩選欄位",
+    resizeSidebar: "調整欄位欄寬度",
+    jumpToColumn: "跳到欄 {name}",
   },
   jsonl: {
     entriesCount: "共 {count} 筆",
