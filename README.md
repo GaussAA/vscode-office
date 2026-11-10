@@ -25,6 +25,8 @@ This repository is a fork of [cweijan/vscode-office](https://github.com/cweijan/
 alongside the original. The fork is maintained for one person's data work, which is why it only
 keeps the formats that work involves.
 
+If both extensions are installed, each one offers to open the same spreadsheet files, so VS Code picks one as the default. To choose, use **Reopen Editor With…** on a tab, or set `workbench.editorAssociations` (for example `{ "*.xlsx": "GaussAA.officeViewer" }`). Disabling the original is the simplest way to avoid the question.
+
 ### Parquet: the files upstream cannot open
 
 Upstream bundles `hyparquet` without its decompressors, so a ZSTD-compressed file fails with

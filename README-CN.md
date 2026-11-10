@@ -23,6 +23,8 @@ ICNS、XMind、HTML、Java `.class`、压缩包——都在 **6.0.0** 里删掉�
 [NOTICE.md](NOTICE.md)），以 `GaussAA.office-viewer-plus` 发布，可与原版并存安装。这个 fork
 只服务于一个人的数据工作，所以只保留那部分工作真正会用到的格式。
 
+如果同时安装了原版，两者都会声明可以打开同样的表格文件，VS Code 会选其中一个作为默认。想指定时，在标签页上用 **通过以下方式重新打开编辑器…**，或设置 `workbench.editorAssociations`（例如 `{ "*.xlsx": "GaussAA.officeViewer" }`）。最省事的办法是停用原版。
+
 ### Parquet：上游打不开的压缩文件
 
 上游打包 `hyparquet` 时没有带解压器，ZSTD 压缩的 parquet 会直接报
