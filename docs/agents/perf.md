@@ -75,6 +75,16 @@ raise the budget in the same commit and say why.
   numbers move with the grid implementation, not with us. Above 8 MB the windowed view is
   gated (row above); above 25 MB (CSV/TSV) the size guard asks first
   ([ADR-0016](../adr/0016-preview-size-guard.md)).
+- **Parquet row virtualisation: measured, not shipped.** Rendering 22 of the 50 rows (the
+  viewport's share) roughly halves the page turn (warm 210 → 100 ms on an idle machine), but
+  antd's `virtual` table replaces the `<tr>/<td>` body with a div-based list, and the UI suite
+  asserts on `tbody tr:nth-child(2) td` in nine places. Converting them is a separate change
+  with its own risk (the hidden measure row decides which child index is "the first data row"),
+  so the gain waits until the suite moves with it. The wide-page-turn gate pins the current
+  DOM's numbers in the meantime.
+- **Page-turn timing varies 2-3x with machine load**, so `parquet-wide-page-turn` takes the
+  median of three turns instead of a single sample: 210-520 ms warm and 520-1,270 ms cold were
+  all observed on the same build and hardware.
 - **Two spreadsheet micro-optimisations that were measured and dropped** (on the 152 MB CSV):
   the double UTF-8 decode is 108 ms of a 9.7 s load, and the extra JSZip pass for a workbook's
   sort state is 15-41 ms of a 10 s load — about 1% each. The time is in `parseCsv` (1.5 s) and
