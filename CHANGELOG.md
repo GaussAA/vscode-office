@@ -36,7 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The parquet bottom bar keeps its selection together: the copy and close buttons sit next to
+- The keyboard cursor and the bottom bar now agree: every path that restores a cursor (the first
+  arrow of a cold start, a page turn, `PageDown`) also fills the inspector, which used to say
+  "Select a cell to inspect it" while a cell was clearly focused.
+- A matched row is visible again. The tint was mixed from a colour that already had 33% alpha,
+  so it landed at roughly 6% effective opacity; it now uses the opaque find-match colour.- The parquet bottom bar keeps its selection together: the copy and close buttons sit next to
   the value instead of being pushed to the far end against the pager, and a container value is
   previewed with the same 320-character cap the cells use (copy still takes the whole value).
 - Clicking a link cell now also selects it, so the URL lands in the inspector where it can be
