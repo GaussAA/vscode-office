@@ -730,11 +730,14 @@ body:has(.parquet-app) {
   background: var(--pv-panel-strong);
 }
 
+/* The selection is one group — label, value, copy, close — that must stay together. It used
+   to stretch (`flex: 1`), which pushed its own buttons 700px away from the value and against
+   the pager; proximity is the only grouping signal this bar has. */
 .parquet-viewer__selection {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   height: 32px;
 }
@@ -751,8 +754,9 @@ body:has(.parquet-app) {
 }
 
 .parquet-viewer__selection-value {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 40ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

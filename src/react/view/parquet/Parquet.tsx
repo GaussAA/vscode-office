@@ -199,6 +199,10 @@ function ParquetCell({
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
+        // Opening the link is the point of the click, but it must not be the *only* thing that
+        // happens: without this the one value a reader most wants to copy was the only one the
+        // inspector could never hold.
+        onActivate();
         openLink();
       }}
       onAuxClick={(event) => event.preventDefault()}
@@ -1056,11 +1060,20 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const inspectedType = inspected
     ? fileInfo?.columns.find((column) => column.name === inspected.column)?.type
     : undefined;
-  const inspectedText = inspected
+  const inspectedFull = inspected
     ? inspected.value === null || inspected.value === undefined
       ? $t("parquet.nullLabel")
       : formatCellValue(inspected.value, inspectedType)
     : "";
+  /**
+   * Containers are previewed, never dumped: `formatCellValue` has no length cap, so selecting a
+   * 5000-element LIST used to stringify the whole thing into state (and into the title) on every
+   * arrow key. Copy still gets the full value.
+   */
+  const inspectedText =
+    inspected && inspected.value !== null && typeof inspected.value === "object"
+      ? jsonPreviewText(inspected.value)
+      : inspectedFull;
 
   /**
    * Assistive tech hears the selection once it settles. The visible bar updates on every arrow
@@ -1437,14 +1450,14 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                   <span className="parquet-viewer__selection-label">
                     {inspected.column} · row {inspected.row + 1}
                   </span>
-                  <span className="parquet-viewer__selection-value" title={inspectedText}>
+                  <span className="parquet-viewer__selection-value" title={inspectedFull}>
                     {inspectedText}
                   </span>
                   <button
                     type="button"
                     className="parquet-viewer__pager-btn"
                     onClick={() => {
-                      void navigator.clipboard.writeText(inspectedText).catch(() => undefined);
+                      void navigator.clipboard.writeText(inspectedFull).catch(() => undefined);
                     }}
                     title={$t("parquet.copyValue")}
                     aria-label={$t("parquet.copyValue")}

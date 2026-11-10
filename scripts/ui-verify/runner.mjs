@@ -1144,6 +1144,81 @@ const scenarios = [
         `table body overlaps the bottom bar: ${layout.tableBodyBottom} > ${layout.footerTop}`,
       );
 
+      // The selection is one group. It used to stretch, which dragged its own copy/close buttons
+      // to the far end of the bar, right up against the pager; the distance between the group's
+      // right edge and the pager is what tells the two layouts apart.
+      const grouping = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const group = document.querySelector('.parquet-viewer__selection')?.getBoundingClientRect();
+                const pager = document.querySelector('.parquet-viewer__pager')?.getBoundingClientRect();
+                const copy = document.querySelector('[aria-label="Copy value"]')?.getBoundingClientRect();
+                const value = document.querySelector('.parquet-viewer__selection-value')?.getBoundingClientRect();
+                if (!group || !pager || !copy || !value) return { groupToPager: null, copyToValue: null };
+                return {
+                    groupToPager: Math.round(pager.left - group.right),
+                    copyToValue: Math.round(copy.left - value.right),
+                };
+            })())`),
+      );
+      expect(
+        typeof grouping.groupToPager === "number" && grouping.groupToPager > 80,
+        `the selection group is stretched to the pager (${grouping.groupToPager}px apart)`,
+      );
+      expect(
+        typeof grouping.copyToValue === "number" && grouping.copyToValue < 40,
+        `copy button sits ${grouping.copyToValue}px from the value`,
+      );
+
+      // A container is previewed, not dumped: the same 320-character cap the cells use.
+      await openParquet(page, base, "?preview=1");
+      await page.evaluate(`(() => {
+                const cell = [...document.querySelectorAll('.parquet-viewer__cell--json')][0];
+                cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      const previewed = await page.waitFor(
+        `/meta_json|tags_json/.test(document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '')`,
+        5000,
+      );
+      expect(previewed, "a JSON cell never reached the inspector");
+      const capped = json(
+        await page.evaluate(`JSON.stringify({
+                shown: document.querySelector('.parquet-viewer__selection-value')?.innerText ?? '',
+                full: document.querySelector('.parquet-viewer__selection-value')?.getAttribute('title') ?? '',
+            })`),
+      );
+      expect(capped.shown.length <= 340, `the inspector dumped ${capped.shown.length} chars`);
+      expect(
+        capped.full.length >= capped.shown.length,
+        "the title no longer carries the full value for copying",
+      );
+
+      // Clicking a link opens it *and* selects it: the one value a reader most wants to copy
+      // must not be the only one the inspector can never hold.
+      await page.evaluate(`(() => {
+                const link = document.querySelector('.parquet-viewer__cell-link');
+                link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            })()`);
+      const linked = await page.waitFor(
+        `/url/.test(document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '')`,
+        5000,
+      );
+      expect(linked, "clicking a link did not put it in the inspector");
+      const opened = await page.evaluate(`(window.__openExternalCalls ?? []).length`);
+      expect(opened > 0, "the link click stopped opening the link");
+
+      // End on the state this scenario documents: the four-column fixture with a plain cell
+      // selected, not the twelve-column link fixture it just finished with.
+      await openParquet(page, base, "?mixed=1");
+      await page.evaluate(`(() => {
+                const cell = ${firstRowCell(2)}.querySelector('.parquet-viewer__cell');
+                cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      const restored = await page.waitFor(
+        `/name · row 1/.test(document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '')`,
+        5000,
+      );
+      expect(restored, "the documented state did not come back");
+
       return `${state.label} = ${state.value}`;
     },
   },
