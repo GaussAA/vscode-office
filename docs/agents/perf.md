@@ -1,13 +1,14 @@
 # Performance gate
 
-`pnpm verify:perf` runs the built viewers in headless Chrome and asserts three numbers that
+`pnpm verify:perf` runs the built viewers in headless Chrome and asserts four numbers that
 used to be catastrophic and invisible:
 
-| invariant                                | budget                                    | why it exists                                                                                                                               |
-| ---------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| first paint reads at most 1.25x the file | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file |
-| a whole-file search is one pass          | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                      |
-| a 21 MB CSV paints its windowed view     | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows           |
+| invariant                                | budget                                    | why it exists                                                                                                                                 |
+| ---------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| first paint reads at most 1.25x the file | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file   |
+| a whole-file search is one pass          | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                        |
+| a 21 MB CSV paints its windowed view     | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows             |
+| a page turn on 60 columns stays usable   | warm < 600 ms, cold < 2 s                 | measured 205 ms warm (render of 3,000 cells) and 520-1,150 ms cold (one decoded data page per column, plus waiting for an in-flight prefetch) |
 
 It is separate from `pnpm verify:ui` on purpose: that suite answers "does the DOM look
 right" with small fixtures; this one answers "what did it cost" with large files, and byte

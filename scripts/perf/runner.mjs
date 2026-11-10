@@ -5,7 +5,7 @@
  *   node scripts/perf/runner.mjs --all      # also print the non-asserted numbers
  *   node scripts/perf/runner.mjs --headed   # watch it run
  *
- * Two invariants, both learned from measuring the shipped bundle on a 1M-row file:
+ * Three invariants, all learned from measuring the shipped bundle on large files:
  *
  *  1. **First paint is bounded by the file, not twice the file.** hyparquet plans a read per
  *     call and the viewer issues the visible page and its prefetch back to back; before the
@@ -15,8 +15,12 @@
  *     containing each batch: 28 s for 1M rows and 40 s for 200k x 60. A single pass is ~1-3 s,
  *     so the budgets below are ~4-6x the measured value and still far under the old cost.
  *
- * Both files are written with one row group (PyArrow's default), because that is the shape
- * where the difference shows.
+ *  3. **A page turn stays interactive with 60 columns.** Warm turns are render-bound (~205 ms),
+ *     cold ones also decode one data page per column (~550 ms). Both are gated, because a
+ *     future change that materialises the page or re-decodes it shows up here first.
+ *
+ * Both parquet files are written with one row group (PyArrow's default), because that is the
+ * shape where the difference shows.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -37,6 +41,19 @@ const FIRST_PAINT_BUDGET = 1.25;
 const SEARCH_BUDGET_FLAT_MS = 12_000;
 /** Milliseconds for a full scan of the 200k-row x 60-column file. Measured: ~1.2-2.4 s; the batched version takes ~40 s. */
 const SEARCH_BUDGET_WIDE_MS = 12_000;
+/**
+ * Milliseconds for one page turn on the 60-column file, measured after the prefetch has settled.
+ * Measured: ~210 ms warm, ~520 ms when the next 50-row window still has to decode a data page
+ * per column. The budget is the ceiling for the warm path; a regression that renders the whole
+ * file or re-decodes an already-warm page shows up here first.
+ */
+const WIDE_PAGE_TURN_MS = 600;
+/**
+ * Back-to-back turns without waiting for the prefetch. Measured: ~520-1150 ms depending on
+ * whether the previous prefetch is still decoding (single-flight makes the next request wait
+ * for it). The budget guards against the multi-second regressions, not against that jitter.
+ */
+const WIDE_RAPID_TURN_MS = 2_000;
 /**
  * Milliseconds for a 21 MB CSV to paint its first windowed row. Measured: ~0.5-1.4 s (the
  * The full-parse path this replaces needed ~2.6 s for 37 MB and would have climbed with size;
@@ -220,6 +237,39 @@ const scenarios = [
         `${(served.bytes / MB).toFixed(2)} MB = ${ratio.toFixed(2)}x file` +
         ` (page turn ${next.ms} ms, 0 bytes)`
       );
+    },
+  },
+  {
+    name: "parquet-wide-page-turn",
+    async run({ page, base, harness }) {
+      await page.navigate(`${base}/harness?file=wide`);
+      const ready = await page.waitFor(`(window.__bench?.ready ?? 0) > 0`, 60000);
+      expect(ready, "the wide file never painted");
+      // The idle prefetch needs to finish before "warm" means anything.
+      await page.sleep(3000);
+      harness.reset();
+
+      const warm = await nextPage(page);
+      expect(!warm.timeout, `paging forward stalled at ${warm.stage}`);
+      expect(
+        warm.ms <= WIDE_PAGE_TURN_MS,
+        `a warm page turn on 60 columns took ${warm.ms} ms (budget ${WIDE_PAGE_TURN_MS} ms)`,
+      );
+
+      // Rapid: no pause between turns, so the next window's data pages are not prefetched.
+      const first = await nextPage(page);
+      expect(!first.timeout, `rapid paging stalled at ${first.stage}`);
+      expect(
+        first.ms <= WIDE_RAPID_TURN_MS,
+        `a cold page turn on 60 columns took ${first.ms} ms (budget ${WIDE_RAPID_TURN_MS} ms)`,
+      );
+      const second = await nextPage(page);
+      expect(!second.timeout, `rapid paging stalled at ${second.stage}`);
+      expect(
+        second.ms <= WIDE_RAPID_TURN_MS,
+        `the second cold page turn took ${second.ms} ms (budget ${WIDE_RAPID_TURN_MS} ms)`,
+      );
+      return `warm ${warm.ms} ms, cold ${first.ms} ms / ${second.ms} ms`;
     },
   },
   {
