@@ -24,6 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The parquet bottom bar is no longer an `aria-live` region. It updates on every arrow key, so a
+  screen reader queued one announcement per keystroke; a visually hidden status region now
+  announces the selection once it has settled for 600 ms.
+- Link cells advertise the key that opens them (`aria-keyshortcuts="Enter"`) while the anchor
+  stays out of the tab order — the grid keeps a single tab stop by design, so Enter on the cell
+  is the keyboard path and now it says so.
+- Clicking a schema field could silently fail to scroll the table: the jump dispatched one
+  synthetic scrollbar event and assumed it worked, but the virtual table ignores a dispatch that
+  lands on the thumb while its track is still unmeasured. The scroll is now verified against the
+  target column being in view and retried for a few frames.
 - The parquet error state is a live region (`role="alert"`). That state replaces the entire
   chrome with one message, so a screen-reader user previously received no announcement at all.
 - The label layer — 10px table headers, 9.5px type badges, the `SCHEMA` section title — gets a
