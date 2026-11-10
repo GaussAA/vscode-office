@@ -344,62 +344,97 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    */
   const focusColumn = useCallback((position: number, mark = true) => {
     if (mark) setActiveColumn(position);
-    // Let the active column commit first. The virtual table rebuilds its scrollbar when a
-    // column class changes; scrolling before that render can be reset by it.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const virtualBody = tableWrapRef.current?.querySelector<HTMLElement>(
-          ".ant-table-tbody-virtual",
-        );
-        const body =
-          tableWrapRef.current?.querySelector<HTMLElement>(".ant-table-body, .ant-table-content") ??
-          virtualBody;
-        const viewportWidth = virtualBody?.clientWidth ?? body?.clientWidth ?? 0;
-        if (!viewportWidth) return;
-        const columnLeft = INDEX_COLUMN_WIDTH + position * DATA_COLUMN_WIDTH;
-        const left = Math.max(0, columnLeft - Math.max(0, (viewportWidth - DATA_COLUMN_WIDTH) / 2));
 
-        // antd's virtual table keeps horizontal offset in rc-virtual-list rather than in a
-        // scrollable DOM node, and its scrollTo only handles rows. The horizontal scrollbar
-        // is a custom track: a click on the track is the same public interaction the user
-        // has, so translate the desired offset into a track position.
-        if (virtualBody) {
-          const track = tableWrapRef.current?.querySelector<HTMLElement>(
-            ".ant-table-tbody-virtual-scrollbar-horizontal",
-          );
-          const thumb = track?.querySelector<HTMLElement>(
-            ".ant-table-tbody-virtual-scrollbar-thumb",
-          );
-          const inner = tableWrapRef.current?.querySelector<HTMLElement>(
-            ".ant-table-tbody-virtual-holder-inner",
-          );
-          if (track && thumb && inner) {
-            const maxScroll = Math.max(0, inner.scrollWidth - virtualBody.clientWidth);
-            if (maxScroll === 0) return;
-            const trackRect = track.getBoundingClientRect();
-            const thumbRect = thumb.getBoundingClientRect();
-            const offsetRange = Math.max(0, trackRect.width - thumbRect.width);
-            const target = Math.min(left, maxScroll);
-            const x = trackRect.left + (target / maxScroll) * offsetRange + thumbRect.width / 2;
-            track.dispatchEvent(
-              new MouseEvent("mousedown", {
-                bubbles: true,
-                cancelable: true,
-                button: 0,
-                clientX: x,
-                clientY: trackRect.top + trackRect.height / 2,
-              }),
-            );
-            return;
-          }
-        }
-        if (!body) return;
-        const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-          ? "auto"
-          : "smooth";
-        if (typeof body.scrollTo === "function") body.scrollTo({ left, behavior });
-        else body.scrollLeft = left;
-      });
+    const geometry = () => {
+      const wrap = tableWrapRef.current;
+      if (!wrap) return null;
+      const virtualBody = wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual");
+      const body =
+        wrap.querySelector<HTMLElement>(".ant-table-body, .ant-table-content") ?? virtualBody;
+      const viewportWidth = virtualBody?.clientWidth ?? body?.clientWidth ?? 0;
+      if (!viewportWidth) return null;
+      const columnLeft = INDEX_COLUMN_WIDTH + position * DATA_COLUMN_WIDTH;
+      const left = Math.max(0, columnLeft - Math.max(0, (viewportWidth - DATA_COLUMN_WIDTH) / 2));
+      return { wrap, virtualBody, body, viewportWidth, columnLeft, left };
+    };
+
+    /** Horizontal offset the body currently shows, however it is implemented. */
+    const currentOffset = (): number | null => {
+      const wrap = tableWrapRef.current;
+      if (!wrap) return null;
+      const inner = wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner");
+      if (inner) return wrap.getBoundingClientRect().left - inner.getBoundingClientRect().left;
+      const body = wrap.querySelector<HTMLElement>(".ant-table-body, .ant-table-content");
+      return body ? body.scrollLeft : null;
+    };
+
+    const columnVisible = (): boolean => {
+      const g = geometry();
+      const offset = currentOffset();
+      if (!g || offset === null) return false;
+      const relative = g.columnLeft - offset;
+      return relative >= -1 && relative + DATA_COLUMN_WIDTH <= g.viewportWidth + 1;
+    };
+
+    /** One scroll attempt; false means the body was not ready and another frame may help. */
+    const scrollOnce = (): boolean => {
+      const g = geometry();
+      if (!g) return false;
+
+      // antd's virtual table keeps horizontal offset in rc-virtual-list rather than in a
+      // scrollable DOM node, and its scrollTo only handles rows. The horizontal scrollbar is a
+      // custom track, so translate the desired offset into a click on it. rc-virtual-list
+      // ignores a mousedown whose target is the thumb — which is what an unmeasured track
+      // produces — so the widths are checked before dispatching instead of after.
+      if (g.virtualBody) {
+        const track = g.wrap.querySelector<HTMLElement>(
+          ".ant-table-tbody-virtual-scrollbar-horizontal",
+        );
+        const thumb = track?.querySelector<HTMLElement>(".ant-table-tbody-virtual-scrollbar-thumb");
+        const inner = g.wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner");
+        if (!track || !thumb || !inner) return false;
+        const maxScroll = Math.max(0, inner.scrollWidth - g.virtualBody.clientWidth);
+        const trackRect = track.getBoundingClientRect();
+        const thumbRect = thumb.getBoundingClientRect();
+        const offsetRange = trackRect.width - thumbRect.width;
+        if (maxScroll <= 0 || offsetRange <= 0 || thumbRect.width <= 0) return false;
+        const target = Math.min(g.left, maxScroll);
+        const x = trackRect.left + (target / maxScroll) * offsetRange + thumbRect.width / 2;
+        track.dispatchEvent(
+          new MouseEvent("mousedown", {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            clientX: x,
+            clientY: trackRect.top + trackRect.height / 2,
+          }),
+        );
+        return true;
+      }
+
+      if (!g.body) return false;
+      const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth";
+      if (typeof g.body.scrollTo === "function") g.body.scrollTo({ left: g.left, behavior });
+      else g.body.scrollLeft = g.left;
+      return true;
+    };
+
+    // Let the active column commit first, then keep trying for a few frames. The virtual table
+    // rebuilds its scrollbar whenever a column class changes, so an attempt can land on a
+    // detached track — or on a live one whose geometry is still zero. Both are silent, so each
+    // attempt is verified against the column actually being in view.
+    requestAnimationFrame(() => {
+      let tries = 6;
+      const attempt = () => {
+        scrollOnce();
+        requestAnimationFrame(() => {
+          if (columnVisible() || --tries <= 0) return;
+          attempt();
+        });
+      };
+      attempt();
     });
   }, []);
 
