@@ -39,7 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The keyboard cursor and the bottom bar now agree: every path that restores a cursor (the first
+- Row numbers now belong to the page whose rows are actually on screen. `page` changed on the
+  click while the rows arrived up to 1.7 s later, so the `#` column, `aria-rowindex` and the
+  inspector briefly described the wrong rows — the bottom bar could read "row 1" beside a value
+  from row 251, and screen readers announced it.- The keyboard cursor and the bottom bar now agree: every path that restores a cursor (the first
   arrow of a cold start, a page turn, `PageDown`) also fills the inspector, which used to say
   "Select a cell to inspect it" while a cell was clearly focused.
 - A matched row is visible again. The tint was mixed from a colour that already had 33% alpha,
