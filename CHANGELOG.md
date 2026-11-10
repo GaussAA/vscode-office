@@ -7,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Find in file in the parquet viewer now answers with a cell, not a row: the scan records the
+  first matching column for every hit, so jumping to a match (or pressing `Enter` to walk them)
+  scrolls that column into view as well. In a 60-column file a hit used to land off-screen with
+  no marker anywhere.
+
 ### Fixed
 
+- A scan that finds nothing now says `0 matches` instead of leaving the bar blank, which was
+  indistinguishable from "you never searched".
+- The match counter reads `1 match` / `N matches` instead of `1 row` / `N rows`, which collided
+  with the row count in the status bar.
 - Parquet row styling above the virtual threshold: the body renders `div` cells, but every
   row-level rule named `tr > td`, so alternating stripes, the 6px cell padding, the removal of
   row separators and the match/target-row tints were all silently dead on real files (rows
