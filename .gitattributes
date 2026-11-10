@@ -1,5 +1,10 @@
-# Normalize line endings on commit; check out CRLF on Windows.
-* text=auto
+# Normalize line endings on commit and check out LF everywhere.
+#
+# `text=auto` alone still checks out CRLF on Windows (core.autocrlf), and `oxfmt --check`
+# compares the working copy: a fresh clone then reports every file as unformatted, and a
+# `git checkout --` of one file re-introduces the false positive. Pinning `eol=lf` makes the
+# checked-out bytes match what the formatter wrote, on every platform.
+* text=auto eol=lf
 
 # Husky hooks are executed by sh: CRLF there breaks the hook.
 .husky/* text eol=lf
