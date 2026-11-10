@@ -432,7 +432,9 @@ const scenarios = [
                 cells: document.querySelectorAll('.parquet-viewer__cell').length,
             })`),
       );
-      expect(state.range === "No rows", `empty pager says ${state.range}`);
+      // Said once, in the body. The footer used to repeat it, which made the bottom bar look
+      // like a second error.
+      expect(state.range === "", `empty pager says ${state.range}`);
       expect(state.empty === "No rows", `table empty text is ${state.empty}`);
       expect(state.columns === 1, `sidebar rendered ${state.columns} columns`);
       expect(state.cells === 0, `empty file rendered ${state.cells} cells`);

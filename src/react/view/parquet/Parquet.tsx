@@ -778,7 +778,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
 
   const rowRange = useMemo(() => {
     if (!fileInfo) return "";
-    if (fileInfo.rowCount === 0) return $t("parquet.noRows");
+    // An empty file says so once, in the body. Repeating it in the footer made the bottom bar
+    // look like a failure message.
+    if (fileInfo.rowCount === 0) return "";
     // What is on screen, which during a page load is still the previous page.
     const start = loadedPage * PAGE_SIZE + 1;
     const end = Math.min(fileInfo.rowCount, (loadedPage + 1) * PAGE_SIZE);
@@ -1088,7 +1090,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         title: "#",
         key: "__index",
         width: INDEX_COLUMN_WIDTH,
-        align: "center",
+        // Numbers line up on their right edge everywhere in this surface, the row index
+        // included: centring one of them made the column read as a label.
+        align: "right",
         fixed: "left",
         className: "parquet-viewer__index-cell",
         onCell: () => ({ role: "rowheader", "aria-colindex": 1 }),
@@ -1628,7 +1632,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                       className="parquet-table"
                       dataSource={tableRows}
                       columns={tableColumns}
-                      locale={{ emptyText: $t("parquet.noRows") }}
+                      // The empty state is rendered above instead of the table; a second copy
+                      // here would only exist to be found in a screenshot.
+                      locale={{ emptyText: "" }}
                       pagination={false}
                       size="small"
                       scroll={{
@@ -1757,12 +1763,14 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 {$t("parquet.go")}
               </button>
               <span className="parquet-viewer__pager-info">{rowRange}</span>
-              <span className="parquet-viewer__pager-page">
-                {$t("parquet.pagePosition", {
-                  page: (page + 1).toLocaleString(),
-                  total: totalPages.toLocaleString(),
-                })}
-              </span>
+              {fileInfo.rowCount > 0 && (
+                <span className="parquet-viewer__pager-page">
+                  {$t("parquet.pagePosition", {
+                    page: (page + 1).toLocaleString(),
+                    total: totalPages.toLocaleString(),
+                  })}
+                </span>
+              )}
               <button
                 type="button"
                 className="parquet-viewer__pager-btn"
