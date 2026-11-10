@@ -39,7 +39,9 @@ import {
 import { jsonPreviewText, tokenizeJson, type JsonToken } from "./parquetPreview.ts";
 import "./Parquet.less";
 
-const PAGE_SIZE = PARQUET_PAGE_SIZE;
+/** A page below this is not a screenful; above it, paging stops being useful. */
+const MIN_ROWS_PER_PAGE = 8;
+const PARQUET_MAX_PAGE_SIZE = 200;
 /** Cap on matched rows kept in memory (highlight + navigation). */
 const SEARCH_MAX_ROWS = 5_000;
 /** Schema sidebar bounds; the drag handle and keyboard use the same range. */
@@ -356,21 +358,24 @@ function ParquetCell({
  */
 const PERSIST_PREFIX = "parquet-state:";
 
-function loadPersistedPage(key: string | undefined): number {
+function loadPersistedRow(key: string | undefined): number {
   if (!key) return 0;
   try {
     const raw = localStorage.getItem(PERSIST_PREFIX + key);
     if (!raw) return 0;
-    const parsed = JSON.parse(raw) as { page?: number };
-    return typeof parsed.page === "number" && parsed.page >= 0 ? parsed.page : 0;
+    // `row` since 6.4.1: a page is a screenful, so its size depends on the window and a stored
+    // page number would land somewhere else next time. Older entries (only `page`) are ignored
+    // rather than misread as rows.
+    const parsed = JSON.parse(raw) as { row?: number };
+    return typeof parsed.row === "number" && parsed.row >= 0 ? parsed.row : 0;
   } catch {
     return 0;
   }
 }
 
-function savePersistedPage(key: string | undefined, page: number) {
+function savePersistedRow(key: string | undefined, row: number) {
   if (!key) return;
-  savePersistedState(PERSIST_PREFIX, key, { page });
+  savePersistedState(PERSIST_PREFIX, key, { row });
 }
 
 function ParquetViewer({ dark }: { dark: boolean }) {
@@ -383,6 +388,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    * under a fresh label, and an `aria-live` announcement of it).
    */
   const [loadedPage, setLoadedPage] = useState(0);
+  /** First row of the loaded page. Row identity comes from here, never from page * pageSize,
+   *  because the page size changes when the window does. */
+  const [loadedStart, setLoadedStart] = useState(0);
+  const loadedStartRef = useRef(0);
+  /** Row to return to once the page size is known; consumed by the measuring effect. */
+  const restoreRowRef = useRef(0);
+  /** True until the restored page has actually loaded; nothing may be persisted before that. */
+  const restorePendingRef = useRef(false);
+  /** Bumped when the page size changes, so the page loader runs again against the new slicing. */
+  const [reloadToken, setReloadToken] = useState(0);
   const [pageRows, setPageRows] = useState<Record<string, unknown>[]>([]);
   const [pageLoading, setPageLoading] = useState(false);
   const [rowJump, setRowJump] = useState<number | null>(null);
@@ -424,6 +439,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     } catch {}
     return SIDER_DEFAULT;
   });
+  /** Rows per page. A page is one screenful, so this follows the body height. */
+  const [pageSize, setPageSize] = useState(PARQUET_PAGE_SIZE);
+  const pageSizeRef = useRef(PARQUET_PAGE_SIZE);
   const [tableBodyHeight, setTableBodyHeight] = useState(320);
   /**
    * Per-column widths, keyed by column name. Column widths are a reading decision, so they
@@ -721,8 +739,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
 
   const totalPages = useMemo(() => {
     if (!fileInfo?.rowCount) return 1;
-    return Math.max(1, Math.ceil(fileInfo.rowCount / PAGE_SIZE));
-  }, [fileInfo]);
+    return Math.max(1, Math.ceil(fileInfo.rowCount / pageSize));
+  }, [fileInfo, pageSize]);
 
   const tableRows = useMemo<TableRow[]>(() => {
     return pageRows.map((row, index) => ({
@@ -764,11 +782,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
         fileInfoRef.current = info;
         setFileInfo(info);
-        // Come back to the page this document was left on, clamped: the file may have
-        // shrunk since. Only file-backed documents have a stable key.
+        // Come back to where this document was left. The page cannot be computed yet — a page
+        // is a screenful, and this document has not been measured — so remember the row and let
+        // the measuring effect turn it into a page.
         documentKeyRef.current = payload.path;
-        const lastPage = Math.max(0, Math.ceil(info.rowCount / PAGE_SIZE) - 1);
-        setPage(Math.min(loadPersistedPage(payload.path), lastPage));
+        restoreRowRef.current = loadPersistedRow(payload.path);
+        restorePendingRef.current = restoreRowRef.current !== 0;
 
         sessionRef.current = new ParquetSession(
           {
@@ -776,7 +795,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             readRows: (start, end) =>
               readParquetRows(info.file, info.metadata, start, end, { utf8: false }),
           },
-          { pageSize: PAGE_SIZE, chunkSize: PARQUET_CHUNK_SIZE },
+          { pageSize: pageSizeRef.current, chunkSize: PARQUET_CHUNK_SIZE },
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load parquet file");
@@ -787,6 +806,39 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     [selectCell],
   );
 
+  // The table body gets the height the flex column actually leaves it, instead of a
+  // `100vh - N` guess that turns into an unexplained gap whenever the bars change.
+  useEffect(() => {
+    const element = tableWrapRef.current;
+    if (!element || !fileInfo) return;
+    const update = () => {
+      const header = element.querySelector<HTMLElement>(".ant-table-header");
+      const headerHeight = header?.offsetHeight ?? 38;
+      const bodyHeight = Math.max(80, Math.round(element.clientHeight - headerHeight));
+      setTableBodyHeight(bodyHeight);
+      setTableBodyWidth(element.clientWidth);
+      // A page is one screenful: the pager's row range should describe the rows you can see.
+      // `setPageSize` keeps the decoded chunks, so re-paging never costs a read.
+      const rows = Math.max(MIN_ROWS_PER_PAGE, Math.floor(bodyHeight / ROW_HEIGHT));
+      if (rows !== pageSizeRef.current) {
+        const clamped = Math.min(rows, PARQUET_MAX_PAGE_SIZE);
+        pageSizeRef.current = clamped;
+        // Which page holds the row we want? On the very first sizing that is the persisted row
+        // (the page number cannot be computed before the page size is known); afterwards it is
+        // the row already on screen, so a resize does not move the reader.
+        const keepRow = restoreRowRef.current || loadedStartRef.current;
+        restoreRowRef.current = 0;
+        const session = sessionRef.current;
+        if (session) setPage(session.setPageSize(clamped, keepRow));
+        setPageSize(clamped);
+        setReloadToken((token) => token + 1);
+      }
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [fileInfo, siderWidth]);
   // Rows are read one page at a time; a big file no longer materialises every row in the
   // webview. The session owns the cache, the prefetch and the "only the newest page wins"
   // guard, so this effect is only wiring.
@@ -804,6 +856,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         if (controller.signal.aborted || snapshot.stale) return;
         setPageRows(snapshot.rows);
         setLoadedPage(page);
+        setLoadedStart(snapshot.start);
+        loadedStartRef.current = snapshot.start;
+        if (snapshot.start === restoreRowRef.current) restorePendingRef.current = false;
         setPageLoading(false);
         // Prefetch only once this page is on screen. Decoding the *next* page is a full
         // page per column (~1.2 s on a 60-column file) and it runs on the same thread as
@@ -822,7 +877,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       controller.abort();
       cancelPrefetch?.();
     };
-  }, [fileInfo, page]);
+  }, [fileInfo, page, reloadToken]);
 
   // Every page change drops the inspector, the cursor and the jump highlight: they all
   // point at rows on the old page. `jumpToRow` re-sets the highlight right after this.
@@ -837,8 +892,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   );
 
   useEffect(() => {
-    savePersistedPage(documentKeyRef.current, page);
-  }, [page, fileInfo]);
+    // Nothing to remember before the first page has actually arrived — and while a restore is
+    // still pending, the page-0 load that wins the race must not write over the stored row.
+    if (!fileInfo || pageRows.length === 0 || restorePendingRef.current) return;
+    savePersistedRow(documentKeyRef.current, loadedStart);
+  }, [loadedStart, fileInfo, pageRows.length]);
 
   useEffect(() => {
     try {
@@ -851,23 +909,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       localStorage.setItem(COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(columnWidths));
     } catch {}
   }, [columnWidths]);
-
-  // The table body gets the height the flex column actually leaves it, instead of a
-  // `100vh - N` guess that turns into an unexplained gap whenever the bars change.
-  useEffect(() => {
-    const element = tableWrapRef.current;
-    if (!element || !fileInfo) return;
-    const update = () => {
-      const header = element.querySelector<HTMLElement>(".ant-table-header");
-      const headerHeight = header?.offsetHeight ?? 38;
-      setTableBodyHeight(Math.max(80, Math.round(element.clientHeight - headerHeight)));
-      setTableBodyWidth(element.clientWidth);
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [fileInfo, siderWidth]);
 
   useEffect(() => {
     const onFind = (event: KeyboardEvent) => {
@@ -920,10 +961,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         return;
       }
       const row = Math.max(0, Math.min(info.rowCount - 1, Math.round(rowJump) - 1));
-      goToPage(Math.floor(row / PAGE_SIZE));
+      goToPage(Math.floor(row / pageSize));
       setTargetRow(row);
     },
-    [rowJump, goToPage, message],
+    [rowJump, goToPage, pageSize, message],
   );
 
   // Bring the jumped-to row into view once its page has rendered; without this the right page
@@ -931,10 +972,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   // table the row may not be in the DOM at all, so the scroller is asked instead of the DOM.
   useEffect(() => {
     if (targetRow == null) return;
-    const index = targetRow - page * PAGE_SIZE;
+    const index = targetRow - page * pageSize;
     if (index < 0 || index >= pageRows.length) return;
     tableRef.current?.scrollTo({ index });
-  }, [targetRow, page, pageRows]);
+  }, [targetRow, page, pageSize, pageRows]);
 
   const rowRange = useMemo(() => {
     if (!fileInfo) return "";
@@ -942,10 +983,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     // look like a failure message.
     if (fileInfo.rowCount === 0) return "";
     // What is on screen, which during a page load is still the previous page.
-    const start = loadedPage * PAGE_SIZE + 1;
-    const end = Math.min(fileInfo.rowCount, (loadedPage + 1) * PAGE_SIZE);
+    const start = loadedStart + 1;
+    const end = Math.min(fileInfo.rowCount, loadedStart + pageSize);
     return `${start.toLocaleString()}–${end.toLocaleString()} of ${fileInfo.rowCount.toLocaleString()}`;
-  }, [fileInfo, loadedPage]);
+  }, [fileInfo, loadedStart, pageSize]);
 
   const runSearch = useCallback(async () => {
     const info = fileInfoRef.current;
@@ -985,7 +1026,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       );
       if (result.rows.length > 0) {
         setActiveMatch(0);
-        const target = Math.floor(result.rows[0] / PAGE_SIZE);
+        const target = Math.floor(result.rows[0] / pageSizeRef.current);
         goToPage((current) => (current === target ? current : target));
         // A hit is a cell, not a row: bring its column into view too. `mark` stays false so
         // the tint keeps meaning "you clicked a schema field", not "a search ran".
@@ -1002,18 +1043,18 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     (direction: 1 | -1) => {
       if (matchRows.size === 0) return;
       const sorted = [...matchRows].sort((a, b) => a - b);
-      const pageStart = page * PAGE_SIZE;
-      const pageEnd = pageStart + PAGE_SIZE;
+      const pageStart = page * pageSize;
+      const pageEnd = pageStart + pageSize;
       const target =
         direction > 0
           ? (sorted.find((row) => row >= pageEnd) ?? sorted[0])
           : ([...sorted].reverse().find((row) => row < pageStart) ?? sorted[sorted.length - 1]);
-      goToPage(Math.floor(target / PAGE_SIZE));
+      goToPage(Math.floor(target / pageSize));
       setActiveMatch(sorted.indexOf(target));
       const column = matchColumnsRef.current.get(target);
       if (column !== undefined) focusColumn(column, false);
     },
-    [matchRows, page, goToPage, focusColumn],
+    [matchRows, page, pageSize, goToPage, focusColumn],
   );
 
   /**
@@ -1029,12 +1070,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       const row = pageRows[next.row];
       if (!column || !row) return;
       setInspected({
-        row: loadedPage * PAGE_SIZE + next.row,
+        row: loadedStart + next.row,
         column: column.name,
         value: row[column.name],
       });
     },
-    [selectCell, fileInfo, loadedPage, pageRows],
+    [selectCell, fileInfo, loadedStart, pageRows],
   );
 
   /** Abandon a running scan. The scan checks `searchSeq` between pages, so this stops it. */
@@ -1088,7 +1129,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (event.key === "Enter") {
         if (cursor && row && column) {
           setInspected({
-            row: loadedPage * PAGE_SIZE + cursor.row,
+            row: loadedStart + cursor.row,
             column: column.name,
             value: row[column.name],
           });
@@ -1097,7 +1138,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       }
       const rows = Math.max(1, pageRows.length);
       const cols = fileInfo.columns.length;
-      const pageCount = Math.max(1, Math.ceil(fileInfo.rowCount / PAGE_SIZE));
+      const pageCount = Math.max(1, Math.ceil(fileInfo.rowCount / pageSize));
       const base = cursorRef.current ?? { row: 0, col: 0 };
 
       /**
@@ -1189,7 +1230,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       const nextRow = pageRows[next.row];
       if (nextColumn && nextRow) {
         setInspected({
-          row: loadedPage * PAGE_SIZE + next.row,
+          row: loadedStart + next.row,
           column: nextColumn.name,
           value: nextRow[nextColumn.name],
         });
@@ -1199,7 +1240,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       cursor,
       fileInfo,
       page,
-      loadedPage,
+      pageSize,
+      loadedStart,
       pageRows,
       selectCell,
       goToPage,
@@ -1257,7 +1299,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         className: "parquet-viewer__index-cell",
         onCell: () => ({ role: "rowheader", "aria-colindex": 1 }),
         onHeaderCell: () => ({ role: "columnheader", "aria-colindex": 1 }),
-        render: (_value, _row, index) => loadedPage * PAGE_SIZE + index + 1,
+        render: (_value, _row, index) => loadedStart + index + 1,
       },
     ];
     fileInfo.columns.forEach((column, position) => {
@@ -1289,7 +1331,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         }),
         onCell: () => ({ role: "gridcell", "aria-colindex": position + 2 }),
         render: (value: unknown, _row, index) => {
-          const rowIndex = loadedPage * PAGE_SIZE + index;
+          const rowIndex = loadedStart + index;
           return (
             <ParquetCell
               value={value}
@@ -1323,7 +1365,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       });
     }
     return cols;
-  }, [fileInfo, loadedPage, query, selectCell, activeColumn, columnLayout]);
+  }, [fileInfo, loadedStart, query, selectCell, activeColumn, columnLayout]);
 
   useEffect(() => {
     handler
@@ -1821,6 +1863,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                   aria-label={fileName || undefined}
                   aria-rowcount={fileInfo.rowCount}
                   aria-colcount={fileInfo.columns.length + 1}
+                  // A page is one screenful, so its size is a runtime fact. Exposed for the UI
+                  // assertions (and it documents the model in the DOM).
+                  data-page-size={pageSize}
+                  data-page-start={loadedStart}
                 >
                   <CursorContext.Provider value={cursor}>
                     <Table<TableRow>
@@ -1843,7 +1889,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                         y: tableBodyHeight,
                       }}
                       rowClassName={(_row, index) => {
-                        const absolute = loadedPage * PAGE_SIZE + index;
+                        const absolute = loadedStart + index;
                         const classes: string[] = [];
                         if (index % 2 === 1) classes.push("parquet-viewer__row--alt");
                         if (matchRows.has(absolute)) classes.push("parquet-viewer__row--match");
@@ -1855,7 +1901,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                       // row, not the index within the rendered window.
                       onRow={(_row, index) => ({
                         role: "row",
-                        "aria-rowindex": loadedPage * PAGE_SIZE + (index ?? 0) + 1,
+                        "aria-rowindex": loadedStart + (index ?? 0) + 1,
                       })}
                       components={{
                         table: PresentationTable,

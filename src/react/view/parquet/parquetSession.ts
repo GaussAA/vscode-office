@@ -52,15 +52,15 @@ const DEFAULT_CHUNK_SIZE = 5_000;
 const DEFAULT_MAX_CACHED_CHUNKS = 3;
 
 export class ParquetSession {
-  readonly pageSize: number;
   readonly chunkSize: number;
   readonly rowCount: number;
-  readonly totalPages: number;
 
   private readonly source: ParquetRowsSource;
   private readonly maxCachedChunks: number;
   private readonly cache = new Map<number, ParquetRow[]>();
   private readonly pending = new Map<number, Promise<ParquetRow[]>>();
+
+  private pageSizeValue: number;
 
   /** Bumped by reset(); in-flight work from an older generation is discarded. */
   private generation = 0;
@@ -72,11 +72,32 @@ export class ParquetSession {
 
   constructor(source: ParquetRowsSource, options: ParquetSessionOptions = {}) {
     this.source = source;
-    this.pageSize = Math.max(1, options.pageSize ?? DEFAULT_PAGE_SIZE);
-    this.chunkSize = Math.max(this.pageSize, options.chunkSize ?? DEFAULT_CHUNK_SIZE);
+    this.pageSizeValue = Math.max(1, options.pageSize ?? DEFAULT_PAGE_SIZE);
+    this.chunkSize = Math.max(this.pageSizeValue, options.chunkSize ?? DEFAULT_CHUNK_SIZE);
     this.rowCount = Math.max(0, source.rowCount);
-    this.totalPages = Math.max(1, Math.ceil(this.rowCount / this.pageSize));
     this.maxCachedChunks = Math.max(1, options.maxCachedChunks ?? DEFAULT_MAX_CACHED_CHUNKS);
+  }
+
+  /** Rows per page. The viewer keeps this equal to the rows its viewport shows. */
+  get pageSize(): number {
+    return this.pageSizeValue;
+  }
+
+  get totalPages(): number {
+    return Math.max(1, Math.ceil(this.rowCount / this.pageSizeValue));
+  }
+
+  /**
+   * Change the page size without losing the decoded chunks.
+   *
+   * A page is "one screenful", so it changes with the window. The cache is keyed by chunk, which
+   * does not depend on the page size, so re-paging a big file must not cost another read.
+   * Returns the clamped page holding `keepRow`, so the caller can stay on the same row.
+   */
+  setPageSize(size: number, keepRow = 0): number {
+    const next = Math.max(1, Math.min(this.chunkSize, Math.floor(size)));
+    this.pageSizeValue = next;
+    return this.clampPage(Math.floor(Math.max(0, keepRow) / next));
   }
 
   get page(): number {
@@ -107,9 +128,12 @@ export class ParquetSession {
     const end = Math.min(this.rowCount, start + this.pageSize);
     const seq = ++this.loadSeq;
     const generation = this.generation;
+    // A load sliced with one page size must not land after another page size took over: the
+    // rows would be right but the page-local cursor row would point at a different row.
+    const pageSize = this.pageSizeValue;
 
     const rows = await this.loadRows(start, end);
-    if (generation !== this.generation || seq !== this.loadSeq) {
+    if (generation !== this.generation || seq !== this.loadSeq || pageSize !== this.pageSizeValue) {
       return { page: target, start, end, rows: [], stale: true };
     }
 

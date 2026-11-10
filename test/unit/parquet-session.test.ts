@@ -175,3 +175,28 @@ test("chunks: prefetch reads the next chunk once the current one is warm", async
   await session.showPage(2); // first page of chunk 1
   assert.equal(source.calls.length, 2, "crossing the boundary was already warmed");
 });
+
+test("page size: re-paging keeps the chunks and lands on the row you were reading", async () => {
+  const source = makeSource(5_000);
+  const session = new ParquetSession(source, { pageSize: 50, chunkSize: 5_000 });
+  await session.showPage(2); // rows 100..150
+
+  const page = session.setPageSize(20, 120);
+  assert.equal(session.pageSize, 20);
+  assert.equal(page, 6, "row 120 is on page 6 of 20-row pages");
+  assert.equal(session.totalPages, 250, "a page is one screenful, so the count follows it");
+  assert.deepEqual(source.calls, [[0, 5_000]], "re-paging must not read again");
+
+  const snapshot = await session.showPage(page);
+  assert.deepEqual([snapshot.start, snapshot.end], [120, 140]);
+  assert.equal(snapshot.rows[0].id, 120);
+});
+
+test("page size: a load sliced with the old size is discarded", async () => {
+  const source = makeSource(300, { delay: 5 });
+  const session = new ParquetSession(source, { pageSize: 50, chunkSize: 300 });
+  const inFlight = session.showPage(0);
+  session.setPageSize(20, 0);
+  const stale = await inFlight;
+  assert.equal(stale.stale, true, "the old slice must not land on the new page grid");
+});

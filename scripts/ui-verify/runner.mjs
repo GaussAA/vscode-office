@@ -168,6 +168,23 @@ const pagerState = (page) =>
 })`)
     .then(json);
 
+/**
+ * Rows per page, as the viewer computed it.
+ *
+ * A page is one screenful, so the number depends on the viewport and cannot be written into an
+ * assertion. The viewer publishes it as `data-page-size` on the grid.
+ */
+const pageSize = async (page) => {
+  const value = await page.evaluate(
+    `Number(document.querySelector('.parquet-viewer__table-wrap')?.dataset.pageSize ?? 0)`,
+  );
+  return value > 0 ? value : 50;
+};
+
+/** The pager's row range for `index`, given a page size. */
+const rangeOf = (size, index, total) =>
+  `${(index * size + 1).toLocaleString()}–${Math.min(total, (index + 1) * size).toLocaleString()} of ${total.toLocaleString()}`;
+
 /** Perceived luminance (0..1) of an element's background, or null when it has none. */
 const luminance = (page, selector) =>
   page.evaluate(`(() => {
@@ -534,8 +551,9 @@ const scenarios = [
       // No query: the harness serves `sample.parquet`, the committed ZSTD fixture. Rendering
       // it at all proves hyparquet-compressors decoded the columns.
       await openParquet(page, base, "");
+      const size = await pageSize(page);
       const state = await pagerState(page);
-      expect(state.range === "1–50 of 300", `zstd range: ${state.range}`);
+      expect(state.range === rangeOf(size, 0, 300), `zstd range: ${state.range}`);
       expect(state.first === "1", `zstd first row: ${state.first}`);
       const names = json(
         await page.evaluate(
@@ -569,13 +587,14 @@ const scenarios = [
     docs: "parquet-types.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
+      const size = await pageSize(page);
       const first = await pagerState(page);
-      expect(first.range === "1–50 of 300", `page 1 range: ${first.range}`);
+      expect(first.range === rangeOf(size, 0, 300), `page 1 range: ${first.range}`);
       expect(first.first === "1", `page 1 first row: ${first.first}`);
       await clickNextPage(page);
       const second = await pagerState(page);
-      expect(second.range === "51–100 of 300", `page 2 range: ${second.range}`);
-      expect(second.first === "51", `page 2 first row: ${second.first}`);
+      expect(second.range === rangeOf(size, 1, 300), `page 2 range: ${second.range}`);
+      expect(second.first === String(size + 1), `page 2 first row: ${second.first}`);
       const pagerTitles = json(
         await page.evaluate(`JSON.stringify({
                 previous: document.querySelector('button[aria-label="Previous page"]')?.getAttribute('title') ?? null,
@@ -586,13 +605,14 @@ const scenarios = [
         pagerTitles.previous === "Previous page" && pagerTitles.next === "Next page",
         `pager titles: ${JSON.stringify(pagerTitles)}`,
       );
-      return `1–50 then 51–100 of 300`;
+      return `${rangeOf(size, 0, 300)} then ${rangeOf(size, 1, 300)}`;
     },
   },
   {
     name: "parquet-sidebar",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
+      const size = await pageSize(page);
       const state = json(
         await page.evaluate(`JSON.stringify({
                 meta: [...document.querySelectorAll('.parquet-viewer__meta-item')].map((element) => element.innerText.trim()),
@@ -694,7 +714,11 @@ const scenarios = [
       const pageLabel = await page.evaluate(
         `(document.querySelector('.parquet-viewer__pager-page')?.innerText ?? '').trim()`,
       );
-      expect(/^Page 1 of 6$/.test(pageLabel), `pager page position: "${pageLabel}"`);
+      const totalPages = Math.ceil(300 / size);
+      expect(
+        pageLabel === `Page 1 of ${totalPages}`,
+        `pager page position: "${pageLabel}" (expected Page 1 of ${totalPages})`,
+      );
 
       // Density: spare viewport width grows the columns, but only up to a cap. Stretching a
       // four-column file to fill 1239px turned `id` into a 273px panel.
@@ -1069,18 +1093,22 @@ const scenarios = [
     docs: "parquet-restore-page.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
+      const size = await pageSize(page);
       await clickNextPage(page);
       const second = await pagerState(page);
-      expect(second.range === "51–100 of 300", `page 2 range: ${second.range}`);
+      expect(second.range === rangeOf(size, 1, 300), `page 2 range: ${second.range}`);
 
       // A fresh document with the same localStorage: exactly what a tab switch does once
       // the webview is allowed to be destroyed while kept hidden. Wait for the rows too:
       // the pager text updates before the page's cells arrive, so asserting on the range
       // alone races the table (this started failing on antd 6, whose render order differs).
       await page.navigate(`${base}/harness-parquet?mixed=1`);
+      // Restoring is row-based now, so the expected range is the page holding that row.
+      const expected = rangeOf(size, 1, 300);
+      const firstRowNumber = String(size + 1);
       const restored = await page.waitFor(
-        `document.querySelector('.parquet-viewer__pager-info')?.innerText === '51–100 of 300'` +
-          ` && (${ROWS}[0])?.children[0]?.innerText === '51'`,
+        `document.querySelector('.parquet-viewer__pager-info')?.innerText === ${JSON.stringify(expected)}` +
+          ` && (${ROWS}[0])?.children[0]?.innerText === ${JSON.stringify(firstRowNumber)}`,
         15000,
       );
       const after = await pagerState(page);
@@ -1096,8 +1124,9 @@ const scenarios = [
     docs: "parquet-large-file.png",
     async run({ page, base }) {
       await openParquet(page, base, "?big=1");
+      const size = await pageSize(page);
       const state = await pagerState(page);
-      expect(state.range === "1–50 of 250,000", `large range: ${state.range}`);
+      expect(state.range === rangeOf(size, 0, 250000), `large range: ${state.range}`);
 
       // Leaving the field is not a decision, and it used to be: the jump fired on blur, so
       // looking at the table mid-edit navigated away. Only Enter and Go act now.
@@ -1113,7 +1142,7 @@ const scenarios = [
       const afterBlur = await page.evaluate(
         `document.querySelector('.parquet-viewer__pager-info')?.innerText ?? ''`,
       );
-      expect(afterBlur === "1–50 of 250,000", `blur applied a row jump: ${afterBlur}`);
+      expect(afterBlur === rangeOf(size, 0, 250000), `blur applied a row jump: ${afterBlur}`);
       // Enter is the contract.
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__row-jump input');
@@ -1125,7 +1154,7 @@ const scenarios = [
                 input.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', bubbles: true }));
             })()`);
       const entered = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '51–100 of 250,000'`,
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === ${JSON.stringify(rangeOf(size, Math.floor(99 / size), 250000))}`,
         8000,
       );
       expect(entered, "Enter did not apply the row jump");
@@ -1139,12 +1168,13 @@ const scenarios = [
                     .find(b => b.textContent.trim() === 'Go')
                     ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
+      const expectedJump = rangeOf(size, Math.floor(239999 / size), 250000);
       const arrived = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '').includes('239,951')`,
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === ${JSON.stringify(expectedJump)}`,
       );
-      expect(arrived, "jump never reached row 239,951");
+      expect(arrived, `jump never reached row 240000 (expected ${expectedJump})`);
       const jumped = await pagerState(page);
-      expect(jumped.range === "239,951–240,000 of 250,000", `jump range: ${jumped.range}`);
+      expect(jumped.range === expectedJump, `jump range: ${jumped.range}`);
       // The table is virtual: the first rendered row is whatever the scroller keeps on screen,
       // not the page's first row. What must be true is that the jumped-to row is the visible
       // target — a stronger statement than "the page starts where we asked".
@@ -1176,7 +1206,8 @@ const scenarios = [
       // Rendering it at all proves the decode, and the range proves it is the same file.
       await openParquet(page, base, "?inline=1");
       const state = await pagerState(page);
-      expect(state.range === "1–50 of 300", `inline range: ${state.range}`);
+      const size = await pageSize(page);
+      expect(state.range === rangeOf(size, 0, 300), `inline range: ${state.range}`);
       expect(state.first === "1", `inline first row: ${state.first}`);
       return `inline base64 payload: ${state.range}`;
     },
@@ -1265,6 +1296,7 @@ const scenarios = [
     name: "parquet-keyboard-paging",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
+      const size = await pageSize(page);
       const press = (key, extra = "") =>
         page.evaluate(`(() => {
                 const wrap = document.querySelector('.parquet-viewer__table-wrap');
@@ -1299,37 +1331,29 @@ const scenarios = [
         `the bottom bar disagrees with the grid: ${JSON.stringify(synced)}`,
       );
 
-      // PageDown moves by what the viewport shows, not by the 50-row page: a page-sized step
-      // dropped a third of the rows without ever displaying them.
+      // A page is one screenful now, so PageDown lands exactly on the next page — the step and
+      // the page agree instead of skipping rows the reader never saw.
       await press("PageDown");
       const stepped = await page.waitFor(
         `(() => {
                 const cell = document.activeElement?.getAttribute('data-cell') ?? '';
                 const row = Number(cell.split(':')[0]);
                 const range = document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '';
-                return row >= 10 && range === '1–50 of 300';
+                return row === 0 && range === ${JSON.stringify(rangeOf(size, 1, 300))};
             })()`,
         5000,
       );
-      expect(stepped, `PageDown did not step inside the page (${await cursorAt()})`);
-      // Enough steps cross into the next page.
-      await press("PageDown");
-      await press("PageDown");
-      const turned = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '51–100 of 300'`,
-        5000,
-      );
-      expect(turned, "repeated PageDown never crossed into the next page");
+      expect(stepped, `PageDown did not turn exactly one page (${await cursorAt()})`);
 
       // ArrowUp at the top of a page walks back to the previous page's last row.
       await press("ArrowUp");
       const back = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '1–50 of 300'`,
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === ${JSON.stringify(rangeOf(size, 0, 300))}`,
         5000,
       );
       expect(back, "ArrowUp did not walk back a page");
       const onLast = await page.waitFor(
-        `document.activeElement?.getAttribute('data-cell') === '49:0'`,
+        `document.activeElement?.getAttribute('data-cell') === ${JSON.stringify(`${size - 1}:0`)}`,
         5000,
       );
       expect(
@@ -1339,14 +1363,15 @@ const scenarios = [
 
       // Ctrl+End reaches the end of the file; Ctrl+Home comes back.
       await press("End", ", ctrlKey: true");
+      const lastPage = Math.ceil(300 / size) - 1;
       const atEnd = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '251–300 of 300'`,
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === ${JSON.stringify(rangeOf(size, lastPage, 300))}`,
         5000,
       );
       expect(atEnd, "Ctrl+End did not reach the last page");
       await press("Home", ", ctrlKey: true");
       const atStart = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '1–50 of 300'`,
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === ${JSON.stringify(rangeOf(size, 0, 300))}`,
         5000,
       );
       expect(atStart, "Ctrl+Home did not return to the first page");
@@ -1558,6 +1583,7 @@ const scenarios = [
     name: "parquet-bool-cursor-jump",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
+      const size = await pageSize(page);
 
       // Booleans split into true/false colours: false stops reading as a wall of accent.
       const boolState = json(
@@ -1661,7 +1687,8 @@ const scenarios = [
       const range = await page.evaluate(
         `document.querySelector('.parquet-viewer__pager-info')?.innerText ?? ''`,
       );
-      expect(range === "101–150 of 300", `jump page range: ${range}`);
+      const expectedJump = rangeOf(size, Math.floor(122 / size), 300);
+      expect(range === expectedJump, `jump page range: ${range} (expected ${expectedJump})`);
       return "bool split + keyboard cursor + in-bar selection + target row";
     },
   },
@@ -1670,6 +1697,7 @@ const scenarios = [
     docs: "parquet-search.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
+      const size = await pageSize(page);
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__find-input');
                 const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -1702,7 +1730,10 @@ const scenarios = [
       expect(state.count === "1 of 1", `unexpected match count: ${state.count}`);
       expect(state.hits > 0, "matched cell was not highlighted");
       expect(state.rows === 1, `expected 1 marked row, got ${state.rows}`);
-      expect(state.range === "51–100 of 300", `did not jump to the match page: ${state.range}`);
+      expect(
+        state.range === rangeOf(size, Math.floor(53 / size), 300),
+        `did not jump to the match page: ${state.range}`,
+      );
       // A hit must not look like a schema click: the column scrolls into view, but the tint
       // that means "you picked this field" stays off.
       const sloppy = await page.evaluate(
@@ -1966,8 +1997,15 @@ const scenarios = [
       await page.evaluate(
         `document.querySelector('.parquet-viewer__too-large-open')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
       );
+      // The page size only exists once the grid has measured itself, so wait for the table
+      // before computing the expected range.
+      await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__table-wrap[data-page-size]')`,
+        15000,
+      );
+      const size = await pageSize(page);
       const loaded = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '').includes('1–50 of 300')`,
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '').includes(${JSON.stringify(rangeOf(size, 0, 300))})`,
         15000,
       );
       expect(loaded, "the viewer never loaded the document after confirming");
@@ -2163,6 +2201,7 @@ const scenarios = [
     name: "parquet-prefetch",
     async run({ page, base, stats }) {
       await openParquet(page, base, "?mixed=1");
+      const size = await pageSize(page);
       // The prefetch is idle-scheduled now (it used to start in the same tick as the visible
       // page and delay it), so give the idle callback a chance before asserting on it.
       await page.sleep(300);
@@ -2172,7 +2211,7 @@ const scenarios = [
       const delta = after.ranged - before.ranged;
       expect(delta === 0, `page 2 needed ${delta} extra range requests (prefetch is broken)`);
       const state = await pagerState(page);
-      expect(state.range === "51–100 of 300", `page 2 did not render: ${state.range}`);
+      expect(state.range === rangeOf(size, 1, 300), `page 2 did not render: ${state.range}`);
       return `next page served from cache (0 extra reads)`;
     },
   },

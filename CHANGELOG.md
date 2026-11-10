@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [Unreleased]
+
+### Changed
+
+- A parquet page is now one screenful. The viewer measures the body and pages by the rows that
+  fit (8–200), so the pager's range describes what is actually on screen, `PageDown` moves exactly
+  one page, and `1–50 of 300` no longer claims 50 rows in a table that shows 21. The position is
+  remembered as a **row** instead of a page number, because a page number means a different row
+  at a different window height.
+
 ## [6.4.1] - 2026-11-10
 
 ### Fixed
