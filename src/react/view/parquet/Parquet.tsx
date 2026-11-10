@@ -339,6 +339,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   /** Owns the page cache, cancellation and the page<->row arithmetic. */
   const sessionRef = useRef<ParquetSession | null>(null);
   const searchSeq = useRef(0);
+  /** The needle the current results belong to; empty when there are none to trust. */
+  const searchedQuery = useRef("");
 
   // Keep the cursor in a ref as well as state: several keydowns can arrive before React
   // re-renders, and each one must move from the position the previous one reached.
@@ -739,6 +741,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setSearchProgress(null);
       return;
     }
+    // The results belong to this text. Remembering it is what lets Enter tell "walk the hits I
+    // already have" from "this is a new needle, search it".
+    searchedQuery.current = needle;
     setSearching(true);
     setSearchedEmpty(false);
     setSearchProgress({ scanned: 0, total: info.rowCount, matches: 0 });
@@ -792,9 +797,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     [matchRows, page, goToPage, focusColumn],
   );
 
-  // clearing the box drops the previous results
+  // Clearing the box drops the previous results — and so does editing it: a result set that no
+  // longer matches the text in the box is a lie that Enter would act on.
   const resetSearch = useCallback(() => {
     searchSeq.current++;
+    searchedQuery.current = "";
     setSearching(false);
     setSearchProgress(null);
     setSearchCapped(false);
@@ -806,7 +813,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const handleQueryChange = useCallback(
     (next: string) => {
       setQuery(next);
-      if (!next.trim()) resetSearch();
+      if (next.trim().toLowerCase() !== searchedQuery.current) resetSearch();
     },
     [resetSearch],
   );
@@ -1111,7 +1118,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                   // whole-file scan (1.3 s on a million rows) belongs on the button and on
                   // Ctrl/Cmd+Enter, not on the key the user presses to walk the matches.
                   if (event.ctrlKey || event.metaKey) void runSearch();
-                  else if (matchRows.size > 0) jumpMatch(event.shiftKey ? -1 : 1);
+                  else if (
+                    matchRows.size > 0 &&
+                    query.trim().toLowerCase() === searchedQuery.current
+                  )
+                    jumpMatch(event.shiftKey ? -1 : 1);
                   else void runSearch();
                 }}
               />

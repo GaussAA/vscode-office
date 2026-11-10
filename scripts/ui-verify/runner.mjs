@@ -1312,6 +1312,33 @@ const scenarios = [
         `document.querySelectorAll('.parquet-viewer__row--match').length`,
       );
       expect(stillMarked === 0, `${stillMarked} row(s) stayed marked after an empty scan`);
+      // Editing the text invalidates the result set: a count that no longer matches the box is a
+      // lie, and Enter used to act on it — jumping to a hit of the previous needle.
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__find-input');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'service-c-54x');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            })()`);
+      const cleared = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '') === ''`,
+        4000,
+      );
+      expect(cleared, "the old match count survived a new query");
+      const stale = await page.evaluate(
+        `document.querySelectorAll('.parquet-viewer__row--match').length`,
+      );
+      expect(stale === 0, `${stale} row(s) stayed marked for the old query`);
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__find-input');
+                input.focus();
+                input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            })()`);
+      const reSearched = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '') === '0 matches'`,
+        15000,
+      );
+      expect(reSearched, "Enter did not search the edited text");
       // End on a hit: this scenario also produces the documentation screenshot, and a picture
       // of "0 matches" is not what the README is trying to show.
       await page.evaluate(`(() => {
