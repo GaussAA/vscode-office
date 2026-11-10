@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The parquet schema sidebar can be filtered, and the field list is a single tab stop navigated
+- Copying a parquet value now answers: the copy button turns into a check for a moment and its
+  label says `Copied`. `Ctrl+C` on the grid copies the selected value, which previously only
+  selected the page text.
+- The top bar shows the file's size. `PRODUCT.md` lists "how big is this file" as one of the four
+  questions the viewer is opened to answer, and it was the only one never displayed. The pager
+  also shows `Page n / N` beside the row range.
+- The schema field filter has a clear button, so restoring the full list no longer means
+  selecting the text and deleting it.- The parquet schema sidebar can be filtered, and the field list is a single tab stop navigated
   with the arrow keys. With 60 columns, reaching the grid used to take 60 presses of Tab, and
   finding a field meant scanning a list of truncated names. Type badges wrap to two lines so
   `TIMESTAMP_MILLIS` and `TIMESTAMP_MICROS` no longer render identically.- The parquet command bar now names the file's compression codec. Decoding ZSTD/GZIP/BROTLI/LZ4
