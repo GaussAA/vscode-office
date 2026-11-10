@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.1] - 2026-11-10
+
+### Fixed
+
+- Paging a large parquet file no longer re-reads a whole data page per turn. Decoding costs the
+  same for 50 rows as for 20,000 (measured on a 202 MB / 1.1 M row / 49 column file: 22.6 MB and
+  ~1.4 s either way), so the session now reads in 5,000-row chunks and a page is a slice of one.
+  On that file a page turn went from 1.2–1.5 s to 0 ms, and the turn that crosses a chunk
+  boundary is prefetched in idle time. `verify:perf` also gained a scroll-frame check: scrolling
+  the 60-column fixture holds p95 16.8 ms (~60 fps).
+
+### Changed
+
+- A parquet page is one screenful. The viewer measures the body and pages by the rows that fit
+  (8–200), so the pager's range describes what is on screen, `PageDown` moves exactly one page, and
+  `1–50 of 300` no longer claims 50 rows in a table that shows 21. The position is remembered as a
+  **row** instead of a page number, because a page number means a different row at a different
+  window height.
+- The ten parquet icon colours read six `--vscode-charts-*` variables between them, each duplicated
+  two or three times. There is now one `--pv-chart-*` token per colour and the icons are aliases of
+  it; `verify:ui` asserts the aliases resolve to the same value.
+
 ### Removed
 
 - `viewerTheme.css` is gone. It declared a fourteen-variable `--viewer-*` token layer that looked
@@ -19,17 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `test/unit/stylesheets.test.ts` fails on any stylesheet under `src` that nothing imports. It is
   what found both orphans; the first version stopped at `src/react` and would have kept the second
   one alive.
-
-## [6.4.1] - 2026-11-10
-
-### Fixed
-
-- Paging a large parquet file no longer re-reads a whole data page per turn. Decoding costs the
-  same for 50 rows as for 20,000 (measured on a 202 MB / 1.1 M row / 49 column file: 22.6 MB and
-  ~1.4 s either way), so the session now reads in 5,000-row chunks and a page is a slice of one.
-  On that file a page turn went from 1.2–1.5 s to 0 ms, and the turn that crosses a chunk
-  boundary is prefetched in idle time. `verify:perf` also gained a scroll-frame check: scrolling
-  the 60-column fixture holds p95 16.8 ms (~60 fps).
 
 ## [6.4.0] - 2026-11-10
 
@@ -177,7 +188,16 @@ Four rounds of design critique on the parquet viewer, plus the column work that 
 
 - Empty, binary and light-theme edge cases in the parquet and JSONL views.
 
-## [6.0.0] - 2024-XX-XX
+## [6.0.1] - 2026-11-09
+
+### Fixed
+
+- **All three viewers no longer open blank.** 6.0.0 inlined the webview config JSON into a
+  double-quoted data-config attribute without escaping it, so the browser ended the attribute at
+  the first JSON quote and the React root never mounted. The config is HTML-escaped before it
+  enters the attribute.
+
+## [6.0.0] - 2026-11-09
 
 ### Breaking Changes
 

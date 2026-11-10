@@ -24,6 +24,11 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 
 parquet 首屏字节数、全文件搜索耗时、宽表翻页耗时，以及大表格窗口视图的首屏/堆/渲染行数是不变量，由 `pnpm verify:perf` 守住，见 docs/agents/perf.md。
 
+### Release
+
+版本号、tag、Release 标题与正文只有一套写法（`Office Viewer Plus v<version>` + 与 CHANGELOG 同源的
+正文），步骤与校验见 docs/agents/release.md。发布格式漂移算发布缺陷，就地修。
+
 ### Domain docs
 
 单 context：根目录 `GLOSSARY.md` + `docs/adr/`。见 `docs/agents/domain.md`。
