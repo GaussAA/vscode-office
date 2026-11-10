@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- An empty parquet file says "No rows" once, in the body; the footer no longer repeats it, and the
+- Parquet column widths can be dragged from the header edge, reset with a double-click, and
+  adjusted with the arrow keys on the handle. Widths are remembered per column name, so a JSON
+  column that needed 300 px stays wide the next time the file is opened. The row-number column
+  keeps its width.- An empty parquet file says "No rows" once, in the body; the footer no longer repeats it, and the
   pager hides its position label when there are no rows to be positioned in.
 - The row-number column is right-aligned like every other number on the surface.
 - `DESIGN.md` now matches the implementation: the thin-mix rule is stated in terms of final
