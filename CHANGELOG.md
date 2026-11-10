@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The parquet command bar now names the file's compression codec. Decoding ZSTD/GZIP/BROTLI/LZ4
+- The parquet schema sidebar can be filtered, and the field list is a single tab stop navigated
+  with the arrow keys. With 60 columns, reaching the grid used to take 60 presses of Tab, and
+  finding a field meant scanning a list of truncated names. Type badges wrap to two lines so
+  `TIMESTAMP_MILLIS` and `TIMESTAMP_MICROS` no longer render identically.- The parquet command bar now names the file's compression codec. Decoding ZSTD/GZIP/BROTLI/LZ4
   is the reason this fork exists, and until now the surface said nothing about it.
 - Search says what Enter does: a hint appears as soon as you type, the readout is
   `4 of 12 · stops at 5,000` instead of a bare total, and a running scan can be stopped from
