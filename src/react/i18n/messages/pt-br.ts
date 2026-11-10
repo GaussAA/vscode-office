@@ -156,6 +156,7 @@ export default {
       "O arquivo não termina com um rodapé parquet válido. Provavelmente está truncado ou não é um arquivo parquet.",
     errorCodec: "Esta versão não consegue decodificar a compressão {codec}.",
     errorDetail: "Detalhe técnico",
+    revealFile: "Revelar no Explorador",
   },
   previewGuard: {
     title: "Arquivo grande demais para pré-visualização automática",

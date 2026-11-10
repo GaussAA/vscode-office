@@ -1078,16 +1078,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               <button
                 type="button"
                 className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
-                onClick={() => handler.emit("init")}
+                onClick={() => handler.emit("revealFile")}
               >
-                {$t("common.retry")}
+                {$t("parquet.revealFile")}
               </button>
               <button
                 type="button"
                 className="parquet-viewer__pager-btn"
-                onClick={() => handler.emit("editInVSCode", true)}
+                onClick={() => handler.emit("init")}
               >
-                {$t("common.editInVscode")}
+                {$t("common.retry")}
               </button>
             </div>
           </div>

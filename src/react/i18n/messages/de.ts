@@ -155,6 +155,7 @@ export default {
       "Die Datei endet nicht mit einem gültigen Parquet-Footer. Sie ist wahrscheinlich abgeschnitten oder keine Parquet-Datei.",
     errorCodec: "Diese Version kann die Komprimierung {codec} nicht dekodieren.",
     errorDetail: "Technisches Detail",
+    revealFile: "Im Explorer anzeigen",
   },
   previewGuard: {
     title: "Datei zu groß für die automatische Vorschau",

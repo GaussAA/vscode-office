@@ -111,6 +111,15 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
       await vscode.commands.executeCommand("vscode.openWith", target, "GaussAA.officeViewer");
     })
     .on("developerTool", () => vscode.commands.executeCommand("workbench.action.toggleDevTools"))
+    .on("revealFile", async () => {
+      // The one exit a broken file actually has. A virtual document has nothing to reveal, and
+      // the command rejects for it — say so instead of failing silently behind the error pane.
+      try {
+        await vscode.commands.executeCommand("revealFileInOS", uri);
+      } catch {
+        void vscode.window.showWarningMessage("This file has no location in the file explorer.");
+      }
+    })
     .on("sponsorClick", () => {})
     .on("openSponsor", () => {
       vscode.commands.executeCommand("workbench.extensions.action.showExtensionsWithIds", [

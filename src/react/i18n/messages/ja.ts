@@ -155,6 +155,7 @@ export default {
       "ファイル末尾に有効な parquet フッターがありません。切り詰められているか、parquet ファイルではありません。",
     errorCodec: "このビルドでは {codec} 圧縮をデコードできません。",
     errorDetail: "技術的な詳細",
+    revealFile: "エクスプローラーで表示",
   },
   previewGuard: {
     title: "ファイルが大きいため自動プレビューしません",

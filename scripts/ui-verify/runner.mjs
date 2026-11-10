@@ -505,7 +505,7 @@ const scenarios = [
       // gets no announcement at all, only an empty page.
       expect(state.role === "alert", `error state is not announced (role=${state.role})`);
       expect(
-        state.buttons.includes("Retry") && state.buttons.includes("Edit In VS Code"),
+        state.buttons.includes("Retry") && state.buttons.includes("Reveal in Explorer"),
         `error state has no way out: ${JSON.stringify(state.buttons)}`,
       );
       expect(!state.table, "a broken file still rendered a table");

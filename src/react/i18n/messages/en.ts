@@ -174,6 +174,7 @@ export default {
       "The file does not end with a valid parquet footer. It is probably truncated, or it is not a parquet file.",
     errorCodec: "This build cannot decode {codec} compression.",
     errorDetail: "Technical detail",
+    revealFile: "Reveal in Explorer",
   },
   jsonl: {
     entriesCount: "{count} entries",

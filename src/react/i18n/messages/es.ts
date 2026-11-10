@@ -156,6 +156,7 @@ export default {
       "El archivo no termina con un pie de parquet válido. Probablemente esté truncado o no sea un archivo parquet.",
     errorCodec: "Esta versión no puede decodificar la compresión {codec}.",
     errorDetail: "Detalle técnico",
+    revealFile: "Mostrar en el explorador",
   },
   previewGuard: {
     title: "El archivo es demasiado grande para la vista previa automática",

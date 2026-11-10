@@ -169,6 +169,7 @@ export default {
     errorTruncated: "檔案結尾沒有有效的 parquet 尾端標記。它可能被截斷，或根本不是 parquet 檔案。",
     errorCodec: "這個建置無法解碼 {codec} 壓縮。",
     errorDetail: "技術細節",
+    revealFile: "在檔案總管中顯示",
   },
   jsonl: {
     entriesCount: "共 {count} 筆",

@@ -154,6 +154,7 @@ export default {
       "파일 끝에 유효한 parquet 푸터가 없습니다. 잘렸거나 parquet 파일이 아닐 수 있습니다.",
     errorCodec: "이 빌드는 {codec} 압축을 디코딩할 수 없습니다.",
     errorDetail: "기술적 세부 정보",
+    revealFile: "탐색기에 표시",
   },
   previewGuard: {
     title: "파일이 커서 자동으로 미리 보지 않습니다",
