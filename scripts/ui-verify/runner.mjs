@@ -1012,6 +1012,70 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-keyboard-paging",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      const press = (key, extra = "") =>
+        page.evaluate(`(() => {
+                const wrap = document.querySelector('.parquet-viewer__table-wrap');
+                wrap.focus();
+                wrap.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true ${extra} }));
+            })()`);
+      const cursorAt = () =>
+        page.evaluate(`document.activeElement?.getAttribute('data-cell') ?? null`);
+
+      await press("ArrowDown");
+      const started = await page.waitFor(
+        `document.activeElement?.getAttribute('data-cell') === '0:0'`,
+      );
+      expect(started, `keyboard cursor did not start at 0:0 (${await cursorAt()})`);
+
+      // 300 rows at 50 per page: PageDown has to leave the page, not stop at its last row.
+      await press("PageDown");
+      const turned = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '51–100 of 300'`,
+        5000,
+      );
+      expect(turned, "PageDown did not turn the page");
+      const onNext = await page.waitFor(
+        `document.activeElement?.getAttribute('data-cell') === '0:0'`,
+        5000,
+      );
+      expect(onNext, `the cursor did not land on the new page (${await cursorAt()})`);
+
+      // ArrowUp at the top of a page walks back to the previous page's last row.
+      await press("ArrowUp");
+      const back = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '1–50 of 300'`,
+        5000,
+      );
+      expect(back, "ArrowUp did not walk back a page");
+      const onLast = await page.waitFor(
+        `document.activeElement?.getAttribute('data-cell') === '49:0'`,
+        5000,
+      );
+      expect(
+        onLast,
+        `the cursor did not land on the previous page's last row (${await cursorAt()})`,
+      );
+
+      // Ctrl+End reaches the end of the file; Ctrl+Home comes back.
+      await press("End", ", ctrlKey: true");
+      const atEnd = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '251–300 of 300'`,
+        5000,
+      );
+      expect(atEnd, "Ctrl+End did not reach the last page");
+      await press("Home", ", ctrlKey: true");
+      const atStart = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') === '1–50 of 300'`,
+        5000,
+      );
+      expect(atStart, "Ctrl+Home did not return to the first page");
+      return "PageDown/PageUp, page-edge arrows and Ctrl+Home/End keep the cursor";
+    },
+  },
+  {
     name: "parquet-inspector",
     docs: "parquet-inspector.png",
     async run({ page, base }) {
@@ -1130,6 +1194,8 @@ const scenarios = [
             const wrap = document.querySelector('.parquet-viewer__table-wrap');
             wrap.focus();
             const press = (key) => wrap.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+            // The first arrow lands on the first cell, so reaching name·row 2 takes two rights.
+            press('ArrowRight');
             press('ArrowRight');
             press('ArrowDown');
         })()`);

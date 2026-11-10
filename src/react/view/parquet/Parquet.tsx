@@ -327,6 +327,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [searchedEmpty, setSearchedEmpty] = useState(false);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<CellCursor | null>(null);
+  /** Where the cursor should land once a page turned by keyboard has loaded. */
+  const pendingCursor = useRef<{ where: "first" | "last"; col: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const siderDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   /** Absolute row the footer jump aimed at, highlighted until the next navigation. */
@@ -849,6 +851,58 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       }
       const rows = Math.max(1, pageRows.length);
       const cols = fileInfo.columns.length;
+      const pageCount = Math.max(1, Math.ceil(fileInfo.rowCount / PAGE_SIZE));
+      const base = cursorRef.current ?? { row: 0, col: 0 };
+
+      /**
+       * Turn the page and land the cursor on the edge of the new one. The column is kept: a
+       * comparison across pages should not have to be re-navigated. The row is applied once the
+       * new page's rows exist, because `goToPage` clears the cursor on purpose.
+       */
+      const turnPage = (nextPage: number, where: "first" | "last"): boolean => {
+        const targetPage = Math.max(0, Math.min(pageCount - 1, nextPage));
+        if (targetPage === page) return false;
+        pendingCursor.current = { where, col: base.col };
+        goToPage(targetPage);
+        return true;
+      };
+
+      if ((event.ctrlKey || event.metaKey) && (event.key === "Home" || event.key === "End")) {
+        event.preventDefault();
+        turnPage(event.key === "Home" ? 0 : pageCount - 1, event.key === "Home" ? "first" : "last");
+        return;
+      }
+      if (event.key === "PageDown") {
+        event.preventDefault();
+        turnPage(page + 1, "first");
+        return;
+      }
+      if (event.key === "PageUp") {
+        event.preventDefault();
+        turnPage(page - 1, "last");
+        return;
+      }
+      // Arrows walk off the end of a page into the next one instead of stopping dead: 50 rows is
+      // not a file, and a virtual table cannot be scrolled with the keyboard otherwise.
+      if (event.key === "ArrowDown" && cursor && cursor.row >= rows - 1) {
+        event.preventDefault();
+        turnPage(page + 1, "first");
+        return;
+      }
+      if (event.key === "ArrowUp" && cursor && cursor.row === 0) {
+        event.preventDefault();
+        turnPage(page - 1, "last");
+        return;
+      }
+
+      // The first arrow lands on the first cell: without this, Down starts at row 1 and Up at
+      // row -1 (clamped to 0), so the top-left cell could never be reached from a cold start.
+      if (!cursorRef.current) {
+        event.preventDefault();
+        selectCell({ row: 0, col: 0 });
+        return;
+      }
+
       const moves: Record<string, [number, number]> = {
         ArrowDown: [1, 0],
         ArrowUp: [-1, 0],
@@ -860,7 +914,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       const move = moves[event.key];
       if (!move) return;
       event.preventDefault();
-      const base = cursorRef.current ?? { row: 0, col: 0 };
       const next = {
         row: Math.max(0, Math.min(rows - 1, base.row + move[0])),
         col:
@@ -881,8 +934,18 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         });
       }
     },
-    [cursor, fileInfo, page, pageRows, selectCell],
+    [cursor, fileInfo, page, pageRows, selectCell, goToPage],
   );
+
+  // A page turned from the keyboard has to put the cursor back: `goToPage` clears it, and the
+  // row it should land on ("last" = the previous page's final row) is only known once the new
+  // page's rows have arrived.
+  useEffect(() => {
+    const pending = pendingCursor.current;
+    if (!pending || pageRows.length === 0) return;
+    pendingCursor.current = null;
+    selectCell({ row: pending.where === "first" ? 0 : pageRows.length - 1, col: pending.col });
+  }, [pageRows, selectCell]);
 
   // Move real focus with the cursor. A focusable cell is what makes the roving tabindex
   // work for assistive tech; the scroll keeps the focused cell in view. A virtual table may not
