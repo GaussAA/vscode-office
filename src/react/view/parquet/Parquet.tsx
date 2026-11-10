@@ -809,6 +809,27 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     [matchRows, page, goToPage, focusColumn],
   );
 
+  /**
+   * Move the cursor *and* show the cell in the bottom bar. A focus ring the inspector disagrees
+   * with is worse than no ring at all, and two of the cursor's entry points (the first arrow of a
+   * cold start, and the row restored after a keyboard page turn) used to skip the inspector.
+   */
+  const revealCursor = useCallback(
+    (next: CellCursor | null) => {
+      selectCell(next);
+      if (!next) return;
+      const column = fileInfo?.columns[next.col];
+      const row = pageRows[next.row];
+      if (!column || !row) return;
+      setInspected({
+        row: page * PAGE_SIZE + next.row,
+        column: column.name,
+        value: row[column.name],
+      });
+    },
+    [selectCell, fileInfo, page, pageRows],
+  );
+
   /** Abandon a running scan. The scan checks `searchSeq` between pages, so this stops it. */
   const cancelSearch = useCallback(() => {
     searchSeq.current++;
@@ -896,13 +917,14 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (event.key === "PageDown") {
         event.preventDefault();
         if (base.row + visibleRows <= rows - 1)
-          selectCell({ row: base.row + visibleRows, col: base.col });
+          revealCursor({ row: base.row + visibleRows, col: base.col });
         else turnPage(page + 1, "first");
         return;
       }
       if (event.key === "PageUp") {
         event.preventDefault();
-        if (base.row - visibleRows >= 0) selectCell({ row: base.row - visibleRows, col: base.col });
+        if (base.row - visibleRows >= 0)
+          revealCursor({ row: base.row - visibleRows, col: base.col });
         else turnPage(page - 1, "last");
         return;
       }
@@ -923,7 +945,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       // row -1 (clamped to 0), so the top-left cell could never be reached from a cold start.
       if (!cursorRef.current) {
         event.preventDefault();
-        selectCell({ row: 0, col: 0 });
+        revealCursor({ row: 0, col: 0 });
         return;
       }
 
@@ -958,7 +980,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         });
       }
     },
-    [cursor, fileInfo, page, pageRows, selectCell, goToPage, tableBodyHeight],
+    [cursor, fileInfo, page, pageRows, selectCell, goToPage, tableBodyHeight, revealCursor],
   );
 
   // A page turned from the keyboard has to put the cursor back: `goToPage` clears it, and the
@@ -968,8 +990,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     const pending = pendingCursor.current;
     if (!pending || pageRows.length === 0) return;
     pendingCursor.current = null;
-    selectCell({ row: pending.where === "first" ? 0 : pageRows.length - 1, col: pending.col });
-  }, [pageRows, selectCell]);
+    revealCursor({ row: pending.where === "first" ? 0 : pageRows.length - 1, col: pending.col });
+  }, [pageRows, revealCursor]);
 
   // Move real focus with the cursor. A focusable cell is what makes the roving tabindex
   // work for assistive tech; the scroll keeps the focused cell in view. A virtual table may not

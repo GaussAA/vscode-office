@@ -1041,6 +1041,12 @@ const scenarios = [
         `document.activeElement?.getAttribute('data-cell') === '0:0'`,
       );
       expect(started, `keyboard cursor did not start at 0:0 (${await cursorAt()})`);
+      // The focus ring and the bottom bar must agree, including on the paths that only restore
+      // a cursor (cold start, page turn) rather than walking to a cell.
+      const synced = await page.evaluate(
+        `(document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '').trim()`,
+      );
+      expect(/id · row 1\b/.test(synced), `the bottom bar disagrees with the cursor: "${synced}"`);
 
       // PageDown moves by what the viewport shows, not by the 50-row page: a page-sized step
       // dropped a third of the rows without ever displaying them.
@@ -1401,7 +1407,30 @@ const scenarios = [
       const geometry = json(
         await page.evaluate(`JSON.stringify((() => {
                 const rows = [...document.querySelectorAll('.ant-table-tbody-virtual-holder-inner > *')];
-                const bg = (row) => row ? getComputedStyle(row.querySelector('.ant-table-cell') ?? row).backgroundColor : null;
+                // Composite alpha: a tint that resolves to rgba(…, 0.06) is invisible even when
+                // its raw channels look far from the background.
+                const nums = (value) => (value.match(/[\\d.]+/g) ?? []).map(Number);
+                const composite = (fg, under) => {
+                    const alpha = fg.length > 3 ? fg[3] : 1;
+                    return [0, 1, 2].map((i) => Math.round(fg[i] * alpha + under[i] * (1 - alpha)));
+                };
+                const bg = (row) => {
+                    const cell = row ? (row.querySelector('.ant-table-cell') ?? row) : null;
+                    if (!cell) return null;
+                    const fg = nums(getComputedStyle(cell).backgroundColor);
+                    if (fg.length < 3) return null;
+                    let node = cell.parentElement;
+                    let under = null;
+                    while (node) {
+                        const candidate = nums(getComputedStyle(node).backgroundColor);
+                        if (candidate.length >= 3 && (candidate.length === 3 || candidate[3] >= 0.5)) {
+                            under = candidate.slice(0, 3);
+                            break;
+                        }
+                        node = node.parentElement;
+                    }
+                    return composite(fg, under ?? [255, 255, 255]);
+                };
                 const base = rows.find((row) => !/row--(alt|match|target)/.test(row.className));
                 const alt = rows.find((row) => /row--alt/.test(row.className));
                 const match = document.querySelector('.parquet-viewer__row--match');
@@ -1428,6 +1457,10 @@ const scenarios = [
         geometry.match && geometry.base && geometry.match !== geometry.base,
         "the matched row has no tint",
       );
+      // The tint's *strength* is not gated: measuring it means resolving antd's layered
+      // backgrounds, and the walk-up produced [0,0,0] for the matched row — an unreliable number
+      // is worse than none. The colour is chosen for legibility and checked in the screenshot;
+      // only the fact that the row is tinted differently is asserted above.
       // Enter follows VS Code's own find: it walks the hits. Re-running the scan is Ctrl+Enter
       // and the button, so a multi-hit query gives the semantics something to observe.
       await page.evaluate(`(() => {

@@ -29,9 +29,13 @@ body:has(.parquet-app) {
   --pv-control-hover: color-mix(in srgb, var(--pv-fg) 13%, var(--pv-panel));
   --pv-control-active: color-mix(in srgb, var(--pv-fg) 18%, var(--pv-panel));
   --pv-row-alt: color-mix(in srgb, var(--pv-fg) 3.5%, var(--pv-bg));
+  /* findMatchHighlightBackground is semi-transparent on purpose — VS Code paints it *over*
+     text. Mixing it again at 18% left roughly 6% effective opacity, so a matched row read as a
+     slightly luckier stripe instead of a hit. The opaque token is the right source; the fallback
+     is that same amber, flattened. */
   --pv-row-match: color-mix(
     in srgb,
-    var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33)) 18%,
+    var(--vscode-editor-findMatchBackground, #ea5c00) 22%,
     var(--pv-bg)
   );
   --pv-row-target: color-mix(in srgb, var(--pv-accent) 18%, var(--pv-bg));
