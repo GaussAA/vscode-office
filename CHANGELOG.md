@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scrolls that column into view as well. In a 60-column file a hit used to land off-screen with
   no marker anywhere.
 
+### Changed
+
+- The parquet error state now names the file, explains the failure in a sentence and keeps two
+  ways out — `Retry` and `Edit In VS Code`. The library's own message
+  (`parquet file invalid (footer != PAR1)`) moved into a collapsed "Technical detail": someone
+  who opened a broken file previously got one line of parser output and a retry button, with no
+  indication of which file it was.
+
 ### Fixed
 
 - The parquet error state is a live region (`role="alert"`). That state replaces the entire
