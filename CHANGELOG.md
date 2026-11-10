@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The parquet schema field jump now measures the live column instead of assuming a fixed
+  120 px width — columns are stretched to fill the viewport when a file has few of them — drags
+  the horizontal scrollbar instead of clicking it, and keeps the header in step with the body.
+  The header is a separate scroll surface, so a jump used to leave the column labels one or two
+  columns away from the values underneath them.
+- The parquet error state's primary action is `Reveal in Explorer` rather than opening the file
+  as a binary in the editor, which for a broken file leads straight to a VS Code warning page.
+  `Retry` stays, as the secondary action.
 - The parquet bottom bar is no longer an `aria-live` region. It updates on every arrow key, so a
   screen reader queued one announcement per keystroke; a visually hidden status region now
   announces the selection once it has settled for 600 ms.
