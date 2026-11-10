@@ -46,7 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Row numbers now belong to the page whose rows are actually on screen. `page` changed on the
+- Leaving the parquet row-jump field no longer navigates. The jump fires on `Enter` (or the Go
+  button) only, so looking at the table mid-edit no longer moves the page out from under you.
+- The parquet error pane can copy its own message, and `Retry` is offered only where retrying
+  could change the answer: an unsupported compression codec is a property of the file, so the
+  codec branch shows the way out and the details instead of a button that loops.- Row numbers now belong to the page whose rows are actually on screen. `page` changed on the
   click while the rows arrived up to 1.7 s later, so the `#` column, `aria-rowindex` and the
   inspector briefly described the wrong rows — the bottom bar could read "row 1" beside a value
   from row 251, and screen readers announced it.- The keyboard cursor and the bottom bar now agree: every path that restores a cursor (the first
