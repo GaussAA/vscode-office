@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Copying a parquet value now answers: the copy button turns into a check for a moment and its
+- An empty parquet file says "No rows" once, in the body; the footer no longer repeats it, and the
+  pager hides its position label when there are no rows to be positioned in.
+- The row-number column is right-aligned like every other number on the surface.
+- `DESIGN.md` now matches the implementation: the thin-mix rule is stated in terms of final
+  opacity (a mix source with its own alpha is not the same as a plain percentage), and the colour
+  inventory lists the light-theme muted override and the two JSON token colours.- Copying a parquet value now answers: the copy button turns into a check for a moment and its
   label says `Copied`. `Ctrl+C` on the grid copies the selected value, which previously only
   selected the page text.
 - The top bar shows the file's size. `PRODUCT.md` lists "how big is this file" as one of the four
