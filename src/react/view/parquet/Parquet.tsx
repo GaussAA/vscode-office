@@ -919,7 +919,14 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 value={query}
                 onChange={(event) => handleQueryChange(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") void runSearch();
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  // Enter follows VS Code's own find: move to the next hit. Re-running a
+                  // whole-file scan (1.3 s on a million rows) belongs on the button and on
+                  // Ctrl/Cmd+Enter, not on the key the user presses to walk the matches.
+                  if (event.ctrlKey || event.metaKey) void runSearch();
+                  else if (matchRows.size > 0) jumpMatch(event.shiftKey ? -1 : 1);
+                  else void runSearch();
                 }}
               />
               {query && (
@@ -945,7 +952,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 aria-label={$t("parquet.searchAllRows")}
               >
                 <span
-                  className={`codicon ${searching ? "codicon-loading codicon-modifier-spin" : "codicon-arrow-right"}`}
+                  className={`codicon ${searching ? "codicon-loading codicon-modifier-spin" : "codicon-refresh"}`}
                 />
               </button>
             </div>

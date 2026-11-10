@@ -1093,7 +1093,33 @@ const scenarios = [
         geometry.match && geometry.base && geometry.match !== geometry.base,
         "the matched row has no tint",
       );
-      return `${state.count} at ${state.range}, ${state.hits} highlighted cell(s), ${geometry.height}px rows`;
+      // Enter follows VS Code's own find: it walks the hits. Re-running the scan is Ctrl+Enter
+      // and the button, so a multi-hit query gives the semantics something to observe.
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__find-input');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'service-');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                document.querySelector('.parquet-viewer__find-btn')
+                    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      const many = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').endsWith('rows')`,
+        15000,
+      );
+      expect(many, "a multi-hit scan did not report its matches");
+      const before = (await pagerState(page)).range;
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__find-input');
+                input.focus();
+                input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            })()`);
+      const stepped = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') !== ${JSON.stringify(before)}`,
+        15000,
+      );
+      expect(stepped, `Enter did not step to the next hit (still ${before})`);
+      return `${state.count} at ${state.range}, ${geometry.height}px rows, Enter steps past ${before}`;
     },
   },
   {
