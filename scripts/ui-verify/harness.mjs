@@ -248,9 +248,14 @@ function parquetStub(fixtures) {
   const inlineBase64 = readFileSync(fixtures.mixed).toString("base64");
   return `<script>
 (function () {
+  window.__openExternalCalls = [];
   const api = {
     postMessage(msg) {
       if (!msg) return;
+      if (msg.type === 'openExternal') {
+        window.__openExternalCalls.push(String(msg.content));
+        return;
+      }
       const params = new URLSearchParams(location.search);
       const guard = params.get('guard') === '1';
       // "Open anyway" for a gated virtual document: the host reads it and sends it inline.
@@ -266,6 +271,7 @@ function parquetStub(fixtures) {
         : params.get('nested') === '1' ? '/nested.parquet'
         : params.get('empty') === '1' ? '/empty.parquet'
         : params.get('types') === '1' ? '/types.parquet'
+        : params.get('preview') === '1' ? '/preview.parquet'
         : params.get('bad') === '1' ? '/bad.parquet'
         : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
@@ -595,6 +601,7 @@ export function startHarness(fixtures, port = 0) {
       path === "/nested.parquet" ||
       path === "/empty.parquet" ||
       path === "/types.parquet" ||
+      path === "/preview.parquet" ||
       path === "/bad.parquet"
     ) {
       const file =
@@ -608,9 +615,11 @@ export function startHarness(fixtures, port = 0) {
                 ? fixtures.empty
                 : path === "/types.parquet"
                   ? fixtures.types
-                  : path === "/bad.parquet"
-                    ? fixtures.bad
-                    : fixtures.big;
+                  : path === "/preview.parquet"
+                    ? fixtures.preview
+                    : path === "/bad.parquet"
+                      ? fixtures.bad
+                      : fixtures.big;
       serveParquet(req, res, file, stats, url.searchParams.get("range") !== "off");
       return;
     }

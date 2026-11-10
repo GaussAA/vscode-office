@@ -9,11 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Parquet URL cells: a complete `http(s)` value is clickable and opens through the extension
+  host after re-validation; unsafe schemes and URLs with credentials never reach the OS.
+- Parquet schema field jump: clicking a field scrolls the table horizontally to its column and
+  leaves a subtle column tint, without changing the selected row.
 - Configuration center for unified constant management (`src/config/constants.ts`)
 - Event listener cleanup infrastructure to prevent memory leaks
 - Standard project documentation (`.nvmrc`, `.editorconfig`, `SECURITY.md`, `CONTRIBUTING.md`)
 - Comprehensive test fixtures (26 files, +767% coverage)
 - Memory leak fix guide (`docs/memory-leak-fix-guide.md`)
+
+### Changed
+
+- JSON arrays/objects in parquet cells — including Polars-style list fields stored as JSON
+  strings — are token-coloured instead of rendered as one flat string.
 
 ### Fixed
 

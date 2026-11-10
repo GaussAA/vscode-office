@@ -71,6 +71,14 @@ _Avoid_: tree data（那是 antd 的类型名，指的不是这一层）
 搜索命中切分后的文本片段，带 `hit` 标记。两个视图共用一个切分函数；各自只决定用哪个 `<mark>` 类名。
 _Avoid_: match, span
 
+**Link cell（链接单元格）**:
+一个值恰好是完整 `http(s)` URL 的表格单元格。它仍然属于原列的类型（通常是 `STRING`）；点击交给宿主 `openExternal`，不在 webview 内导航。列名、是否以 `url` 结尾都不参与判断。
+_Avoid_: 链接列、hyperlink column（列没有被重新类型化）
+
+**Field jump（字段跳转）**:
+点击 parquet schema 字段后，把表格水平滚动到该列并留下淡色列高亮。它不改变筛选、分页或行选择，只是导航。
+_Avoid_: 筛选、定位行（那是 jump-to-row）
+
 **Typecheck baseline（类型闸门基线）**:
 `scripts/typecheck-baseline.json` 里记录的已知类型错误，只许减不许增。它现在是空的，所以规则退化为：任何类型错误都会让 `pnpm check` 失败。
 _Avoid_: whitelist（它曾经是白名单；现在只是一个已清空的棘轮）
