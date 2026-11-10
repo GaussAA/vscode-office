@@ -306,6 +306,7 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 - **Do** 用 10px 大写 + 600 字重 + ≥0.045em 字距表达标签层级，并把其余文字留给 12–13px 常规字重。
 - **Do** 用 `color-mix(in srgb, var(--fg) 8%, var(--panel))` 这一族混合造控件底，让深浅主题自动成立。
 - **Do** 在新增数据色时同时更新 `scripts/ui-verify` 的对比度断言（浅色主题 ≥ 4.5:1），否则闸门会红。
+- **Do** 让窗口化视图的 `aria-rowcount` / `aria-colcount` 说**文件**的行列数，不是 DOM 里渲染的那一窗；`aria-rowindex` 与 `aria-colindex` 在表头与单元格两侧都要写。
 
 ### Don't:
 

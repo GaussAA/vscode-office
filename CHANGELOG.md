@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The parquet table now exposes grid semantics: `role="grid"` with the **file's** row and column
+  counts (not the rendered window), `row` / `gridcell` / `rowheader` / `columnheader` roles,
+  absolute `aria-rowindex` that stays continuous across pages, and `aria-colindex` on both the
+  header and the cells — the header is a separate scroll surface, so a cell can only be mapped
+  to its column when both sides carry the ordinal. The header's own `<table>` shell became
+  `role="presentation"`, since a table is not a valid child of a grid.
 - The parquet error state now names the file, explains the failure in a sentence and keeps two
   ways out — `Retry` and `Edit In VS Code`. The library's own message
   (`parquet file invalid (footer != PAR1)`) moved into a collapsed "Technical detail": someone
