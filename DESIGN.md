@@ -178,7 +178,9 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 
 **The One Host Lookup Rule.** 同一个宿主变量只读一次，语义差异用别名表达。parquet 的十个图标色原本各自重复读取四个 `--vscode-charts-*`：改一次颜色要改三处，且随时可能漂移。现在六个 `--pv-chart-*` 各读一次，图标色是它们的别名（`--pv-icon-rows` → `--pv-chart-blue`），由 `verify:ui` 的 `parquet-tokens` 断言别名图真的一致 —— 设计 token 只有在解析值一致时才算单一事实来源。
 
-**The Two Token Layers Rule.** `--pv-*` 是 parquet 自己的那一层，**不引用** `--viewer-*`：后者由 `viewerTheme.css` 提供给其它视图，作用域挂在 `.office-viewer-themed` 上，且其 `--viewer-accent` 指 `textLink-foreground` 而 `--pv-accent` 指 `button-background` —— 语义不同，不是重复。跨视图合并前必须先把这两个语义分开，否则「去重」就是在悄悄改色。
+**The One Token Layer Rule.** 这个仓库只有一层 token：各组件的 `--pv-*` / `--sponsor-*` / 各自前缀，每个都写在**被引入的**样式表里。曾有一个 `viewerTheme.css` 定义十四变量 `--viewer-*` 层，声明得像其它视图在用：没有一处 import，构建产物里一个字都没有，`--viewer-accent` 指 `textLink-foreground` 而 `--pv-accent` 指 `button-background`。已删除；`test/unit/stylesheets.test.ts` 现在断言「`src/react` 下每个样式表都被某处引入」，孤儿样式表读起来像活代码，正是最难被发现的死代码。
+
+若将来真要共享一层 token，顺序是：先把同名不同义的（accent：按钮 vs 链接）拆成两个名字，再让 token 声明**不带任何副作用**（字号、字体、滚动条另行作用域化），最后才谈合并 —— 否则「去重」就是悄悄改配色。
 
 **The Chart-Colour Is Not Text Rule.** `--vscode-charts-*` 是为图形调过的色。12px 文本需要更高的对比度，所以浅色主题下这六个色被显式覆盖为同色相的更深值（`-on-light` 系列），并由 `verify:ui` 的 ≥4.5:1 断言守住。新增数据色必须同时给出浅色值，否则只能在图标上用。
 

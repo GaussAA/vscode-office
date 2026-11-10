@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- `viewerTheme.css` is gone. It declared a fourteen-variable `--viewer-*` token layer that looked
+  like the shared theme for every viewer, but nothing imported it: it never reached the build, no
+  component read a single one of its variables, and its `--viewer-accent` meant the link colour
+  while parquet's `--pv-accent` means the button colour. `test/unit/stylesheets.test.ts` now fails
+  on any stylesheet under `src/react` that nothing imports — an orphan stylesheet reads like live
+  code, which is the hardest kind of dead code to notice.
+
 ## [Unreleased]
+
+### Removed
+
+- `viewerTheme.css` is gone. It declared a fourteen-variable `--viewer-*` token layer that looked
+  like the shared theme for every viewer, but nothing imported it: it never reached the build, no
+  component read a single one of its variables, and its `--viewer-accent` meant the link colour
+  while parquet's `--pv-accent` means the button colour. `test/unit/stylesheets.test.ts` now fails
+  on any stylesheet under `src/react` that nothing imports — an orphan stylesheet reads like live
+  code, which is the hardest kind of dead code to notice.
 
 ### Changed
 
