@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 import test from "node:test";
 
 /**
@@ -39,7 +39,7 @@ const styles = sources.filter((path) => /\.(css|less)$/.test(path));
 test("every stylesheet is imported by something", () => {
   const text = code.map((path) => readFileSync(path, "utf8")).join("\n");
   const orphans = styles.filter((path) => {
-    const name = path.slice(path.lastIndexOf("\\") + 1);
+    const name = basename(path);
     // Imported either as `import "./Name.css"` or via a less `@import`.
     return (
       !text.includes(name) &&
