@@ -156,17 +156,18 @@ curl -s https://open-vsx.org/api/GaussAA/office-viewer-plus | head -c 200
 
 ## E. 哪些是自动的，哪些只能人做
 
-| 项目                                                                       | 谁负责          |
-| -------------------------------------------------------------------------- | --------------- |
-| 图标是 PNG 且 ≥128px                                                       | `check:release` |
-| `version` 是 `major.minor.patch`（Marketplace 不接受 semver 预发布后缀）   | `check:release` |
-| tag 与 `version` 一致                                                      | `check:release` |
-| `README` / `LICENSE` / `CHANGELOG` 存在、`license` 字段存在                | `check:release` |
-| `l10n` 目录与 `package.json.l10n`                                          | `check:release` |
-| 工作流有 `id-token: write`、`--oidc`、`--trusted-publishing`，且不引用 PAT | `check:release` |
-| **Marketplace 受信策略存在且字段匹配**                                     | 人（A2）        |
-| **Open VSX 命名空间存在、已主张所有权**                                    | 人（B1）        |
-| **Open VSX 受信发布者已注册**                                              | 人（B2）        |
+| 项目                                                                          | 谁负责          |
+| ----------------------------------------------------------------------------- | --------------- |
+| 图标是 PNG 且 ≥128px                                                          | `check:release` |
+| `version` 是 `major.minor.patch`（Marketplace 不接受 semver 预发布后缀）      | `check:release` |
+| tag 与 `version` 一致                                                         | `check:release` |
+| `README` / `LICENSE` / `CHANGELOG` 存在、`license` 字段存在                   | `check:release` |
+| `CHANGELOG.md` 里有与 `version` 对应的、带日期的 `## [x.y.z] - YYYY-MM-DD` 段 | `check:release` |
+| `l10n` 目录与 `package.json.l10n`                                             | `check:release` |
+| 工作流有 `id-token: write`、`--oidc`、`--trusted-publishing`，且不引用 PAT    | `check:release` |
+| **Marketplace 受信策略存在且字段匹配**                                        | 人（A2）        |
+| **Open VSX 命名空间存在、已主张所有权**                                       | 人（B1）        |
+| **Open VSX 受信发布者已注册**                                                 | 人（B2）        |
 
 最后三项无法在仓库里验证——需要登录态。它们的失败信息分别是
 "trusted publishing policy not found"（Marketplace）和 "no matching trusted publisher"（Open VSX），

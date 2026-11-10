@@ -59,6 +59,23 @@ for (const file of ["README.md", "LICENSE", "CHANGELOG.md"]) {
     fail(`${file} is missing; vsce packages without it but the listing looks broken`);
 }
 
+/**
+ * The Marketplace shows the matching `## [x.y.z]` section as the release notes, so a version
+ * number without one publishes a page that describes some other release. This is the check that
+ * would have caught 6.2.0: its code shipped, but the changelog jumped from 6.3.0 to 6.1.0 and
+ * the version never had a section of its own.
+ */
+const versionHeading = new RegExp(
+  `^## \\[${manifest.version.replace(/\./g, "\\.")}\\] - \\d{4}-\\d{2}-\\d{2}$`,
+  "m",
+);
+if (!versionHeading.test(read("CHANGELOG.md"))) {
+  fail(
+    `CHANGELOG.md has no dated "## [${manifest.version}] - YYYY-MM-DD" section; ` +
+      "the Marketplace release notes would show another version",
+  );
+}
+
 const icon = manifest.icon;
 if (!icon) {
   fail('package.json has no "icon"');
