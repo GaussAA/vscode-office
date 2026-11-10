@@ -30,7 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Parquet search results now belong to the text in the box: editing the needle clears the
+- The parquet bottom bar keeps its selection together: the copy and close buttons sit next to
+  the value instead of being pushed to the far end against the pager, and a container value is
+  previewed with the same 320-character cap the cells use (copy still takes the whole value).
+- Clicking a link cell now also selects it, so the URL lands in the inspector where it can be
+  copied; the click still opens the link.- Parquet search results now belong to the text in the box: editing the needle clears the
   previous counts, marks and column hits, and `Enter` searches the new text instead of jumping
   to a hit of the old one.
 - The parquet grid is keyboard-navigable across the whole file: `PageDown`/`PageUp` turn a page,
