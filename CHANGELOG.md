@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Parquet row styling above the virtual threshold: the body renders `div` cells, but every
+  row-level rule named `tr > td`, so alternating stripes, the 6px cell padding, the removal of
+  row separators and the match/target-row tints were all silently dead on real files (rows
+  measured 39px instead of the designed 34px). `verify:ui` now asserts the row height, the
+  absent border, and that the alternate, match and target rows carry a different background.
+- Find in file: `Enter` walks to the next hit the way VS Code's own find does, `Shift+Enter`
+  to the previous one, and `Ctrl/Cmd+Enter` — or the button, whose icon no longer reads as
+  "next" — re-runs the whole-file scan.
+
 ## [6.3.0] - 2026-11-10
 
 ### Added
