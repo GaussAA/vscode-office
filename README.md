@@ -1,4 +1,4 @@
-# Office Viewer Plus
+# Data File Viewer (Parquet, JSONL, Excel)
 
 English | [简体中文](README-CN.md) | [繁體中文](README-TW.md)
 

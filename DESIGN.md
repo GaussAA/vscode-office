@@ -1,5 +1,5 @@
 ---
-name: Office Viewer Plus
+name: Data File Viewer (Parquet, JSONL, Excel)
 description: VS Code 里三件只读预览仪器的视觉体系 —— 主题是机身，颜色只给信号，密度就是效率。
 colors:
   editor-surface: "#1e1e1e"
@@ -120,7 +120,7 @@ components:
     padding: "6px 12px"
 ---
 
-# Design System: Office Viewer Plus
+# Design System: Data File Viewer (Parquet, JSONL, Excel)
 
 ## Overview
 

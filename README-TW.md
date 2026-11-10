@@ -1,4 +1,4 @@
-# Office Viewer Plus
+# Data File Viewer (Parquet, JSONL, Excel)
 
 [English](README.md) | [简体中文](README-CN.md) | 繁體中文
 
@@ -17,7 +17,7 @@ ICNS、XMind、HTML、Java `.class`、壓縮檔——都在 **6.0.0** 移除：�
 原生已經支援，其餘都有更成熟的專用閱讀器。理由見
 [ADR-0015](docs/adr/0015-narrow-to-three-viewers.md)，升級說明見 [CHANGELOG.md](CHANGELOG.md)。
 
-## 本倉庫：Office Viewer Plus（fork）
+## 本倉庫：Data File Viewer (Parquet, JSONL, Excel)（fork）
 
 本倉庫 fork 自 [cweijan/vscode-office](https://github.com/cweijan/vscode-office)（MIT，見
 [NOTICE.md](NOTICE.md)），以 `GaussAA.office-viewer-plus` 發佈，可與原版並存安裝。這個 fork

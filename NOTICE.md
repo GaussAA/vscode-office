@@ -4,7 +4,7 @@ This project is a fork of [Office Viewer](https://github.com/cweijan/vscode-offi
 Weijan Chen (@cweijan), licensed under the MIT License. The original copyright notice is
 preserved in [LICENSE](./LICENSE).
 
-Fork identity: `GaussAA.office-viewer-plus` (Marketplace display name "Data File Viewer (Parquet, JSONL, Excel)"; the project is still called Office Viewer Plus).
+Fork identity: `GaussAA.office-viewer-plus` (display name "Data File Viewer (Parquet, JSONL, Excel)", formerly "Office Viewer Plus", which the Marketplace rejected as taken).
 
 ## What this fork changed
 

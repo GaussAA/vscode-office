@@ -29,7 +29,7 @@ pnpm run package           # 产出 office-viewer-plus-<version>.vsix
 ```bash
 gh release create v4.4.1 office-viewer-plus-4.4.1.vsix \
   --repo GaussAA/vscode-office \
-  --title "Office Viewer Plus 4.4.1" \
+  --title "Data File Viewer (Parquet, JSONL, Excel) 4.4.1" \
   --notes-file <notes.md>
 ```
 

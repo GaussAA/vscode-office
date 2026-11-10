@@ -5,17 +5,17 @@
 
 ## 唯一命名格式
 
-| 东西                | 格式                                                      | 例子                            |
-| ------------------- | --------------------------------------------------------- | ------------------------------- |
-| Git tag             | `v<major>.<minor>.<patch>`                                | `v6.4.1`                        |
-| GitHub Release 标题 | `Office Viewer Plus v<major>.<minor>.<patch>`             | `Office Viewer Plus v6.4.1`     |
-| Release 正文小标题  | `### Added` / `### Changed` / `### Fixed` / `### Removed` | —                               |
-| 附件名              | `<name>-<version>.vsix`（vsce 自动生成）                  | `office-viewer-plus-6.4.1.vsix` |
-| CHANGELOG 小节      | `## [<version>] - <YYYY-MM-DD>`                           | `## [6.4.1] - 2026-11-10`       |
+| 东西                | 格式                                                                | 例子                                              |
+| ------------------- | ------------------------------------------------------------------- | ------------------------------------------------- |
+| Git tag             | `v<major>.<minor>.<patch>`                                          | `v6.4.1`                                          |
+| GitHub Release 标题 | `Data File Viewer (Parquet, JSONL, Excel) v<major>.<minor>.<patch>` | `Data File Viewer (Parquet, JSONL, Excel) v6.4.1` |
+| Release 正文小标题  | `### Added` / `### Changed` / `### Fixed` / `### Removed`           | —                                                 |
+| 附件名              | `<name>-<version>.vsix`（vsce 自动生成）                            | `office-viewer-plus-6.4.1.vsix`                   |
+| CHANGELOG 小节      | `## [<version>] - <YYYY-MM-DD>`                                     | `## [6.4.1] - 2026-11-10`                         |
 
 三条硬规则：
 
-1. **标题只写产品名与版本**：`Office Viewer Plus v6.4.1`。不写「项目质量全面提升」这类后缀 ——
+1. **标题只写产品名与版本**：`Data File Viewer (Parquet, JSONL, Excel) v6.4.1`。不写「项目质量全面提升」这类后缀 ——
    那是发布说明的正文，不是标题；也不写裸版本号（`6.4.0`）或带 `v` 却省产品名（`v6.2.0 - …`）。
    历史上有过这三种写法，已统一。
 2. **正文不要重复版本号**：GitHub 已经把版本与日期放在标题和左侧，正文第一行也不要再写
@@ -34,11 +34,11 @@ pnpm check:full
 pnpm run package
 # 4. 提交并打 tag
 git add -A && git commit -m "release: <version>"
-git tag -a v<version> -m "Office Viewer Plus <version>"
+git tag -a v<version> -m "Data File Viewer (Parquet, JSONL, Excel) <version>"
 # 5. 推送代码与 tag
 git push origin main && git push origin v<version>
 # 6. 建 Release（标题按上表，正文取自 CHANGELOG 该小节）
-gh release create v<version> --title "Office Viewer Plus v<version>" \
+gh release create v<version> --title "Data File Viewer (Parquet, JSONL, Excel) v<version>" \
   --notes-file /tmp/notes.md "office-viewer-plus-<version>.vsix"
 ```
 
