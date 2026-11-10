@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.5] - 2026-11-11
+
+### Changed
+
+- New extension icon (`image/logo.png`, 512x512, square): a table between braces, in teal and amber. The Marketplace rejected the previous icon as too similar to an existing one.
+
 ## [6.4.4] - 2026-11-11
 
 ### Changed
