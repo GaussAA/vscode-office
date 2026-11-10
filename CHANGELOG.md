@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.1] - 2026-11-10
+
+### Fixed
+
+- Paging a large parquet file no longer re-reads a whole data page per turn. Decoding costs the
+  same for 50 rows as for 20,000 (measured on a 202 MB / 1.1 M row / 49 column file: 22.6 MB and
+  ~1.4 s either way), so the session now reads in 5,000-row chunks and a page is a slice of one.
+  On that file a page turn went from 1.2–1.5 s to 0 ms, and the turn that crosses a chunk
+  boundary is prefetched in idle time. `verify:perf` also gained a scroll-frame check: scrolling
+  the 60-column fixture holds p95 16.8 ms (~60 fps).
+
 ## [6.4.0] - 2026-11-10
 
 Four rounds of design critique on the parquet viewer, plus the column work that came out of it.
