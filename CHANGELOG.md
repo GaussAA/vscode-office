@@ -54,7 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Leaving the parquet row-jump field no longer navigates. The jump fires on `Enter` (or the Go
+- Columns in a narrow parquet file no longer stretch to fill the window. Spare width grows them
+  up to 240 px and the rest is left empty, so a four-column file is four readable columns instead
+  of five broad panels — and a dragged width now lands where it was dropped.- Leaving the parquet row-jump field no longer navigates. The jump fires on `Enter` (or the Go
   button) only, so looking at the table mid-edit no longer moves the page out from under you.
 - The parquet error pane can copy its own message, and `Retry` is offered only where retrying
   could change the answer: an unsupported compression codec is a property of the file, so the
