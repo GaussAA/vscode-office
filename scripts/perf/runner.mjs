@@ -305,7 +305,7 @@ const scenarios = [
         `searching ${fixtures.flatRows.toLocaleString()} rows took ${result.ms} ms ` +
           `(budget ${SEARCH_BUDGET_FLAT_MS} ms); check for a per-batch re-read`,
       );
-      expect(/1 row/.test(result.count ?? ""), `unexpected match count: ${result.count}`);
+      expect(/1 match/.test(result.count ?? ""), `unexpected match count: ${result.count}`);
       return `${result.ms} ms for ${fixtures.flatRows.toLocaleString()} rows → ${result.count}`;
     },
   },
