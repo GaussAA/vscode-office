@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The parquet error state is a live region (`role="alert"`). That state replaces the entire
+  chrome with one message, so a screen-reader user previously received no announcement at all.
+- The label layer — 10px table headers, 9.5px type badges, the `SCHEMA` section title — gets a
+  darker muted foreground under a light theme, because the theme's `descriptionForeground` is
+  tuned for 13px body text and measured 3.5–4.0:1 at these sizes. The UI contrast gate now
+  covers those three selectors as well, so the declared values cannot drift back down.
 - A scan that finds nothing now says `0 matches` instead of leaving the bar blank, which was
   indistinguishable from "you never searched".
 - The match counter reads `1 match` / `N matches` instead of `1 row` / `N rows`, which collided
