@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.2] - 2026-11-10
+
 ### Fixed
 
 - **[SECURITY]** `xlsx` is back on SheetJS 0.20.3 (the 6.2.0 downgrade to npm 0.18.5 reintroduced
@@ -14,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the 6.2.0 event-listener cleanup helpers; the Git history view no longer calls
   `removeAllListeners()` from an effect whose dependencies can change, which could drop the
   one-time `viewColumn` handler.
-- Restored the pre-6.0.0 changelog history that 6.2.0 deleted.
+- Restored the changelog history (5.0.0 and earlier) that 6.2.0 deleted.
+- The sample files under `test/fixtures` are now exercised by `test/unit/fixtures.test.ts`.
 - `.nvmrc` is 24, matching the host Node and CI.
 
 ## [6.4.1] - 2026-11-10
