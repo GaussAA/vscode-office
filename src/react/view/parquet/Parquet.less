@@ -84,6 +84,10 @@ body:has(.parquet-app) {
   --pv-link: #006ab1;
   --pv-json-key: #6f2d8a;
   --pv-error: #b00000;
+  /* The label layer (10–10.5px headers, 9.5px type badges) measured 3.5–4.0:1 against the
+     light theme's descriptionForeground, which is tuned for 13px body text. Labels are the
+     smallest type in the surface and carry the most semantics, so they get their own value. */
+  --pv-muted: #5c5c5c;
 }
 
 .parquet-viewer *,

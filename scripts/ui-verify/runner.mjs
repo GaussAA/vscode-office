@@ -479,13 +479,17 @@ const scenarios = [
                 error: document.querySelector('.parquet-viewer__error span:nth-child(2)')?.innerText ?? null,
                 retry: [...document.querySelectorAll('.parquet-viewer__error button')]
                     .some(b => b.textContent.trim() === 'Retry'),
+                role: document.querySelector('.parquet-viewer__error')?.getAttribute('role') ?? null,
                 table: !!document.querySelector('.parquet-table'),
             })`),
       );
       expect(/parquet/i.test(state.error ?? ""), `unexpected error copy: ${state.error}`);
       expect(state.retry, "error state has no way to try again");
+      // The whole chrome is gone in this state; without a live region a screen-reader user
+      // gets no announcement at all, only an empty page.
+      expect(state.role === "alert", `error state is not announced (role=${state.role})`);
       expect(!state.table, "a broken file still rendered a table");
-      return "malformed file: message + retry";
+      return "malformed file: announced message + retry";
     },
   },
   {
@@ -853,6 +857,11 @@ const scenarios = [
         ["numeric", ".parquet-viewer__cell--numeric"],
         ["string", ".parquet-viewer__cell--string"],
         ["bool", ".parquet-viewer__cell--bool-true"],
+        // The label layer: the smallest type in the surface, and the only layer the gate used
+        // to leave unguarded. Measured 3.5–4.0:1 before the light override existed.
+        ["badge", ".parquet-viewer__list-type"],
+        ["header", ".parquet-table thead th"],
+        ["sectionTitle", ".parquet-viewer__sider-title"],
       ]) {
         parquet[key] = await contrastRatio(page, selector);
       }

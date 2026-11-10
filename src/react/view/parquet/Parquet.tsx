@@ -910,7 +910,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       )}
       {error ? (
         <div className="parquet-viewer__empty">
-          <div className="parquet-viewer__error">
+          <div className="parquet-viewer__error" role="alert">
             <span className="codicon codicon-error" />
             <span>{error}</span>
             <button
