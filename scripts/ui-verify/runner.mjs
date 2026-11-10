@@ -700,6 +700,103 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-column-resize",
+    async run({ page, base }) {
+      // Twelve columns: the table overflows, so the widths this scenario sets are the widths
+      // that render. On a four-column file antd stretches the columns to fill the viewport and
+      // a 80px drag lands as a much larger step.
+      await openParquet(page, base, "?preview=1");
+      const measure = `(() => {
+                const heads = [...document.querySelectorAll('.parquet-table thead th')];
+                const nameHead = heads[2];
+                const colIndex = nameHead?.getAttribute('aria-colindex');
+                const cell = document.querySelector(
+                    '.ant-table-tbody-virtual .ant-table-cell[aria-colindex="' + colIndex + '"]',
+                );
+                return {
+                    heads: heads.length,
+                    resizers: document.querySelectorAll('.parquet-viewer__column-resizer').length,
+                    nameWidth: nameHead ? Math.round(nameHead.getBoundingClientRect().width) : null,
+                    cellWidth: cell ? Math.round(cell.getBoundingClientRect().width) : null,
+                    separatorRole: document.querySelector('.parquet-viewer__column-resizer')?.getAttribute('role'),
+                };
+            })()`;
+      const before = json(await page.evaluate(`JSON.stringify(${measure})`));
+      // The index column keeps its width: only data columns own a handle.
+      expect(
+        before.resizers === before.heads - 1,
+        `${before.resizers} handles for ${before.heads} columns`,
+      );
+      expect(before.separatorRole === "separator", `resizer role: ${before.separatorRole}`);
+
+      // Drag the NAME column 80px wider. The handle sits on the header's right edge; the width
+      // the virtual scroller uses has to follow, not just the header's.
+      const dragged = await page.evaluate(`(() => {
+                const heads = [...document.querySelectorAll('.parquet-table thead th')];
+                const head = heads[2];
+                const handle = head?.querySelector('.parquet-viewer__column-resizer');
+                if (!handle) return null;
+                const box = handle.getBoundingClientRect();
+                const x = box.left + box.width / 2;
+                const y = box.top + box.height / 2;
+                const at = (px) => ({ clientX: px, clientY: y, bubbles: true, pointerId: 1, button: 0, buttons: 1 });
+                handle.dispatchEvent(new PointerEvent('pointerdown', at(x)));
+                handle.dispatchEvent(new PointerEvent('pointermove', at(x + 80)));
+                handle.dispatchEvent(new PointerEvent('pointerup', at(x + 80)));
+                return true;
+            })()`);
+      expect(dragged, "the NAME column has no resize handle");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const after = json(await page.evaluate(`JSON.stringify(${measure})`));
+      expect(
+        after.nameWidth === before.nameWidth + 80,
+        `header width ${before.nameWidth} -> ${after.nameWidth}`,
+      );
+      expect(
+        after.cellWidth >= after.nameWidth - 1,
+        `body cell width ${after.cellWidth} did not follow the header (${after.nameWidth})`,
+      );
+
+      // It survives a reload: a column width is a reading decision, not a per-visit one.
+      await openParquet(page, base, "?preview=1");
+      const reloaded = json(await page.evaluate(`JSON.stringify(${measure})`));
+      expect(
+        reloaded.nameWidth === after.nameWidth,
+        `width did not persist: ${reloaded.nameWidth} after reload, ${after.nameWidth} before`,
+      );
+
+      // Double-click resets it.
+      await page.evaluate(`(() => {
+                const heads = [...document.querySelectorAll('.parquet-table thead th')];
+                const head = heads[2];
+                head?.querySelector('.parquet-viewer__column-resizer')
+                    ?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+            })()`);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const reset = json(await page.evaluate(`JSON.stringify(${measure})`));
+      expect(
+        reset.nameWidth === before.nameWidth,
+        `double-click did not reset the width: ${reset.nameWidth} vs ${before.nameWidth}`,
+      );
+
+      // Keyboard parity: the handle is a separator, so arrows resize it.
+      await page.evaluate(`(() => {
+                const heads = [...document.querySelectorAll('.parquet-table thead th')];
+                const head = heads[2];
+                const handle = head?.querySelector('.parquet-viewer__column-resizer');
+                handle?.focus();
+                handle?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+            })()`);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const keyed = json(await page.evaluate(`JSON.stringify(${measure})`));
+      expect(
+        keyed.nameWidth === before.nameWidth + 8,
+        `arrow key resize: ${before.nameWidth} -> ${keyed.nameWidth}`,
+      );
+      return "column widths: drag, persist, reset, keyboard";
+    },
+  },
+  {
     name: "parquet-grid-semantics",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");

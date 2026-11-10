@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   type HTMLAttributes,
+  type ThHTMLAttributes,
 } from "react";
 import "@vscode/codicons/dist/codicon.css";
 import { $t } from "../../i18n/i18nConfig.ts";
@@ -48,6 +49,11 @@ const SIDER_STORAGE_KEY = "parquet-sider-width";
 /** Must agree with the column widths passed to <Table>: the sidebar jump uses arithmetic. */
 const INDEX_COLUMN_WIDTH = 64;
 const DATA_COLUMN_WIDTH = 120;
+/** Column width bounds, in px. Below 64 the header text is unreadable; above 480 a wide table
+ *  stops fitting anything. */
+const COLUMN_MIN_WIDTH = 64;
+const COLUMN_MAX_WIDTH = 480;
+const COLUMN_WIDTH_STORAGE_KEY = "parquet-column-widths";
 /** How long a selection must hold still before it is announced to assistive tech. */
 const ANNOUNCE_DELAY_MS = 600;
 /** Must agree with `.parquet-viewer__cell` in the stylesheet: 6px padding ×2 + 22px line-height. */
@@ -60,6 +66,86 @@ const ROW_HEIGHT = 34;
  */
 function PresentationTable(props: HTMLAttributes<HTMLTableElement>) {
   return <table {...props} role="presentation" />;
+}
+
+interface ResizableHeaderCellProps extends ThHTMLAttributes<HTMLTableCellElement> {
+  /** Column name, used as the key the width is stored under. */
+  columnKey?: string;
+  onResizeColumn?: (width: number) => void;
+  onResetColumn?: () => void;
+}
+
+/**
+ * A header cell with a drag handle on its right edge.
+ *
+ * antd has no column resizing and the widths are what the virtual scroller feeds on, so the
+ * handle measures the cell it lives in and reports the new width upward. Pointer capture keeps
+ * the drag alive when the pointer leaves the 3px strip it started on.
+ */
+function ResizableHeaderCell(props: ResizableHeaderCellProps) {
+  const { children, columnKey, onResizeColumn, onResetColumn, ...rest } = props;
+  const drag = useRef<{ x: number; width: number } | null>(null);
+  if (!onResizeColumn) return <th {...rest}>{children}</th>;
+  return (
+    <th {...rest}>
+      {children}
+      <span
+        className="parquet-viewer__column-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={$t("parquet.resizeColumn", { name: columnKey ?? "" })}
+        title={$t("parquet.resetColumnWidth")}
+        tabIndex={0}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const cell = event.currentTarget.parentElement;
+          if (!cell) return;
+          drag.current = { x: event.clientX, width: cell.getBoundingClientRect().width };
+          // A synthetic pointer (tests, or a programmatic dispatch) has no active pointer to
+          // capture, and setPointerCapture throws for it.
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {}
+        }}
+        onPointerMove={(event) => {
+          if (!drag.current) return;
+          const next = Math.round(
+            Math.max(
+              COLUMN_MIN_WIDTH,
+              Math.min(COLUMN_MAX_WIDTH, drag.current.width + event.clientX - drag.current.x),
+            ),
+          );
+          onResizeColumn(next);
+        }}
+        onPointerUp={(event) => {
+          drag.current = null;
+          try {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          } catch {}
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+        }}
+        // Keyboard parity with the pointer: the handle is a separator, so arrows resize it.
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          event.stopPropagation();
+          const cell = event.currentTarget.parentElement;
+          const current = cell ? Math.round(cell.getBoundingClientRect().width) : DATA_COLUMN_WIDTH;
+          const step = event.shiftKey ? 32 : 8;
+          onResizeColumn(
+            Math.max(
+              COLUMN_MIN_WIDTH,
+              Math.min(COLUMN_MAX_WIDTH, current + (event.key === "ArrowRight" ? step : -step)),
+            ),
+          );
+        }}
+        onDoubleClick={() => onResetColumn?.()}
+      />
+    </th>
+  );
 }
 
 /**
@@ -329,6 +415,30 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     return SIDER_DEFAULT;
   });
   const [tableBodyHeight, setTableBodyHeight] = useState(320);
+  /**
+   * Per-column widths, keyed by column name. Column widths are a reading decision, so they
+   * outlive the page view the same way the sidebar width does.
+   */
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    try {
+      const raw = localStorage.getItem(COLUMN_WIDTH_STORAGE_KEY);
+      const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+      if (parsed && typeof parsed === "object") {
+        const clean: Record<string, number> = {};
+        for (const [name, width] of Object.entries(parsed as Record<string, unknown>)) {
+          if (typeof width === "number" && width >= COLUMN_MIN_WIDTH && width <= COLUMN_MAX_WIDTH) {
+            clean[name] = width;
+          }
+        }
+        return clean;
+      }
+    } catch {}
+    return {};
+  });
+  const columnWidthOf = useCallback(
+    (name: string) => columnWidths[name] ?? DATA_COLUMN_WIDTH,
+    [columnWidths],
+  );
   const [tableBodyWidth, setTableBodyWidth] = useState(0);
   /** The virtual table owns scrolling; cursor moves and row jumps go through its ref. */
   const tableRef = useRef<TableRef>(null);
@@ -691,6 +801,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       localStorage.setItem(SIDER_STORAGE_KEY, String(siderWidth));
     } catch {}
   }, [siderWidth]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(columnWidths));
+    } catch {}
+  }, [columnWidths]);
 
   // The table body gets the height the flex column actually leaves it, instead of a
   // `100vh - N` guess that turns into an unexplained gap whenever the bars change.
@@ -1108,13 +1224,25 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         dataIndex: column.name,
         key: column.name,
         ellipsis: true,
-        width: DATA_COLUMN_WIDTH,
+        width: columnWidthOf(column.name),
         align: kind === "numeric" ? "right" : "left",
         className: active ? "parquet-viewer__column--active" : undefined,
         // A grid whose header and body are separate scroll surfaces has to state the column
         // ordinal on both sides: assistive tech maps a cell to its header by `aria-colindex`,
         // and the header itself needs the matching number.
-        onHeaderCell: () => ({ role: "columnheader", "aria-colindex": position + 2 }),
+        onHeaderCell: () => ({
+          role: "columnheader",
+          "aria-colindex": position + 2,
+          columnKey: column.name,
+          onResizeColumn: (width: number) =>
+            setColumnWidths((current) => ({ ...current, [column.name]: width })),
+          onResetColumn: () =>
+            setColumnWidths((current) => {
+              const next = { ...current };
+              delete next[column.name];
+              return next;
+            }),
+        }),
         onCell: () => ({ role: "gridcell", "aria-colindex": position + 2 }),
         render: (value: unknown, _row, index) => {
           const rowIndex = loadedPage * PAGE_SIZE + index;
@@ -1137,7 +1265,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       });
     });
     return cols;
-  }, [fileInfo, loadedPage, query, selectCell, activeColumn]);
+  }, [fileInfo, loadedPage, query, selectCell, activeColumn, columnWidthOf]);
 
   useEffect(() => {
     handler
@@ -1640,7 +1768,14 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                       scroll={{
                         // Virtual scrolling needs numbers: x is the full column extent (or the
                         // viewport when it is wider), y is the body height measured above.
-                        x: Math.max(tableBodyWidth, 64 + (fileInfo.columns.length + 1) * 120),
+                        x: Math.max(
+                          tableBodyWidth,
+                          INDEX_COLUMN_WIDTH +
+                            fileInfo.columns.reduce(
+                              (sum, column) => sum + columnWidthOf(column.name),
+                              0,
+                            ),
+                        ),
                         y: tableBodyHeight,
                       }}
                       rowClassName={(_row, index) => {
@@ -1660,7 +1795,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                       })}
                       components={{
                         table: PresentationTable,
-                        header: { table: PresentationTable },
+                        header: { table: PresentationTable, cell: ResizableHeaderCell },
                       }}
                     />
                   </CursorContext.Provider>

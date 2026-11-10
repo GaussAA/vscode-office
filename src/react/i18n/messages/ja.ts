@@ -167,6 +167,8 @@ export default {
     jumpToColumn: "列 {name} へ移動",
     pagePosition: "{page} / {total} ページ",
     copyError: "エラーの詳細をコピー",
+    resizeColumn: "列 {name} の幅を変更",
+    resetColumnWidth: "ダブルクリックで幅をリセット",
   },
   previewGuard: {
     title: "ファイルが大きいため自動プレビューしません",

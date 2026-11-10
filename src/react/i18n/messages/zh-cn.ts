@@ -182,6 +182,8 @@ export default {
     jumpToColumn: "跳到列 {name}",
     pagePosition: "第 {page} / {total} 页",
     copyError: "复制错误详情",
+    resizeColumn: "调整列宽 {name}",
+    resetColumnWidth: "双击恢复默认宽度",
   },
   jsonl: {
     entriesCount: "共 {count} 条",

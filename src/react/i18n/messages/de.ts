@@ -167,6 +167,8 @@ export default {
     jumpToColumn: "Zur Spalte {name} springen",
     pagePosition: "Seite {page} von {total}",
     copyError: "Fehlerdetails kopieren",
+    resizeColumn: "Spalte {name} skalieren",
+    resetColumnWidth: "Doppelklick setzt die Breite zurück",
   },
   previewGuard: {
     title: "Datei zu groß für die automatische Vorschau",

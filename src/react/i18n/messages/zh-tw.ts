@@ -181,6 +181,8 @@ export default {
     jumpToColumn: "跳到欄 {name}",
     pagePosition: "第 {page} / {total} 頁",
     copyError: "複製錯誤詳情",
+    resizeColumn: "調整欄寬 {name}",
+    resetColumnWidth: "按兩下恢復預設寬度",
   },
   jsonl: {
     entriesCount: "共 {count} 筆",

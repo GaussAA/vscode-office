@@ -167,6 +167,8 @@ export default {
     jumpToColumn: "Перейти к столбцу {name}",
     pagePosition: "Страница {page} из {total}",
     copyError: "Скопировать описание ошибки",
+    resizeColumn: "Изменить ширину столбца {name}",
+    resetColumnWidth: "Двойной щелчок сбрасывает ширину",
   },
   previewGuard: {
     title: "Файл слишком велик для автоматического просмотра",

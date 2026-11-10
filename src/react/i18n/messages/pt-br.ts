@@ -168,6 +168,8 @@ export default {
     jumpToColumn: "Ir para a coluna {name}",
     pagePosition: "Página {page} de {total}",
     copyError: "Copiar detalhes do erro",
+    resizeColumn: "Redimensionar a coluna {name}",
+    resetColumnWidth: "Clique duplo para restaurar a largura",
   },
   previewGuard: {
     title: "Arquivo grande demais para pré-visualização automática",

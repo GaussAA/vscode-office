@@ -186,6 +186,8 @@ export default {
     jumpToColumn: "Jump to column {name}",
     pagePosition: "Page {page} of {total}",
     copyError: "Copy error details",
+    resizeColumn: "Resize column {name}",
+    resetColumnWidth: "Double-click to reset the width",
   },
   jsonl: {
     entriesCount: "{count} entries",
