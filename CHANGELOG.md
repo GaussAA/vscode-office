@@ -30,7 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The parquet schema field jump now measures the live column instead of assuming a fixed
+- Parquet search results now belong to the text in the box: editing the needle clears the
+  previous counts, marks and column hits, and `Enter` searches the new text instead of jumping
+  to a hit of the old one.
+- The parquet grid is keyboard-navigable across the whole file: `PageDown`/`PageUp` turn a page,
+  the arrow keys walk off a page edge into the next one, and `Ctrl/Cmd+Home`/`End` jump to the
+  first and last row. The column is kept across a page turn. The first arrow of a cold start now
+  lands on the first cell instead of the second row.- The parquet schema field jump now measures the live column instead of assuming a fixed
   120 px width — columns are stretched to fill the viewport when a file has few of them — drags
   the horizontal scrollbar instead of clicking it, and keeps the header in step with the body.
   The header is a separate scroll surface, so a jump used to leave the column labels one or two
