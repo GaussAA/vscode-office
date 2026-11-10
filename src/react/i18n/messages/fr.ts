@@ -166,6 +166,7 @@ export default {
     filterFields: "Filtrer les champs",
     resizeSidebar: "Redimensionner la barre de schéma",
     jumpToColumn: "Aller à la colonne {name}",
+    pagePosition: "Page {page} sur {total}",
   },
   previewGuard: {
     title: "Fichier trop volumineux pour un aperçu automatique",

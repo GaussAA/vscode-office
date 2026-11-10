@@ -165,6 +165,7 @@ export default {
     filterFields: "Felder filtern",
     resizeSidebar: "Schema-Leiste skalieren",
     jumpToColumn: "Zur Spalte {name} springen",
+    pagePosition: "Seite {page} von {total}",
   },
   previewGuard: {
     title: "Datei zu groß für die automatische Vorschau",

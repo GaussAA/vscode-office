@@ -165,6 +165,7 @@ export default {
     filterFields: "Фильтр полей",
     resizeSidebar: "Изменить ширину панели схемы",
     jumpToColumn: "Перейти к столбцу {name}",
+    pagePosition: "Страница {page} из {total}",
   },
   previewGuard: {
     title: "Файл слишком велик для автоматического просмотра",

@@ -366,11 +366,18 @@ body:has(.parquet-app) {
   font-variant-numeric: tabular-nums;
 }
 
+.parquet-viewer__field-filter-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 2px 0 6px;
+}
+
 .parquet-viewer__field-filter {
   width: 100%;
   height: 26px;
-  margin: 2px 0 6px;
-  padding: 0 8px;
+  /* Room for the clear button, which sits inside the field's right edge. */
+  padding: 0 24px 0 8px;
   border: 0;
   border-radius: var(--pv-radius-sm);
   color: var(--pv-fg);
@@ -385,6 +392,35 @@ body:has(.parquet-app) {
   &:focus-visible {
     outline: 1px solid var(--pv-focus);
     outline-offset: -1px;
+  }
+}
+
+.parquet-viewer__field-filter-clear {
+  position: absolute;
+  right: 2px;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
+  color: var(--pv-muted);
+  background: transparent;
+  cursor: pointer;
+
+  .codicon {
+    font-size: 12px;
+  }
+
+  &:hover {
+    color: var(--pv-fg);
+    background: var(--pv-control-hover);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--pv-focus);
+    outline-offset: 0;
   }
 }
 
@@ -875,6 +911,16 @@ body:has(.parquet-app) {
   padding: 0 4px;
   color: var(--pv-fg);
   text-align: center;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Where you are in the file, next to how many rows that is. The range alone left the reader
+   without a sense of position in a 20,000-page file. */
+.parquet-viewer__pager-page {
+  padding: 0 4px;
+  color: var(--pv-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

@@ -164,6 +164,7 @@ export default {
     filterFields: "필드 필터",
     resizeSidebar: "스키마 사이드바 너비 조정",
     jumpToColumn: "{name} 열로 이동",
+    pagePosition: "{total}페이지 중 {page}",
   },
   previewGuard: {
     title: "파일이 커서 자동으로 미리 보지 않습니다",

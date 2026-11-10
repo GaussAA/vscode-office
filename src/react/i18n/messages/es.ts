@@ -166,6 +166,7 @@ export default {
     filterFields: "Filtrar campos",
     resizeSidebar: "Redimensionar la barra de esquema",
     jumpToColumn: "Ir a la columna {name}",
+    pagePosition: "Página {page} de {total}",
   },
   previewGuard: {
     title: "El archivo es demasiado grande para la vista previa automática",

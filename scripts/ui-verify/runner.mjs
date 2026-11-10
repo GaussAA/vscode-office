@@ -586,10 +586,12 @@ const scenarios = [
                 footerBorder: getComputedStyle(document.querySelector('.parquet-viewer__bottombar')).borderTopWidth,
             })`),
       );
-      // Rows, columns, codec, author — the codec is what tells the reader this fork is why the
-      // file opened at all.
+      // Rows, columns, file size, codec, author. The size is one of the four questions
+      // PRODUCT.md says the file is opened to answer, and it used to be the only one missing.
       expect(
-        state.meta.length === 4 && state.meta.some((item) => /CODEC/i.test(item)),
+        state.meta.length === 5 &&
+          state.meta.some((item) => /CODEC/i.test(item)) &&
+          state.meta.some((item) => /\d+\s?(B|KB|MB|GB)$/i.test(item.trim())),
         `topbar meta items: ${JSON.stringify(state.meta)}`,
       );
       expect(
@@ -658,19 +660,26 @@ const scenarios = [
       );
       expect(clipped.length === 0, `type badges are clipped: ${JSON.stringify(clipped)}`);
 
-      // Clear the filter: this scenario also produces the documentation screenshot, and a
-      // sidebar with one of four fields hidden is the wrong thing to document.
-      await page.evaluate(`(() => {
-                const input = document.querySelector('.parquet-viewer__field-filter');
-                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                setter.call(input, '');
-                input.dispatchEvent(new Event('input', { bubbles: true }));
+      // The filter needs a way back that is not "select the text and delete it" — and clearing
+      // it also restores the state this scenario documents.
+      const cleared = await page.evaluate(`(() => {
+                const clearBtn = document.querySelector('.parquet-viewer__field-filter-clear');
+                if (!clearBtn) return null;
+                clearBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return true;
             })()`);
-      const restored = await page.waitFor(
+      expect(cleared, "the field filter has no clear button");
+      const unfiltered = await page.waitFor(
         `document.querySelectorAll('.parquet-viewer__list-item').length === 4`,
         4000,
       );
-      expect(restored, "the field filter did not clear");
+      expect(unfiltered, "clearing the filter did not restore the fields");
+
+      // Where you are in the file, not only how many rows that is.
+      const pageLabel = await page.evaluate(
+        `(document.querySelector('.parquet-viewer__pager-page')?.innerText ?? '').trim()`,
+      );
+      expect(/^Page 1 of 6$/.test(pageLabel), `pager page position: "${pageLabel}"`);
 
       return `${state.meta.length} inline meta items, filterable schema, one tab stop`;
     },
@@ -1335,6 +1344,26 @@ const scenarios = [
         5000,
       );
       expect(restored, "the documented state did not come back");
+
+      // A copy has to answer: the button used to stay silent, which reads as "nothing happened".
+      await page.evaluate(`document.querySelector('[aria-label="Copy value"]')
+                .dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+      const receipt = await page.waitFor(`!!document.querySelector('[aria-label="Copied"]')`, 4000);
+      expect(receipt, "copying gave no receipt");
+      // The same path is reachable from the grid, where the value actually is.
+      await page.evaluate(`(() => {
+                const wrap = document.querySelector('.parquet-viewer__table-wrap');
+                wrap.focus();
+                wrap.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true }));
+            })()`);
+      const gridCopy = await page.waitFor(
+        `!!document.querySelector('[aria-label="Copied"]')`,
+        4000,
+      );
+      expect(gridCopy, "Ctrl+C on the grid did not copy the selected value");
+      // Let the receipt expire: this scenario supplies the documentation screenshot, and a
+      // permanent check mark would document a state that lasts 1.2 s.
+      await page.waitFor(`!document.querySelector('[aria-label="Copied"]')`, 4000);
 
       return `${state.label} = ${state.value}`;
     },

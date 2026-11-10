@@ -184,6 +184,7 @@ export default {
     filterFields: "Filter fields",
     resizeSidebar: "Resize schema sidebar",
     jumpToColumn: "Jump to column {name}",
+    pagePosition: "Page {page} of {total}",
   },
   jsonl: {
     entriesCount: "{count} entries",

@@ -165,6 +165,7 @@ export default {
     filterFields: "フィールドを絞り込み",
     resizeSidebar: "スキーマバーの幅を変更",
     jumpToColumn: "列 {name} へ移動",
+    pagePosition: "{page} / {total} ページ",
   },
   previewGuard: {
     title: "ファイルが大きいため自動プレビューしません",

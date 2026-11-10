@@ -342,6 +342,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [searchedEmpty, setSearchedEmpty] = useState(false);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<CellCursor | null>(null);
+  /** The full text of the current selection, for Ctrl+C on the grid. */
+  const inspectedCopyRef = useRef("");
   /** Where the cursor should land once a page turned by keyboard has loaded. */
   const pendingCursor = useRef<{ where: "first" | "last"; col: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -544,6 +546,24 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     if (!needle) return all;
     return all.filter(({ column }) => column.name.toLowerCase().includes(needle));
   }, [fileInfo, fieldFilter]);
+
+  /** Briefly true right after a copy, so the button can answer instead of staying silent. */
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef(0);
+
+  /** One copy path: clipboard, then a receipt. Silence after "Copy" reads as "nothing happened". */
+  const copyValue = useCallback((text: string) => {
+    void navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true);
+        window.clearTimeout(copyTimer.current);
+        copyTimer.current = window.setTimeout(() => setCopied(false), 1200);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(copyTimer.current), []);
 
   const totalPages = useMemo(() => {
     if (!fileInfo?.rowCount) return 1;
@@ -966,6 +986,14 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         return;
       }
 
+      // Ctrl+C on the grid copies the inspected value. Without it the only copy target was the
+      // bottom bar button: the value on screen behaved like plain text and selected the page.
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
+        if (!inspectedCopyRef.current) return;
+        event.preventDefault();
+        copyValue(inspectedCopyRef.current);
+        return;
+      }
       // The first arrow lands on the first cell: without this, Down starts at row 1 and Up at
       // row -1 (clamped to 0), so the top-left cell could never be reached from a cold start.
       if (!cursorRef.current) {
@@ -1015,6 +1043,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       goToPage,
       tableBodyHeight,
       revealCursor,
+      copyValue,
     ],
   );
 
@@ -1153,6 +1182,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     inspected && inspected.value !== null && typeof inspected.value === "object"
       ? jsonPreviewText(inspected.value)
       : inspectedFull;
+
+  useEffect(() => {
+    inspectedCopyRef.current = inspectedFull;
+  }, [inspectedFull]);
 
   /**
    * Assistive tech hears the selection once it settles. The visible bar updates on every arrow
@@ -1387,6 +1420,17 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                     : $t("parquet.columnsLabel")}
                 </span>
               </span>
+              {fileInfo.file?.byteLength ? (
+                <span
+                  className="parquet-viewer__meta-item"
+                  title={formatBytes(fileInfo.file.byteLength)}
+                >
+                  <span className="codicon codicon-file-binary parquet-icon parquet-icon--size" />
+                  <span className="parquet-viewer__meta-value">
+                    {formatBytes(fileInfo.file.byteLength)}
+                  </span>
+                </span>
+              ) : null}
               {codecs.length > 0 && (
                 <span className="parquet-viewer__meta-item" title={$t("parquet.codec")}>
                   <span className="codicon codicon-file-zip parquet-icon parquet-icon--codec" />
@@ -1422,18 +1466,34 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                     : `${visibleColumns.length}/${fileInfo.columns.length}`}
                 </span>
               </div>
-              <input
-                type="text"
-                className="parquet-viewer__field-filter"
-                value={fieldFilter}
-                placeholder={$t("parquet.filterFields")}
-                aria-label={$t("parquet.filterFields")}
-                spellCheck={false}
-                onChange={(event) => {
-                  setFieldFilter(event.target.value);
-                  setFieldCursor(0);
-                }}
-              />
+              <div className="parquet-viewer__field-filter-row">
+                <input
+                  type="text"
+                  className="parquet-viewer__field-filter"
+                  value={fieldFilter}
+                  placeholder={$t("parquet.filterFields")}
+                  aria-label={$t("parquet.filterFields")}
+                  spellCheck={false}
+                  onChange={(event) => {
+                    setFieldFilter(event.target.value);
+                    setFieldCursor(0);
+                  }}
+                />
+                {fieldFilter !== "" && (
+                  <button
+                    type="button"
+                    className="parquet-viewer__field-filter-clear"
+                    onClick={() => {
+                      setFieldFilter("");
+                      setFieldCursor(0);
+                    }}
+                    title={$t("common.close")}
+                    aria-label={$t("common.close")}
+                  >
+                    <span className="codicon codicon-close" />
+                  </button>
+                )}
+              </div>
               <div
                 className="parquet-viewer__list"
                 role="listbox"
@@ -1607,13 +1667,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                   <button
                     type="button"
                     className="parquet-viewer__pager-btn"
-                    onClick={() => {
-                      void navigator.clipboard.writeText(inspectedFull).catch(() => undefined);
-                    }}
-                    title={$t("parquet.copyValue")}
-                    aria-label={$t("parquet.copyValue")}
+                    onClick={() => copyValue(inspectedFull)}
+                    title={copied ? $t("common.copied") : $t("parquet.copyValue")}
+                    aria-label={copied ? $t("common.copied") : $t("parquet.copyValue")}
                   >
-                    <span className="codicon codicon-copy" />
+                    <span className={`codicon ${copied ? "codicon-check" : "codicon-copy"}`} />
                   </button>
                   <button
                     type="button"
@@ -1689,6 +1747,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 {$t("parquet.go")}
               </button>
               <span className="parquet-viewer__pager-info">{rowRange}</span>
+              <span className="parquet-viewer__pager-page">
+                {$t("parquet.pagePosition", {
+                  page: (page + 1).toLocaleString(),
+                  total: totalPages.toLocaleString(),
+                })}
+              </span>
               <button
                 type="button"
                 className="parquet-viewer__pager-btn"
