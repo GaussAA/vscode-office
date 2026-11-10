@@ -1,30 +1,18 @@
-import { App, ConfigProvider, InputNumber, Table, theme as antdTheme } from "antd";
+import { App, ConfigProvider, InputNumber, Table } from "antd";
 import type { ColumnsType, TableRef } from "antd/es/table";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type HTMLAttributes,
-  type ThHTMLAttributes,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@vscode/codicons/dist/codicon.css";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { handler } from "../../util/vscode.ts";
-import { getVscodeThemeColor, useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
+import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
-import { normalizeExternalUrl } from "@/common/externalLink";
 import { formatBytes, previewLimitBytes } from "@/common/previewLimit";
-import { highlightRuns } from "../../common/highlight.ts";
-import { savePersistedState } from "../../common/persistedState.ts";
 import { ParquetSession } from "./parquetSession.ts";
 import { searchParquetValues } from "./parquetSearch.ts";
 import { describeParquetFailure } from "./parquetError.ts";
+import { jsonPreviewText } from "./parquetPreview.ts";
 import SponsorBar from "../components/SponsorBar.tsx";
 import {
   formatCellValue,
@@ -32,142 +20,46 @@ import {
   PARQUET_PAGE_SIZE,
   openParquetFile,
   readParquetRows,
-  type ColumnCategory,
-  type ParquetColumnInfo,
   type ParquetFileInfo,
 } from "./parquetParser.ts";
-import { jsonPreviewText, tokenizeJson, type JsonToken } from "./parquetPreview.ts";
+import { parquetAntdTheme } from "./parquetAntdTheme.ts";
+import {
+  ANNOUNCE_DELAY_MS,
+  COLUMN_MAX_WIDTH,
+  COLUMN_MIN_WIDTH,
+  COLUMN_STRETCH_MAX,
+  COLUMN_WIDTH_STORAGE_KEY,
+  DATA_COLUMN_WIDTH,
+  INDEX_COLUMN_WIDTH,
+  MIN_ROWS_PER_PAGE,
+  PARQUET_MAX_PAGE_SIZE,
+  ROW_HEIGHT,
+  SEARCH_MAX_ROWS,
+  SIDER_DEFAULT,
+  SIDER_MAX,
+  SIDER_MIN,
+  SIDER_STORAGE_KEY,
+} from "./parquetLayout.ts";
+import { loadPersistedRow, savePersistedRow } from "./parquetPersistence.ts";
+import { PresentationTable, ResizableHeaderCell } from "./parquetHeaders.tsx";
+import {
+  COLUMN_ICONS,
+  CursorContext,
+  ParquetCell,
+  type CellCursor,
+  type TableRow,
+} from "./parquetCell.tsx";
+
 import "./Parquet.less";
-
-/** A page below this is not a screenful; above it, paging stops being useful. */
-const MIN_ROWS_PER_PAGE = 8;
-const PARQUET_MAX_PAGE_SIZE = 200;
-/** Cap on matched rows kept in memory (highlight + navigation). */
-const SEARCH_MAX_ROWS = 5_000;
-/** Schema sidebar bounds; the drag handle and keyboard use the same range. */
-const SIDER_MIN = 208;
-const SIDER_MAX = 420;
-const SIDER_DEFAULT = 260;
-const SIDER_STORAGE_KEY = "parquet-sider-width";
-/** Must agree with the column widths passed to <Table>: the sidebar jump uses arithmetic. */
-const INDEX_COLUMN_WIDTH = 64;
-const DATA_COLUMN_WIDTH = 120;
-/** Column width bounds, in px. Below 64 the header text is unreadable; above 480 a wide table
- *  stops fitting anything. */
-const COLUMN_MIN_WIDTH = 64;
-const COLUMN_MAX_WIDTH = 480;
-const COLUMN_WIDTH_STORAGE_KEY = "parquet-column-widths";
-/**
- * How wide a column may grow to help fill the viewport before the grid simply stops short.
- *
- * Without a cap antd stretches the columns proportionally, which turned a four-column file into
- * four 273px panels and made a dragged width land somewhere other than where it was dropped.
- * "Density is efficiency" (DESIGN.md) is the reason to stop: a 550px-wide `id` column is not
- * more readable, it is just wider.
- */
-const COLUMN_STRETCH_MAX = 240;
-/** How long a selection must hold still before it is announced to assistive tech. */
-const ANNOUNCE_DELAY_MS = 600;
-/** Must agree with `.parquet-viewer__cell` in the stylesheet: 6px padding ×2 + 22px line-height. */
-const ROW_HEIGHT = 34;
-
-/**
- * antd renders the column header as its own `<table>`, and a `table` inside a `grid` is not a
- * valid child of one. Dropping the table role keeps the header cells' explicit `columnheader`
- * roles while the grid underneath owns the rows.
- */
-function PresentationTable(props: HTMLAttributes<HTMLTableElement>) {
-  return <table {...props} role="presentation" />;
-}
-
-interface ResizableHeaderCellProps extends ThHTMLAttributes<HTMLTableCellElement> {
-  /** Column name, used as the key the width is stored under. */
-  columnKey?: string;
-  onResizeColumn?: (width: number) => void;
-  onResetColumn?: () => void;
-}
-
-/**
- * A header cell with a drag handle on its right edge.
- *
- * antd has no column resizing and the widths are what the virtual scroller feeds on, so the
- * handle measures the cell it lives in and reports the new width upward. Pointer capture keeps
- * the drag alive when the pointer leaves the 3px strip it started on.
- */
-function ResizableHeaderCell(props: ResizableHeaderCellProps) {
-  const { children, columnKey, onResizeColumn, onResetColumn, ...rest } = props;
-  const drag = useRef<{ x: number; width: number } | null>(null);
-  if (!onResizeColumn) return <th {...rest}>{children}</th>;
-  return (
-    <th {...rest}>
-      {children}
-      <span
-        className="parquet-viewer__column-resizer"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label={$t("parquet.resizeColumn", { name: columnKey ?? "" })}
-        title={$t("parquet.resetColumnWidth")}
-        tabIndex={0}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const cell = event.currentTarget.parentElement;
-          if (!cell) return;
-          drag.current = { x: event.clientX, width: cell.getBoundingClientRect().width };
-          // A synthetic pointer (tests, or a programmatic dispatch) has no active pointer to
-          // capture, and setPointerCapture throws for it.
-          try {
-            event.currentTarget.setPointerCapture(event.pointerId);
-          } catch {}
-        }}
-        onPointerMove={(event) => {
-          if (!drag.current) return;
-          const next = Math.round(
-            Math.max(
-              COLUMN_MIN_WIDTH,
-              Math.min(COLUMN_MAX_WIDTH, drag.current.width + event.clientX - drag.current.x),
-            ),
-          );
-          onResizeColumn(next);
-        }}
-        onPointerUp={(event) => {
-          drag.current = null;
-          try {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          } catch {}
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-        }}
-        // Keyboard parity with the pointer: the handle is a separator, so arrows resize it.
-        onKeyDown={(event) => {
-          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-          event.preventDefault();
-          event.stopPropagation();
-          const cell = event.currentTarget.parentElement;
-          const current = cell ? Math.round(cell.getBoundingClientRect().width) : DATA_COLUMN_WIDTH;
-          const step = event.shiftKey ? 32 : 8;
-          onResizeColumn(
-            Math.max(
-              COLUMN_MIN_WIDTH,
-              Math.min(COLUMN_MAX_WIDTH, current + (event.key === "ArrowRight" ? step : -step)),
-            ),
-          );
-        }}
-        onDoubleClick={() => onResetColumn?.()}
-      />
-    </th>
-  );
-}
 
 /**
  * Run background work when the page is idle.
  *
- * Prefetching the next page is a full data page per column (~1.2 s on a 60-column file) and
- * it runs on the same thread as React. Started in the same tick as the visible page, it
- * delayed a cache hit to 1.7 s; `requestIdleCallback` lets the render go first, and the
- * timeout keeps a permanently busy page from starving the prefetch. Falls back to a timer
- * where rIC does not exist.
+ * Prefetching the next chunk is a full data page per column (~1.2 s on a 60-column file) and it
+ * runs on the same thread as React. Started in the same tick as the visible page, it delayed a
+ * cache hit to 1.7 s; `requestIdleCallback` lets the render go first, and the timeout keeps a
+ * permanently busy page from starving the prefetch. Falls back to a timer where rIC does not
+ * exist.
  */
 function schedulePrefetch(run: () => void): () => void {
   if (typeof requestIdleCallback === "function") {
@@ -178,35 +70,6 @@ function schedulePrefetch(run: () => void): () => void {
   return () => window.clearTimeout(handle);
 }
 
-/** Wrap the matched runs of a cell value in <mark>, so a hit is visible in place. */
-function highlightCell(text: string, needle: string) {
-  if (!needle) return text;
-  const parts: React.ReactNode[] = [];
-  highlightRuns(text, needle).forEach((run, position) => {
-    if (!run.hit) {
-      parts.push(run.text);
-      return;
-    }
-    parts.push(
-      <mark key={position} className="parquet-viewer__hit">
-        {run.text}
-      </mark>,
-    );
-  });
-  return parts;
-}
-/** Icon per category. The category itself is decided once, in parquetParser.categorizeType. */
-const COLUMN_ICONS: Record<ColumnCategory, string> = {
-  bool: "codicon-symbol-boolean",
-  numeric: "codicon-symbol-numeric",
-  string: "codicon-symbol-string",
-  datetime: "codicon-symbol-event",
-  structure: "codicon-symbol-structure",
-  field: "codicon-symbol-field",
-};
-
-type TableRow = Record<string, unknown> & { key: string };
-
 /** A virtual document arrives as inline base64; a local one as a fetchable path. */
 type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBase64"> & {
   fileName?: string;
@@ -214,170 +77,6 @@ type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBas
   size?: number;
   tooLarge?: boolean;
 };
-
-/** Keyboard cursor into the visible page: row is page-local, col indexes fileInfo.columns. */
-interface CellCursor {
-  row: number;
-  col: number;
-}
-
-const CursorContext = createContext<CellCursor | null>(null);
-
-/**
- * One data cell. It reads the cursor from context instead of receiving it through the
- * memoised column definitions, so moving the cursor re-renders the cells without
- * rebuilding every column definition.
- *
- * The cell is a roving tab stop: only the cursor cell has `tabIndex=0`. Arrow keys move
- * real focus here, and the aria-label gives screen readers the column, row and value.
- */
-function ParquetCell({
-  value,
-  rowIndex,
-  pageIndex,
-  position,
-  column,
-  query,
-  onActivate,
-}: {
-  value: unknown;
-  rowIndex: number;
-  pageIndex: number;
-  position: number;
-  column: ParquetColumnInfo;
-  query: string;
-  onActivate: () => void;
-}) {
-  const cursor = useContext(CursorContext);
-  const isCursor = cursor?.row === pageIndex && cursor?.col === position;
-  const kind = column.category;
-  const isNull = value === null || value === undefined;
-  // Only a complete http(s) value becomes a link. A description containing a URL stays a
-  // description; the host validates the emitted URL again before opening anything.
-  const externalUrl = isNull ? null : normalizeExternalUrl(value);
-  const jsonText = isNull || externalUrl ? null : jsonPreviewText(value);
-  const displayText = isNull
-    ? $t("parquet.nullLabel")
-    : externalUrl
-      ? typeof value === "string"
-        ? value.trim()
-        : externalUrl
-      : (jsonText ?? formatCellValue(value, column.type));
-  const classes = [
-    "parquet-viewer__cell",
-    isNull
-      ? "parquet-viewer__cell--null"
-      : externalUrl
-        ? "parquet-viewer__cell--link"
-        : jsonText
-          ? "parquet-viewer__cell--json"
-          : kind === "bool"
-            ? ""
-            : `parquet-viewer__cell--${kind}`,
-    kind === "bool" && !isNull && !externalUrl && !jsonText
-      ? value === true
-        ? "parquet-viewer__cell--bool-true"
-        : "parquet-viewer__cell--bool-false"
-      : "",
-    isCursor ? "parquet-viewer__cell--cursor" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const labelText = displayText.length > 160 ? `${displayText.slice(0, 160)}…` : displayText;
-  const openLink = () => {
-    if (externalUrl) handler.emit("openExternal", externalUrl);
-  };
-  const content = isNull ? (
-    $t("parquet.nullLabel")
-  ) : externalUrl ? (
-    <a
-      className="parquet-viewer__cell-link"
-      href={externalUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      tabIndex={-1}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        // Opening the link is the point of the click, but it must not be the *only* thing that
-        // happens: without this the one value a reader most wants to copy was the only one the
-        // inspector could never hold.
-        onActivate();
-        openLink();
-      }}
-      onAuxClick={(event) => event.preventDefault()}
-    >
-      {highlightCell(displayText, query.trim())}
-    </a>
-  ) : jsonText ? (
-    tokenizeJson(jsonText).map((token: JsonToken, index) => (
-      <span
-        key={index}
-        className={`parquet-viewer__json-token parquet-viewer__json-token--${token.type}`}
-      >
-        {highlightCell(token.text, query.trim())}
-      </span>
-    ))
-  ) : (
-    highlightCell(displayText, query.trim())
-  );
-
-  return (
-    <span
-      className={classes}
-      data-cell={`${pageIndex}:${position}`}
-      tabIndex={isCursor ? 0 : -1}
-      aria-label={`${column.name}, row ${rowIndex + 1}: ${labelText}${externalUrl ? ", external link" : ""}`}
-      aria-keyshortcuts={externalUrl ? "Enter" : undefined}
-      title={isNull ? "null" : displayText}
-      onClick={onActivate}
-      onKeyDown={(event) => {
-        // The anchor is not a separate tab stop (one per URL cell would flood the grid);
-        // Enter on the roving cell is the keyboard equivalent of clicking the link.
-        if (externalUrl && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          event.stopPropagation();
-          openLink();
-        }
-      }}
-    >
-      {content}
-    </span>
-  );
-}
-
-/**
- * Where this document was left when its webview went away.
- *
- * Persisted per document, in `localStorage`, keyed by the document's path: webviews of one
- * view type share a single origin, so an unkeyed entry would be overwritten by whichever
- * parquet file was open last. The JSONL viewer does the same thing with its `cacheId`.
- *
- * This exists so the viewer comes back where the user left it once the webview is allowed
- * to be destroyed when its tab is hidden (see `retainContextWhenHidden`).
- */
-const PERSIST_PREFIX = "parquet-state:";
-
-function loadPersistedRow(key: string | undefined): number {
-  if (!key) return 0;
-  try {
-    const raw = localStorage.getItem(PERSIST_PREFIX + key);
-    if (!raw) return 0;
-    // `row` since 6.4.1: a page is a screenful, so its size depends on the window and a stored
-    // page number would land somewhere else next time. Older entries (only `page`) are ignored
-    // rather than misread as rows.
-    const parsed = JSON.parse(raw) as { row?: number };
-    return typeof parsed.row === "number" && parsed.row >= 0 ? parsed.row : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function savePersistedRow(key: string | undefined, row: number) {
-  if (!key) return;
-  savePersistedState(PERSIST_PREFIX, key, { row });
-}
-
 function ParquetViewer({ dark }: { dark: boolean }) {
   const { message } = App.useApp();
   const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
@@ -2045,45 +1744,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       </div>
     </div>
   );
-}
-
-/** antd tokens derived from the same VS Code variables the stylesheet uses. */
-function parquetAntdTheme(dark: boolean) {
-  return {
-    algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-    token: {
-      // A transparent container renders antd inputs as borders floating on the
-      // toolbar; the table is flattened to the page in the stylesheet instead.
-      colorBgContainer: getVscodeThemeColor(
-        "--vscode-editor-background",
-        dark ? "#1e1e1e" : "#ffffff",
-      ),
-      colorBgElevated: getVscodeThemeColor(
-        "--vscode-editorWidget-background",
-        dark ? "#202020" : "#ffffff",
-      ),
-      colorBorder: getVscodeThemeColor("--vscode-panel-border", dark ? "#2b2b2b" : "#e5e5e5"),
-      colorText: getVscodeThemeColor("--vscode-foreground", dark ? "#cccccc" : "#3b3b3b"),
-      colorTextSecondary: getVscodeThemeColor(
-        "--vscode-descriptionForeground",
-        dark ? "#9d9d9d" : "#717171",
-      ),
-      colorPrimary: getVscodeThemeColor("--vscode-button-background", "#0078d4"),
-      colorError: getVscodeThemeColor("--vscode-errorForeground", "#f14c4c"),
-      colorWarning: getVscodeThemeColor("--vscode-editorWarning-foreground", "#cca700"),
-      colorFillAlter: getVscodeThemeColor(
-        "--vscode-editorGroupHeader-tabsBackground",
-        dark ? "#2d2d2d" : "#f3f4f6",
-      ),
-      fontFamily: getVscodeThemeColor(
-        "--vscode-font-family",
-        '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      ),
-      fontSize: Number.parseInt(getVscodeThemeColor("--vscode-font-size", "13px"), 10) || 13,
-      controlHeightSM: 22,
-      borderRadius: 4,
-    },
-  };
 }
 
 export default function Parquet() {

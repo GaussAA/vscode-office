@@ -26,6 +26,20 @@ interface Manifest {
 
 const readManifest = (): Manifest => JSON.parse(read("package.json")) as Manifest;
 
+/**
+ * Every UI scenario source: the runner's driver plus the modules it imports.
+ *
+ * The scenarios used to live in `runner.mjs`; scanning only that file would have made these two
+ * coverage tests pass on an empty set the moment they moved.
+ */
+const scenarioSources = (): string => {
+  const dir = "scripts/ui-verify/scenarios";
+  const modules = readdirSync(join(root, dir))
+    .filter((name) => name.endsWith(".mjs"))
+    .map((name) => read(`${dir}/${name}`));
+  return [read("scripts/ui-verify/runner.mjs"), ...modules].join("\n");
+};
+
 function walk(dir: string, extensions: string[]): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(join(root, dir))) {
@@ -131,7 +145,7 @@ test("every React route is covered by the smoke list or a dedicated scenario", (
   const routes = [...mainRouteText.matchAll(/case\s+['"]([^'"]+)['"]:/g)].map((match) => match[1]);
   assert.ok(routes.length >= 4, "the route switch should still have its cases");
 
-  const runner = read("scripts/ui-verify/runner.mjs");
+  const runner = scenarioSources();
   const smokeBlock = /const routes = \[([\s\S]*?)\]/.exec(runner);
   assert.ok(smokeBlock, "the smoke scenario should build its routes from a literal array");
   const smoked = new Set([...smokeBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]));
@@ -160,7 +174,7 @@ test("every React route is covered by the smoke list or a dedicated scenario", (
 });
 
 test("the smoke list names routes that actually exist", () => {
-  const runner = read("scripts/ui-verify/runner.mjs");
+  const runner = scenarioSources();
   const smokeBlock = /const routes = \[([\s\S]*?)\]/.exec(runner);
   assert.ok(smokeBlock, "the smoke scenario should build its routes from a literal array");
   const smoked = [...smokeBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
