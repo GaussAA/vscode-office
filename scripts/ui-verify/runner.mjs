@@ -1106,10 +1106,23 @@ const scenarios = [
       expect(started, `keyboard cursor did not start at 0:0 (${await cursorAt()})`);
       // The focus ring and the bottom bar must agree, including on the paths that only restore
       // a cursor (cold start, page turn) rather than walking to a cell.
-      const synced = await page.evaluate(
-        `(document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '').trim()`,
+      const firstRow = `[...document.querySelectorAll('.ant-table-tbody-virtual-holder-inner > *')][0]
+                ?.querySelectorAll('.ant-table-cell')[1]?.innerText?.trim() ?? null`;
+      const selection = async () =>
+        json(
+          await page.evaluate(`JSON.stringify({
+                label: (document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '').trim(),
+                value: (document.querySelector('.parquet-viewer__selection-value')?.innerText ?? '').trim(),
+                firstId: ${firstRow},
+            })`),
+        );
+      // The focus ring and the bottom bar must agree, *and* the value must be the one under that
+      // row number. A page turn used to leave "row 1" over a value from row 251.
+      const synced = await selection();
+      expect(
+        /id · row 1\b/.test(synced.label) && synced.value === synced.firstId,
+        `the bottom bar disagrees with the grid: ${JSON.stringify(synced)}`,
       );
-      expect(/id · row 1\b/.test(synced), `the bottom bar disagrees with the cursor: "${synced}"`);
 
       // PageDown moves by what the viewport shows, not by the 50-row page: a page-sized step
       // dropped a third of the rows without ever displaying them.
@@ -1162,6 +1175,20 @@ const scenarios = [
         5000,
       );
       expect(atStart, "Ctrl+Home did not return to the first page");
+      // After a long jump the cursor is restored from the newly loaded page, not the old one.
+      const home = await page.waitFor(
+        `(() => {
+                const label = (document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '').trim();
+                const value = (document.querySelector('.parquet-viewer__selection-value')?.innerText ?? '').trim();
+                const first = ${firstRow};
+                return /id · row 1\\b/.test(label) && value === first && first === '1';
+            })()`,
+        5000,
+      );
+      expect(
+        home,
+        `the inspector kept a value from the previous page: ${JSON.stringify(await selection())}`,
+      );
       return "PageDown/PageUp, page-edge arrows and Ctrl+Home/End keep the cursor";
     },
   },

@@ -280,6 +280,13 @@ function savePersistedPage(key: string | undefined, page: number) {
 function ParquetViewer({ dark }: { dark: boolean }) {
   const { message } = App.useApp();
   const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
+  /**
+   * The page `pageRows` actually came from. Row identity — the `#` column, `aria-rowindex`, the
+   * inspector's row number — must derive from this, not from `page`: `page` changes on the click,
+   * the rows arrive 0.5–1.7 s later, and in between every row number was a lie (a stale value
+   * under a fresh label, and an `aria-live` announcement of it).
+   */
+  const [loadedPage, setLoadedPage] = useState(0);
   const [pageRows, setPageRows] = useState<Record<string, unknown>[]>([]);
   const [pageLoading, setPageLoading] = useState(false);
   const [rowJump, setRowJump] = useState<number | null>(null);
@@ -622,6 +629,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       .then((snapshot) => {
         if (controller.signal.aborted || snapshot.stale) return;
         setPageRows(snapshot.rows);
+        setLoadedPage(page);
         setPageLoading(false);
         // Prefetch only once this page is on screen. Decoding the *next* page is a full
         // page per column (~1.2 s on a 60-column file) and it runs on the same thread as
@@ -751,10 +759,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const rowRange = useMemo(() => {
     if (!fileInfo) return "";
     if (fileInfo.rowCount === 0) return $t("parquet.noRows");
-    const start = page * PAGE_SIZE + 1;
-    const end = Math.min(fileInfo.rowCount, (page + 1) * PAGE_SIZE);
+    // What is on screen, which during a page load is still the previous page.
+    const start = loadedPage * PAGE_SIZE + 1;
+    const end = Math.min(fileInfo.rowCount, (loadedPage + 1) * PAGE_SIZE);
     return `${start.toLocaleString()}–${end.toLocaleString()} of ${fileInfo.rowCount.toLocaleString()}`;
-  }, [fileInfo, page]);
+  }, [fileInfo, loadedPage]);
 
   const runSearch = useCallback(async () => {
     const info = fileInfoRef.current;
@@ -838,12 +847,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       const row = pageRows[next.row];
       if (!column || !row) return;
       setInspected({
-        row: page * PAGE_SIZE + next.row,
+        row: loadedPage * PAGE_SIZE + next.row,
         column: column.name,
         value: row[column.name],
       });
     },
-    [selectCell, fileInfo, page, pageRows],
+    [selectCell, fileInfo, loadedPage, pageRows],
   );
 
   /** Abandon a running scan. The scan checks `searchSeq` between pages, so this stops it. */
@@ -897,7 +906,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (event.key === "Enter") {
         if (cursor && row && column) {
           setInspected({
-            row: page * PAGE_SIZE + cursor.row,
+            row: loadedPage * PAGE_SIZE + cursor.row,
             column: column.name,
             value: row[column.name],
           });
@@ -990,13 +999,23 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       const nextRow = pageRows[next.row];
       if (nextColumn && nextRow) {
         setInspected({
-          row: page * PAGE_SIZE + next.row,
+          row: loadedPage * PAGE_SIZE + next.row,
           column: nextColumn.name,
           value: nextRow[nextColumn.name],
         });
       }
     },
-    [cursor, fileInfo, page, pageRows, selectCell, goToPage, tableBodyHeight, revealCursor],
+    [
+      cursor,
+      fileInfo,
+      page,
+      loadedPage,
+      pageRows,
+      selectCell,
+      goToPage,
+      tableBodyHeight,
+      revealCursor,
+    ],
   );
 
   // A page turned from the keyboard has to put the cursor back: `goToPage` clears it, and the
@@ -1004,10 +1023,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   // page's rows have arrived.
   useEffect(() => {
     const pending = pendingCursor.current;
-    if (!pending || pageRows.length === 0) return;
+    // Both halves have to agree before the cursor is restored: applying it against the previous
+    // page's rows is what put "row 1" next to a value from row 251.
+    if (!pending || pageRows.length === 0 || loadedPage !== page) return;
     pendingCursor.current = null;
     revealCursor({ row: pending.where === "first" ? 0 : pageRows.length - 1, col: pending.col });
-  }, [pageRows, revealCursor]);
+  }, [pageRows, loadedPage, page, revealCursor]);
 
   // Move real focus with the cursor. A focusable cell is what makes the roving tabindex
   // work for assistive tech; the scroll keeps the focused cell in view. A virtual table may not
@@ -1043,7 +1064,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         className: "parquet-viewer__index-cell",
         onCell: () => ({ role: "rowheader", "aria-colindex": 1 }),
         onHeaderCell: () => ({ role: "columnheader", "aria-colindex": 1 }),
-        render: (_value, _row, index) => page * PAGE_SIZE + index + 1,
+        render: (_value, _row, index) => loadedPage * PAGE_SIZE + index + 1,
       },
     ];
     fileInfo.columns.forEach((column, position) => {
@@ -1063,7 +1084,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         onHeaderCell: () => ({ role: "columnheader", "aria-colindex": position + 2 }),
         onCell: () => ({ role: "gridcell", "aria-colindex": position + 2 }),
         render: (value: unknown, _row, index) => {
-          const rowIndex = page * PAGE_SIZE + index;
+          const rowIndex = loadedPage * PAGE_SIZE + index;
           return (
             <ParquetCell
               value={value}
@@ -1083,7 +1104,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       });
     });
     return cols;
-  }, [fileInfo, page, query, selectCell, activeColumn]);
+  }, [fileInfo, loadedPage, query, selectCell, activeColumn]);
 
   useEffect(() => {
     handler
@@ -1544,7 +1565,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                         y: tableBodyHeight,
                       }}
                       rowClassName={(_row, index) => {
-                        const absolute = page * PAGE_SIZE + index;
+                        const absolute = loadedPage * PAGE_SIZE + index;
                         const classes: string[] = [];
                         if (index % 2 === 1) classes.push("parquet-viewer__row--alt");
                         if (matchRows.has(absolute)) classes.push("parquet-viewer__row--match");
@@ -1556,7 +1577,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                       // row, not the index within the rendered window.
                       onRow={(_row, index) => ({
                         role: "row",
-                        "aria-rowindex": page * PAGE_SIZE + (index ?? 0) + 1,
+                        "aria-rowindex": loadedPage * PAGE_SIZE + (index ?? 0) + 1,
                       })}
                       components={{
                         table: PresentationTable,
