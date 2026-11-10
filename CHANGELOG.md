@@ -7,114 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.0] - 2026-11-10
+
+Four rounds of design critique on the parquet viewer, plus the column work that came out of it.
+
 ### Added
 
-- The parquet "this file is too large" panel offers a second way out: `Reveal in Explorer`.
-  Opening an 80 MB file anyway is a bet on memory; the file is on disk regardless, and looking at
-  it where it lives costs nothing.- Parquet column widths can be dragged from the header edge, reset with a double-click, and
+- The parquet top bar names the file's compression codec and its size. Decoding ZSTD/GZIP/BROTLI/
+  LZ4 is the reason this fork exists, and "how big is this file" is one of the four questions
+  `PRODUCT.md` says the viewer is opened to answer — neither was on screen before.
+- Parquet column widths can be dragged from the header edge, reset with a double-click, and
   adjusted with the arrow keys on the handle. Widths are remembered per column name, so a JSON
-  column that needed 300 px stays wide the next time the file is opened. The row-number column
-  keeps its width.- An empty parquet file says "No rows" once, in the body; the footer no longer repeats it, and the
-  pager hides its position label when there are no rows to be positioned in.
-- The row-number column is right-aligned like every other number on the surface.
-- `DESIGN.md` now matches the implementation: the thin-mix rule is stated in terms of final
-  opacity (a mix source with its own alpha is not the same as a plain percentage), and the colour
-  inventory lists the light-theme muted override and the two JSON token colours.- Copying a parquet value now answers: the copy button turns into a check for a moment and its
-  label says `Copied`. `Ctrl+C` on the grid copies the selected value, which previously only
-  selected the page text.
-- The top bar shows the file's size. `PRODUCT.md` lists "how big is this file" as one of the four
-  questions the viewer is opened to answer, and it was the only one never displayed. The pager
-  also shows `Page n / N` beside the row range.
-- The schema field filter has a clear button, so restoring the full list no longer means
-  selecting the text and deleting it.- The parquet schema sidebar can be filtered, and the field list is a single tab stop navigated
-  with the arrow keys. With 60 columns, reaching the grid used to take 60 presses of Tab, and
-  finding a field meant scanning a list of truncated names. Type badges wrap to two lines so
-  `TIMESTAMP_MILLIS` and `TIMESTAMP_MICROS` no longer render identically.- The parquet command bar now names the file's compression codec. Decoding ZSTD/GZIP/BROTLI/LZ4
-  is the reason this fork exists, and until now the surface said nothing about it.
-- Search says what Enter does: a hint appears as soon as you type, the readout is
-  `4 of 12 · stops at 5,000` instead of a bare total, and a running scan can be stopped from
-  the same button that started it.
-- `PageDown`/`PageUp` step by the rows the viewport shows instead of by the 50-row page, which
-  used to skip a third of the rows unseen. The pager also gained first/last buttons.- Find in file in the parquet viewer now answers with a cell, not a row: the scan records the
-  first matching column for every hit, so jumping to a match (or pressing `Enter` to walk them)
-  scrolls that column into view as well. In a 60-column file a hit used to land off-screen with
-  no marker anywhere.
+  column that needed 300 px stays wide the next time the file is opened.
+- Spare width grows the columns up to 240 px and stops there, leaving the rest empty instead of
+  stretching a four-column file into four broad panels.
+- The schema sidebar can be filtered, and its field list is a single tab stop navigated with the
+  arrow keys. Reaching the grid used to take one Tab press per column.
+- The bottom bar shows `Page n / N` beside the row range, and the pager has first/last buttons.
+- Search says what `Enter` does: a hint appears as soon as you type, the readout is
+  `4 of 12 · stops at 5,000` instead of a bare total, and a running scan can be stopped from the
+  button that started it.
+- Copying a value answers: the button turns into a check and says `Copied`. `Ctrl+C` on the grid
+  copies the selected value.
+- The "this file is too large" panel offers a second way out — `Reveal in Explorer` — because
+  opening it anyway is a bet on memory the file itself does not require.
+- Clicking a link cell also selects it, so the URL lands in the inspector where it can be copied.
 
 ### Changed
 
-- The parquet table now exposes grid semantics: `role="grid"` with the **file's** row and column
-  counts (not the rendered window), `row` / `gridcell` / `rowheader` / `columnheader` roles,
-  absolute `aria-rowindex` that stays continuous across pages, and `aria-colindex` on both the
-  header and the cells — the header is a separate scroll surface, so a cell can only be mapped
-  to its column when both sides carry the ordinal. The header's own `<table>` shell became
-  `role="presentation"`, since a table is not a valid child of a grid.
-- The parquet error state now names the file, explains the failure in a sentence and keeps two
-  ways out — `Retry` and `Edit In VS Code`. The library's own message
-  (`parquet file invalid (footer != PAR1)`) moved into a collapsed "Technical detail": someone
-  who opened a broken file previously got one line of parser output and a retry button, with no
-  indication of which file it was.
+- `PageDown`/`PageUp` step by the rows the viewport shows instead of by the 50-row page, which
+  used to skip a third of the data unseen.
+- Leaving the row-jump field no longer navigates; only `Enter` or the Go button acts on it.
+- A matched row is visible again. Its tint was mixed from a colour that already carried 33 % alpha,
+  so it landed at roughly 6 % effective opacity.
+- The `#` column is right-aligned like every other number, and an empty file says "No rows" once
+  instead of three times.
 
 ### Fixed
 
-- Columns in a narrow parquet file no longer stretch to fill the window. Spare width grows them
-  up to 240 px and the rest is left empty, so a four-column file is four readable columns instead
-  of five broad panels — and a dragged width now lands where it was dropped.- Leaving the parquet row-jump field no longer navigates. The jump fires on `Enter` (or the Go
-  button) only, so looking at the table mid-edit no longer moves the page out from under you.
-- The parquet error pane can copy its own message, and `Retry` is offered only where retrying
-  could change the answer: an unsupported compression codec is a property of the file, so the
-  codec branch shows the way out and the details instead of a button that loops.- Row numbers now belong to the page whose rows are actually on screen. `page` changed on the
-  click while the rows arrived up to 1.7 s later, so the `#` column, `aria-rowindex` and the
-  inspector briefly described the wrong rows — the bottom bar could read "row 1" beside a value
-  from row 251, and screen readers announced it.- The keyboard cursor and the bottom bar now agree: every path that restores a cursor (the first
-  arrow of a cold start, a page turn, `PageDown`) also fills the inspector, which used to say
-  "Select a cell to inspect it" while a cell was clearly focused.
-- A matched row is visible again. The tint was mixed from a colour that already had 33% alpha,
-  so it landed at roughly 6% effective opacity; it now uses the opaque find-match colour.- The parquet bottom bar keeps its selection together: the copy and close buttons sit next to
-  the value instead of being pushed to the far end against the pager, and a container value is
-  previewed with the same 320-character cap the cells use (copy still takes the whole value).
-- Clicking a link cell now also selects it, so the URL lands in the inspector where it can be
-  copied; the click still opens the link.- Parquet search results now belong to the text in the box: editing the needle clears the
-  previous counts, marks and column hits, and `Enter` searches the new text instead of jumping
-  to a hit of the old one.
-- The parquet grid is keyboard-navigable across the whole file: `PageDown`/`PageUp` turn a page,
-  the arrow keys walk off a page edge into the next one, and `Ctrl/Cmd+Home`/`End` jump to the
-  first and last row. The column is kept across a page turn. The first arrow of a cold start now
-  lands on the first cell instead of the second row.- The parquet schema field jump now measures the live column instead of assuming a fixed
-  120 px width — columns are stretched to fill the viewport when a file has few of them — drags
-  the horizontal scrollbar instead of clicking it, and keeps the header in step with the body.
-  The header is a separate scroll surface, so a jump used to leave the column labels one or two
+- Row numbers belong to the page whose rows are actually on screen. `page` changed on the click
+  while the rows arrived up to 1.7 s later, so the `#` column, `aria-rowindex` and the inspector
+  briefly described the wrong rows — the bottom bar could read "row 1" beside a value from row
+  251, and screen readers announced it.
+- The schema field jump measures the live column instead of assuming a fixed 120 px width (columns
+  are stretched when a file has few of them), and keeps the header in step with the body. The
+  header is a separate scroll surface, so a jump used to leave the column labels one or two
   columns away from the values underneath them.
-- The parquet error state's primary action is `Reveal in Explorer` rather than opening the file
-  as a binary in the editor, which for a broken file leads straight to a VS Code warning page.
-  `Retry` stays, as the secondary action.
-- The parquet bottom bar is no longer an `aria-live` region. It updates on every arrow key, so a
-  screen reader queued one announcement per keystroke; a visually hidden status region now
-  announces the selection once it has settled for 600 ms.
-- Link cells advertise the key that opens them (`aria-keyshortcuts="Enter"`) while the anchor
-  stays out of the tab order — the grid keeps a single tab stop by design, so Enter on the cell
-  is the keyboard path and now it says so.
-- Clicking a schema field could silently fail to scroll the table: the jump dispatched one
-  synthetic scrollbar event and assumed it worked, but the virtual table ignores a dispatch that
-  lands on the thumb while its track is still unmeasured. The scroll is now verified against the
-  target column being in view and retried for a few frames.
-- The parquet error state is a live region (`role="alert"`). That state replaces the entire
-  chrome with one message, so a screen-reader user previously received no announcement at all.
-- The label layer — 10px table headers, 9.5px type badges, the `SCHEMA` section title — gets a
-  darker muted foreground under a light theme, because the theme's `descriptionForeground` is
-  tuned for 13px body text and measured 3.5–4.0:1 at these sizes. The UI contrast gate now
-  covers those three selectors as well, so the declared values cannot drift back down.
-- A scan that finds nothing now says `0 matches` instead of leaving the bar blank, which was
-  indistinguishable from "you never searched".
-- The match counter reads `1 match` / `N matches` instead of `1 row` / `N rows`, which collided
-  with the row count in the status bar.
-- Parquet row styling above the virtual threshold: the body renders `div` cells, but every
-  row-level rule named `tr > td`, so alternating stripes, the 6px cell padding, the removal of
-  row separators and the match/target-row tints were all silently dead on real files (rows
-  measured 39px instead of the designed 34px). `verify:ui` now asserts the row height, the
-  absent border, and that the alternate, match and target rows carry a different background.
-- Find in file: `Enter` walks to the next hit the way VS Code's own find does, `Shift+Enter`
-  to the previous one, and `Ctrl/Cmd+Enter` — or the button, whose icon no longer reads as
-  "next" — re-runs the whole-file scan.
+- Editing the search needle invalidates the previous results, so `Enter` no longer jumps to a hit
+  of the old query.
+- The keyboard cursor and the inspector agree: every path that restores a cursor also fills the
+  bottom bar, which used to say "Select a cell to inspect it" while a cell was focused.
+- The error pane can copy its own message, and `Retry` is offered only where retrying could change
+  the answer — an unsupported codec is a property of the file, not a transient failure.
+- The parquet table exposes grid semantics: `role="grid"` with the file's row and column counts,
+  `aria-rowindex`/`aria-colindex` on both header and cells, and a keyboard model that reaches the
+  whole file (`PageDown`/`PageUp`, page-edge arrows, `Ctrl+Home`/`End`).
+- The parquet error state names the file, explains the failure in a sentence and keeps the raw
+  message behind a disclosure.
+- The bottom bar is no longer an `aria-live` region; it updates on every arrow key, so it queued
+  one announcement per keystroke. A settled selection is announced through a separate status
+  region.
+- Link cells advertise the key that opens them (`aria-keyshortcuts="Enter"`) while the anchor stays
+  out of the tab order.
+- Row styling reaches the virtual body: it renders `div` cells, so every `tr > td` rule was
+  silently dead above the virtual threshold — stripes, cell padding and the match tint all
+  vanished without a failing test.
+- A scan that finds nothing says `0 matches`; the counter reads `1 match` / `N matches` instead of
+  `1 row` / `N rows`, which collided with the table's own vocabulary.
+- `Find in file`: `Enter` walks to the next hit the way VS Code's own find does, `Shift+Enter`
+  walks back, and `Ctrl+Enter` re-runs the scan.
 
 ## [6.3.0] - 2026-11-10
 
