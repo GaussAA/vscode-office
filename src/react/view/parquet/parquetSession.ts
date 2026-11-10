@@ -10,7 +10,11 @@
  *  2. A prefetch that started before `reset()` must never populate the new cache. The old
  *     component checked the sequence guard on the visible page but not on the prefetch, so a
  *     reload could serve the previous file's rows from the new file's cache.
- *  3. The cache is bounded (LRU-ish: oldest insertion wins), and revisiting a page costs no read.
+ *  3. Reads are cached in **chunks**, not pages, and the cache is bounded. Decoding a parquet
+ *     data page costs the same whether one row is asked for or twenty thousand — measured on a
+ *     202 MB / 1.1 M row file: 50 rows and 20,000 rows both read 22.6 MB and took ~1.4 s. With a
+ *     page-sized read every turn paid that cost; with a chunk it is paid once per chunk and the
+ *     turns inside it cost nothing.
  *  4. Page <-> row arithmetic lives here. Nothing else may do `page * pageSize` again.
  *
  * The viewer is read-only: there is no edit map, no patch and no save payload. Rows go straight
@@ -26,8 +30,10 @@ export interface ParquetRowsSource {
 
 export interface ParquetSessionOptions {
   pageSize?: number;
-  /** Pages kept in memory; the viewer prefetches one page ahead. */
-  maxCachedPages?: number;
+  /** Rows read in one go. Deliberately much larger than a page; see invariant 3. */
+  chunkSize?: number;
+  /** Chunks kept in memory; the viewer prefetches the next one. */
+  maxCachedChunks?: number;
 }
 
 export interface PageSnapshot {
@@ -42,15 +48,17 @@ export interface PageSnapshot {
 }
 
 const DEFAULT_PAGE_SIZE = 50;
-const DEFAULT_MAX_CACHED_PAGES = 6;
+const DEFAULT_CHUNK_SIZE = 5_000;
+const DEFAULT_MAX_CACHED_CHUNKS = 3;
 
 export class ParquetSession {
   readonly pageSize: number;
+  readonly chunkSize: number;
   readonly rowCount: number;
   readonly totalPages: number;
 
   private readonly source: ParquetRowsSource;
-  private readonly maxCachedPages: number;
+  private readonly maxCachedChunks: number;
   private readonly cache = new Map<number, ParquetRow[]>();
   private readonly pending = new Map<number, Promise<ParquetRow[]>>();
 
@@ -65,9 +73,10 @@ export class ParquetSession {
   constructor(source: ParquetRowsSource, options: ParquetSessionOptions = {}) {
     this.source = source;
     this.pageSize = Math.max(1, options.pageSize ?? DEFAULT_PAGE_SIZE);
+    this.chunkSize = Math.max(this.pageSize, options.chunkSize ?? DEFAULT_CHUNK_SIZE);
     this.rowCount = Math.max(0, source.rowCount);
     this.totalPages = Math.max(1, Math.ceil(this.rowCount / this.pageSize));
-    this.maxCachedPages = Math.max(1, options.maxCachedPages ?? DEFAULT_MAX_CACHED_PAGES);
+    this.maxCachedChunks = Math.max(1, options.maxCachedChunks ?? DEFAULT_MAX_CACHED_CHUNKS);
   }
 
   get page(): number {
@@ -99,7 +108,7 @@ export class ParquetSession {
     const seq = ++this.loadSeq;
     const generation = this.generation;
 
-    const rows = await this.loadRaw(target, start, end);
+    const rows = await this.loadRows(start, end);
     if (generation !== this.generation || seq !== this.loadSeq) {
       return { page: target, start, end, rows: [], stale: true };
     }
@@ -112,17 +121,22 @@ export class ParquetSession {
   /**
    * Warm the cache for `page` without waiting. Failures are swallowed: a prefetch is an
    * optimisation, never a correctness requirement.
+   *
+   * Reads the page's chunk, and — once that chunk is in memory — the one after it. Crossing a
+   * chunk boundary costs a full read, so leaving it to the turn that hits it would make one page
+   * turn in every hundred slow for no reason.
    */
   prefetch(page: number): void {
     if (page < 0 || page >= this.totalPages) return;
-    const target = this.clampPage(page);
-    if (this.cache.has(target) || this.pending.has(target)) return;
-    const start = this.startOf(target);
-    const end = Math.min(this.rowCount, start + this.pageSize);
-    void this.loadRaw(target, start, end).catch(() => undefined);
+    const chunk = this.chunkOf(this.startOf(this.clampPage(page)));
+    if (!this.cache.has(chunk)) {
+      this.warmChunk(chunk);
+      return;
+    }
+    this.warmChunk(chunk + 1);
   }
 
-  /** Drop every cached page and pending load. In-flight work becomes stale. */
+  /** Drop every cached chunk and pending load. In-flight work becomes stale. */
   reset(): void {
     this.generation++;
     this.loadSeq++;
@@ -132,32 +146,53 @@ export class ParquetSession {
     this.currentRows = [];
   }
 
-  private async loadRaw(page: number, start: number, end: number): Promise<ParquetRow[]> {
-    const cached = this.cache.get(page);
-    if (cached) return cached;
-    const inFlight = this.pending.get(page);
+  private chunkOf(row: number): number {
+    return Math.floor(row / this.chunkSize);
+  }
+
+  /** Rows `[start, end)` from whichever chunk holds them. */
+  private async loadRows(start: number, end: number): Promise<ParquetRow[]> {
+    const chunk = this.chunkOf(start);
+    const chunkStart = chunk * this.chunkSize;
+    const rows = await this.loadChunk(chunk);
+    return rows.slice(start - chunkStart, end - chunkStart);
+  }
+
+  private loadChunk(chunk: number): Promise<ParquetRow[]> {
+    if (chunk * this.chunkSize >= this.rowCount) return Promise.resolve([]);
+    const cached = this.cache.get(chunk);
+    if (cached) return Promise.resolve(cached);
+    const inFlight = this.pending.get(chunk);
     if (inFlight) return inFlight;
 
+    const start = chunk * this.chunkSize;
+    const end = Math.min(this.rowCount, start + this.chunkSize);
     const generation = this.generation;
     const load = this.source
       .readRows(start, end)
       .then((rows) => {
         // A reset() while this was in flight must not repopulate the new cache.
-        if (generation === this.generation) this.remember(page, rows);
+        if (generation === this.generation) this.remember(chunk, rows);
         return rows;
       })
       .finally(() => {
-        if (this.pending.get(page) === load) this.pending.delete(page);
+        if (this.pending.get(chunk) === load) this.pending.delete(chunk);
       });
 
-    this.pending.set(page, load);
+    this.pending.set(chunk, load);
     return load;
   }
 
-  private remember(page: number, rows: ParquetRow[]): void {
+  private warmChunk(chunk: number): void {
+    if (chunk * this.chunkSize >= this.rowCount) return;
+    if (this.cache.has(chunk) || this.pending.has(chunk)) return;
+    void this.loadChunk(chunk).catch(() => undefined);
+  }
+
+  private remember(chunk: number, rows: ParquetRow[]): void {
     if (rows.length === 0) return;
-    this.cache.set(page, rows);
-    while (this.cache.size > this.maxCachedPages) {
+    this.cache.set(chunk, rows);
+    while (this.cache.size > this.maxCachedChunks) {
       const oldest = this.cache.keys().next().value;
       if (oldest === undefined) break;
       this.cache.delete(oldest);

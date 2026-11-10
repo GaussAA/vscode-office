@@ -49,7 +49,7 @@ test("pages: out-of-range page clamps to the last page", async () => {
 
 test("cache: revisiting a page does not re-read it", async () => {
   const source = makeSource(300);
-  const session = new ParquetSession(source);
+  const session = new ParquetSession(source, { chunkSize: 50 });
 
   await session.showPage(0);
   await session.showPage(1);
@@ -61,9 +61,9 @@ test("cache: revisiting a page does not re-read it", async () => {
   ]);
 });
 
-test("cache: bounded to maxCachedPages", async () => {
+test("cache: bounded to maxCachedChunks", async () => {
   const source = makeSource(500);
-  const session = new ParquetSession(source, { maxCachedPages: 2 });
+  const session = new ParquetSession(source, { chunkSize: 50, maxCachedChunks: 2 });
 
   for (const page of [0, 1, 2, 3]) await session.showPage(page);
   await session.showPage(0);
@@ -97,7 +97,7 @@ test("reset: a prefetch from the previous file never lands in the new cache", as
   // Regression for the old component: the visible-page load was sequence-guarded but the
   // prefetch write was not, so a reload could serve old rows from the new cache.
   const source = makeSource(300, { delay: 5 });
-  const session = new ParquetSession(source);
+  const session = new ParquetSession(source, { chunkSize: 50 });
 
   session.prefetch(1);
   session.reset();
@@ -110,22 +110,24 @@ test("reset: a prefetch from the previous file never lands in the new cache", as
 
 test("prefetch: warms the next page so showing it costs no read", async () => {
   const source = makeSource(300);
-  const session = new ParquetSession(source);
+  const session = new ParquetSession(source, { chunkSize: 50 });
 
   await session.showPage(0);
   session.prefetch(1);
   await new Promise((resolve) => setTimeout(resolve, 10));
 
+  const before = source.calls.length;
   await session.showPage(1);
-  assert.deepEqual(source.calls, [
-    [0, 50],
-    [50, 100],
-  ]);
+  assert.equal(source.calls.length, before, "the prefetched page must cost no read");
+  assert.ok(
+    source.calls.some(([start]) => start === 50),
+    "the prefetch must have read the page's rows",
+  );
 });
 
 test("prefetch: concurrent duplicate requests share one read", async () => {
   const source = makeSource(300, { delay: 5 });
-  const session = new ParquetSession(source);
+  const session = new ParquetSession(source, { chunkSize: 50 });
 
   session.prefetch(1);
   session.prefetch(1);
@@ -133,4 +135,43 @@ test("prefetch: concurrent duplicate requests share one read", async () => {
   await new Promise((resolve) => setTimeout(resolve, 30));
 
   assert.equal(source.calls.filter(([start]) => start === 50).length, 1);
+});
+
+test("chunks: turning pages inside a chunk reads once", async () => {
+  // A parquet data page costs the same for 50 rows as for 20,000: measured on a 202 MB file,
+  // both read 22.6 MB and took ~1.4 s. Pages of one chunk must therefore share one read.
+  const source = makeSource(300);
+  const session = new ParquetSession(source, { pageSize: 50, chunkSize: 200 });
+
+  for (const page of [0, 1, 2, 3]) await session.showPage(page);
+  assert.deepEqual(source.calls, [[0, 200]], "four pages inside one chunk cost one read");
+
+  await session.showPage(4);
+  assert.deepEqual(source.calls, [
+    [0, 200],
+    [200, 300],
+  ]);
+});
+
+test("chunks: a page is still a page", async () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 50, chunkSize: 200 });
+  const third = await session.showPage(2);
+  assert.deepEqual([third.start, third.end, third.rows.length], [100, 150, 50]);
+  assert.equal(third.rows[0].id, 100, "the slice must line up with the page, not the chunk");
+});
+
+test("chunks: prefetch reads the next chunk once the current one is warm", async () => {
+  const source = makeSource(300);
+  const session = new ParquetSession(source, { pageSize: 50, chunkSize: 100 });
+
+  await session.showPage(0); // chunk 0 in memory
+  session.prefetch(1);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.deepEqual(source.calls, [
+    [0, 100],
+    [100, 200],
+  ]);
+  await session.showPage(2); // first page of chunk 1
+  assert.equal(source.calls.length, 2, "crossing the boundary was already warmed");
 });

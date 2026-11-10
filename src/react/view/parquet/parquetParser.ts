@@ -75,6 +75,15 @@ export interface ParquetFileInfo {
 
 /** Rows per page in the webview table. Shared so paging and row addressing agree. */
 export const PARQUET_PAGE_SIZE = 50;
+/**
+ * Rows read per source call.
+ *
+ * A parquet data page costs the same to decode whether one row or twenty thousand are asked for
+ * — measured on a 202 MB / 1.1 M row / 49 column file: 50 rows and 20,000 rows both read 22.6 MB
+ * and took ~1.4 s. Page-sized reads therefore paid the full price on every turn; a chunk pays it
+ * once per hundred pages.
+ */
+export const PARQUET_CHUNK_SIZE = 5_000;
 
 function asyncBufferFromArrayBuffer(buffer: ArrayBuffer): AsyncBuffer {
   return {

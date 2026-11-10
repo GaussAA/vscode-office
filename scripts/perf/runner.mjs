@@ -293,6 +293,53 @@ const scenarios = [
     },
   },
   {
+    name: "parquet-scroll-frames",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness?file=wide`);
+      const ready = await page.waitFor(`(window.__bench?.ready ?? 0) > 0`, 60000);
+      expect(ready, "the wide file never painted");
+      await page.sleep(2500);
+
+      // Scrolling is the one interaction a reader does constantly, and it re-renders every cell
+      // of every visible row. Measure frame deltas while wheel-scrolling the virtual body.
+      const result = await page.evaluate(`(async () => {
+                const host = document.querySelector('.ant-table-tbody-virtual');
+                if (!host) return { error: 'no virtual body' };
+                const frames = [];
+                let last = performance.now();
+                let scrolling = true;
+                const tick = () => {
+                    const now = performance.now();
+                    frames.push(now - last);
+                    last = now;
+                    if (scrolling) requestAnimationFrame(tick);
+                };
+                requestAnimationFrame(tick);
+                for (let step = 0; step < 40; step++) {
+                    host.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true }));
+                    await new Promise((resolve) => setTimeout(resolve, 16));
+                }
+                scrolling = false;
+                await new Promise((resolve) => setTimeout(resolve, 60));
+                frames.shift();
+                frames.sort((a, b) => a - b);
+                const at = (q) => Number((frames[Math.min(frames.length - 1, Math.floor(frames.length * q))] ?? 0).toFixed(1));
+                return { frames: frames.length, median: at(0.5), p95: at(0.95), worst: at(1) };
+            })()`);
+
+      expect(!result.error, result.error);
+      expect(result.frames > 20, `too few frames measured: ${result.frames}`);
+      // 60 Hz is 16.7 ms. A frame budget of 33 ms allows one dropped frame per 60 ms of scroll;
+      // above that the motion reads as stutter. The p95 is what a person notices.
+      expect(
+        result.p95 <= 33,
+        `scrolling the 60-column file dropped frames: p95 ${result.p95} ms, worst ${result.worst} ms ` +
+          `over ${result.frames} frames`,
+      );
+      return `median ${result.median} ms, p95 ${result.p95} ms, worst ${result.worst} ms over ${result.frames} frames`;
+    },
+  },
+  {
     name: "parquet-search-full-scan",
     async run({ page, base, fixtures }) {
       await page.navigate(`${base}/harness?file=flat`);

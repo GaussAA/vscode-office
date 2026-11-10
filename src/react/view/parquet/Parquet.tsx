@@ -28,6 +28,7 @@ import { describeParquetFailure } from "./parquetError.ts";
 import SponsorBar from "../components/SponsorBar.tsx";
 import {
   formatCellValue,
+  PARQUET_CHUNK_SIZE,
   PARQUET_PAGE_SIZE,
   openParquetFile,
   readParquetRows,
@@ -775,7 +776,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             readRows: (start, end) =>
               readParquetRows(info.file, info.metadata, start, end, { utf8: false }),
           },
-          { pageSize: PAGE_SIZE },
+          { pageSize: PAGE_SIZE, chunkSize: PARQUET_CHUNK_SIZE },
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load parquet file");
