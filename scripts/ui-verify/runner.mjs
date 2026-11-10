@@ -599,7 +599,99 @@ const scenarios = [
         state.firstRow.join("|").includes('["ko","en"]'),
         `LIST cell did not render JSON: ${state.firstRow.join("|")}`,
       );
-      return "top-level names + JSON cell";
+      const syntax = json(
+        await page.evaluate(`JSON.stringify({
+                strings: document.querySelectorAll('.parquet-viewer__cell--json .parquet-viewer__json-token--string').length,
+                punct: document.querySelectorAll('.parquet-viewer__cell--json .parquet-viewer__json-token--punct').length,
+            })`),
+      );
+      expect(syntax.strings >= 2, `LIST strings were not tokenised: ${JSON.stringify(syntax)}`);
+      expect(syntax.punct >= 3, `LIST punctuation was not tokenised: ${JSON.stringify(syntax)}`);
+      return "top-level names + syntax-highlighted JSON cell";
+    },
+  },
+  {
+    name: "parquet-json-links-column-jump",
+    async run({ page, base }) {
+      await openParquet(page, base, "?preview=1");
+      const before = json(
+        await page.evaluate(`JSON.stringify({
+                strings: document.querySelectorAll('.parquet-viewer__json-token--string').length,
+                keys: document.querySelectorAll('.parquet-viewer__json-token--key').length,
+                links: document.querySelectorAll('.parquet-viewer__cell--link a').length,
+                unsafeLinks: [...document.querySelectorAll('.parquet-viewer__cell--link a')]
+                    .filter(a => !/^https?:\\/\\//.test(a.getAttribute('href') ?? '')).length,
+                urlHeaderLeft: document.querySelector('.parquet-table th:last-child')?.getBoundingClientRect().left ?? null,
+                wrapRight: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().right ?? null,
+            })`),
+      );
+      expect(before.strings > 0, `JSON list strings missing: ${JSON.stringify(before)}`);
+      expect(before.keys > 0, `JSON object keys missing: ${JSON.stringify(before)}`);
+      expect(before.links === 4, `expected 4 safe URL cells, got ${before.links}`);
+      expect(before.unsafeLinks === 0, `unsafe href rendered: ${JSON.stringify(before)}`);
+
+      const jump = json(
+        await page.evaluate(`(() => {
+                const item = [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(button => button.querySelector('.parquet-viewer__list-name')?.textContent === 'url');
+                item?.click();
+                return JSON.stringify({ found: !!item });
+            })()`),
+      );
+      expect(jump.found, "the url field is missing from the schema sidebar");
+      await page.sleep(500);
+
+      const after = json(
+        await page.evaluate(`JSON.stringify({
+                urlHeaderLeft: document.querySelector('.parquet-table th:last-child')?.getBoundingClientRect().left ?? null,
+                wrapLeft: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().left ?? null,
+                wrapRight: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().right ?? null,
+                active: document.querySelectorAll('.parquet-viewer__list-item--active').length,
+                pressed: document.querySelector('.parquet-viewer__list-item--active')?.getAttribute('aria-pressed'),
+                activeHeader: document.querySelectorAll('.parquet-table th.parquet-viewer__column--active').length,
+                activeCell: document.querySelectorAll('.ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--active').length,
+            })`),
+      );
+      expect(
+        before.urlHeaderLeft !== null &&
+          before.wrapRight !== null &&
+          before.urlHeaderLeft >= before.wrapRight,
+        `URL column was already visible before the jump: ${JSON.stringify(before)}`,
+      );
+      expect(
+        after.urlHeaderLeft !== null &&
+          after.wrapLeft !== null &&
+          after.wrapRight !== null &&
+          after.urlHeaderLeft >= after.wrapLeft &&
+          after.urlHeaderLeft < after.wrapRight,
+        `schema click did not bring the URL column into view: ${JSON.stringify(after)}`,
+      );
+      expect(
+        after.active === 1 && after.pressed === "true",
+        `schema item not active: ${JSON.stringify(after)}`,
+      );
+      expect(after.activeHeader >= 1, `target header not tinted: ${JSON.stringify(after)}`);
+      expect(after.activeCell > 0, `target cells not tinted: ${JSON.stringify(after)}`);
+
+      const opened = json(
+        await page.evaluate(`(async () => {
+                document.querySelector('.parquet-viewer__cell--link a')?.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+                return JSON.stringify({
+                    calls: window.__openExternalCalls ?? [],
+                    href: document.querySelector('.parquet-viewer__cell--link a')?.getAttribute('href') ?? null,
+                });
+            })()`),
+      );
+      expect(
+        opened.href === "https://huggingface.co/datasets/alpha",
+        `link href was not normalised: ${opened.href}`,
+      );
+      expect(
+        opened.calls.includes("https://huggingface.co/datasets/alpha"),
+        `openExternal was not emitted: ${JSON.stringify(opened.calls)}`,
+      );
+      return "JSON syntax + safe links + schema column jump";
     },
   },
   {
@@ -727,6 +819,19 @@ const scenarios = [
         ["numeric", ".parquet-viewer__cell--numeric"],
         ["string", ".parquet-viewer__cell--string"],
         ["bool", ".parquet-viewer__cell--bool-true"],
+      ]) {
+        parquet[key] = await contrastRatio(page, selector);
+      }
+      for (const [kind, ratio] of Object.entries(parquet)) {
+        expect(ratio !== null && ratio >= 4.5, `parquet ${kind} contrast is ${ratio}:1`);
+      }
+
+      await openParquet(page, base, "?preview=1&theme=light");
+      await page.waitFor(`!!document.querySelector('.parquet-viewer__cell--link a')`);
+      for (const [key, selector] of [
+        ["link", ".parquet-viewer__cell--link a"],
+        ["jsonKey", ".parquet-viewer__json-token--key"],
+        ["jsonString", ".parquet-viewer__json-token--string"],
       ]) {
         parquet[key] = await contrastRatio(page, selector);
       }

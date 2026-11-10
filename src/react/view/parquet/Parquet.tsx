@@ -16,6 +16,7 @@ import { getVscodeThemeColor, useVscodeDarkTheme } from "../../util/vscodeTheme.
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
+import { normalizeExternalUrl } from "@/common/externalLink";
 import { formatBytes, previewLimitBytes } from "@/common/previewLimit";
 import { highlightRuns } from "../../common/highlight.ts";
 import { savePersistedState } from "../../common/persistedState.ts";
@@ -31,6 +32,7 @@ import {
   type ParquetColumnInfo,
   type ParquetFileInfo,
 } from "./parquetParser.ts";
+import { jsonPreviewText, tokenizeJson, type JsonToken } from "./parquetPreview.ts";
 import "./Parquet.less";
 
 const PAGE_SIZE = PARQUET_PAGE_SIZE;
@@ -41,6 +43,9 @@ const SIDER_MIN = 208;
 const SIDER_MAX = 420;
 const SIDER_DEFAULT = 260;
 const SIDER_STORAGE_KEY = "parquet-sider-width";
+/** Must agree with the column widths passed to <Table>: the sidebar jump uses arithmetic. */
+const INDEX_COLUMN_WIDTH = 64;
+const DATA_COLUMN_WIDTH = 120;
 
 /**
  * Run background work when the page is idle.
@@ -134,11 +139,29 @@ function ParquetCell({
   const isCursor = cursor?.row === pageIndex && cursor?.col === position;
   const kind = column.category;
   const isNull = value === null || value === undefined;
-  const displayText = isNull ? $t("parquet.nullLabel") : formatCellValue(value, column.type);
+  // Only a complete http(s) value becomes a link. A description containing a URL stays a
+  // description; the host validates the emitted URL again before opening anything.
+  const externalUrl = isNull ? null : normalizeExternalUrl(value);
+  const jsonText = isNull || externalUrl ? null : jsonPreviewText(value);
+  const displayText = isNull
+    ? $t("parquet.nullLabel")
+    : externalUrl
+      ? typeof value === "string"
+        ? value.trim()
+        : externalUrl
+      : (jsonText ?? formatCellValue(value, column.type));
   const classes = [
     "parquet-viewer__cell",
-    isNull ? "parquet-viewer__cell--null" : kind === "bool" ? "" : `parquet-viewer__cell--${kind}`,
-    kind === "bool" && !isNull
+    isNull
+      ? "parquet-viewer__cell--null"
+      : externalUrl
+        ? "parquet-viewer__cell--link"
+        : jsonText
+          ? "parquet-viewer__cell--json"
+          : kind === "bool"
+            ? ""
+            : `parquet-viewer__cell--${kind}`,
+    kind === "bool" && !isNull && !externalUrl && !jsonText
       ? value === true
         ? "parquet-viewer__cell--bool-true"
         : "parquet-viewer__cell--bool-false"
@@ -148,17 +171,59 @@ function ParquetCell({
     .filter(Boolean)
     .join(" ");
   const labelText = displayText.length > 160 ? `${displayText.slice(0, 160)}…` : displayText;
+  const openLink = () => {
+    if (externalUrl) handler.emit("openExternal", externalUrl);
+  };
+  const content = isNull ? (
+    $t("parquet.nullLabel")
+  ) : externalUrl ? (
+    <a
+      className="parquet-viewer__cell-link"
+      href={externalUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      tabIndex={-1}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openLink();
+      }}
+      onAuxClick={(event) => event.preventDefault()}
+    >
+      {highlightCell(displayText, query.trim())}
+    </a>
+  ) : jsonText ? (
+    tokenizeJson(jsonText).map((token: JsonToken, index) => (
+      <span
+        key={index}
+        className={`parquet-viewer__json-token parquet-viewer__json-token--${token.type}`}
+      >
+        {highlightCell(token.text, query.trim())}
+      </span>
+    ))
+  ) : (
+    highlightCell(displayText, query.trim())
+  );
 
   return (
     <span
       className={classes}
       data-cell={`${pageIndex}:${position}`}
       tabIndex={isCursor ? 0 : -1}
-      aria-label={`${column.name}, row ${rowIndex + 1}: ${labelText}`}
+      aria-label={`${column.name}, row ${rowIndex + 1}: ${labelText}${externalUrl ? ", external link" : ""}`}
       title={isNull ? "null" : displayText}
       onClick={onActivate}
+      onKeyDown={(event) => {
+        // The anchor is not a separate tab stop (one per URL cell would flood the grid);
+        // Enter on the roving cell is the keyboard equivalent of clicking the link.
+        if (externalUrl && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          event.stopPropagation();
+          openLink();
+        }
+      }}
     >
-      {isNull ? $t("parquet.nullLabel") : highlightCell(displayText, query.trim())}
+      {content}
     </span>
   );
 }
@@ -238,6 +303,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const tableRef = useRef<TableRef>(null);
   /** Pending focus retry while the virtual list renders the cursor's row. */
   const focusTimer = useRef(0);
+  /** Field whose column the schema click last brought into view; tints it while browsing. */
+  const [activeColumn, setActiveColumn] = useState<number | null>(null);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<CellCursor | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -258,6 +325,72 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const selectCell = useCallback((next: CellCursor | null) => {
     cursorRef.current = next;
     setCursor(next);
+  }, []);
+
+  /**
+   * Bring one field into view without changing the page or the row selection. The column
+   * widths are fixed, so the target is arithmetic rather than a DOM measurement; this also
+   * works while the table viewport is scrolled.
+   */
+  const focusColumn = useCallback((position: number) => {
+    setActiveColumn(position);
+    // Let the active column commit first. The virtual table rebuilds its scrollbar when a
+    // column class changes; scrolling before that render can be reset by it.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const virtualBody = tableWrapRef.current?.querySelector<HTMLElement>(
+          ".ant-table-tbody-virtual",
+        );
+        const body =
+          tableWrapRef.current?.querySelector<HTMLElement>(".ant-table-body, .ant-table-content") ??
+          virtualBody;
+        const viewportWidth = virtualBody?.clientWidth ?? body?.clientWidth ?? 0;
+        if (!viewportWidth) return;
+        const columnLeft = INDEX_COLUMN_WIDTH + position * DATA_COLUMN_WIDTH;
+        const left = Math.max(0, columnLeft - Math.max(0, (viewportWidth - DATA_COLUMN_WIDTH) / 2));
+
+        // antd's virtual table keeps horizontal offset in rc-virtual-list rather than in a
+        // scrollable DOM node, and its scrollTo only handles rows. The horizontal scrollbar
+        // is a custom track: a click on the track is the same public interaction the user
+        // has, so translate the desired offset into a track position.
+        if (virtualBody) {
+          const track = tableWrapRef.current?.querySelector<HTMLElement>(
+            ".ant-table-tbody-virtual-scrollbar-horizontal",
+          );
+          const thumb = track?.querySelector<HTMLElement>(
+            ".ant-table-tbody-virtual-scrollbar-thumb",
+          );
+          const inner = tableWrapRef.current?.querySelector<HTMLElement>(
+            ".ant-table-tbody-virtual-holder-inner",
+          );
+          if (track && thumb && inner) {
+            const maxScroll = Math.max(0, inner.scrollWidth - virtualBody.clientWidth);
+            if (maxScroll === 0) return;
+            const trackRect = track.getBoundingClientRect();
+            const thumbRect = thumb.getBoundingClientRect();
+            const offsetRange = Math.max(0, trackRect.width - thumbRect.width);
+            const target = Math.min(left, maxScroll);
+            const x = trackRect.left + (target / maxScroll) * offsetRange + thumbRect.width / 2;
+            track.dispatchEvent(
+              new MouseEvent("mousedown", {
+                bubbles: true,
+                cancelable: true,
+                button: 0,
+                clientX: x,
+                clientY: trackRect.top + trackRect.height / 2,
+              }),
+            );
+            return;
+          }
+        }
+        if (!body) return;
+        const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth";
+        if (typeof body.scrollTo === "function") body.scrollTo({ left, behavior });
+        else body.scrollLeft = left;
+      });
+    });
   }, []);
 
   const totalPages = useMemo(() => {
@@ -283,6 +416,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setPageRows([]);
       setInspected(null);
       selectCell(null);
+      setActiveColumn(null);
       setTargetRow(null);
       searchSeq.current++;
       setSearching(false);
@@ -642,7 +776,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       {
         title: "#",
         key: "__index",
-        width: 64,
+        width: INDEX_COLUMN_WIDTH,
         align: "center",
         fixed: "left",
         className: "parquet-viewer__index-cell",
@@ -651,13 +785,15 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     ];
     fileInfo.columns.forEach((column, position) => {
       const kind = column.category;
+      const active = activeColumn === position;
       cols.push({
         title: column.name,
         dataIndex: column.name,
         key: column.name,
         ellipsis: true,
-        width: 120,
+        width: DATA_COLUMN_WIDTH,
         align: kind === "numeric" ? "right" : "left",
+        className: active ? "parquet-viewer__column--active" : undefined,
         render: (value: unknown, _row, index) => {
           const rowIndex = page * PAGE_SIZE + index;
           return (
@@ -670,6 +806,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               query={query}
               onActivate={() => {
                 selectCell({ row: index, col: position });
+                setActiveColumn(position);
                 setInspected({ row: rowIndex, column: column.name, value });
               }}
             />
@@ -678,7 +815,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       });
     });
     return cols;
-  }, [fileInfo, page, query, selectCell]);
+  }, [fileInfo, page, query, selectCell, activeColumn]);
 
   useEffect(() => {
     handler
@@ -899,11 +1036,20 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 <span className="parquet-viewer__sider-count">{fileInfo.columns.length}</span>
               </div>
               <div className="parquet-viewer__list">
-                {fileInfo.columns.map((column) => {
+                {fileInfo.columns.map((column, position) => {
                   const icon = COLUMN_ICONS[column.category];
                   const kind = column.category;
+                  const active = activeColumn === position;
                   return (
-                    <div key={column.name} className="parquet-viewer__list-item">
+                    <button
+                      key={column.name}
+                      type="button"
+                      className={`parquet-viewer__list-item${active ? " parquet-viewer__list-item--active" : ""}`}
+                      aria-pressed={active}
+                      aria-label={`Jump to column ${column.name}`}
+                      title={`Jump to ${column.name}`}
+                      onClick={() => focusColumn(position)}
+                    >
                       <span
                         className={`codicon parquet-viewer__list-icon parquet-viewer__list-icon--${kind} ${icon}`}
                       />
@@ -913,7 +1059,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                       <span className="parquet-viewer__list-type" title={column.type}>
                         {column.type}
                       </span>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

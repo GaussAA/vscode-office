@@ -45,6 +45,12 @@ Reading is lazy and stays usable on big files:
 - **Type-aware cells.** Numbers are right-aligned with tabular figures, strings, booleans and
   timestamps are coloured from the theme, plain `BYTE_ARRAY` values render as hex, nulls show
   as `NULL`, and clicking a cell opens its full value.
+- **Structured cells look structured.** JSON arrays/objects — including list fields that
+  Polars stores as a JSON _string_ — are token-coloured instead of one flat string.
+- **URLs are links.** A cell whose whole value is `http(s)` opens in the browser through the
+  extension host; other schemes and URLs with credentials are never opened.
+- **Click a schema field to jump to its column.** The table scrolls horizontally to that
+  column and leaves a quiet tint behind, without changing rows or filters.
 
 ![Parquet types](docs/screenshots/parquet-types.png)
 
