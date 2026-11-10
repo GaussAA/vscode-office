@@ -84,16 +84,15 @@ import type {
   GitStash,
   GitRemoteDetail,
 } from "./types";
-import { GIT_HISTORY } from "@/config/constants";
 import "./gitHistory.css";
 import "@vscode/codicons/dist/codicon.css";
 import SponsorBar from "../components/SponsorBar";
 
-const ROW_HEIGHT = GIT_HISTORY.ROW_HEIGHT;
-const TABLE_HEADER_HEIGHT = GIT_HISTORY.HEADER_HEIGHT;
-const INITIAL_MAX_COMMITS = GIT_HISTORY.INITIAL_MAX_COMMITS;
-const LOAD_MORE_COMMITS = GIT_HISTORY.LOAD_MORE_COMMITS;
-const WARNING_ACTIONS = GIT_HISTORY.WARNING_ACTIONS;
+const ROW_HEIGHT = 28;
+const TABLE_HEADER_HEIGHT = 28;
+const INITIAL_MAX_COMMITS = 300;
+const LOAD_MORE_COMMITS = 100;
+const WARNING_ACTIONS = new Set(["merge"]);
 
 function countRealCommits(commits: ReadonlyArray<GitCommit>): number {
   let count = 0;
@@ -963,11 +962,6 @@ function GitHistoryView({
     if (initialRepo) {
       loadRepositoryRef.current(initialRepo);
     }
-
-    // Cleanup: remove all event listeners when component unmounts
-    return () => {
-      handler.removeAllListeners();
-    };
   }, [applyCommitsData, clearCommitList, completeExecution, runNextBatchAction, syncRelPath]);
 
   useEffect(() => {

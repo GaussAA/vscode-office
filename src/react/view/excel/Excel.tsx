@@ -610,9 +610,6 @@ function ExcelViewer() {
       setBottombarEl(null);
       themeObserver.disconnect();
       clearTimeout(themeTimer);
-      // Clean up handler event listeners
-      handler.off("open");
-      handler.off("saveDone");
     };
     // `handleAutoFitColumns` is deliberately omitted: this effect boots the spreadsheet
     // and calls emit('init'), so re-running it when that callback's identity changes would

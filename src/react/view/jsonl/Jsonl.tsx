@@ -239,13 +239,6 @@ export default function JsonlViewer() {
     });
 
     handler.emit("init");
-
-    return () => {
-      handler.off("jsonlInfo");
-      handler.off("jsonlEntries");
-      handler.off("jsonlEntryData");
-      handler.off("jsonlSearchBatch");
-    };
   }, [recenter, requestEntry, selectEntry, startSearch]);
 
   const clearSearch = useCallback(() => {

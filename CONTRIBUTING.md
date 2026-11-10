@@ -10,7 +10,7 @@ Be respectful and constructive in all interactions. We're here to build great so
 
 ### Prerequisites
 
-- Node.js 20.11.0+ (use `.nvmrc` with `nvm use`)
+- Node.js 24+ (use `.nvmrc` with `nvm use`)
 - pnpm 12.16.1+
 - VS Code 1.125.0+
 
@@ -170,11 +170,10 @@ vscode-office/
 ### New Viewer Features
 
 1. Implement in relevant viewer component
-2. Add configuration if needed (see `src/config/constants.ts`)
-3. Update toolbar/context menu as appropriate
-4. Add keyboard shortcuts if applicable
-5. Test with various file sizes
-6. Document in README or ADR
+2. Update toolbar/context menu as appropriate
+3. Add keyboard shortcuts if applicable
+4. Test with various file sizes
+5. Document in README or ADR
 
 ## Documentation
 

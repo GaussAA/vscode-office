@@ -37,26 +37,6 @@ export class Handler {
     return this;
   }
 
-  /**
-   * Remove a specific event listener.
-   * Returns true if the listener was found and removed, false otherwise.
-   */
-  off(event: string, callback: (content: any) => unknown): boolean {
-    return this.eventEmitter.removeListener(event, callback);
-  }
-
-  /**
-   * Remove all listeners for a specific event, or all listeners if no event is specified.
-   */
-  removeAllListeners(event?: string): this {
-    if (event) {
-      this.eventEmitter.removeAllListeners(event);
-    } else {
-      this.eventEmitter.removeAllListeners();
-    }
-    return this;
-  }
-
   emit(event: string, content?: any) {
     if (this.isEnd) return this;
     this.panel.webview.postMessage({ type: event, content });
