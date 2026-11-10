@@ -20,8 +20,12 @@ export const TEXT_WINDOW_MAX_BYTES = 200 * 1024 * 1024;
 
 /** The windowed view renders text formats and workbooks; both now have a `SheetSource`. */
 const WINDOW_EXTENSIONS = new Set([".csv", ".tsv"]);
-/** Workbooks the windowed view can parse: `.xlsx`/`.xlsm` go through ExcelJS. */
-const WORKBOOK_EXTENSIONS = new Set([".xlsx", ".xlsm"]);
+/**
+ * Workbooks the windowed view can render: `.xlsx`/`.xlsm` through ExcelJS, `.xls`/`.ods`
+ * through SheetJS. Both keep the 15 MB guard — windowing fixes memory and rendering, not the
+ * decoder's time.
+ */
+const WORKBOOK_EXTENSIONS = new Set([".xlsx", ".xlsm", ".xls", ".ods"]);
 
 export interface SheetViewOptions {
   /**

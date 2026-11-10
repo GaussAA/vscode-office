@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Large workbooks (`.xls`, `.ods`) also open in the read-only windowed view: every workbook
+  format above 8 MB is now rendered as row text with a sheet picker and whole-file find, instead
+  of a cell object per value. See ADR-0017.
 - Configuration center for unified constant management (`src/config/constants.ts`)
 - Event listener cleanup infrastructure to prevent memory leaks
 - Standard project documentation (`.nvmrc`, `.editorconfig`, `SECURITY.md`, `CONTRIBUTING.md`)

@@ -444,6 +444,17 @@ function windowXlsx() {
 
 const WINDOW_XLSX = windowXlsx();
 
+/** The same idea for a legacy workbook: `.xls` is decoded by SheetJS, not ExcelJS. */
+function windowXls() {
+  const data = [["id", "name"]];
+  for (let row = 0; row < 50; row++) data.push([String(row), `legacy-${row}`]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Old");
+  return XLSX.write(workbook, { type: "buffer", bookType: "biff8" });
+}
+
+const WINDOW_XLS = windowXls();
+
 /**
  * Bridge for a workbook that must open in the windowed view: 12 MB claimed, just under the
  * 15 MB workbook guard and over the 8 MB window threshold.
@@ -463,6 +474,33 @@ function excelWorkbookStub() {
           size: 12 * 1024 * 1024,
           readOnly: true,
           documentCacheId: 'demo:window-xlsx',
+        } }, '*');
+      }, 60);
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
+
+/** Bridge for a legacy workbook: `.xls` at 12 MB, windowed through SheetJS. */
+function excelLegacyStub() {
+  return `<script>
+(function () {
+  const api = {
+    postMessage(msg) {
+      if (!msg || msg.type !== 'init') return;
+      setTimeout(function () {
+        window.postMessage({ type: 'open', content: {
+          ext: '.xls',
+          fileName: 'window.xls',
+          path: '/window.xls',
+          scheme: 'file',
+          size: 12 * 1024 * 1024,
+          readOnly: true,
+          documentCacheId: 'demo:window-xls',
         } }, '*');
       }, 60);
     },
@@ -503,17 +541,20 @@ export function startHarness(fixtures, port = 0) {
       const guard = path === "/harness-route" && url.searchParams.get("guard") === "1";
       const windowed = path === "/harness-route" && url.searchParams.get("window") === "1";
       const workbookView = path === "/harness-route" && url.searchParams.get("workbook") === "1";
+      const legacyView = path === "/harness-route" && url.searchParams.get("legacy") === "1";
       const stub = guard
         ? excelGuardStub()
-        : workbookView
-          ? excelWorkbookStub()
-          : windowed
-            ? excelWindowStub()
-            : path === "/harness-route"
-              ? smokeStub(url.searchParams.get("route") ?? "html")
-              : route === "parquet"
-                ? parquetStub(fixtures)
-                : jsonlStub(url.searchParams.get("empty") === "1" ? [] : entries);
+        : legacyView
+          ? excelLegacyStub()
+          : workbookView
+            ? excelWorkbookStub()
+            : windowed
+              ? excelWindowStub()
+              : path === "/harness-route"
+                ? smokeStub(url.searchParams.get("route") ?? "html")
+                : route === "parquet"
+                  ? parquetStub(fixtures)
+                  : jsonlStub(url.searchParams.get("empty") === "1" ? [] : entries);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;
@@ -565,6 +606,12 @@ export function startHarness(fixtures, port = 0) {
     if (path === "/huge.csv") {
       res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
       res.end("a,b,c\n1,2,3\n4,5,6\n");
+      return;
+    }
+
+    if (path === "/window.xls") {
+      res.writeHead(200, { "content-type": "application/vnd.ms-excel" });
+      res.end(WINDOW_XLS);
       return;
     }
 

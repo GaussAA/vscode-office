@@ -1139,6 +1139,31 @@ const scenarios = [
     },
   },
   {
+    name: "excel-windowed-legacy",
+    async run({ page, base }) {
+      // `.xls` is decoded by SheetJS rather than ExcelJS; the window contract must be the same.
+      await page.navigate(`${base}/harness-route?route=excel&legacy=1`);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 20000);
+      expect(ready, "the windowed .xls did not render");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                grid: !!document.querySelector('#container .x-spreadsheet'),
+                total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
+                rows: document.querySelectorAll('.windowed-sheet__row').length,
+                first: document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText ?? '',
+                second: [...document.querySelectorAll('.windowed-sheet__row')][1]
+                    ?.querySelectorAll('.windowed-sheet__cell')[1]?.innerText ?? '',
+            })`),
+      );
+      expect(!state.grid, "the editable grid mounted for a legacy workbook");
+      expect(state.total === 51, `unexpected row count: ${state.total}`);
+      expect(state.rows > 0 && state.rows < 80, `rendered ${state.rows} rows`);
+      expect(state.first === "id", `unexpected first cell: ${state.first}`);
+      expect(state.second === "legacy-0", `unexpected second row: ${state.second}`);
+      return `51-row .xls windowed through SheetJS`;
+    },
+  },
+  {
     name: "remaining-routes-smoke",
     async run({ page, base }) {
       // The routes without a behavioural scenario of their own: the spreadsheet viewer and the

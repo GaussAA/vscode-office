@@ -76,7 +76,7 @@ CI 在每次 push 时都会跑这三项，以及 `pnpm build` 和 `pnpm run pack
 - 超大文件的 parquet 全文件搜索受 I/O 限制（会读取访问到的每个 row group）。
 - parquet 只读，没有写端。
 - 表格超过 8 MB 时进入只读窗口视图（只渲染视口内的行）。工作簿超过 15 MB、虚拟工作区里的
-  CSV/TSV 超过 25 MB 时先询问再加载；本地 CSV/TSV 最多可窗口化到 200 MB。工作簿以行文本
+  CSV/TSV 超过 25 MB 时先询问再加载；本地 CSV/TSV 最多可窗口化到 200 MB。所有工作簿格式（`.xlsx`、`.xlsm`、`.xls`、`.ods`）都以行文本
   窗口化，所以超过 8 MB 也是只读。
 - JSONL 搜索匹配原始文本，不理解 JSON 路径。
 - 上游的遥测已完全移除。
