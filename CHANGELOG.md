@@ -9,7 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Find in file in the parquet viewer now answers with a cell, not a row: the scan records the
+- The parquet command bar now names the file's compression codec. Decoding ZSTD/GZIP/BROTLI/LZ4
+  is the reason this fork exists, and until now the surface said nothing about it.
+- Search says what Enter does: a hint appears as soon as you type, the readout is
+  `4 of 12 · stops at 5,000` instead of a bare total, and a running scan can be stopped from
+  the same button that started it.
+- `PageDown`/`PageUp` step by the rows the viewport shows instead of by the 50-row page, which
+  used to skip a third of the rows unseen. The pager also gained first/last buttons.- Find in file in the parquet viewer now answers with a cell, not a row: the scan records the
   first matching column for every hit, so jumping to a match (or pressing `Enter` to walk them)
   scrolls that column into view as well. In a 60-column file a hit used to land off-screen with
   no marker anywhere.
