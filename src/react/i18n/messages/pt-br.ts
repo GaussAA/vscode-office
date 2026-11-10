@@ -151,6 +151,11 @@ export default {
     inspectHint: "Selecione uma célula para ver o valor",
     cappedSuffix: " · parou em {max}",
     invalidRow: "Insira um número de linha válido",
+    errorTitle: "Não foi possível abrir este arquivo parquet",
+    errorTruncated:
+      "O arquivo não termina com um rodapé parquet válido. Provavelmente está truncado ou não é um arquivo parquet.",
+    errorCodec: "Esta versão não consegue decodificar a compressão {codec}.",
+    errorDetail: "Detalhe técnico",
   },
   previewGuard: {
     title: "Arquivo grande demais para pré-visualização automática",

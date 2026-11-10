@@ -150,6 +150,11 @@ export default {
     inspectHint: "セルを選択すると値を表示します",
     cappedSuffix: " · {max} で停止",
     invalidRow: "有効な行番号を入力してください",
+    errorTitle: "この parquet ファイルを開けませんでした",
+    errorTruncated:
+      "ファイル末尾に有効な parquet フッターがありません。切り詰められているか、parquet ファイルではありません。",
+    errorCodec: "このビルドでは {codec} 圧縮をデコードできません。",
+    errorDetail: "技術的な詳細",
   },
   previewGuard: {
     title: "ファイルが大きいため自動プレビューしません",

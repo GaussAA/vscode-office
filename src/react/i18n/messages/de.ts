@@ -150,6 +150,11 @@ export default {
     inspectHint: "Zelle auswählen, um den Wert zu sehen",
     cappedSuffix: " · bei {max} gestoppt",
     invalidRow: "Bitte eine gültige Zeilennummer eingeben",
+    errorTitle: "Diese Parquet-Datei konnte nicht geöffnet werden",
+    errorTruncated:
+      "Die Datei endet nicht mit einem gültigen Parquet-Footer. Sie ist wahrscheinlich abgeschnitten oder keine Parquet-Datei.",
+    errorCodec: "Diese Version kann die Komprimierung {codec} nicht dekodieren.",
+    errorDetail: "Technisches Detail",
   },
   previewGuard: {
     title: "Datei zu groß für die automatische Vorschau",

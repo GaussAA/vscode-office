@@ -165,6 +165,10 @@ export default {
     inspectHint: "點擊儲存格查看完整值",
     cappedSuffix: " · 已停在 {max}",
     invalidRow: "請輸入有效行號",
+    errorTitle: "無法開啟這個 parquet 檔案",
+    errorTruncated: "檔案結尾沒有有效的 parquet 尾端標記。它可能被截斷，或根本不是 parquet 檔案。",
+    errorCodec: "這個建置無法解碼 {codec} 壓縮。",
+    errorDetail: "技術細節",
   },
   jsonl: {
     entriesCount: "共 {count} 筆",

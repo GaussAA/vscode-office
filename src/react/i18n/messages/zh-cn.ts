@@ -165,6 +165,11 @@ export default {
     inspectHint: "点击单元格查看完整值",
     cappedSuffix: " · 已停在 {max}",
     invalidRow: "请输入有效行号",
+    errorTitle: "无法打开这个 parquet 文件",
+    errorTruncated:
+      "文件末尾没有有效的 parquet 尾部标记。它可能被截断，或者根本不是 parquet 文件。",
+    errorCodec: "这个构建无法解码 {codec} 压缩。",
+    errorDetail: "技术细节",
   },
   jsonl: {
     entriesCount: "共 {count} 条",

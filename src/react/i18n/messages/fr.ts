@@ -151,6 +151,11 @@ export default {
     inspectHint: "Sélectionnez une cellule pour voir sa valeur",
     cappedSuffix: " · arrêté à {max}",
     invalidRow: "Veuillez saisir un numéro de ligne valide",
+    errorTitle: "Impossible d'ouvrir ce fichier parquet",
+    errorTruncated:
+      "Le fichier ne se termine pas par un pied de page parquet valide. Il est probablement tronqué, ou ce n'est pas un fichier parquet.",
+    errorCodec: "Cette version ne peut pas décoder la compression {codec}.",
+    errorDetail: "Détail technique",
   },
   previewGuard: {
     title: "Fichier trop volumineux pour un aperçu automatique",

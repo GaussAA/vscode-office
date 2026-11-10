@@ -22,6 +22,7 @@ import { highlightRuns } from "../../common/highlight.ts";
 import { savePersistedState } from "../../common/persistedState.ts";
 import { ParquetSession } from "./parquetSession.ts";
 import { searchParquetValues } from "./parquetSearch.ts";
+import { describeParquetFailure } from "./parquetError.ts";
 import SponsorBar from "../components/SponsorBar.tsx";
 import {
   formatCellValue,
@@ -279,6 +280,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Shown in the error state too: that is the one state where the chrome is gone. */
+  const [fileName, setFileName] = useState("");
   /** Set when the host refused to inline an oversized virtual document. */
   const [tooLarge, setTooLarge] = useState<{
     size: number;
@@ -841,6 +844,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           forcedRef.current = false;
           lastPathRef.current = payload.path;
         }
+        setFileName(payload.fileName ?? "");
         // Only virtual documents are gated: a local file is paged with range requests, so its
         // size is irrelevant; one that arrives inline pays for the whole file at once.
         if (!forcedRef.current && payload.tooLarge) {
@@ -870,6 +874,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       ? $t("parquet.nullLabel")
       : formatCellValue(inspected.value, inspectedType)
     : "";
+
+  /** Library message → the sentence a reader can act on, plus the original for the details. */
+  const failure = describeParquetFailure(error);
 
   /** The host refused to inline an oversized virtual document; ask it to read it anyway. */
   const handleOpenAnyway = useCallback(() => {
@@ -908,18 +915,50 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           <span>{$t("parquet.loading")}</span>
         </div>
       )}
-      {error ? (
-        <div className="parquet-viewer__empty">
+      {failure ? (
+        <div className="parquet-viewer__error-pane">
+          {fileName && (
+            <div className="parquet-viewer__error-file">
+              <span className="codicon codicon-file" />
+              <span className="parquet-viewer__error-file-name">{fileName}</span>
+            </div>
+          )}
           <div className="parquet-viewer__error" role="alert">
             <span className="codicon codicon-error" />
-            <span>{error}</span>
-            <button
-              type="button"
-              className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
-              onClick={() => handler.emit("init")}
-            >
-              {$t("common.retry")}
-            </button>
+            <div className="parquet-viewer__error-body">
+              <p className="parquet-viewer__error-title">
+                {failure.kind === "other" ? failure.raw : $t("parquet.errorTitle")}
+              </p>
+              {failure.kind !== "other" && (
+                <p className="parquet-viewer__error-text">
+                  {failure.kind === "codec"
+                    ? $t("parquet.errorCodec", { codec: failure.codec })
+                    : $t("parquet.errorTruncated")}
+                </p>
+              )}
+              {failure.kind !== "other" && (
+                <details className="parquet-viewer__error-raw">
+                  <summary>{$t("parquet.errorDetail")}</summary>
+                  <pre>{failure.raw}</pre>
+                </details>
+              )}
+            </div>
+            <div className="parquet-viewer__error-actions">
+              <button
+                type="button"
+                className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
+                onClick={() => handler.emit("init")}
+              >
+                {$t("common.retry")}
+              </button>
+              <button
+                type="button"
+                className="parquet-viewer__pager-btn"
+                onClick={() => handler.emit("editInVSCode", true)}
+              >
+                {$t("common.editInVscode")}
+              </button>
+            </div>
           </div>
         </div>
       ) : fileInfo ? (

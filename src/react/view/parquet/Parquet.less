@@ -878,17 +878,102 @@ body:has(.parquet-app) {
   }
 }
 
-.parquet-viewer__empty {
+/* The failure state replaces the whole chrome, so it carries the two things a reader needs to
+   act: which file this is, and a way out. A left-aligned bar, not a floating pill. */
+.parquet-viewer__error-pane {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
   flex: 1;
-  min-height: 200px;
-  padding: 24px;
-  color: var(--pv-muted);
-  font-size: 13px;
+  min-height: 0;
+  padding: 24px 16px;
+  overflow: auto;
 }
 
+.parquet-viewer__error-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--pv-fg);
+  font-size: 13px;
+  font-weight: 600;
+
+  .codicon {
+    flex-shrink: 0;
+    font-size: 14px;
+    color: var(--pv-muted);
+  }
+}
+
+.parquet-viewer__error-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parquet-viewer__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 640px;
+  padding: 14px 16px;
+  border-radius: var(--pv-radius);
+  color: var(--pv-error);
+  background: color-mix(in srgb, var(--pv-error) 10%, transparent);
+  font-size: 13px;
+  line-height: 1.5;
+
+  > .codicon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 16px;
+  }
+}
+
+.parquet-viewer__error-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.parquet-viewer__error-title {
+  margin: 0;
+  color: var(--pv-error);
+  font-weight: 600;
+}
+
+.parquet-viewer__error-text {
+  margin: 0;
+  color: var(--pv-fg);
+}
+
+.parquet-viewer__error-raw {
+  margin-top: 6px;
+  color: var(--pv-muted);
+  font-family: var(--pv-mono);
+  font-size: 11.5px;
+
+  summary {
+    cursor: pointer;
+  }
+
+  pre {
+    margin: 6px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+.parquet-viewer__error-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  align-self: center;
+}
 .parquet-viewer__no-rows {
   display: flex;
   flex: 1;
@@ -904,31 +989,6 @@ body:has(.parquet-app) {
   .codicon {
     font-size: 28px;
     opacity: 0.65;
-  }
-}
-
-.parquet-viewer__error {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  max-width: 560px;
-  padding: 14px 16px;
-  border-radius: var(--pv-radius);
-  color: var(--pv-error);
-  background: color-mix(in srgb, var(--pv-error) 10%, transparent);
-  font-size: 13px;
-  line-height: 1.5;
-
-  .codicon {
-    flex-shrink: 0;
-    margin-top: 2px;
-    font-size: 16px;
-  }
-
-  button {
-    flex-shrink: 0;
-    align-self: center;
-    margin-left: auto;
   }
 }
 

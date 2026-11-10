@@ -149,6 +149,11 @@ export default {
     inspectHint: "셀을 선택하면 값을 표시합니다",
     cappedSuffix: " · {max}에서 중단",
     invalidRow: "유효한 행 번호를 입력하세요",
+    errorTitle: "이 parquet 파일을 열 수 없습니다",
+    errorTruncated:
+      "파일 끝에 유효한 parquet 푸터가 없습니다. 잘렸거나 parquet 파일이 아닐 수 있습니다.",
+    errorCodec: "이 빌드는 {codec} 압축을 디코딩할 수 없습니다.",
+    errorDetail: "기술적 세부 정보",
   },
   previewGuard: {
     title: "파일이 커서 자동으로 미리 보지 않습니다",

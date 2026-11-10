@@ -169,6 +169,11 @@ export default {
     inspectHint: "Select a cell to inspect it",
     cappedSuffix: " · stopped at {max}",
     invalidRow: "Enter a valid row number",
+    errorTitle: "Could not open this parquet file",
+    errorTruncated:
+      "The file does not end with a valid parquet footer. It is probably truncated, or it is not a parquet file.",
+    errorCodec: "This build cannot decode {codec} compression.",
+    errorDetail: "Technical detail",
   },
   jsonl: {
     entriesCount: "{count} entries",

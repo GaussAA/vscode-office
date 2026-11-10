@@ -476,20 +476,40 @@ const scenarios = [
       await openParquet(page, base, "?bad=1");
       const state = json(
         await page.evaluate(`JSON.stringify({
-                error: document.querySelector('.parquet-viewer__error span:nth-child(2)')?.innerText ?? null,
-                retry: [...document.querySelectorAll('.parquet-viewer__error button')]
-                    .some(b => b.textContent.trim() === 'Retry'),
+                file: document.querySelector('.parquet-viewer__error-file-name')?.innerText ?? null,
+                title: document.querySelector('.parquet-viewer__error-title')?.innerText ?? null,
+                text: document.querySelector('.parquet-viewer__error-text')?.innerText ?? null,
+                detail: document.querySelector('.parquet-viewer__error-raw pre')?.textContent ?? null,
+                buttons: [...document.querySelectorAll('.parquet-viewer__error-actions button')]
+                    .map(b => b.textContent.trim()),
                 role: document.querySelector('.parquet-viewer__error')?.getAttribute('role') ?? null,
                 table: !!document.querySelector('.parquet-table'),
             })`),
       );
-      expect(/parquet/i.test(state.error ?? ""), `unexpected error copy: ${state.error}`);
-      expect(state.retry, "error state has no way to try again");
+      // This state loses the whole chrome, so the file has to be named here or nowhere.
+      expect(state.file === "parquet-sample", `error state does not name the file: ${state.file}`);
+      // The headline is a sentence; the parser's own words live under the details.
+      expect(
+        !!state.title && !/footer|PAR1|invalid/i.test(state.title),
+        `error title is still the parser's message: ${state.title}`,
+      );
+      expect(
+        /truncated|not a parquet/i.test(state.text ?? ""),
+        `error body does not explain the file: ${state.text}`,
+      );
+      expect(
+        /footer|PAR1|parquet/i.test(state.detail ?? ""),
+        `raw message is gone: ${state.detail}`,
+      );
       // The whole chrome is gone in this state; without a live region a screen-reader user
       // gets no announcement at all, only an empty page.
       expect(state.role === "alert", `error state is not announced (role=${state.role})`);
+      expect(
+        state.buttons.includes("Retry") && state.buttons.includes("Edit In VS Code"),
+        `error state has no way out: ${JSON.stringify(state.buttons)}`,
+      );
       expect(!state.table, "a broken file still rendered a table");
-      return "malformed file: announced message + retry";
+      return "broken file: named, explained, escapable";
     },
   },
   {
