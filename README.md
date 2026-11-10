@@ -45,6 +45,12 @@ Reading is lazy and stays usable on big files:
 - **Type-aware cells.** Numbers are right-aligned with tabular figures, strings, booleans and
   timestamps are coloured from the theme, plain `BYTE_ARRAY` values render as hex, nulls show
   as `NULL`, and clicking a cell opens its full value.
+- **Structured cells look structured.** JSON arrays/objects — including list fields that
+  Polars stores as a JSON _string_ — are token-coloured instead of one flat string.
+- **URLs are links.** A cell whose whole value is `http(s)` opens in the browser through the
+  extension host; other schemes and URLs with credentials are never opened.
+- **Click a schema field to jump to its column.** The table scrolls horizontally to that
+  column and leaves a quiet tint behind, without changing rows or filters.
 
 ![Parquet types](docs/screenshots/parquet-types.png)
 
@@ -72,6 +78,16 @@ lists entries, the right pane renders the selected entry as a tree (or as raw te
 - Keyboard: `←`/`→` collapse/expand, `Space` toggles, `Enter` copies the value,
   `Ctrl+Shift+C` copies the path.
 
+### Spreadsheets: large files stay usable
+
+Above 8 MB, CSV/TSV and workbook files open in a read-only windowed table: only the rows the
+viewport holds are in the DOM, so a 21 MB CSV paints in ~0.5 s with ~33 MB of heap where the
+editable grid needs seconds and hundreds of megabytes. Find scans the file in blocks, "go to
+row" only moves the scroll offset, and workbooks keep a sheet picker. Editing above the
+threshold stays in the text editor (**Open in VS Code**).
+
+![Read-only windowed spreadsheet](docs/screenshots/excel-windowed.png)
+
 ### Verification
 
 ```bash
@@ -90,8 +106,8 @@ CI runs all three on every push, together with `pnpm build` and `pnpm run packag
 - Parquet is read-only; there is no writer.
 - Spreadsheets above 8 MB open in a read-only windowed view (viewport rows only). Workbooks
   above 15 MB, and CSV/TSV from a virtual workspace above 25 MB, ask before loading at all;
-  a local CSV/TSV may be windowed up to 200 MB. Workbooks are windowed as row text, so they
-  are read-only above 8 MB too.
+  a local CSV/TSV may be windowed up to 200 MB. All workbook formats (`.xlsx`, `.xlsm`, `.xls`, `.ods`) are windowed
+  as row text, so they are read-only above 8 MB too.
 - JSONL search matches raw text, not JSON paths.
 - Upstream telemetry has been removed entirely.
 

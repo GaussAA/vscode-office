@@ -143,16 +143,28 @@ async function openParquet(page, base, query = "") {
       : query.includes("empty=1")
         ? `!!document.querySelector('.parquet-viewer__no-rows')`
         : `!!document.querySelector('.parquet-viewer__cell')
-            && !!document.querySelector('.parquet-table tbody .ant-table-row')`,
+            && !!document.querySelector('.parquet-table .ant-table-row')`,
   );
   expect(ready, "parquet table did not render");
 }
+
+/**
+ * Rows and cells without assuming the table's DOM shape.
+ *
+ * antd draws a classic `<tr>/<td>` body by default and a div-based list when `virtual` is on.
+ * Both keep `.ant-table-row` and `.ant-table-cell`, and the hidden measure row is not an
+ * `.ant-table-row` in either — so indexing by that class is stable, while
+ * `tr:nth-child(2)` ("the first data row") moves when the measure row disappears.
+ */
+const ROWS = "[...document.querySelectorAll('.parquet-table .ant-table-row')]";
+/** A cell of the first data row by column position (index column included). */
+const firstRowCell = (column) => `(${ROWS}[0])?.children[${column}]`;
 
 const pagerState = (page) =>
   page
     .evaluate(`JSON.stringify({
     range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
-    first: document.querySelector('.parquet-table tbody tr:nth-child(2) td')?.innerText ?? null,
+    first: (${ROWS}[0])?.children[0]?.innerText ?? null,
 })`)
     .then(json);
 
@@ -437,7 +449,7 @@ const scenarios = [
         await page.evaluate(`JSON.stringify((() => {
                 const headers = [...document.querySelectorAll('.parquet-table thead th')];
                 const longHeader = headers.find(h => h.innerText.toLowerCase().includes('very long column'));
-                const cells = [...document.querySelectorAll('.parquet-table tbody tr:nth-child(2) td')];
+                const cells = [...((${ROWS}[0])?.children ?? [])];
                 return {
                     headers: headers.map(h => h.innerText),
                     longHeaderHeight: longHeader ? Math.round(longHeader.getBoundingClientRect().height) : 0,
@@ -495,8 +507,8 @@ const scenarios = [
       const align = json(
         await page.evaluate(`JSON.stringify({
                 header: getComputedStyle(document.querySelectorAll('.ant-table-thead th')[1]).textAlign,
-                cell: getComputedStyle(document.querySelector('.ant-table-tbody tr:nth-child(2) td:nth-child(2)')).textAlign,
-                value: getComputedStyle(document.querySelector('.ant-table-tbody tr:nth-child(2) td:nth-child(2) .parquet-viewer__cell')).textAlign,
+                cell: getComputedStyle(${firstRowCell(1)}).textAlign,
+                value: getComputedStyle(${firstRowCell(1)}.querySelector('.parquet-viewer__cell')).textAlign,
             })`),
       );
       expect(
@@ -572,7 +584,7 @@ const scenarios = [
       const state = json(
         await page.evaluate(`JSON.stringify({
                 names: [...document.querySelectorAll('.parquet-viewer__list-name')].map(n => n.textContent),
-                firstRow: [...document.querySelectorAll('.parquet-table tbody tr:nth-child(2) .parquet-viewer__cell')].map(n => n.textContent),
+                firstRow: [...((${ROWS}[0])?.querySelectorAll('.parquet-viewer__cell') ?? [])].map(n => n.textContent),
             })`),
       );
       expect(
@@ -587,7 +599,99 @@ const scenarios = [
         state.firstRow.join("|").includes('["ko","en"]'),
         `LIST cell did not render JSON: ${state.firstRow.join("|")}`,
       );
-      return "top-level names + JSON cell";
+      const syntax = json(
+        await page.evaluate(`JSON.stringify({
+                strings: document.querySelectorAll('.parquet-viewer__cell--json .parquet-viewer__json-token--string').length,
+                punct: document.querySelectorAll('.parquet-viewer__cell--json .parquet-viewer__json-token--punct').length,
+            })`),
+      );
+      expect(syntax.strings >= 2, `LIST strings were not tokenised: ${JSON.stringify(syntax)}`);
+      expect(syntax.punct >= 3, `LIST punctuation was not tokenised: ${JSON.stringify(syntax)}`);
+      return "top-level names + syntax-highlighted JSON cell";
+    },
+  },
+  {
+    name: "parquet-json-links-column-jump",
+    async run({ page, base }) {
+      await openParquet(page, base, "?preview=1");
+      const before = json(
+        await page.evaluate(`JSON.stringify({
+                strings: document.querySelectorAll('.parquet-viewer__json-token--string').length,
+                keys: document.querySelectorAll('.parquet-viewer__json-token--key').length,
+                links: document.querySelectorAll('.parquet-viewer__cell--link a').length,
+                unsafeLinks: [...document.querySelectorAll('.parquet-viewer__cell--link a')]
+                    .filter(a => !/^https?:\\/\\//.test(a.getAttribute('href') ?? '')).length,
+                urlHeaderLeft: document.querySelector('.parquet-table th:last-child')?.getBoundingClientRect().left ?? null,
+                wrapRight: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().right ?? null,
+            })`),
+      );
+      expect(before.strings > 0, `JSON list strings missing: ${JSON.stringify(before)}`);
+      expect(before.keys > 0, `JSON object keys missing: ${JSON.stringify(before)}`);
+      expect(before.links === 4, `expected 4 safe URL cells, got ${before.links}`);
+      expect(before.unsafeLinks === 0, `unsafe href rendered: ${JSON.stringify(before)}`);
+
+      const jump = json(
+        await page.evaluate(`(() => {
+                const item = [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(button => button.querySelector('.parquet-viewer__list-name')?.textContent === 'url');
+                item?.click();
+                return JSON.stringify({ found: !!item });
+            })()`),
+      );
+      expect(jump.found, "the url field is missing from the schema sidebar");
+      await page.sleep(500);
+
+      const after = json(
+        await page.evaluate(`JSON.stringify({
+                urlHeaderLeft: document.querySelector('.parquet-table th:last-child')?.getBoundingClientRect().left ?? null,
+                wrapLeft: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().left ?? null,
+                wrapRight: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().right ?? null,
+                active: document.querySelectorAll('.parquet-viewer__list-item--active').length,
+                pressed: document.querySelector('.parquet-viewer__list-item--active')?.getAttribute('aria-pressed'),
+                activeHeader: document.querySelectorAll('.parquet-table th.parquet-viewer__column--active').length,
+                activeCell: document.querySelectorAll('.ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--active').length,
+            })`),
+      );
+      expect(
+        before.urlHeaderLeft !== null &&
+          before.wrapRight !== null &&
+          before.urlHeaderLeft >= before.wrapRight,
+        `URL column was already visible before the jump: ${JSON.stringify(before)}`,
+      );
+      expect(
+        after.urlHeaderLeft !== null &&
+          after.wrapLeft !== null &&
+          after.wrapRight !== null &&
+          after.urlHeaderLeft >= after.wrapLeft &&
+          after.urlHeaderLeft < after.wrapRight,
+        `schema click did not bring the URL column into view: ${JSON.stringify(after)}`,
+      );
+      expect(
+        after.active === 1 && after.pressed === "true",
+        `schema item not active: ${JSON.stringify(after)}`,
+      );
+      expect(after.activeHeader >= 1, `target header not tinted: ${JSON.stringify(after)}`);
+      expect(after.activeCell > 0, `target cells not tinted: ${JSON.stringify(after)}`);
+
+      const opened = json(
+        await page.evaluate(`(async () => {
+                document.querySelector('.parquet-viewer__cell--link a')?.click();
+                await new Promise(resolve => setTimeout(resolve, 50));
+                return JSON.stringify({
+                    calls: window.__openExternalCalls ?? [],
+                    href: document.querySelector('.parquet-viewer__cell--link a')?.getAttribute('href') ?? null,
+                });
+            })()`),
+      );
+      expect(
+        opened.href === "https://huggingface.co/datasets/alpha",
+        `link href was not normalised: ${opened.href}`,
+      );
+      expect(
+        opened.calls.includes("https://huggingface.co/datasets/alpha"),
+        `openExternal was not emitted: ${JSON.stringify(opened.calls)}`,
+      );
+      return "JSON syntax + safe links + schema column jump";
     },
   },
   {
@@ -606,7 +710,7 @@ const scenarios = [
       await page.navigate(`${base}/harness-parquet?mixed=1`);
       const restored = await page.waitFor(
         `document.querySelector('.parquet-viewer__pager-info')?.innerText === '51–100 of 300'` +
-          ` && document.querySelector('.parquet-table tbody tr:nth-child(2) td')?.innerText === '51'`,
+          ` && (${ROWS}[0])?.children[0]?.innerText === '51'`,
         15000,
       );
       const after = await pagerState(page);
@@ -654,7 +758,13 @@ const scenarios = [
       expect(arrived, "jump never reached row 239,951");
       const jumped = await pagerState(page);
       expect(jumped.range === "239,951–240,000 of 250,000", `jump range: ${jumped.range}`);
-      expect(jumped.first === "239951", `jump first row: ${jumped.first}`);
+      // The table is virtual: the first rendered row is whatever the scroller keeps on screen,
+      // not the page's first row. What must be true is that the jumped-to row is the visible
+      // target — a stronger statement than "the page starts where we asked".
+      const target = await page.evaluate(
+        `document.querySelector('.parquet-viewer__row--target')?.children[0]?.innerText ?? null`,
+      );
+      expect(target === "240000", `jump target row: ${target} (first rendered: ${jumped.first})`);
       return "read-only + blur and Go jumps";
     },
   },
@@ -716,6 +826,19 @@ const scenarios = [
         expect(ratio !== null && ratio >= 4.5, `parquet ${kind} contrast is ${ratio}:1`);
       }
 
+      await openParquet(page, base, "?preview=1&theme=light");
+      await page.waitFor(`!!document.querySelector('.parquet-viewer__cell--link a')`);
+      for (const [key, selector] of [
+        ["link", ".parquet-viewer__cell--link a"],
+        ["jsonKey", ".parquet-viewer__json-token--key"],
+        ["jsonString", ".parquet-viewer__json-token--string"],
+      ]) {
+        parquet[key] = await contrastRatio(page, selector);
+      }
+      for (const [kind, ratio] of Object.entries(parquet)) {
+        expect(ratio !== null && ratio >= 4.5, `parquet ${kind} contrast is ${ratio}:1`);
+      }
+
       await openJsonl(page, base, "light");
       await page.waitFor(`!!document.querySelector('.jsonl-val--number')`);
       const jsonl = {};
@@ -742,7 +865,7 @@ const scenarios = [
       );
       expect(hint === "Select a cell to inspect it", `selection hint: ${hint}`);
       await page.evaluate(`(() => {
-                const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
+                const cell = ${firstRowCell(2)}.querySelector('.parquet-viewer__cell');
                 cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const inspected = await page.waitFor(
@@ -764,7 +887,7 @@ const scenarios = [
         await page.evaluate(`JSON.stringify({
                 insideFooter: !!document.querySelector('.parquet-viewer__bottombar .parquet-viewer__selection'),
                 extraRow: !!document.querySelector('.parquet-viewer__inspector-slot, .parquet-viewer__inspector'),
-                tableBodyBottom: document.querySelector('.parquet-table .ant-table-body')?.getBoundingClientRect().bottom ?? -1,
+                tableBodyBottom: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().bottom ?? -1,
                 footerTop: document.querySelector('.parquet-viewer__bottombar')?.getBoundingClientRect().top ?? -1,
             })`),
       );
@@ -784,7 +907,7 @@ const scenarios = [
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
       await page.evaluate(`(() => {
-                const cell = document.querySelector('.parquet-table tbody tr:nth-child(2) td:nth-child(3) .parquet-viewer__cell');
+                const cell = ${firstRowCell(2)}.querySelector('.parquet-viewer__cell');
                 cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const inspected = await page.waitFor(
@@ -1136,6 +1259,31 @@ const scenarios = [
       );
       expect(total === 3, `second sheet has ${total} rows`);
       return "201-row workbook windowed, sheet switch works";
+    },
+  },
+  {
+    name: "excel-windowed-legacy",
+    async run({ page, base }) {
+      // `.xls` is decoded by SheetJS rather than ExcelJS; the window contract must be the same.
+      await page.navigate(`${base}/harness-route?route=excel&legacy=1`);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 20000);
+      expect(ready, "the windowed .xls did not render");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                grid: !!document.querySelector('#container .x-spreadsheet'),
+                total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
+                rows: document.querySelectorAll('.windowed-sheet__row').length,
+                first: document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText ?? '',
+                second: [...document.querySelectorAll('.windowed-sheet__row')][1]
+                    ?.querySelectorAll('.windowed-sheet__cell')[1]?.innerText ?? '',
+            })`),
+      );
+      expect(!state.grid, "the editable grid mounted for a legacy workbook");
+      expect(state.total === 51, `unexpected row count: ${state.total}`);
+      expect(state.rows > 0 && state.rows < 80, `rendered ${state.rows} rows`);
+      expect(state.first === "id", `unexpected first cell: ${state.first}`);
+      expect(state.second === "legacy-0", `unexpected second row: ${state.second}`);
+      return `51-row .xls windowed through SheetJS`;
     },
   },
   {

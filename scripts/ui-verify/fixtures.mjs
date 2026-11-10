@@ -96,6 +96,48 @@ export function createFixtures(cacheDir) {
     });
   });
 
+  // A wide page for the schema jump, with URL cells and JSON-in-a-string cells exactly as
+  // Polars writes them (`task_ids` is a STRING containing `'["…"]'`, not a parquet LIST).
+  const preview = writeIfMissing(join(cacheDir, "preview.parquet"), () => {
+    const n = 6;
+    const ids = new Int32Array(n);
+    const titles = [];
+    const tags = [];
+    const meta = [];
+    const urls = [];
+    for (let i = 0; i < n; i++) {
+      ids[i] = i + 1;
+      titles.push(`dataset-${i + 1}`);
+      tags.push(i === 0 ? "[]" : `["task-${i}","language-${i}"]`);
+      meta.push(`{"source":"hf","index":${i},"ok":true}`);
+      urls.push(
+        i === 0
+          ? "https://huggingface.co/datasets/alpha"
+          : i === 1
+            ? "javascript:alert(1)"
+            : i === 2
+              ? "https://user:pass@example.com/private"
+              : `https://huggingface.co/datasets/alpha-${i}`,
+      );
+    }
+    const fillers = Array.from({ length: 7 }, (_, index) => ({
+      name: `filler_${index + 1}`,
+      data: Array.from({ length: n }, (_, row) => `value-${index + 1}-${row}`),
+      type: "STRING",
+    }));
+    return parquetWriteBuffer({
+      statistics: false,
+      columnData: [
+        { name: "id", data: ids, type: "INT32" },
+        { name: "title", data: titles, type: "STRING" },
+        { name: "tags_json", data: tags, type: "STRING" },
+        { name: "meta_json", data: meta, type: "STRING" },
+        ...fillers,
+        { name: "url", data: urls, type: "STRING" },
+      ],
+    });
+  });
+
   const bad = writeIfMissing(join(cacheDir, "bad.parquet"), () => {
     const text = new TextEncoder().encode("this is not a parquet file\n");
     return text.buffer.slice(text.byteOffset, text.byteOffset + text.byteLength);
@@ -124,6 +166,7 @@ export function createFixtures(cacheDir) {
     mixed,
     empty,
     types,
+    preview,
     bad,
     big,
     bigRows: BIG_ROWS,

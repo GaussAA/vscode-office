@@ -11,7 +11,7 @@ import SponsorBar from "../components/SponsorBar";
 import "./Excel.less";
 import { MIN_VIEW_COLS, MIN_VIEW_ROWS } from "./excel_meta.ts";
 import { detectCsvEncoding } from "./csvEncoding.ts";
-import { loadSheets, loadWorkbookRows } from "./excel_reader.ts";
+import { loadLegacyWorkbookRows, loadSheets, loadWorkbookRows } from "./excel_reader.ts";
 import {
   export_xlsx,
   exportSaveAs,
@@ -522,10 +522,15 @@ function ExcelViewer() {
               virtual: payload.scheme !== "file",
             });
             if (view === "window") {
-              if (/\.(xlsx|xlsm)$/i.test(payload.ext ?? "")) {
+              if (/\.(xlsx|xlsm|xls|ods)$/i.test(payload.ext ?? "")) {
                 // ExcelJS parses the whole workbook (a zip cannot be seeked), but into plain
                 // row text instead of the grid's cell-object graph.
-                const source = createWorkbookSheetSource(await loadWorkbookRows(buffer));
+                // ExcelJS reads xlsx/xlsm; `.xls`/`.ods` have to go through SheetJS.
+                const legacy = /\.(xls|ods)$/i.test(payload.ext ?? "");
+                const rows = legacy
+                  ? await loadLegacyWorkbookRows(buffer)
+                  : await loadWorkbookRows(buffer);
+                const source = createWorkbookSheetSource(rows);
                 workbookRef.current = source;
                 setSheetNames(source.sheetNames);
                 setActiveSheet(source.sheetIndex);

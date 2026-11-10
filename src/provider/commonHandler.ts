@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { basename, join, parse } from "path";
 import { Handler } from "@/common/handler";
+import { normalizeExternalUrl } from "@/common/externalLink";
 import { isUriReadOnly } from "@/common/fileReadOnly";
 import { bytesToSavePayload, saveContentToBytes } from "@/common/saveContent";
 import { Uri, workspace } from "vscode";
@@ -117,8 +118,11 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
       ]);
     })
     .on("openExternal", (url: string) => {
-      if (url) {
-        vscode.env.openExternal(vscode.Uri.parse(url));
+      // The webview is not trusted. Re-validate at the only place that can actually ask the
+      // operating system to open something: http(s) only, no userinfo, no control characters.
+      const safe = normalizeExternalUrl(url);
+      if (safe) {
+        void vscode.env.openExternal(vscode.Uri.parse(safe));
       }
     })
     .on("dispose", () => {

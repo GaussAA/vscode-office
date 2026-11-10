@@ -5,7 +5,7 @@
  *   node scripts/perf/runner.mjs --all      # also print the non-asserted numbers
  *   node scripts/perf/runner.mjs --headed   # watch it run
  *
- * Two invariants, both learned from measuring the shipped bundle on a 1M-row file:
+ * Three invariants, all learned from measuring the shipped bundle on large files:
  *
  *  1. **First paint is bounded by the file, not twice the file.** hyparquet plans a read per
  *     call and the viewer issues the visible page and its prefetch back to back; before the
@@ -15,8 +15,12 @@
  *     containing each batch: 28 s for 1M rows and 40 s for 200k x 60. A single pass is ~1-3 s,
  *     so the budgets below are ~4-6x the measured value and still far under the old cost.
  *
- * Both files are written with one row group (PyArrow's default), because that is the shape
- * where the difference shows.
+ *  3. **A page turn stays interactive with 60 columns.** Warm turns are render-bound (~205 ms),
+ *     cold ones also decode one data page per column (~550 ms). Both are gated, because a
+ *     future change that materialises the page or re-decodes it shows up here first.
+ *
+ * Both parquet files are written with one row group (PyArrow's default), because that is the
+ * shape where the difference shows.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -37,6 +41,20 @@ const FIRST_PAINT_BUDGET = 1.25;
 const SEARCH_BUDGET_FLAT_MS = 12_000;
 /** Milliseconds for a full scan of the 200k-row x 60-column file. Measured: ~1.2-2.4 s; the batched version takes ~40 s. */
 const SEARCH_BUDGET_WIDE_MS = 12_000;
+/**
+ * Milliseconds for one page turn on the 60-column file, measured after the prefetch has settled.
+ * Measured on an idle machine: ~210 ms warm and ~520 ms cold (one decoded data page per column).
+ * A loaded machine inflates both by 2-4x, so the budgets are deliberately loose: this gate exists
+ * to catch an order-of-magnitude regression (the per-batch re-decode cost 5-10x), not to police
+ * a few hundred milliseconds. The samples are reported so a real drift is still visible.
+ */
+const WIDE_PAGE_TURN_MS = 2_000;
+/**
+ * Back-to-back turns without waiting for the prefetch. Measured: ~520-1150 ms depending on
+ * whether the previous prefetch is still decoding (single-flight makes the next request wait
+ * for it). The budget guards against the multi-second regressions, not against that jitter.
+ */
+const WIDE_RAPID_TURN_MS = 5_000;
 /**
  * Milliseconds for a 21 MB CSV to paint its first windowed row. Measured: ~0.5-1.4 s (the
  * The full-parse path this replaces needed ~2.6 s for 37 MB and would have climbed with size;
@@ -61,6 +79,13 @@ if (unknown.length > 0) {
   process.exitCode = 1;
   process.exit();
 }
+
+/**
+ * Contention inflates a sample; it never makes a real regression look fast. So the gate takes
+ * the *best* of several samples: a loaded machine then costs extra rounds instead of a red run,
+ * while anything that makes even the best turn slow (the failure mode being guarded) still fails.
+ */
+const best = (values) => Math.min(...values);
 
 const expect = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -88,7 +113,8 @@ const nextPage = (page) =>
     .evaluate(`(async () => {
       const deadline = performance.now() + 60000;
       const info = () => document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '';
-      const firstCell = () => document.querySelector('.parquet-table tbody tr:nth-child(2) td')?.innerText ?? '';
+      // Structure-agnostic: the table draws <tr>/<td> or a div list when virtual is on.
+      const firstCell = () => document.querySelector('.parquet-table .ant-table-row')?.children[0]?.innerText ?? '';
       const before = info();
       const started = performance.now();
       [...document.querySelectorAll('.parquet-viewer__pager-btn')]
@@ -220,6 +246,50 @@ const scenarios = [
         `${(served.bytes / MB).toFixed(2)} MB = ${ratio.toFixed(2)}x file` +
         ` (page turn ${next.ms} ms, 0 bytes)`
       );
+    },
+  },
+  {
+    name: "parquet-wide-page-turn",
+    async run({ page, base, harness }) {
+      await page.navigate(`${base}/harness?file=wide`);
+      const ready = await page.waitFor(`(window.__bench?.ready ?? 0) > 0`, 60000);
+      expect(ready, "the wide file never painted");
+      // The idle prefetch needs to finish before "warm" means anything.
+      await page.sleep(3000);
+      harness.reset();
+
+      // Machine load moves a single turn by 2-4x, so assert on the best of three instead of
+      // whichever sample happened to run while another build was finishing.
+      const warm = [];
+      for (let attempt = 0; attempt < 3; attempt++) {
+        // Pause before every sample: a turn measured right after another turn is cold by
+        // definition, and mixing the two is what made this look like a 2x regression.
+        if (attempt > 0) await page.sleep(2500);
+        const turn = await nextPage(page);
+        expect(!turn.timeout, `paging forward stalled at ${turn.stage}`);
+        warm.push(turn.ms);
+      }
+      const warmBest = best(warm);
+      expect(
+        warmBest <= WIDE_PAGE_TURN_MS,
+        `the best warm page turn on 60 columns was ${warmBest} ms ` +
+          `(samples ${warm.join(", ")}; budget ${WIDE_PAGE_TURN_MS} ms)`,
+      );
+
+      // Rapid: no pause between turns, so the next window's data pages are not prefetched.
+      const cold = [];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const turn = await nextPage(page);
+        expect(!turn.timeout, `rapid paging stalled at ${turn.stage}`);
+        cold.push(turn.ms);
+      }
+      const coldBest = best(cold);
+      expect(
+        coldBest <= WIDE_RAPID_TURN_MS,
+        `the best cold page turn on 60 columns was ${coldBest} ms ` +
+          `(samples ${cold.join(", ")}; budget ${WIDE_RAPID_TURN_MS} ms)`,
+      );
+      return `warm ${warmBest} ms ${JSON.stringify(warm)}, cold ${coldBest} ms ${JSON.stringify(cold)}`;
     },
   },
   {

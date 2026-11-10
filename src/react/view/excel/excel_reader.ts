@@ -21,7 +21,7 @@ import {
 } from "./excel_protection";
 import type { CellData, SheetData } from "./x-spreadsheet/index";
 import { toDisplayText } from "@/common/displayText";
-import { workbookRows, type WorkbookSheetRows } from "./workbookRows";
+import { workbookRows, workbookRowsFromSheetJs, type WorkbookSheetRows } from "./workbookRows";
 
 type RowMap = NonNullable<SheetData["rows"]>;
 
@@ -353,6 +353,16 @@ export async function loadWorkbookRows(buffer: ArrayBuffer): Promise<WorkbookShe
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   return workbookRows(workbook);
+}
+
+/**
+ * Rows-only load for the formats ExcelJS cannot open (`.xls`, `.ods`).
+ *
+ * Same idea as `loadWorkbookRows`, different decoder: SheetJS already has the bytes parsed for
+ * the grid path, so the windowed path reuses that read and keeps only the text.
+ */
+export async function loadLegacyWorkbookRows(buffer: ArrayBuffer): Promise<WorkbookSheetRows[]> {
+  return workbookRowsFromSheetJs(XLSX.read(buffer, { type: "array" }));
 }
 
 const sheetJsColWidthToPx = (col?: XLSX.ColInfo) => {

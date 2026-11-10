@@ -23,6 +23,8 @@ body:has(.parquet-app) {
   --pv-accent-hover: var(--vscode-button-hoverBackground, #1177bb);
   --pv-focus: var(--vscode-focusBorder, #0078d4);
   --pv-error: var(--vscode-errorForeground, #f48771);
+  --pv-link: var(--vscode-textLink-foreground, #3794ff);
+  --pv-json-key: var(--vscode-charts-purple, #b180d7);
   --pv-control: color-mix(in srgb, var(--pv-fg) 8%, var(--pv-panel));
   --pv-control-hover: color-mix(in srgb, var(--pv-fg) 13%, var(--pv-panel));
   --pv-control-active: color-mix(in srgb, var(--pv-fg) 18%, var(--pv-panel));
@@ -79,6 +81,8 @@ body:has(.parquet-app) {
   --pv-cell-string: #2e7d32;
   --pv-cell-bool: #9a5b00;
   --pv-cell-datetime: #6f2d8a;
+  --pv-link: #006ab1;
+  --pv-json-key: #6f2d8a;
   --pv-error: #b00000;
 }
 
@@ -366,14 +370,38 @@ body:has(.parquet-app) {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   min-height: 32px;
   padding: 6px 8px;
   margin-bottom: 1px;
+  border: 0;
   border-radius: var(--pv-radius-sm);
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   transition: background 0.12s ease;
 
   &:hover {
     background: var(--pv-hover);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--pv-focus);
+    outline-offset: -1px;
+  }
+
+  &--active {
+    background: color-mix(in srgb, var(--pv-link) 12%, transparent);
+  }
+
+  &--active .parquet-viewer__list-name {
+    color: var(--pv-link);
+  }
+
+  &--active:hover {
+    background: color-mix(in srgb, var(--pv-link) 16%, transparent);
   }
 }
 
@@ -541,6 +569,23 @@ body:has(.parquet-app) {
     background: var(--pv-row-target) !important;
   }
 
+  /* The schema click leaves a quiet column tint behind, not a second selection state. */
+  .ant-table-thead > tr > th.parquet-viewer__column--active {
+    color: var(--pv-fg) !important;
+    background: color-mix(in srgb, var(--pv-link) 10%, var(--pv-panel)) !important;
+  }
+
+  .ant-table-tbody > tr > td.parquet-viewer__column--active,
+  .ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--active {
+    background: color-mix(in srgb, var(--pv-link) 7%, var(--pv-bg)) !important;
+  }
+
+  .ant-table-tbody > tr:hover > td.parquet-viewer__column--active,
+  .ant-table-tbody > tr.ant-table-row-hover > td.parquet-viewer__column--active,
+  .ant-table-tbody-virtual .ant-table-row:hover .ant-table-cell.parquet-viewer__column--active {
+    background: color-mix(in srgb, var(--pv-link) 11%, var(--pv-bg)) !important;
+  }
+
   .ant-table-cell-fix-left,
   .ant-table-cell-fix-right {
     background: var(--pv-bg) !important;
@@ -602,6 +647,55 @@ body:has(.parquet-app) {
 
 .parquet-viewer__cell--null {
   color: var(--vscode-disabledForeground, #8a8a8a);
+  font-style: italic;
+}
+
+.parquet-viewer__cell--link {
+  color: var(--pv-link);
+}
+
+.parquet-viewer__cell-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 1.5px;
+  }
+}
+
+.parquet-viewer__cell--json {
+  color: var(--pv-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.parquet-viewer__json-token--punct {
+  color: var(--pv-muted);
+}
+
+.parquet-viewer__json-token--key {
+  color: var(--pv-json-key);
+}
+
+.parquet-viewer__json-token--string {
+  color: var(--pv-cell-string, var(--vscode-charts-green, #89d185));
+}
+
+.parquet-viewer__json-token--number {
+  color: var(--pv-cell-numeric, var(--vscode-charts-blue, #4ea1ff));
+}
+
+.parquet-viewer__json-token--boolean {
+  color: var(--pv-cell-bool, var(--vscode-charts-orange, #f0a45e));
+}
+
+.parquet-viewer__json-token--null,
+.parquet-viewer__json-token--ellipsis {
+  color: var(--pv-muted);
   font-style: italic;
 }
 
