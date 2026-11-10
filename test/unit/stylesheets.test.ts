@@ -12,9 +12,9 @@ import test from "node:test";
  */
 
 const root = join(import.meta.dirname, "..", "..");
-// The webview areas only: `src/vscode.css` is an upstream orphan outside this scope (it is not a
-// competing token layer, it only spells the host variables for standalone browsing).
-const stylesheetDirs = [join(root, "src", "react")];
+// The whole source tree. The first version stopped at `src/react` and would have kept a second
+// orphan (`src/vscode.css`, host variables spelled for standalone browsing) alive forever.
+const stylesheetDirs = [join(root, "src")];
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

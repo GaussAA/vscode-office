@@ -11,38 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `viewerTheme.css` is gone. It declared a fourteen-variable `--viewer-*` token layer that looked
   like the shared theme for every viewer, but nothing imported it: it never reached the build, no
-  component read a single one of its variables, and its `--viewer-accent` meant the link colour
-  while parquet's `--pv-accent` means the button colour. `test/unit/stylesheets.test.ts` now fails
-  on any stylesheet under `src/react` that nothing imports — an orphan stylesheet reads like live
-  code, which is the hardest kind of dead code to notice.
-
-## [Unreleased]
-
-### Removed
-
-- `viewerTheme.css` is gone. It declared a fourteen-variable `--viewer-*` token layer that looked
-  like the shared theme for every viewer, but nothing imported it: it never reached the build, no
-  component read a single one of its variables, and its `--viewer-accent` meant the link colour
-  while parquet's `--pv-accent` means the button colour. `test/unit/stylesheets.test.ts` now fails
-  on any stylesheet under `src/react` that nothing imports — an orphan stylesheet reads like live
-  code, which is the hardest kind of dead code to notice.
-
-### Changed
-
-- The ten parquet icon colours read six `--vscode-charts-*` variables between them, each duplicated
-  two or three times, so a colour change had to be made in several places. There is now one
-  `--pv-chart-*` token per colour and the icons are aliases of it; `verify:ui` asserts the aliases
-  resolve to the same value, and `DESIGN.md` records why `--pv-*` is deliberately its own layer
-  rather than an alias of the other viewers' `--viewer-*` (their `accent` means a different
-  variable).
-
-### Changed
-
-- A parquet page is now one screenful. The viewer measures the body and pages by the rows that
-  fit (8–200), so the pager's range describes what is actually on screen, `PageDown` moves exactly
-  one page, and `1–50 of 300` no longer claims 50 rows in a table that shows 21. The position is
-  remembered as a **row** instead of a page number, because a page number means a different row
-  at a different window height.
+  component read a single one of its variables, and its `--viewer-accent` called the link colour
+  "accent" while parquet's `--pv-accent` means the button colour.
+- `src/vscode.css` is gone too: 503 lines spelling the host variables for standalone browsing,
+  imported by nothing. Every `var(--vscode-…)` in the tree already carries its own fallback (289 of
+  them), so the file never mattered to rendering.
+- `test/unit/stylesheets.test.ts` fails on any stylesheet under `src` that nothing imports. It is
+  what found both orphans; the first version stopped at `src/react` and would have kept the second
+  one alive.
 
 ## [6.4.1] - 2026-11-10
 
