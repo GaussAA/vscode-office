@@ -748,7 +748,8 @@ const scenarios = [
             })()`,
         6000,
       );
-      const diag = await page.evaluate(`JSON.stringify((() => {
+      if (!arrived) {
+        const diag = await page.evaluate(`JSON.stringify((() => {
                 const wrap = document.querySelector('.parquet-viewer__table-wrap');
                 const body = wrap?.querySelector('.ant-table-tbody-virtual');
                 const track = wrap?.querySelector('.ant-table-tbody-virtual-scrollbar-horizontal');
@@ -756,16 +757,16 @@ const scenarios = [
                 const inner = wrap?.querySelector('.ant-table-tbody-virtual-holder-inner');
                 return {
                     wrapW: wrap?.clientWidth, wrapLeft: wrap?.getBoundingClientRect().left,
-                    bodyW: body?.clientWidth, innerW: inner?.scrollWidth,
-                    innerLeft: inner?.getBoundingClientRect().left,
+                    innerW: inner?.scrollWidth, innerLeft: inner?.getBoundingClientRect().left,
+                    innerTransform: inner ? getComputedStyle(inner).transform : null,
                     trackW: track?.getBoundingClientRect().width,
                     thumbW: thumb?.getBoundingClientRect().width,
                     thumbLeft: thumb?.getBoundingClientRect().left,
                     headerLeft: document.querySelector('.parquet-table th:last-child')?.getBoundingClientRect().left,
-                    siderW: document.querySelector('.parquet-viewer__sider')?.clientWidth,
                 };
             })())`);
-      expect(arrived, `schema click did not bring the URL column into view: ${diag}`);
+        throw new Error(`schema click did not bring the URL column into view: ${diag}`);
+      }
 
       const after = json(
         await page.evaluate(`JSON.stringify({
@@ -813,7 +814,21 @@ const scenarios = [
         opened.calls.includes("https://huggingface.co/datasets/alpha"),
         `openExternal was not emitted: ${JSON.stringify(opened.calls)}`,
       );
-      return "JSON syntax + safe links + schema column jump";
+      // The header is a separate scroll surface; a jump that moves only the body leaves the
+      // column labels one or two columns away from the values under them.
+      const alignment = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const cell = document.querySelector('.parquet-viewer__cell--link')?.closest('.ant-table-cell, td');
+                const head = [...document.querySelectorAll('.parquet-table thead th')].at(-1);
+                if (!cell || !head) return { diff: null };
+                return { diff: Math.abs(head.getBoundingClientRect().left - cell.getBoundingClientRect().left) };
+            })())`),
+      );
+      expect(
+        typeof alignment.diff === "number" && alignment.diff < 2,
+        `header and body disagree by ${alignment.diff}px`,
+      );
+      return "JSON syntax + safe links + schema column jump (header aligned)";
     },
   },
   {
