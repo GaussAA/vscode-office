@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Parquet column widths can be dragged from the header edge, reset with a double-click, and
+- The parquet "this file is too large" panel offers a second way out: `Reveal in Explorer`.
+  Opening an 80 MB file anyway is a bet on memory; the file is on disk regardless, and looking at
+  it where it lives costs nothing.- Parquet column widths can be dragged from the header edge, reset with a double-click, and
   adjusted with the arrow keys on the handle. Widths are remembered per column name, so a JSON
   column that needed 300 px stays wide the next time the file is opened. The row-number column
   keeps its width.- An empty parquet file says "No rows" once, in the body; the footer no longer repeats it, and the
