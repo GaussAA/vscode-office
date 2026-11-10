@@ -38,6 +38,11 @@ export interface ParquetSearchOptions {
 export interface ParquetSearchResult {
   /** Matching row indexes in ascending order, at most `maxRows` of them. */
   rows: number[];
+  /**
+   * Column index of the first value that matched, parallel to `rows`. "Which column" is half
+   * the answer: a hit on column 47 of 60 is invisible when the table only scrolls rows.
+   */
+  columns: number[];
   /** True when the file matched more rows than were kept. */
   capped: boolean;
   cancelled: boolean;
@@ -70,14 +75,17 @@ export async function searchParquetValues(
   const rowCount = Math.max(0, info.rowCount);
   const maxRows = Math.max(1, options.maxRows ?? DEFAULT_MAX_ROWS);
   if (!needle || rowCount === 0) {
-    return { rows: [], capped: false, cancelled: false, scanned: 0 };
+    return { rows: [], columns: [], capped: false, cancelled: false, scanned: 0 };
   }
 
   const hits = new Uint8Array(rowCount);
+  /** First matching column per row, stored 1-based so 0 can mean "nothing recorded". */
+  const hitColumns = new Uint16Array(rowCount);
   let matches = 0;
-  const mark = (row: number) => {
+  const mark = (row: number, columnIndex: number) => {
     if (row < 0 || row >= rowCount || hits[row]) return;
     hits[row] = 1;
+    hitColumns[row] = Math.min(0xffff, columnIndex + 1);
     matches++;
   };
 
@@ -102,14 +110,15 @@ export async function searchParquetValues(
     for (let index = 0; index < info.columns.length; index++) {
       checkCancelled();
       const column = info.columns[index];
+      const columnMark = (row: number) => mark(row, index);
       if (column.nested) {
-        await scanNestedColumn(info.file, info.metadata, column, needle, mark, {
+        await scanNestedColumn(info.file, info.metadata, column, needle, columnMark, {
           rowCount,
           checkCancelled,
           onRow: (row) => report(index, row / Math.max(1, rowCount)),
         });
       } else {
-        await scanFlatColumn(info.file, info.metadata, column, needle, mark, {
+        await scanFlatColumn(info.file, info.metadata, column, needle, columnMark, {
           rowCount,
           checkCancelled,
           onRow: (row) => report(index, row / Math.max(1, rowCount)),
@@ -123,13 +132,18 @@ export async function searchParquetValues(
   }
 
   const rows: number[] = [];
+  const columns: number[] = [];
   for (let row = 0; row < rowCount && rows.length < maxRows; row++) {
-    if (hits[row]) rows.push(row);
+    if (hits[row]) {
+      rows.push(row);
+      columns.push(hitColumns[row] - 1);
+    }
   }
   options.onProgress?.(rowCount, matches);
 
   return {
     rows,
+    columns,
     capped: matches > rows.length,
     cancelled: stopped || cancelled(),
     scanned: stopped ? 0 : rowCount,

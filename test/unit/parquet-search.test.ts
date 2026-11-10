@@ -42,6 +42,20 @@ test("search: matches a substring of any column, case-insensitively", async () =
   assert.equal(result.cancelled, false);
 });
 
+test("search: reports which column matched for every row it keeps", async () => {
+  const info = await generated();
+
+  const result = await searchParquetValues(info, "needle");
+  assert.deepEqual(result.rows, [1, 4]);
+  // Both hits sit in `note`, the third column: without this the UI can only scroll rows,
+  // so a hit on column 47 of 60 lands off-screen with no marker at all.
+  assert.deepEqual(result.columns, [2, 2]);
+
+  const numeric = await searchParquetValues(info, "3");
+  assert.deepEqual(numeric.rows, [2]);
+  assert.deepEqual(numeric.columns, [0]);
+});
+
 test("search: numeric columns are matched as their display text", async () => {
   const info = await generated();
 

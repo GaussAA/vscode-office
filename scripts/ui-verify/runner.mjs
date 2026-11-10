@@ -639,7 +639,27 @@ const scenarios = [
             })()`),
       );
       expect(jump.found, "the url field is missing from the schema sidebar");
-      await page.sleep(500);
+      // The jump dispatches a mousedown on rc-virtual-list's custom scrollbar, and the table
+      // rebuilds that scrollbar when the active-column class changes: a dispatch aimed at the
+      // replaced track is lost. It reproduced about once in two full-suite runs, so retry the
+      // click the way a human would rather than padding the sleep.
+      const columnInView = `(() => {
+                const header = document.querySelector('.parquet-table th:last-child')?.getBoundingClientRect();
+                const wrap = document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect();
+                if (!header || !wrap) return false;
+                return header.left >= wrap.left && header.left < wrap.right;
+            })()`;
+      const clickUrlField = `(() => {
+                const item = [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(button => button.querySelector('.parquet-viewer__list-name')?.textContent === 'url');
+                item?.click();
+            })()`;
+      let arrived = await page.waitFor(columnInView, 3000);
+      if (!arrived) {
+        await page.evaluate(clickUrlField);
+        arrived = await page.waitFor(columnInView, 5000);
+      }
+      expect(arrived, "schema click did not bring the URL column into view");
 
       const after = json(
         await page.evaluate(`JSON.stringify({
@@ -1036,7 +1056,7 @@ const scenarios = [
                     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const done = await page.waitFor(
-        `document.querySelector('.parquet-viewer__find-count')?.innerText === '1 row'`,
+        `document.querySelector('.parquet-viewer__find-count')?.innerText === '1 match'`,
         15000,
       );
       expect(done, "whole-file search did not report a match");
@@ -1056,10 +1076,16 @@ const scenarios = [
                 range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
             })`),
       );
-      expect(state.count === "1 row", `unexpected match count: ${state.count}`);
+      expect(state.count === "1 match", `unexpected match count: ${state.count}`);
       expect(state.hits > 0, "matched cell was not highlighted");
       expect(state.rows === 1, `expected 1 marked row, got ${state.rows}`);
       expect(state.range === "51–100 of 300", `did not jump to the match page: ${state.range}`);
+      // A hit must not look like a schema click: the column scrolls into view, but the tint
+      // that means "you picked this field" stays off.
+      const sloppy = await page.evaluate(
+        `document.querySelectorAll('.parquet-viewer__column--active').length`,
+      );
+      expect(sloppy === 0, `a search left ${sloppy} schema-selected column(s)`);
       // Geometry that only exists when the row-level rules reach the virtual body. The body
       // renders div `.ant-table-cell`s, so a `tr > td` rule is silently dead there: stripes,
       // the 6px cell padding and the match tint all vanished without a single failing test.
@@ -1104,7 +1130,7 @@ const scenarios = [
                     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
       const many = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').endsWith('rows')`,
+        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').endsWith('matches')`,
         15000,
       );
       expect(many, "a multi-hit scan did not report its matches");
@@ -1119,7 +1145,42 @@ const scenarios = [
         15000,
       );
       expect(stepped, `Enter did not step to the next hit (still ${before})`);
-      return `${state.count} at ${state.range}, ${geometry.height}px rows, Enter steps past ${before}`;
+      // A scan that finds nothing is an answer, and the bar has to say so: previously the
+      // whole state block was gated on `matchRows.size > 0`, so zero hits looked identical
+      // to "you never searched".
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__find-input');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'no-such-value-anywhere');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                document.querySelector('.parquet-viewer__find-btn')
+                    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      const nothing = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '') === '0 matches'`,
+        15000,
+      );
+      expect(nothing, "a scan with no hits left the bar blank");
+      const stillMarked = await page.evaluate(
+        `document.querySelectorAll('.parquet-viewer__row--match').length`,
+      );
+      expect(stillMarked === 0, `${stillMarked} row(s) stayed marked after an empty scan`);
+      // End on a hit: this scenario also produces the documentation screenshot, and a picture
+      // of "0 matches" is not what the README is trying to show.
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__find-input');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'service-c-54');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                document.querySelector('.parquet-viewer__find-btn')
+                    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      const again = await page.waitFor(
+        `document.querySelector('.parquet-viewer__find-count')?.innerText === '1 match'`,
+        15000,
+      );
+      expect(again, "re-running the first query did not restore its hit");
+      return `${state.count} at ${state.range}, ${geometry.height}px rows, Enter steps past ${before}, empty scan says 0`;
     },
   },
   {

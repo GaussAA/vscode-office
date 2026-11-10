@@ -305,6 +305,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const focusTimer = useRef(0);
   /** Field whose column the schema click last brought into view; tints it while browsing. */
   const [activeColumn, setActiveColumn] = useState<number | null>(null);
+  /** Row → first matching column, for the rows the last scan kept. */
+  const matchColumnsRef = useRef<Map<number, number>>(new Map());
+  /** A finished scan that found nothing: that is an answer, and it has to look like one. */
+  const [searchedEmpty, setSearchedEmpty] = useState(false);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<CellCursor | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -332,8 +336,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    * widths are fixed, so the target is arithmetic rather than a DOM measurement; this also
    * works while the table viewport is scrolled.
    */
-  const focusColumn = useCallback((position: number) => {
-    setActiveColumn(position);
+  const focusColumn = useCallback((position: number, mark = true) => {
+    if (mark) setActiveColumn(position);
     // Let the active column commit first. The virtual table rebuilds its scrollbar when a
     // column class changes; scrolling before that render can be reset by it.
     requestAnimationFrame(() => {
@@ -623,6 +627,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       return;
     }
     setSearching(true);
+    setSearchedEmpty(false);
     setSearchProgress({ scanned: 0, total: info.rowCount, matches: 0 });
     try {
       // One page-aligned pass over the file, column by column, instead of a read per
@@ -639,16 +644,23 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (seq !== searchSeq.current || result.cancelled) return;
       setMatchRows(new Set(result.rows));
       setSearchCapped(result.capped);
+      setSearchedEmpty(result.rows.length === 0);
+      matchColumnsRef.current = new Map(
+        result.rows.map((row, at) => [row, result.columns[at] ?? 0] as const),
+      );
       if (result.rows.length > 0) {
         const target = Math.floor(result.rows[0] / PAGE_SIZE);
         goToPage((current) => (current === target ? current : target));
+        // A hit is a cell, not a row: bring its column into view too. `mark` stays false so
+        // the tint keeps meaning "you clicked a schema field", not "a search ran".
+        focusColumn(result.columns[0] ?? 0, false);
       }
     } catch (e) {
       if (seq === searchSeq.current) setError(e instanceof Error ? e.message : "Search failed");
     } finally {
       if (seq === searchSeq.current) setSearching(false);
     }
-  }, [query, goToPage]);
+  }, [query, goToPage, focusColumn]);
 
   const jumpMatch = useCallback(
     (direction: 1 | -1) => {
@@ -661,8 +673,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           ? (sorted.find((row) => row >= pageEnd) ?? sorted[0])
           : ([...sorted].reverse().find((row) => row < pageStart) ?? sorted[sorted.length - 1]);
       goToPage(Math.floor(target / PAGE_SIZE));
+      const column = matchColumnsRef.current.get(target);
+      if (column !== undefined) focusColumn(column, false);
     },
-    [matchRows, page, goToPage],
+    [matchRows, page, goToPage, focusColumn],
   );
 
   // clearing the box drops the previous results
@@ -672,6 +686,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     setSearchProgress(null);
     setSearchCapped(false);
     setMatchRows(new Set());
+    setSearchedEmpty(false);
+    matchColumnsRef.current = new Map();
   }, []);
 
   const handleQueryChange = useCallback(
@@ -997,6 +1013,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                     <span className="codicon codicon-chevron-down" />
                   </button>
                 </>
+              )}
+              {!searching && searchedEmpty && (
+                <span className="parquet-viewer__find-count">
+                  {$t("parquet.matchCountMany", { count: "0" })}
+                </span>
               )}
             </div>
             <div className="parquet-viewer__meta">
