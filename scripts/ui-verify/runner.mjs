@@ -696,6 +696,37 @@ const scenarios = [
       );
       expect(/^Page 1 of 6$/.test(pageLabel), `pager page position: "${pageLabel}"`);
 
+      // Density: spare viewport width grows the columns, but only up to a cap. Stretching a
+      // four-column file to fill 1239px turned `id` into a 273px panel.
+      const layout = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const wrap = document.querySelector('.parquet-viewer__table-wrap');
+                const heads = [...document.querySelectorAll('.parquet-table thead th')];
+                const body = [...document.querySelectorAll('.ant-table-tbody-virtual-holder-inner > *')][0];
+                const cells = [...(body?.querySelectorAll('.ant-table-cell') ?? [])];
+                return {
+                    wrap: Math.round(wrap?.getBoundingClientRect().width ?? 0),
+                    headWidths: heads.map(th => Math.round(th.getBoundingClientRect().width)),
+                    cellWidths: cells.map(cell => Math.round(cell.getBoundingClientRect().width)),
+                };
+            })())`),
+      );
+      const dataHeads = layout.headWidths.slice(1);
+      const widest = Math.max(...dataHeads);
+      expect(
+        widest <= 240,
+        `a column grew to ${widest}px (cap is 240): ${JSON.stringify(layout.headWidths)}`,
+      );
+      expect(
+        widest > 120,
+        `columns did not use the spare width at all: ${JSON.stringify(layout.headWidths)}`,
+      );
+      // The body has to lay out at the same widths, or the header lies about its own columns.
+      expect(
+        layout.cellWidths.join(",") === layout.headWidths.join(","),
+        `body ${JSON.stringify(layout.cellWidths)} vs header ${JSON.stringify(layout.headWidths)}`,
+      );
+
       return `${state.meta.length} inline meta items, filterable schema, one tab stop`;
     },
   },
@@ -817,8 +848,14 @@ const scenarios = [
                     cellCol: cells[1]?.getAttribute('aria-colindex'),
                     indexRole: cells[0]?.getAttribute('role'),
                     indexCol: cells[0]?.getAttribute('aria-colindex'),
-                    headerRoles: [...new Set(header.map(th => th.getAttribute('role')))],
-                    headerCols: header.map(th => th.getAttribute('aria-colindex')),
+                    // The filler column that absorbs leftover width is not a column of the
+                    // file: it carries no aria-colindex and is hidden from assistive tech.
+                    headerRoles: [...new Set(header
+                        .filter(th => th.getAttribute('aria-colindex'))
+                        .map(th => th.getAttribute('role')))],
+                    headerCols: header
+                        .map(th => th.getAttribute('aria-colindex'))
+                        .filter(Boolean),
                     tableRoles: [...new Set([...document.querySelectorAll('.parquet-table table')]
                         .map(t => t.getAttribute('role')))],
                 };

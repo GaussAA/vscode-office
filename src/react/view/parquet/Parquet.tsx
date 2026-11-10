@@ -54,6 +54,15 @@ const DATA_COLUMN_WIDTH = 120;
 const COLUMN_MIN_WIDTH = 64;
 const COLUMN_MAX_WIDTH = 480;
 const COLUMN_WIDTH_STORAGE_KEY = "parquet-column-widths";
+/**
+ * How wide a column may grow to help fill the viewport before the grid simply stops short.
+ *
+ * Without a cap antd stretches the columns proportionally, which turned a four-column file into
+ * four 273px panels and made a dragged width land somewhere other than where it was dropped.
+ * "Density is efficiency" (DESIGN.md) is the reason to stop: a 550px-wide `id` column is not
+ * more readable, it is just wider.
+ */
+const COLUMN_STRETCH_MAX = 240;
 /** How long a selection must hold still before it is announced to assistive tech. */
 const ANNOUNCE_DELAY_MS = 600;
 /** Must agree with `.parquet-viewer__cell` in the stylesheet: 6px padding ×2 + 22px line-height. */
@@ -439,7 +448,41 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     (name: string) => columnWidths[name] ?? DATA_COLUMN_WIDTH,
     [columnWidths],
   );
+
   const [tableBodyWidth, setTableBodyWidth] = useState(0);
+
+  /**
+   * The widths that actually render, and the resulting table extent.
+   *
+   * Columns grow to use spare room — a two-column file should not be 200px of table in a
+   * 1200px surface — but never past `COLUMN_STRETCH_MAX`, and the growth is uniform. When the
+   * cap is reached the table stops short and the surface's own background shows through, which
+   * is honest: there is no more data.
+   */
+  const columnLayout = useMemo(() => {
+    const base = (fileInfo?.columns ?? []).map((column) => columnWidthOf(column.name));
+    const baseSum = base.reduce((sum, width) => sum + width, 0);
+    const available = Math.max(0, tableBodyWidth - INDEX_COLUMN_WIDTH);
+    if (base.length === 0 || available <= baseSum) {
+      return { widths: base, filler: 0, extent: INDEX_COLUMN_WIDTH + baseSum };
+    }
+    const growth = base.map((width) => Math.max(0, COLUMN_STRETCH_MAX - width));
+    const capacity = growth.reduce((sum, room) => sum + room, 0);
+    if (capacity === 0) return { widths: base, filler: 0, extent: INDEX_COLUMN_WIDTH + baseSum };
+    const share = Math.min(1, (available - baseSum) / capacity);
+    const widths = base.map((width, index) => Math.round(width + growth[index] * share));
+    return {
+      widths,
+      // Whatever the cap refuses to absorb is handed to a filler column: rc-table forces the
+      // table to 100% of its container, so leaving the space unassigned is not an option —
+      // without the filler the leftover is redistributed onto the real columns.
+      filler: Math.max(
+        0,
+        tableBodyWidth - (INDEX_COLUMN_WIDTH + widths.reduce((sum, w) => sum + w, 0)),
+      ),
+      extent: INDEX_COLUMN_WIDTH + widths.reduce((sum, width) => sum + width, 0),
+    };
+  }, [fileInfo, columnWidthOf, tableBodyWidth]);
   /** The virtual table owns scrolling; cursor moves and row jumps go through its ref. */
   const tableRef = useRef<TableRef>(null);
   /** Pending focus retry while the virtual list renders the cursor's row. */
@@ -1224,7 +1267,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         dataIndex: column.name,
         key: column.name,
         ellipsis: true,
-        width: columnWidthOf(column.name),
+        width: columnLayout.widths[position] ?? DATA_COLUMN_WIDTH,
         align: kind === "numeric" ? "right" : "left",
         className: active ? "parquet-viewer__column--active" : undefined,
         // A grid whose header and body are separate scroll surfaces has to state the column
@@ -1264,8 +1307,22 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         },
       });
     });
+    // A column with no data: it exists so the capped layout can own the leftover width instead
+    // of having rc-table spread it over the real columns. Hidden from assistive tech, since it
+    // is not a column of the file.
+    if (columnLayout.filler > 0) {
+      cols.push({
+        title: "",
+        key: "__filler",
+        width: columnLayout.filler,
+        className: "parquet-viewer__filler-cell",
+        onHeaderCell: () => ({ "aria-hidden": true, role: "presentation" }),
+        onCell: () => ({ "aria-hidden": true, role: "presentation" }),
+        render: () => null,
+      });
+    }
     return cols;
-  }, [fileInfo, loadedPage, query, selectCell, activeColumn, columnWidthOf]);
+  }, [fileInfo, loadedPage, query, selectCell, activeColumn, columnLayout]);
 
   useEffect(() => {
     handler
@@ -1768,14 +1825,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                       scroll={{
                         // Virtual scrolling needs numbers: x is the full column extent (or the
                         // viewport when it is wider), y is the body height measured above.
-                        x: Math.max(
-                          tableBodyWidth,
-                          INDEX_COLUMN_WIDTH +
-                            fileInfo.columns.reduce(
-                              (sum, column) => sum + columnWidthOf(column.name),
-                              0,
-                            ),
-                        ),
+                        // The layout already accounts for the viewport; stretching past it is
+                        // what blew narrow files up.
+                        x: columnLayout.extent + columnLayout.filler,
                         y: tableBodyHeight,
                       }}
                       rowClassName={(_row, index) => {
