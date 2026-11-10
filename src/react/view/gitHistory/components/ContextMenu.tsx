@@ -1,15 +1,9 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import type { MenuPayloadMeta } from "../contextMenu/buildContextMenu";
+import type { ContextMenuItem, MenuPayloadMeta } from "../contextMenu/menuTypes";
 import { getContextMenuIcon, getContextMenuIconColor } from "../contextMenu/contextMenuIcons";
 
-export interface ContextMenuItem {
-  id: string;
-  label: string;
-  emphasis?: string;
-  disabled?: boolean;
-  separatorBefore?: boolean;
-}
+export type { ContextMenuItem };
 
 export interface ContextMenuState {
   items: ContextMenuItem[];

@@ -2,7 +2,7 @@ import { SSF } from "xlsx";
 import cellEvaluator from "./x-spreadsheet/core/cell";
 import { formulam } from "./x-spreadsheet/core/formula";
 import { formatm } from "./x-spreadsheet/core/format";
-import type { CellData, CellStyle } from "./x-spreadsheet/index";
+import type { CellData, CellStyle } from "./x-spreadsheet/data";
 
 export function displayCellText(
   cell: CellData,

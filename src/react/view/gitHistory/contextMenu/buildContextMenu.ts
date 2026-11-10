@@ -1,4 +1,4 @@
-import type { ContextMenuItem } from "../components/ContextMenu";
+import type { ContextMenuItem, MenuPayloadMeta } from "./menuTypes";
 import { $t } from "../../../i18n/i18nConfig";
 import type { GitCommit, GitCommitRemote, GitFileChange } from "../types";
 import type { GitPullDefaults } from "../util/gitHistoryState";
@@ -179,19 +179,7 @@ export function buildFileChangeContextMenu(
   })) as ContextMenuItem[];
 }
 
-export interface MenuPayloadMeta {
-  _hash?: string;
-  _parents?: string[];
-  _message?: string;
-  _branch?: string;
-  _remote?: string;
-  _ref?: string;
-  _tag?: string;
-  _selector?: string;
-  _change?: GitFileChange;
-  _hasParents?: boolean;
-  _path?: string;
-}
+export type { MenuPayloadMeta };
 
 export function runContextMenuAction(id: string, meta: MenuPayloadMeta, ctx: MenuContext): void {
   const { repo, emit } = ctx;

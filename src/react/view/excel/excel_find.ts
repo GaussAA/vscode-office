@@ -1,4 +1,4 @@
-import type { SheetData } from "./x-spreadsheet/index";
+import type { SheetData } from "./x-spreadsheet/data";
 
 export interface FindMatch {
   sheetIndex: number;
