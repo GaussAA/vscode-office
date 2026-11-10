@@ -3,12 +3,12 @@
 `pnpm verify:perf` runs the built viewers in headless Chrome and asserts four numbers that
 used to be catastrophic and invisible:
 
-| invariant                                | budget                                    | why it exists                                                                                                                                 |
-| ---------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| first paint reads at most 1.25x the file | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file   |
-| a whole-file search is one pass          | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                        |
-| a 21 MB CSV paints its windowed view     | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows             |
-| a page turn on 60 columns stays usable   | warm < 600 ms, cold < 2 s                 | measured 205 ms warm (render of 3,000 cells) and 520-1,150 ms cold (one decoded data page per column, plus waiting for an in-flight prefetch) |
+| invariant                                | budget                                    | why it exists                                                                                                                                                                      |
+| ---------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| first paint reads at most 1.25x the file | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file                                        |
+| a whole-file search is one pass          | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                                                             |
+| a 21 MB CSV paints its windowed view     | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows                                                  |
+| a page turn on 60 columns stays usable   | best of 3: warm < 2 s, cold < 5 s         | idle: 210 ms warm (render of 3,000 cells), 520 ms cold (one decoded data page per column). Loose on purpose — load inflates samples 2-4x, and the regression this catches is 5-10x |
 
 It is separate from `pnpm verify:ui` on purpose: that suite answers "does the DOM look
 right" with small fixtures; this one answers "what did it cost" with large files, and byte
@@ -82,9 +82,9 @@ raise the budget in the same commit and say why.
   with its own risk (the hidden measure row decides which child index is "the first data row"),
   so the gain waits until the suite moves with it. The wide-page-turn gate pins the current
   DOM's numbers in the meantime.
-- **Page-turn timing varies 2-3x with machine load**, so `parquet-wide-page-turn` takes the
-  median of three turns instead of a single sample: 210-520 ms warm and 520-1,270 ms cold were
-  all observed on the same build and hardware.
+- **Page-turn timing varies 2-4x with machine load**, so `parquet-wide-page-turn` asserts the
+  best of three samples and reports all of them: 210-915 ms warm and 520-1,850 ms cold were all
+  observed on the same build and hardware.
 - **Two spreadsheet micro-optimisations that were measured and dropped** (on the 152 MB CSV):
   the double UTF-8 decode is 108 ms of a 9.7 s load, and the extra JSZip pass for a workbook's
   sort state is 15-41 ms of a 10 s load — about 1% each. The time is in `parseCsv` (1.5 s) and
