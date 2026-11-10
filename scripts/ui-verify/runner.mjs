@@ -1553,27 +1553,43 @@ const scenarios = [
       // only the fact that the row is tinted differently is asserted above.
       // Enter follows VS Code's own find: it walks the hits. Re-running the scan is Ctrl+Enter
       // and the button, so a multi-hit query gives the semantics something to observe.
+      // Setting the value and clicking in one go raced React: the button's handler closed over
+      // the previous render's query. Commit the text first, then act on it.
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__find-input');
                 const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                 setter.call(input, 'service-');
                 input.dispatchEvent(new Event('input', { bubbles: true }));
-                document.querySelector('.parquet-viewer__find-btn')
-                    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
             })()`);
+      const typed = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').includes('Press Enter')`,
+        4000,
+      );
+      expect(typed, "the new query never reached the field");
+      await page.evaluate(`document.querySelector('.parquet-viewer__find-btn')
+                .dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
       const many = await page.waitFor(
         `/^1 of 300$/.test((document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').trim())`,
         15000,
       );
       expect(many, "a multi-hit scan did not report its position");
-      const before = (await pagerState(page)).range;
+      const readPosition = () =>
+        page.evaluate(
+          `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').trim()`,
+        );
+      const before = await readPosition();
       await page.evaluate(`(() => {
                 const input = document.querySelector('.parquet-viewer__find-input');
                 input.focus();
                 input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
             })()`);
+      // The step is the thing being tested, not which page it landed on: a hit on the next page
+      // and a hit ten rows down are both "it moved".
       const stepped = await page.waitFor(
-        `(document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '') !== ${JSON.stringify(before)}`,
+        `${JSON.stringify(before)} !== ${JSON.stringify("")} && (() => {
+                const now = (document.querySelector('.parquet-viewer__find-count')?.innerText ?? '').trim();
+                return now !== ${JSON.stringify(before)} && / of 300$/.test(now);
+            })()`,
         15000,
       );
       expect(stepped, `Enter did not step to the next hit (still ${before})`);
