@@ -1948,12 +1948,20 @@ const scenarios = [
         await page.evaluate(`JSON.stringify({
                 text: document.querySelector('.parquet-viewer__too-large')?.innerText ?? '',
                 table: !!document.querySelector('.parquet-viewer__cell'),
+                buttons: [...document.querySelectorAll('.parquet-viewer__too-large button')]
+                    .map(b => b.textContent.trim()),
             })`),
       );
       expect(/big-virtual\.parquet/.test(state.text), `does not name the file: ${state.text}`);
       expect(/80\.0 MB/.test(state.text), `does not show the size: ${state.text}`);
       expect(/50\.0 MB/.test(state.text), `does not show the limit: ${state.text}`);
       expect(!state.table, "the table rendered — nothing should have been loaded");
+      // "Open anyway" is a memory bet; the file is on disk either way, so there is a second
+      // exit that costs nothing.
+      expect(
+        state.buttons.includes("Open anyway") && state.buttons.includes("Reveal in Explorer"),
+        `the guard has no cost-free exit: ${state.buttons.join(" / ")}`,
+      );
 
       await page.evaluate(
         `document.querySelector('.parquet-viewer__too-large-open')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,

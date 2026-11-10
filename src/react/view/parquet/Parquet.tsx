@@ -1427,13 +1427,24 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 limit: formatBytes(previewLimitBytes(tooLarge.ext)),
               })}
             </p>
-            <button
-              type="button"
-              className="parquet-viewer__pager-btn parquet-viewer__too-large-open"
-              onClick={handleOpenAnyway}
-            >
-              {$t("previewGuard.open")}
-            </button>
+            <div className="parquet-viewer__too-large-actions">
+              <button
+                type="button"
+                className="parquet-viewer__pager-btn parquet-viewer__too-large-open"
+                onClick={handleOpenAnyway}
+              >
+                {$t("previewGuard.open")}
+              </button>
+              {/* "Open anyway" is a memory bet. The file is on disk either way, so the second
+                  exit is the one that costs nothing: go look at it where it lives. */}
+              <button
+                type="button"
+                className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
+                onClick={() => handler.emit("revealFile")}
+              >
+                {$t("parquet.revealFile")}
+              </button>
+            </div>
           </div>
         </div>
       )}
