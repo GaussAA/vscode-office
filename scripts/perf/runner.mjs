@@ -113,7 +113,8 @@ const nextPage = (page) =>
     .evaluate(`(async () => {
       const deadline = performance.now() + 60000;
       const info = () => document.querySelector('.parquet-viewer__pager-info')?.innerText ?? '';
-      const firstCell = () => document.querySelector('.parquet-table tbody tr:nth-child(2) td')?.innerText ?? '';
+      // Structure-agnostic: the table draws <tr>/<td> or a div list when virtual is on.
+      const firstCell = () => document.querySelector('.parquet-table .ant-table-row')?.children[0]?.innerText ?? '';
       const before = info();
       const started = performance.now();
       [...document.querySelectorAll('.parquet-viewer__pager-btn')]

@@ -1,5 +1,5 @@
 import { App, ConfigProvider, InputNumber, Table, theme as antdTheme } from "antd";
-import type { ColumnsType } from "antd/es/table";
+import type { ColumnsType, TableRef } from "antd/es/table";
 import {
   createContext,
   useCallback,
@@ -233,6 +233,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     return SIDER_DEFAULT;
   });
   const [tableBodyHeight, setTableBodyHeight] = useState(320);
+  const [tableBodyWidth, setTableBodyWidth] = useState(0);
+  /** The virtual table owns scrolling; cursor moves and row jumps go through its ref. */
+  const tableRef = useRef<TableRef>(null);
+  /** Pending focus retry while the virtual list renders the cursor's row. */
+  const focusTimer = useRef(0);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<CellCursor | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -389,6 +394,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       const header = element.querySelector<HTMLElement>(".ant-table-header");
       const headerHeight = header?.offsetHeight ?? 38;
       setTableBodyHeight(Math.max(80, Math.round(element.clientHeight - headerHeight)));
+      setTableBodyWidth(element.clientWidth);
     };
     update();
     const observer = new ResizeObserver(update);
@@ -453,12 +459,15 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     [rowJump, goToPage, message],
   );
 
-  // Bring the jumped-to row into view once its page has rendered; without this the right
-  // page loads but the target row can sit below the fold and the user hunts for it.
+  // Bring the jumped-to row into view once its page has rendered; without this the right page
+  // loads but the target row can sit below the fold and the user hunts for it. With a virtual
+  // table the row may not be in the DOM at all, so the scroller is asked instead of the DOM.
   useEffect(() => {
     if (targetRow == null) return;
-    document.querySelector(".parquet-viewer__row--target")?.scrollIntoView({ block: "center" });
-  }, [targetRow, pageRows]);
+    const index = targetRow - page * PAGE_SIZE;
+    if (index < 0 || index >= pageRows.length) return;
+    tableRef.current?.scrollTo({ index });
+  }, [targetRow, page, pageRows]);
 
   const rowRange = useMemo(() => {
     if (!fileInfo) return "";
@@ -606,14 +615,25 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   );
 
   // Move real focus with the cursor. A focusable cell is what makes the roving tabindex
-  // work for assistive tech; the scroll keeps the focused cell in view.
+  // work for assistive tech; the scroll keeps the focused cell in view. A virtual table may not
+  // have rendered the cell yet, so scroll the row into the window and retry the focus for a few
+  // frames instead of assuming it exists.
   useEffect(() => {
     if (!cursor) return;
-    const cell = tableWrapRef.current?.querySelector<HTMLElement>(
-      `[data-cell="${cursor.row}:${cursor.col}"]`,
-    );
-    cell?.focus({ preventScroll: true });
-    cell?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    tableRef.current?.scrollTo({ index: cursor.row });
+    const attempt = (tries: number): void => {
+      const cell = tableWrapRef.current?.querySelector<HTMLElement>(
+        `[data-cell="${cursor.row}:${cursor.col}"]`,
+      );
+      if (!cell && tries > 0) {
+        focusTimer.current = window.setTimeout(() => attempt(tries - 1), 16);
+        return;
+      }
+      cell?.focus({ preventScroll: true });
+      cell?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    };
+    attempt(3);
+    return () => window.clearTimeout(focusTimer.current);
   }, [cursor, pageRows]);
 
   const tableColumns = useMemo<ColumnsType<TableRow>>(() => {
@@ -636,7 +656,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         dataIndex: column.name,
         key: column.name,
         ellipsis: true,
-        minWidth: 120,
+        width: 120,
         align: kind === "numeric" ? "right" : "left",
         render: (value: unknown, _row, index) => {
           const rowIndex = page * PAGE_SIZE + index;
@@ -941,13 +961,20 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 >
                   <CursorContext.Provider value={cursor}>
                     <Table<TableRow>
+                      ref={tableRef}
+                      virtual
                       className="parquet-table"
                       dataSource={tableRows}
                       columns={tableColumns}
                       locale={{ emptyText: $t("parquet.noRows") }}
                       pagination={false}
                       size="small"
-                      scroll={{ y: tableBodyHeight, x: "max-content" }}
+                      scroll={{
+                        // Virtual scrolling needs numbers: x is the full column extent (or the
+                        // viewport when it is wider), y is the body height measured above.
+                        x: Math.max(tableBodyWidth, 64 + (fileInfo.columns.length + 1) * 120),
+                        y: tableBodyHeight,
+                      }}
                       rowClassName={(_row, index) => {
                         const absolute = page * PAGE_SIZE + index;
                         const classes: string[] = [];

@@ -666,7 +666,13 @@ const scenarios = [
       expect(arrived, "jump never reached row 239,951");
       const jumped = await pagerState(page);
       expect(jumped.range === "239,951–240,000 of 250,000", `jump range: ${jumped.range}`);
-      expect(jumped.first === "239951", `jump first row: ${jumped.first}`);
+      // The table is virtual: the first rendered row is whatever the scroller keeps on screen,
+      // not the page's first row. What must be true is that the jumped-to row is the visible
+      // target — a stronger statement than "the page starts where we asked".
+      const target = await page.evaluate(
+        `document.querySelector('.parquet-viewer__row--target')?.children[0]?.innerText ?? null`,
+      );
+      expect(target === "240000", `jump target row: ${target} (first rendered: ${jumped.first})`);
       return "read-only + blur and Go jumps";
     },
   },
@@ -776,7 +782,7 @@ const scenarios = [
         await page.evaluate(`JSON.stringify({
                 insideFooter: !!document.querySelector('.parquet-viewer__bottombar .parquet-viewer__selection'),
                 extraRow: !!document.querySelector('.parquet-viewer__inspector-slot, .parquet-viewer__inspector'),
-                tableBodyBottom: document.querySelector('.parquet-table .ant-table-body')?.getBoundingClientRect().bottom ?? -1,
+                tableBodyBottom: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().bottom ?? -1,
                 footerTop: document.querySelector('.parquet-viewer__bottombar')?.getBoundingClientRect().top ?? -1,
             })`),
       );

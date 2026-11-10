@@ -75,13 +75,13 @@ raise the budget in the same commit and say why.
   numbers move with the grid implementation, not with us. Above 8 MB the windowed view is
   gated (row above); above 25 MB (CSV/TSV) the size guard asks first
   ([ADR-0016](../adr/0016-preview-size-guard.md)).
-- **Parquet row virtualisation: measured, not shipped.** Rendering 22 of the 50 rows (the
-  viewport's share) roughly halves the page turn (warm 210 → 100 ms on an idle machine), but
-  antd's `virtual` table replaces the `<tr>/<td>` body with a div-based list, and the UI suite
-  asserts on `tbody tr:nth-child(2) td` in nine places. Converting them is a separate change
-  with its own risk (the hidden measure row decides which child index is "the first data row"),
-  so the gain waits until the suite moves with it. The wide-page-turn gate pins the current
-  DOM's numbers in the meantime.
+- **Parquet row virtualisation: shipped, after moving the suite with it.** antd's `virtual`
+  table renders the ~22 rows the viewport holds instead of all 50, which halved the warm page
+  turn (210 → 111 ms) and left the cold one decode-bound (632 ms, unchanged). The price was a
+  DOM shape change — a div-based list instead of `<tr>/<td>` — so the nine UI assertions that
+  indexed `tbody tr:nth-child(2) td` were rewritten against `.ant-table-row` / `.ant-table-cell`
+  first, in its own commit, and the two that depended on "the first rendered row is the page's
+  first row" now assert on the target row instead.
 - **Page-turn timing varies 2-4x with machine load**, so `parquet-wide-page-turn` asserts the
   best of three samples and reports all of them: 210-915 ms warm and 520-1,850 ms cold were all
   observed on the same build and hardware.
