@@ -645,6 +645,12 @@ const scenarios = [
                 links: document.querySelectorAll('.parquet-viewer__cell--link a').length,
                 unsafeLinks: [...document.querySelectorAll('.parquet-viewer__cell--link a')]
                     .filter(a => !/^https?:\\/\\//.test(a.getAttribute('href') ?? '')).length,
+                // One tab stop for the whole grid: the anchor stays out of the tab order, so
+                // the cell has to say that Enter opens it.
+                linkTabs: [...new Set([...document.querySelectorAll('.parquet-viewer__cell-link')]
+                    .map(a => a.getAttribute('tabindex')))],
+                linkShortcuts: [...new Set([...document.querySelectorAll('.parquet-viewer__cell--link')]
+                    .map(cell => cell.getAttribute('aria-keyshortcuts')))],
                 urlHeaderLeft: document.querySelector('.parquet-table th:last-child')?.getBoundingClientRect().left ?? null,
                 wrapRight: document.querySelector('.parquet-viewer__table-wrap')?.getBoundingClientRect().right ?? null,
             })`),
@@ -653,6 +659,14 @@ const scenarios = [
       expect(before.keys > 0, `JSON object keys missing: ${JSON.stringify(before)}`);
       expect(before.links === 4, `expected 4 safe URL cells, got ${before.links}`);
       expect(before.unsafeLinks === 0, `unsafe href rendered: ${JSON.stringify(before)}`);
+      expect(
+        before.linkTabs.length === 1 && before.linkTabs[0] === "-1",
+        `a link became a tab stop: ${JSON.stringify(before.linkTabs)}`,
+      );
+      expect(
+        before.linkShortcuts.length === 1 && before.linkShortcuts[0] === "Enter",
+        `the link cell does not advertise its key: ${JSON.stringify(before.linkShortcuts)}`,
+      );
 
       const jump = json(
         await page.evaluate(`(() => {
@@ -943,6 +957,31 @@ const scenarios = [
       );
       expect(/name · row 1/.test(state.label ?? ""), `unexpected selection label: ${state.label}`);
       expect((state.value ?? "").length > 0, "selection showed no value");
+
+      // The visible bar updates on every arrow key, so an aria-live on it queued one
+      // announcement per keystroke. Assistive tech now hears the selection once it settles.
+      const liveOnBar = await page.evaluate(
+        `document.querySelector('.parquet-viewer__selection')?.getAttribute('aria-live') ?? null`,
+      );
+      expect(liveOnBar === null, `the visible bar is still a live region (${liveOnBar})`);
+      const announceSelector = `(document.querySelector('.parquet-viewer__bottombar [role="status"]')?.textContent ?? '')`;
+      const announcedName = await page.waitFor(`${announceSelector}.includes('name')`, 4000);
+      expect(announcedName, "a settled selection was never announced");
+      // Pick another cell: the region has to keep the old text until the new one settles.
+      await page.evaluate(`(() => {
+                const cell = ${firstRowCell(3)}.querySelector('.parquet-viewer__cell');
+                cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      const during = await page.evaluate(announceSelector);
+      expect(
+        during.includes("name"),
+        `the live region updated on the click instead of settling: ${during}`,
+      );
+      const announcedNext = await page.waitFor(`${announceSelector}.includes('active')`, 4000);
+      expect(
+        announcedNext,
+        `the new selection was never announced: ${await page.evaluate(announceSelector)}`,
+      );
 
       // The selected value lives inside the bottom bar; there is no extra full-width row
       // between the table and the footer.

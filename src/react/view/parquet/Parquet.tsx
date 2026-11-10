@@ -47,6 +47,8 @@ const SIDER_STORAGE_KEY = "parquet-sider-width";
 /** Must agree with the column widths passed to <Table>: the sidebar jump uses arithmetic. */
 const INDEX_COLUMN_WIDTH = 64;
 const DATA_COLUMN_WIDTH = 120;
+/** How long a selection must hold still before it is announced to assistive tech. */
+const ANNOUNCE_DELAY_MS = 600;
 
 /**
  * Run background work when the page is idle.
@@ -212,6 +214,7 @@ function ParquetCell({
       data-cell={`${pageIndex}:${position}`}
       tabIndex={isCursor ? 0 : -1}
       aria-label={`${column.name}, row ${rowIndex + 1}: ${labelText}${externalUrl ? ", external link" : ""}`}
+      aria-keyshortcuts={externalUrl ? "Enter" : undefined}
       title={isNull ? "null" : displayText}
       onClick={onActivate}
       onKeyDown={(event) => {
@@ -875,6 +878,20 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       : formatCellValue(inspected.value, inspectedType)
     : "";
 
+  /**
+   * Assistive tech hears the selection once it settles. The visible bar updates on every arrow
+   * key, and an `aria-live` region on it queued one announcement per keystroke — ten moves,
+   * ten messages.
+   */
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    if (!inspected) return;
+    const timer = window.setTimeout(() => {
+      setAnnouncement(`${inspected.column} · row ${inspected.row + 1} · ${inspectedText}`);
+    }, ANNOUNCE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [inspected, inspectedText]);
+
   /** Library message → the sentence a reader can act on, plus the original for the details. */
   const failure = describeParquetFailure(error);
 
@@ -1203,7 +1220,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             </main>
           </div>
           <footer className="parquet-viewer__bottombar">
-            <div className="parquet-viewer__selection" aria-live="polite">
+            {/* One announcement per settled selection. The visible bar updates on every arrow
+                key, and aria-live on it queued a message per keystroke. */}
+            <span className="parquet-viewer__sr-only" role="status" aria-live="polite">
+              {inspected ? announcement : ""}
+            </span>
+            <div className="parquet-viewer__selection">
               {fileInfo.rowCount === 0 ? null : inspected ? (
                 <>
                   <span className="parquet-viewer__selection-label">

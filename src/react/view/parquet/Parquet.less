@@ -878,6 +878,19 @@ body:has(.parquet-app) {
   }
 }
 
+/* Announced, never seen: the settled-selection status for assistive tech. */
+.parquet-viewer__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* The failure state replaces the whole chrome, so it carries the two things a reader needs to
    act: which file this is, and a way out. A left-aligned bar, not a floating pill. */
 .parquet-viewer__error-pane {
