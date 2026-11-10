@@ -541,7 +541,12 @@ body:has(.parquet-app) {
     }
   }
 
-  .ant-table-tbody > tr > td {
+  /* The body has two forms: a plain table (`tr > td`) and, above the virtual threshold, div
+     rows of `.ant-table-cell`. A rule that only names `td` silently loses its stripes, height
+     and row tints on exactly the files that need them most, so every row-level rule here
+     carries both forms. */
+  .ant-table-tbody > tr > td,
+  .ant-table-tbody-virtual .ant-table-cell {
     padding: 6px 12px !important;
     border: 0 !important;
     color: var(--pv-fg);
@@ -551,21 +556,25 @@ body:has(.parquet-app) {
     transition: background 0.1s ease;
   }
 
-  .ant-table-tbody > tr.parquet-viewer__row--alt > td {
+  .ant-table-tbody > tr.parquet-viewer__row--alt > td,
+  .ant-table-tbody-virtual .ant-table-row.parquet-viewer__row--alt .ant-table-cell {
     background: var(--pv-row-alt) !important;
   }
 
   .ant-table-tbody > tr:hover > td,
   .ant-table-tbody > tr.ant-table-row-hover > td,
+  .ant-table-tbody-virtual .ant-table-row:hover .ant-table-cell,
   .ant-table-cell-row-hover {
     background: var(--pv-hover) !important;
   }
 
-  .ant-table-tbody > tr.parquet-viewer__row--match > td {
+  .ant-table-tbody > tr.parquet-viewer__row--match > td,
+  .ant-table-tbody-virtual .ant-table-row.parquet-viewer__row--match .ant-table-cell {
     background: var(--pv-row-match) !important;
   }
 
-  .ant-table-tbody > tr.parquet-viewer__row--target > td {
+  .ant-table-tbody > tr.parquet-viewer__row--target > td,
+  .ant-table-tbody-virtual .ant-table-row.parquet-viewer__row--target .ant-table-cell {
     background: var(--pv-row-target) !important;
   }
 
@@ -960,14 +969,6 @@ body:has(.parquet-app) {
     --sponsor-bar-muted: var(--pv-muted);
     --sponsor-bar-accent: var(--vscode-textLink-foreground, #3794ff);
   }
-}
-
-.parquet-table tbody tr.parquet-viewer__row--match > td {
-  background: var(--pv-row-match) !important;
-}
-
-.parquet-table tbody tr.parquet-viewer__row--target > td {
-  background: var(--pv-row-target) !important;
 }
 
 @media (max-width: 1080px) {

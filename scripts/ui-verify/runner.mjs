@@ -765,6 +765,20 @@ const scenarios = [
         `document.querySelector('.parquet-viewer__row--target')?.children[0]?.innerText ?? null`,
       );
       expect(target === "240000", `jump target row: ${target} (first rendered: ${jumped.first})`);
+      // Landing on the row is not the same as seeing it: the tint is the only confirmation
+      // that the jump arrived, and it lives on the virtual body's div cells.
+      const tints = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const rows = [...document.querySelectorAll('.ant-table-tbody-virtual-holder-inner > *')];
+                const bg = (row) => row ? getComputedStyle(row.querySelector('.ant-table-cell') ?? row).backgroundColor : null;
+                const plain = rows.find((row) => !/row--(alt|match|target)/.test(row.className));
+                return { target: bg(document.querySelector('.parquet-viewer__row--target')), plain: bg(plain) };
+            })())`),
+      );
+      expect(
+        tints.target && tints.plain && tints.target !== tints.plain,
+        "the jumped-to row carries no tint",
+      );
       return "read-only + blur and Go jumps";
     },
   },
@@ -1046,7 +1060,40 @@ const scenarios = [
       expect(state.hits > 0, "matched cell was not highlighted");
       expect(state.rows === 1, `expected 1 marked row, got ${state.rows}`);
       expect(state.range === "51–100 of 300", `did not jump to the match page: ${state.range}`);
-      return `${state.count} at ${state.range}, ${state.hits} highlighted cell(s)`;
+      // Geometry that only exists when the row-level rules reach the virtual body. The body
+      // renders div `.ant-table-cell`s, so a `tr > td` rule is silently dead there: stripes,
+      // the 6px cell padding and the match tint all vanished without a single failing test.
+      const geometry = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const rows = [...document.querySelectorAll('.ant-table-tbody-virtual-holder-inner > *')];
+                const bg = (row) => row ? getComputedStyle(row.querySelector('.ant-table-cell') ?? row).backgroundColor : null;
+                const base = rows.find((row) => !/row--(alt|match|target)/.test(row.className));
+                const alt = rows.find((row) => /row--alt/.test(row.className));
+                const match = document.querySelector('.parquet-viewer__row--match');
+                const cell = document.querySelector('.ant-table-tbody-virtual .ant-table-cell');
+                const style = cell ? getComputedStyle(cell) : null;
+                return {
+                    rows: rows.length,
+                    height: rows[0] ? rows[0].getBoundingClientRect().height : 0,
+                    border: style ? style.borderBottomWidth : null,
+                    padding: style ? style.paddingTop : null,
+                    base: bg(base), alt: bg(alt), match: bg(match),
+                };
+            })())`),
+      );
+      expect(geometry.rows > 0, "the virtual body rendered no rows");
+      expect(geometry.height >= 33 && geometry.height <= 35, `row height: ${geometry.height}px`);
+      expect(geometry.border === "0px", `row separators came back: ${geometry.border}`);
+      expect(geometry.padding === "6px", `cell padding: ${geometry.padding}`);
+      expect(
+        geometry.alt && geometry.base && geometry.alt !== geometry.base,
+        "alternate rows are not tinted",
+      );
+      expect(
+        geometry.match && geometry.base && geometry.match !== geometry.base,
+        "the matched row has no tint",
+      );
+      return `${state.count} at ${state.range}, ${state.hits} highlighted cell(s), ${geometry.height}px rows`;
     },
   },
   {
