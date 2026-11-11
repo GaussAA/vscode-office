@@ -5,6 +5,24 @@ All notable changes to the "vscode-office" extension will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.6.0] - 2026-11-11
+
+### Fixed
+
+- The parquet grid now reaches the bottom bar. antd 6 renders its loading wrapper as `.ant-spin`,
+  while the stylesheet still named antd 4/5's `.ant-spin-nested-loading`; the mismatched selector
+  broke the height chain, so the table stopped at its content height and the bare editor
+  background showed below it — 23px short on a full page and 703px short on a six-row page, which
+  reads as one extra empty row. `verify:ui` now asserts the geometry on both a full and a short
+  page.
+
+### Removed
+
+- The floating "Supported by Database Client" bar. It was `position: fixed`, so in the parquet
+  viewer it sat on top of the pager, and it had no off switch. The sponsor components, assets,
+  `sponsorBaseUrl` config and the `sponsorClick` / `openSponsor` webview messages went with it;
+  the upstream credit moved to README's Credits section and NOTICE.md.
+
 ## [Unreleased]
 
 ### Fixed
