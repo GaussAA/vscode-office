@@ -42,14 +42,18 @@
 - [ ] **6. 等 CI**：`gh run watch` —— 顺序是 `check:full` → `check:release --tag=` → 打包 →
       **Marketplace（OIDC）** → **Open VSX（trusted publishing）**
 - [ ] **7. 验证两个注册表**（见下，注意传播延迟）
-- [ ] **8. 建 GitHub Release**：正文取 CHANGELOG 该小节（去掉 `## [...]` 那一行），附件用 CI 打的那个
-      `bash
-      gh run download <run-id> -n release-vsix          # 取 CI 产物，别用本地旧 vsix
-      gh release create v<version> --title "Data File Viewer (Parquet, JSONL, Excel) v<version>" \
-        --notes-file /tmp/notes.md "office-viewer-plus-<version>.vsix"
-      `
+- [ ] **8. 建 GitHub Release**：正文取 CHANGELOG 该小节（去掉 `## [...]` 那一行），附件用 CI 打的那个 ——
+      命令见本节末尾
 
 `pnpm check:full` 与 `pnpm run package` **不必在本地再跑**：CI 在 tag 上跑完整闸门并打包。
+
+建 Release 的命令（附件取 CI 产物，别用本地目录里的旧 vsix）：
+
+```bash
+gh run download <run-id> -n release-vsix
+gh release create v<version> --title "Data File Viewer (Parquet, JSONL, Excel) v<version>" \
+  --notes-file /tmp/notes.md "office-viewer-plus-<version>.vsix"
+```
 
 ## 校验两个注册表（两个都要，且要等）
 
