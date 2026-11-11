@@ -49,6 +49,7 @@ import {
   type TableRow,
 } from "./parquetCell.tsx";
 
+import { ParquetMetaBar } from "./ParquetMetaBar.tsx";
 import "./Parquet.less";
 
 /**
@@ -1408,57 +1409,13 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                 </span>
               )}
             </div>
-            <div className="parquet-viewer__meta">
-              <span className="parquet-viewer__meta-item" title={$t("parquet.rows")}>
-                <span className="codicon codicon-list-flat parquet-icon parquet-icon--rows" />
-                <span className="parquet-viewer__meta-value">
-                  {fileInfo.rowCount.toLocaleString()}
-                </span>
-                <span className="parquet-viewer__meta-label">
-                  {fileInfo.rowCount === 1 ? $t("parquet.rowOne") : $t("parquet.rows")}
-                </span>
-              </span>
-              <span className="parquet-viewer__meta-item" title={$t("parquet.columnsLabel")}>
-                <span className="codicon codicon-symbol-field parquet-icon parquet-icon--columns" />
-                <span className="parquet-viewer__meta-value">{fileInfo.columns.length}</span>
-                <span className="parquet-viewer__meta-label">
-                  {fileInfo.columns.length === 1
-                    ? $t("parquet.columnOne")
-                    : $t("parquet.columnsLabel")}
-                </span>
-              </span>
-              {fileInfo.file?.byteLength ? (
-                <span
-                  className="parquet-viewer__meta-item"
-                  title={formatBytes(fileInfo.file.byteLength)}
-                >
-                  <span className="codicon codicon-file-binary parquet-icon parquet-icon--size" />
-                  <span className="parquet-viewer__meta-value">
-                    {formatBytes(fileInfo.file.byteLength)}
-                  </span>
-                </span>
-              ) : null}
-              {codecs.length > 0 && (
-                <span className="parquet-viewer__meta-item" title={$t("parquet.codec")}>
-                  <span className="codicon codicon-file-zip parquet-icon parquet-icon--codec" />
-                  <span className="parquet-viewer__meta-value">{codecs.join(" · ")}</span>
-                  <span className="parquet-viewer__meta-label">{$t("parquet.codec")}</span>
-                </span>
-              )}
-              {fileInfo.createdBy && (
-                <span
-                  className="parquet-viewer__meta-item parquet-viewer__meta-item--author"
-                  title={fileInfo.createdBy}
-                >
-                  <span className="codicon codicon-account parquet-icon parquet-icon--author" />
-                  <span className="parquet-viewer__meta-value">
-                    {fileInfo.createdBy.length > 40
-                      ? `${fileInfo.createdBy.slice(0, 40)}…`
-                      : fileInfo.createdBy}
-                  </span>
-                </span>
-              )}
-            </div>
+            <ParquetMetaBar
+              rowCount={fileInfo.rowCount}
+              columnCount={fileInfo.columns.length}
+              fileSize={fileInfo.file?.byteLength}
+              codecs={codecs}
+              createdBy={fileInfo.createdBy}
+            />
           </header>
           <div className="parquet-viewer__body">
             <aside className="parquet-viewer__sider" style={{ width: siderWidth }}>
