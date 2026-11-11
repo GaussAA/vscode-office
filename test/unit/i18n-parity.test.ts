@@ -45,6 +45,10 @@ const LOCALES = {
  * The 56 keys below are the `parquet` chrome and the whole `jsonl` viewer. Translating them
  * into seven languages is a job for a native speaker, not a commit hook; until then the
  * English fallback is correct but unlocalised, and this budget keeps the gap from growing.
+ * A partial `jsonl` block is deliberately not shipped: a handful of translated strings inside
+ * an otherwise English viewer made one header mixed-language, which is worse than fallback.
+ * The count is exact, not slack: a new English key must either be translated or move this
+ * number up in the same commit.
  */
 const MAX_MISSING: Record<string, number> = {
   "zh-cn": 0,

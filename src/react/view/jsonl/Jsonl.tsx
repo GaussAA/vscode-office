@@ -111,12 +111,20 @@ export default function JsonlViewer() {
   }, [query]);
   useEffect(() => observeVscodeThemeChange(() => setDark(isVscodeDarkTheme())), []);
 
-  const requestRange = useCallback((start: number, end: number, mode: "replace" | "append") => {
-    const requestId = ++rangeSeq.current;
-    rangeMode.current.set(requestId, mode);
-    setChunkLoading(true);
-    handler.emit("jsonlIndex", { requestId, start, end });
-  }, []);
+  const requestRange = useCallback(
+    (start: number, end: number, mode: "replace" | "append", anchor?: number) => {
+      const requestId = ++rangeSeq.current;
+      rangeMode.current.set(requestId, mode);
+      setChunkLoading(true);
+      handler.emit("jsonlIndex", {
+        requestId,
+        start,
+        end,
+        ...(typeof anchor === "number" ? { anchor } : {}),
+      });
+    },
+    [],
+  );
 
   const requestEntry = useCallback((index: number) => {
     const requestId = ++entrySeq.current;
@@ -133,11 +141,11 @@ export default function JsonlViewer() {
     [requestEntry],
   );
 
-  /** Load a window of entries around `target`. */
+  /** Load a window of entries around `target`, keeping `target` in it. */
   const recenter = useCallback(
     (target: number, lineCount: number) => {
       const begin = Math.max(0, Math.min(target - 100, Math.max(0, lineCount - JSONL_CHUNK_SIZE)));
-      requestRange(begin, begin + JSONL_CHUNK_SIZE, "replace");
+      requestRange(begin, Math.min(lineCount, begin + JSONL_CHUNK_SIZE), "replace", target);
     },
     [requestRange],
   );
@@ -199,6 +207,9 @@ export default function JsonlViewer() {
       if (!mode) return; // a reply nobody is waiting for any more
       rangeMode.current.delete(payload.requestId);
       if (payload.requestId === rangeSeq.current) setChunkLoading(false);
+      // A replace that a newer replace has already superseded must not repaint the pane: the
+      // newer request owns the anchor guarantee for the row the user jumped to.
+      if (mode === "replace" && payload.requestId !== rangeSeq.current) return;
       if (!payload.entries.length) return;
 
       const end = payload.start + payload.entries.length;
@@ -243,7 +254,12 @@ export default function JsonlViewer() {
 
   const clearSearch = useCallback(() => {
     // Stop the host-side scan instead of letting it run to completion unread.
-    if (searching) handler.emit("jsonlSearchCancel", { requestId: searchSeq.current });
+    const previous = searchSeq.current;
+    if (searching) handler.emit("jsonlSearchCancel", { requestId: previous });
+    // Reject batches already in flight. Without the bump a late batch can append results and
+    // auto-select an entry after the user has left search mode.
+    searchSeq.current++;
+    searchAutoSelected.current = false;
     setSearching(false);
     setSearchEntries([]);
     setSearchMeta(null);
@@ -288,20 +304,25 @@ export default function JsonlViewer() {
 
   const searchActive = query.trim().length > 0;
   const items = searchActive ? searchEntries : directory.items;
+  const hasMore = !searchActive && info !== null && directory.end < info.lineCount;
 
   const jump = useCallback(() => {
     if (!info || info.lineCount === 0 || jumpValue == null) return;
     const target = Math.min(info.lineCount - 1, Math.max(0, Math.round(jumpValue) - 1));
     if (query.trim()) {
+      // Leaving search mode has to go through `clearSearch`: it stops the host scan, clears
+      // the results and recenters the directory on `pendingJump`. Setting `query` to "" here
+      // used to skip all three, so the directory kept a window that did not contain the row
+      // the user had just jumped to, and the host kept scanning.
       pendingJump.current = target;
       setQuery("");
-      setSelected(target);
-      requestEntry(target);
+      clearSearch();
+      selectEntry(target);
       return;
     }
     if (target < directory.start || target >= directory.end) recenter(target, info.lineCount);
     selectEntry(target);
-  }, [info, jumpValue, directory, query, recenter, requestEntry, selectEntry]);
+  }, [info, jumpValue, directory, query, clearSearch, recenter, selectEntry]);
 
   const searchStatus = useMemo(() => {
     if (!searchActive) return null;
@@ -436,6 +457,8 @@ export default function JsonlViewer() {
                   loading={searchActive ? false : chunkLoading}
                   onSelect={selectEntry}
                   onNeedMore={searchActive ? undefined : onNeedMore}
+                  hasMore={hasMore}
+                  windowStart={directory.start}
                   highlight={searchActive ? query.trim() : undefined}
                   emptyText={
                     !info

@@ -96,5 +96,55 @@ export function createPerfFixtures(cacheDir) {
     wideRows: WIDE_ROWS,
     wideBytes: statSync(wide).size,
     wideNeedle: `s${WIDE_TEXT_COLUMNS - 1}-96`,
+    ...createJsonlPerfFixtures(cacheDir),
+  };
+}
+
+/**
+ * JSONL host fixtures. The viewer's expensive half is in the extension host (line index,
+ * window parsing, whole-file search), so these are measured in Node, not the browser:
+ *  - 40 lines x ~2 MB: a 500-line window would parse 80 MB; the 4 MB byte budget parses one.
+ *  - 200k short lines: a whole-file search has to stay one pass.
+ */
+const JSONL_HUGE_LINES = 40;
+const JSONL_HUGE_PAD = 2 * 1024 * 1024;
+const JSONL_LOG_LINES = 200_000;
+
+export function createJsonlPerfFixtures(cacheDir) {
+  mkdirSync(cacheDir, { recursive: true });
+
+  const huge = writeIfMissing(join(cacheDir, "jsonl-huge-lines.jsonl"), () => {
+    const lines = [];
+    for (let index = 0; index < JSONL_HUGE_LINES; index++) {
+      lines.push(
+        JSON.stringify({ id: index, pad: "x".repeat(JSONL_HUGE_PAD), tag: `row-${index}` }),
+      );
+    }
+    return Buffer.from(`${lines.join("\n")}\n`, "utf8");
+  });
+
+  const log = writeIfMissing(join(cacheDir, "jsonl-log-200k.jsonl"), () => {
+    const chunks = [];
+    let text = "";
+    for (let index = 0; index < JSONL_LOG_LINES; index++) {
+      text += `{"id":${index},"ts":"2026-11-09T10:00:00.123Z","level":"INFO","msg":"processed ${index} rows","service":"ingest","ok":true}\n`;
+      if (text.length > 1 << 20) {
+        chunks.push(text);
+        text = "";
+      }
+    }
+    chunks.push(text);
+    return Buffer.from(chunks.join(""), "utf8");
+  });
+
+  return {
+    jsonlHuge: huge,
+    jsonlHugeLines: JSONL_HUGE_LINES,
+    jsonlHugeBytes: statSync(huge).size,
+    jsonlLog: log,
+    jsonlLogLines: JSONL_LOG_LINES,
+    jsonlLogBytes: statSync(log).size,
+    /** Appears once, in the last line: the scan cannot stop early. */
+    jsonlLogNeedle: `processed ${JSONL_LOG_LINES - 1} rows`,
   };
 }

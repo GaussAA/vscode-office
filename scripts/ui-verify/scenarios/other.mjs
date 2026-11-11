@@ -64,6 +64,25 @@ export default [
       ]) {
         jsonl[key] = await contrastRatio(page, selector);
       }
+      // The selection panel is a reading surface too: its path, preview and count are text
+      // the user has to read, not chrome that can fall below AA.
+      await jumpJsonl(page, 14);
+      await page.evaluate(`(() => {
+                const row = [...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')]
+                    .find(node => node.innerText.startsWith('longValue'));
+                row?.querySelector('.ant-tree-node-content-wrapper')
+                    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      await page.waitFor(`!!document.querySelector('.jsonl-valuebar__toggle')`);
+      await page.evaluate(`document.querySelector('.jsonl-valuebar__toggle')?.click()`);
+      await page.waitFor(`!!document.querySelector('.jsonl-valuebar__text')`);
+      for (const [key, selector] of [
+        ["panelPath", ".jsonl-valuebar__path"],
+        ["panelPreview", ".jsonl-valuebar__preview"],
+        ["panelCount", ".jsonl-valuebar__count"],
+      ]) {
+        jsonl[key] = await contrastRatio(page, selector);
+      }
       for (const [kind, ratio] of Object.entries(jsonl)) {
         expect(ratio !== null && ratio >= 4.5, `jsonl ${kind} contrast is ${ratio}:1`);
       }

@@ -21,14 +21,14 @@ export const json = (value) => JSON.parse(value);
 export const expectedProbe = /evaluating a string as JavaScript/i;
 export const unexpected = (list) => list.filter((text) => !expectedProbe.test(text));
 
-export async function openJsonl(page, base, theme = "dark") {
+export async function openJsonl(page, base, theme = "dark", query = "") {
   // JSONL restores the selected entry per document. Scenarios share one profile, so
   // without clearing it the next scenario could start on L11 (too-large) instead of L1.
   await page.navigate(`${base}/stats`);
   await page.evaluate(`Object.keys(localStorage)
         .filter(key => key.startsWith('jsonl-state:'))
         .forEach(key => localStorage.removeItem(key))`);
-  await page.navigate(`${base}/harness?theme=${theme}`);
+  await page.navigate(`${base}/harness?theme=${theme}${query}`);
   const ready = await page.waitFor(
     `!!document.querySelector('.jsonl-index__tree .ant-tree-treenode')`,
   );

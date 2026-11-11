@@ -12,11 +12,28 @@
  *    ships hundreds of full JSON documents to the webview.
  */
 
-/** A line larger than this is not parsed; it is shown as raw text instead. */
-export const JSONL_MAX_LINE_BYTES = 512 * 1024;
+/**
+ * A line larger than this is not parsed; it is shown as raw text instead.
+ *
+ * This used to be 512 KB, which is smaller than one realistic tool-schema record: a real
+ * 6.4 MB, 50-line agent transcript contains a 541 KB line (`openclaw.jsonl`), and the
+ * viewer refused it. The tree model is already bounded (20k nodes, 200 children per level,
+ * depth 12), so the cap only has to keep `JSON.parse` and the postMessage payload finite.
+ */
+export const JSONL_MAX_LINE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Bytes, not lines, bound a directory window. A line window of 500 huge records used to read
+ * and `JSON.parse` all of them before the first row appeared; the budget stops that. The
+ * caller passes `anchor` so the selected row is still guaranteed a place in the window.
+ */
+export const JSONL_RANGE_BYTE_BUDGET = 4 * 1024 * 1024;
 
 /** Entries are streamed into the directory pane in chunks of this size. */
 export const JSONL_CHUNK_SIZE = 500;
+
+/** Bytes decoded per search turn, in addition to the line step. */
+export const JSONL_SEARCH_BYTE_BUDGET = 8 * 1024 * 1024;
 
 /** Top-level keys tried, in order, when deriving a human-friendly label. */
 export const JSONL_LABEL_KEYS = [
@@ -28,13 +45,18 @@ export const JSONL_LABEL_KEYS = [
   "title",
   "ts",
   "timestamp",
+  // Agent transcripts often carry the actual human query here instead of in `id`.
+  "query_search",
 ] as const;
 
 /** How many characters of the raw line are kept for previews. */
 export const JSONL_RAW_PREVIEW_CHARS = 400;
 
 /** Upper bound for the full text shipped to the raw view. */
-export const JSONL_MAX_TEXT_CHARS = 200_000;
+export const JSONL_MAX_TEXT_CHARS = 1_000_000;
+
+/** Upper bound for the selection panel's text; `Copy value` still copies the whole value. */
+export const JSONL_VALUE_TEXT_LIMIT = 200_000;
 
 export interface JsonlInfoPayload {
   fileName: string;
@@ -49,6 +71,11 @@ export interface JsonlRangeRequest {
   requestId: number;
   start: number;
   end: number;
+  /**
+   * Line that must be inside the reply even when the byte budget would cut before it.
+   * `recenter` passes the selected line; plain appends omit it.
+   */
+  anchor?: number;
 }
 
 /**
@@ -92,17 +119,24 @@ export interface JsonlEntryRequest {
 }
 
 /** Everything the detail pane needs for one entry: the summary plus its full text/value. */
+interface JsonlDetailBase extends JsonlEntryBase {
+  /** Full line text, capped at JSONL_MAX_TEXT_CHARS. */
+  text: string;
+  /** Character count of the whole line, before the cap. */
+  textChars: number;
+  /** True when `text` is shorter than the line; the raw view says so instead of pretending. */
+  textTruncated: boolean;
+}
+
 export type JsonlEntryDetail =
-  | (JsonlEntryBase & { kind: "empty"; text: string })
-  | (JsonlEntryBase & { kind: "invalid"; error: string; text: string })
-  | (JsonlEntryBase & { kind: "too-large"; text: string })
-  | (JsonlEntryBase & {
+  | (JsonlDetailBase & { kind: "empty" })
+  | (JsonlDetailBase & { kind: "invalid"; error: string })
+  | (JsonlDetailBase & { kind: "too-large" })
+  | (JsonlDetailBase & {
       kind: "value";
       label?: string;
       /** Parsed JSON, under the size cap. */
       value: unknown;
-      /** Full line text (capped), for the raw view. */
-      text: string;
     });
 
 export interface JsonlEntryPayload {

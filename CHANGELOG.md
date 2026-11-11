@@ -15,6 +15,61 @@ updating.
 
 ## [Unreleased]
 
+### Added
+
+- JSONL: a selection panel docked above the status bar shows the full value of the selected
+  tree row. It wraps, scrolls, reports the character count, and copies the whole value;
+  `Enter` toggles it and `Ctrl+C` still copies. The tree keeps its 120-character string
+  preview for large entries (small ones still wrap leaf strings, as before) and the panel is
+  where a long `description`, prompt or log message is actually read. A line that is one long
+  string — no tree row to select — gets the panel too.
+- JSONL: the directory has an explicit "Load more entries" row. The byte budget can return a
+  window shorter than the pane, which has no scrollbar and therefore emitted no scroll event;
+  the directory now tops itself up a bounded number of times and keeps a visible row for the
+  rest.
+- JSONL: a top-level identity key whose value is an object is now read one level deep
+  (`id: { query }`), which is how agent transcripts store their identity. The 50-line
+  `openclaw.jsonl` sample goes from 0 to 42 labelled rows; arbitrary nested `id`s are still
+  deliberately ignored.
+- JSONL: `verify:perf` gains two host-side invariants — a 4 MB directory window over 2 MB
+  lines returns one row (≤3, measured 15 ms), and a 200k-line search is one pass
+  (measured 0.3–0.5 s). They run in Node against the esbuild-bundled `JsonlSession`, because
+  the browser harness cannot see the extension host.
+- JSONL: a line above the 8 MB parse cap is decoded as a 4 KB head for the directory row
+  instead of in full. A 100 MB record no longer allocates a 100 MB string just to show its
+  size in the list; opening it still decodes it once for the raw view.
+
+### Fixed
+
+- JSONL: a 512 KB line cap refused realistic records — the 6.4 MB, 50-line transcript in the
+  report contains a 541 KB line and the viewer showed only "too large". The parse cap is now
+  8 MB; the tree model's existing 20,000-node bound keeps the render finite.
+- JSONL: directory windows and search turns are byte-bounded (4 MB / 8 MB) instead of
+  line-bounded. A file made of 500 KB records used to `JSON.parse` its whole first chunk
+  before the first row appeared; the selected row now anchors the window so recentring never
+  drops it.
+- JSONL: a node at the 12-level depth cap no longer offers an expand arrow that opens
+  nothing; it stays a leaf and says how many keys are below the cap (`… N more keys`).
+- JSONL: the virtual tree assumed 24px rows while the CSS produced 28px, so the last seventh
+  of every long tree could not be scrolled to. A 600-key entry never rendered its
+  "… N more keys" row, and a 500-entry directory chunk hid its last ~70 rows. The row pitch
+  is one number again.
+- JSONL: raw text past 1,000,000 characters is a marked prefix with a character count instead
+  of a silent cut; the 20,000-node tree cap now renders its own notice row instead of ending
+  mid-tree without a word.
+- JSONL: jumping to an entry while a search was open left the old directory window on screen
+  and kept the host scan running. The jump now clears the search through the same path the
+  clear button uses, then recenters on the target. A late search batch or a superseded
+  directory reply can no longer repaint the window after that jump.
+- JSONL: `Enter` no longer fights the tree's own key handling on a focused row; `Esc` closes
+  the value panel and returns focus to its toggle; `Ctrl+C` works while that toggle is
+  focused; the toggle's accessible name is its action, not the whole row.
+
+### Changed
+
+- JSONL: the directory's raw-text preview no longer relies on a native `title` tooltip; the
+  entry detail is the reading channel (DESIGN.md already banned tooltips as content).
+
 ## [6.4.5] - 2026-11-11
 
 ### Changed

@@ -22,7 +22,7 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 
 ### Performance gate
 
-parquet 首屏字节数、全文件搜索耗时、宽表翻页耗时，以及大表格窗口视图的首屏/堆/渲染行数是不变量，由 `pnpm verify:perf` 守住，见 docs/agents/perf.md。
+parquet 首屏字节数、全文件搜索耗时、宽表翻页耗时，大表格窗口视图的首屏/堆/渲染行数，以及 JSONL 的字节预算窗口/20 万行搜索是不变量，由 `pnpm verify:perf` 守住，见 docs/agents/perf.md。
 
 ### Release
 

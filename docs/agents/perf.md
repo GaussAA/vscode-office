@@ -1,7 +1,7 @@
 # Performance gate
 
-`pnpm verify:perf` runs the built viewers in headless Chrome and asserts four numbers that
-used to be catastrophic and invisible:
+`pnpm verify:perf` runs the built viewers in headless Chrome **and the JSONL host services in
+Node** and asserts six numbers that used to be catastrophic and invisible:
 
 | invariant                                | budget                                    | why it exists                                                                                                                                                                      |
 | ---------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9,6 +9,8 @@ used to be catastrophic and invisible:
 | a whole-file search is one pass          | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                                                             |
 | a 21 MB CSV paints its windowed view     | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows                                                  |
 | a page turn on 60 columns stays usable   | best of 3: warm < 2 s, cold < 5 s         | idle: 210 ms warm (render of 3,000 cells), 520 ms cold (one decoded data page per column). Loose on purpose — load inflates samples 2-4x, and the regression this catches is 5-10x |
+| a JSONL directory window stays in budget | 80 MB / 40 lines: ≤ 3 rows, < 1.5 s       | a 500-line request without the 4 MB byte budget parses all 40 × 2 MB lines before the first row; measured 15 ms / 1 row                                                            |
+| a whole-file JSONL search is one pass    | 200k lines < 5 s, `scanned == total`      | the line window per turn must stay byte-bounded; a per-batch re-read or an unbounded window shows up as an order-of-magnitude jump. Measured 0.3–0.5 s                             |
 
 It is separate from `pnpm verify:ui` on purpose: that suite answers "does the DOM look
 right" with small fixtures; this one answers "what did it cost" with large files, and byte
@@ -18,9 +20,11 @@ counts — not DOM assertions — are the evidence.
 
 ```
 scripts/perf/
-├── runner.mjs    scenarios + budgets + CLI (exit code is the gate)
+├── runner.mjs    scenarios + budgets + CLI (exit code is the gate); bundles the JSONL
+│                 host services with esbuild for the two Node-only checks
 ├── harness.mjs   HTTP server: built HTML from out/webview, fake bridge, Range + byte counting
-└── fixtures.mjs  generates two ONE-ROW-GROUP files with hyparquet-writer into .perf/
+└── fixtures.mjs  generates two ONE-ROW-GROUP parquet files with hyparquet-writer, plus the
+                  JSONL fixtures (40 × 2 MB lines, 200k log lines) into .perf/
 ```
 
 Both fixtures are written with a single row group, which is what PyArrow produces by default
@@ -29,6 +33,12 @@ Both fixtures are written with a single row group, which is what PyArrow produce
 measures. The server counts **bytes served**, which is the number that matters for a remote
 workspace; the in-page stopwatch (`window.__bench.t0` → `ready`, two frames after the first
 row paints) keeps DevTools round-trip time out of the duration.
+
+The JSONL checks are host-side on purpose: indexing, window parsing and the whole-file scan
+happen in the extension host, so the browser harness cannot see them. The runner bundles
+`jsonlFile.ts`, `jsonlSession.ts` and `jsonlFormat.ts` with esbuild into a temp directory and
+imports the ESM output. The window check asserts the **returned row count** (≤3 for 2 MB
+lines), not only time: that is the deterministic proof that the 4 MB budget is applied.
 
 ## Commands
 
@@ -52,6 +62,12 @@ The message names the usual cause, because both budgets fail for exactly one rea
 - **search over budget** → something is reading per batch again. `parquetSearch.ts` must walk
   each column once via `parquetRead`'s `onPage`; a `parquetReadObjects` call inside a row loop
   is the regression.
+- **JSONL window over rows** → the byte budget stopped being applied. Check
+  `JsonlSession.readRange`'s `advance(from, lines, bytes)` call and `JsonlFile.advance`: a
+  request for 500 lines must still return only what fits in 4 MB (one line here).
+- **JSONL search over budget** → the per-turn window grew back to a line count with no byte
+  bound, or a batch re-decodes the same lines. Check `JSONL_SEARCH_BYTE_BUDGET` and
+  `JsonlSession.search`'s `advance` call.
 
 Both were verified by mutation: deleting the `inFlight` lookup takes first paint to 2.10x
 (FAIL), and restoring the per-batch search takes the 1M-row scan to ~28 s (FAIL, budget
@@ -94,6 +110,8 @@ raise the budget in the same commit and say why.
 - **Inline bytes over the bridge** are base64 now, not a `number[]` (5-8x the file on a JSON
   message vs 4/3). `parquet-inline-buffer` renders a virtual document from a base64 payload, so
   the decode path is covered; nothing measures the message size itself.
+- **JSONL open latency** (the 80 MB index scan, ~0.3 s here) is not gated; the window and
+  search checks above catch the shape regressions, and the index scan is linear by design.
 - **Open latency itself** (1-3 s for 1M rows x 5 columns, dominated by decoding the first data
   page per column plus loading the ~430 KB parquet bundle) is not asserted either: it moves
   with bundle size, and the byte budget above already catches the failure mode that mattered.

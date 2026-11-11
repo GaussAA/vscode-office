@@ -5,6 +5,7 @@ import {
   MAX_DEPTH,
   buildEntryModel,
   countNodes,
+  fullValueText,
   makePathKey,
 } from "@/react/view/jsonl/jsonlFormat";
 import { highlightRuns } from "@/react/common/highlight";
@@ -71,6 +72,21 @@ test("buildEntryModel: a scalar entry produces no rows", () => {
   assert.equal(model.wrap, false, "a scalar has nothing to wrap");
 });
 
+test("buildEntryModel: a node at the depth cap is a leaf that counts its hidden keys", () => {
+  let chain: Record<string, unknown> = { leafA: 1, leafB: 2 };
+  for (let depth = 0; depth < MAX_DEPTH + 3; depth++) chain = { child: chain };
+  const model = buildEntryModel(chain);
+  let node = model.nodes[0];
+  let depth = 1;
+  while (node.children.length > 0) {
+    node = node.children[0];
+    depth++;
+  }
+  assert.equal(depth, MAX_DEPTH);
+  assert.equal(node.composite, false, "the capped node must not advertise an expand arrow");
+  assert.ok((node.depthCapped ?? 0) > 0, "the capped node must say how many keys are hidden");
+});
+
 test("buildEntryModel: shallowKeys stop at the default expand depth", () => {
   const model = buildEntryModel({ a: { b: { c: { d: { e: 1 } } } } });
   // Keys are JSON arrays (makePathKey), not dotted paths.
@@ -132,4 +148,37 @@ test("highlightRuns: caps the number of runs on pathological input", () => {
   const parts = highlightRuns("a".repeat(500), "a");
   assert.ok(parts.length <= 41, `produced ${parts.length} runs`);
   assert.equal(parts.map((part) => part.text).join("").length, 500);
+});
+
+test("model: the node cap is reported so the tree can say it was cut", () => {
+  const model = buildEntryModel(objectOfSize(50), { maxNodes: 10 });
+  assert.equal(model.truncated, true);
+  assert.equal(model.limit, 10);
+
+  const whole = buildEntryModel(objectOfSize(50));
+  assert.equal(whole.truncated, false);
+  assert.equal(whole.limit, 20000);
+});
+
+test("fullValueText: strings are read as text, everything else as pretty JSON", () => {
+  const text = fullValueText("line one\nline two");
+  assert.equal(text.text, "line one\nline two");
+  assert.equal(text.truncated, false);
+  assert.equal(text.chars, 17);
+
+  const object = fullValueText({ a: 1 });
+  assert.equal(object.text, '{\n  "a": 1\n}');
+});
+
+test("fullValueText: a cap is reported, and Copy still has the whole value", () => {
+  const value = "x".repeat(50);
+  const cut = fullValueText(value, 10);
+  assert.equal(cut.text.length, 10);
+  assert.equal(cut.chars, 50);
+  assert.equal(cut.truncated, true);
+  assert.ok(!cut.text.endsWith("…"), "the notice owns the message, not a suffix");
+
+  const fits = fullValueText(value, 50);
+  assert.equal(fits.truncated, false);
+  assert.equal(fits.text, value);
 });

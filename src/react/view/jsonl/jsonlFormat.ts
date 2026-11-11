@@ -6,11 +6,18 @@
  * bundling React. It now returns plain data; rendering is one adapter in `JsonlDetail`.
  */
 
+import { JSONL_VALUE_TEXT_LIMIT } from "@/common/jsonlTypes";
 import { toDisplayText } from "@/common/displayText";
 
 export type PathSeg = string | number;
 
-export const ROW_HEIGHT = 24;
+/**
+ * One tree row, including its 1px top and bottom margin. The virtual list positions rows by
+ * this number, so it has to equal the CSS pitch: `--jl-row-height` plus the two margins.
+ * It was 24 while the CSS produced 28, which made the last ~1/7 of every long tree
+ * unreachable — the scrollbar stopped before rows the virtual list had never rendered.
+ */
+export const ROW_HEIGHT = 28;
 export const MAX_CHILDREN = 200;
 export const MAX_DEPTH = 12;
 export const MAX_TREE_NODES = 20000;
@@ -121,6 +128,11 @@ export interface NodeModel {
   children: NodeModel[];
   /** Set on the synthetic "N more keys" row; such a row is not selectable. */
   overflow?: number;
+  /**
+   * Key count hidden by `MAX_DEPTH`. The node becomes a leaf (no dead expand arrow) and the
+   * row says how many keys are below the cap.
+   */
+  depthCapped?: number;
 }
 
 export interface EntryModel {
@@ -131,6 +143,8 @@ export interface EntryModel {
   shallowKeys: string[];
   count: number;
   truncated: boolean;
+  /** The node cap that produced `truncated`; the tree renders it as a notice row. */
+  limit: number;
   /**
    * Whether to render this entry with wrapping. Decided here, by the same walk that builds
    * the tree, so callers no longer have to call `countNodes` first and then `buildTree`.
@@ -185,6 +199,15 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
       keys.push(key);
       if (childPath.length <= defaultExpandDepth) shallowKeys.push(key);
       const childComposite = isComposite(child);
+      // At the cap the node keeps its type badge but must not advertise an expand arrow that
+      // opens nothing. Its hidden key count is the honest "… N more keys" suffix.
+      const hiddenKeys =
+        childComposite && childPath.length >= maxDepth
+          ? Array.isArray(child)
+            ? child.length
+            : Object.keys(child as object).length
+          : 0;
+      const capped = hiddenKeys > 0;
       nodes.push({
         key,
         path: childPath,
@@ -194,8 +217,9 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
         typeLabel: typeLabel(child),
         preview:
           wrap && typeof child === "string" ? wrappedText(child, wrapTextLimit) : preview(child),
-        composite: childComposite,
-        children: childComposite ? walk(child, childPath) : [],
+        composite: childComposite && !capped,
+        children: childComposite && !capped ? walk(child, childPath) : [],
+        ...(capped ? { depthCapped: hiddenKeys } : {}),
       });
     }
     if (entries.length > visible.length) {
@@ -216,7 +240,38 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
   };
 
   const nodes = walk(value, []);
-  return { nodes, keys, shallowKeys, count, truncated, wrap };
+  return { nodes, keys, shallowKeys, count, truncated, limit: maxNodes, wrap };
+}
+
+/**
+ * Text for the selection panel. Strings are shown as their content, not as a quoted literal:
+ * a log line or a prompt is read, not parsed. Everything else is pretty-printed, so a nested
+ * object is legible without expanding it node by node.
+ *
+ * Bounded on purpose. `Copy value` copies the whole thing; this only bounds what is laid out
+ * as DOM text, which is the expensive half on a multi-megabyte string.
+ */
+export interface ValueText {
+  text: string;
+  /** Characters in the whole value, before the panel cap. */
+  chars: number;
+  truncated: boolean;
+}
+
+export function jsonText(value: unknown): string {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+export function fullValueText(value: unknown, limit = JSONL_VALUE_TEXT_LIMIT): ValueText {
+  const text = jsonText(value);
+  const chars = text.length;
+  if (chars <= limit) return { text, chars, truncated: false };
+  return { text: text.slice(0, limit), chars, truncated: true };
 }
 
 /** Read the value a tree key points at. */

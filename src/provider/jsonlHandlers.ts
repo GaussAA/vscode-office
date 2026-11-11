@@ -49,7 +49,7 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
       const end = request.end ?? start + JSONL_CHUNK_SIZE;
       let payload: JsonlEntriesPayload;
       try {
-        payload = await session().readRange(request.requestId, start, end);
+        payload = await session().readRange(request.requestId, start, end, request.anchor);
       } catch {
         // A failed range still has to answer: the client clears its loading flag on a reply.
         payload = { requestId: request.requestId, start, entries: [] };

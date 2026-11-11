@@ -41,6 +41,31 @@ function lineBytes(bytes: Uint8Array, index: JsonlIndex, line: number): Uint8Arr
   return bytes.subarray(start, end);
 }
 
+/** Line size in bytes, excluding the terminator (the same rule `readJsonlLineText` uses). */
+function lineSize(bytes: Uint8Array, index: JsonlIndex, line: number): number {
+  const slice = lineBytes(bytes, index, line);
+  if (slice.length === 0) return 0;
+  return slice.length - (slice[slice.length - 1] === 0x0a ? 1 : 0);
+}
+
+/** Enough for a 400-character preview even when every character is four UTF-8 bytes. */
+const HEAD_DECODE_BYTES = 4 * 1024;
+
+/**
+ * Decode just the beginning of a line. This is what the directory uses for a line above the
+ * parse cap: decoding a 100 MB record only to slice 400 characters out of it allocated a
+ * 100 MB string per row and made the list allocate in proportion to the file. A cut through
+ * a multi-byte sequence leaves U+FFFD at the end; drop that one replacement character.
+ */
+function readLineHead(bytes: Uint8Array, index: JsonlIndex, line: number): string {
+  const slice = lineBytes(bytes, index, line);
+  if (slice.length === 0) return "";
+  const head = slice.subarray(0, Math.min(slice.length, HEAD_DECODE_BYTES));
+  let text = decoder.decode(head);
+  if (head.length < slice.length && text.endsWith("\uFFFD")) text = text.slice(0, -1);
+  return text.replace(/^\uFEFF/, "").replace(/[\r\n]+$/, "");
+}
+
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
@@ -50,25 +75,52 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Derive a human-friendly label from the entry's TOP-LEVEL keys only.
- * Nested `id`s belong to child records, so they are deliberately ignored.
+ * Derive a human-friendly label from the entry's TOP-LEVEL identity keys.
+ *
+ * A top-level identity key whose value is an object is still this entry's identity container
+ * (agent transcripts commonly store `id: { query, ... }`). Look one level inside it, but never
+ * descend into arbitrary nested objects: a child record's `id` is not this entry's identity.
+ * Without this, every record of that shape falls back to its raw JSON head and the directory
+ * becomes a wall of identical rows.
  */
+const NESTED_LABEL_KEYS = ["query", "name", "title", "label", "id", "key"] as const;
+
+function scalarLabel(candidate: unknown): string | undefined {
+  if (typeof candidate === "string") {
+    const trimmed = candidate.trim();
+    return trimmed ? truncate(trimmed, 40) : undefined;
+  }
+  if (
+    typeof candidate === "number" ||
+    typeof candidate === "bigint" ||
+    typeof candidate === "boolean"
+  ) {
+    return String(candidate);
+  }
+  return undefined;
+}
+
 export function deriveLabel(value: unknown): string | undefined {
   if (!isRecord(value)) return undefined;
   for (const key of JSONL_LABEL_KEYS) {
     if (!(key in value)) continue;
     const candidate = value[key];
-    if (typeof candidate === "string") {
-      const trimmed = candidate.trim();
-      if (trimmed) return truncate(trimmed, 40);
+    const direct = scalarLabel(candidate);
+    if (direct) return direct;
+    if (Array.isArray(candidate)) {
+      // `query_search: ["..."]` stores the text in a one-element array. Reading the first
+      // scalar is enough for a row label; an array of objects yields nothing and falls through.
+      for (const item of candidate.slice(0, 3)) {
+        const label = scalarLabel(item);
+        if (label) return label;
+      }
       continue;
     }
-    if (
-      typeof candidate === "number" ||
-      typeof candidate === "bigint" ||
-      typeof candidate === "boolean"
-    ) {
-      return String(candidate);
+    if (isRecord(candidate)) {
+      for (const nestedKey of NESTED_LABEL_KEYS) {
+        const nested = scalarLabel(candidate[nestedKey]);
+        if (nested) return nested;
+      }
     }
   }
   return undefined;
@@ -149,6 +201,16 @@ export function buildJsonlSummary(
   line: number,
   baseLine = 0,
 ): JsonlEntrySummary {
+  const size = lineSize(bytes, index, line);
+  if (size > JSONL_MAX_LINE_BYTES) {
+    // Do not decode a megabyte-scale line to show its size and 400-character head.
+    return {
+      index: baseLine + line,
+      size,
+      raw: truncate(readLineHead(bytes, index, line), JSONL_RAW_PREVIEW_CHARS),
+      kind: "too-large",
+    };
+  }
   return classify(baseLine + line, readJsonlLineText(bytes, index, line));
 }
 
@@ -179,25 +241,28 @@ export function buildJsonlEntry(
   const at = baseLine + line;
   const { size } = decoded;
   const raw = truncate(decoded.text, JSONL_RAW_PREVIEW_CHARS);
-  const text = truncate(decoded.text, JSONL_MAX_TEXT_CHARS);
+  // A plain prefix, not a "…"-suffixed string: the flag is the truth, and the notice can
+  // say how many characters are missing. The old truncate() made 200,000 characters look
+  // like a complete value.
+  const textChars = decoded.text.length;
+  const textTruncated = textChars > JSONL_MAX_TEXT_CHARS;
+  const text = textTruncated ? decoded.text.slice(0, JSONL_MAX_TEXT_CHARS) : decoded.text;
+  const base = { index: at, size, raw, text, textChars, textTruncated };
 
   if (decoded.text.trim() === "") {
-    return { index: at, size, raw: "", kind: "empty", text };
+    return { ...base, kind: "empty" };
   }
   if (size > JSONL_MAX_LINE_BYTES) {
-    return { index: at, size, raw, kind: "too-large", text };
+    return { ...base, kind: "too-large" };
   }
   try {
     const value = JSON.parse(decoded.text);
-    return { index: at, size, raw, kind: "value", label: deriveLabel(value), value, text };
+    return { ...base, kind: "value", label: deriveLabel(value), value };
   } catch (error) {
     return {
-      index: at,
-      size,
-      raw,
+      ...base,
       kind: "invalid",
       error: error instanceof Error ? error.message : "Invalid JSON",
-      text,
     };
   }
 }

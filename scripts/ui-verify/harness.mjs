@@ -131,9 +131,11 @@ function jsonlFixtures() {
       context: { service: "ingest", attempt: 3, latencyMs: 1284.5 },
     },
   ];
-  const bigEntry = {};
+  const bigEntry = { longValue: `L${"o".repeat(4997)}ng` };
   for (let i = 0; i < 600; i++) bigEntry[`key_${i}`] = `value-${i}`;
   sample.push(bigEntry);
+  // A scalar root has no tree row to select; the value panel has to open without one.
+  sample.push(`scalar root ${"s".repeat(300)}`);
 
   return sample.map((value, index) => {
     if (index === 2) {
@@ -143,19 +145,35 @@ function jsonlFixtures() {
         raw: '{"id":3, broken',
         text: '{"id":3, broken',
         size: 15,
+        textChars: 15,
+        textTruncated: false,
         error: "Unexpected token b in JSON at position 9",
       };
     }
     if (index === 3) {
-      return { index, kind: "empty", raw: "", text: "", size: 0 };
+      return {
+        index,
+        kind: "empty",
+        raw: "",
+        text: "",
+        size: 0,
+        textChars: 0,
+        textTruncated: false,
+      };
     }
     if (index === 10) {
+      // Above the 8 MB parse cap, so this payload is one the host can actually emit. Its
+      // text is the 1,000,000-character prefix the host ships for a too-large line.
+      const prefix = '{"blob":"';
+      const text = `${prefix}${"A".repeat(1_000_000 - prefix.length - 2)}"}`;
       return {
         index,
         kind: "too-large",
-        raw: '{"blob":"AAAA…',
-        text: `{"blob":"${"A".repeat(400)}"}`,
-        size: 900 * 1024,
+        raw: `${text.slice(0, 399)}…`,
+        text,
+        size: 9 * 1024 * 1024,
+        textChars: 9 * 1024 * 1024,
+        textTruncated: true,
       };
     }
     const text = JSON.stringify(value);
@@ -169,13 +187,33 @@ function jsonlFixtures() {
       raw: text,
       text,
       size: text.length,
+      textChars: text.length,
+      textTruncated: false,
       label: label === undefined ? undefined : String(label),
       value,
     };
   });
 }
 
-function jsonlStub(fixtures) {
+/** `?many=N`: N identical-shaped directory rows, for scroll/reachability scenarios. */
+function manyFixtures(count) {
+  return Array.from({ length: count }, (_, index) => {
+    const text = `{"id":${index}}`;
+    return {
+      index,
+      kind: "value",
+      raw: text,
+      text,
+      size: text.length,
+      textChars: text.length,
+      textTruncated: false,
+      label: String(index),
+      value: { id: index },
+    };
+  });
+}
+
+function jsonlStub(fixtures, limit = 0) {
   const summaries = fixtures.map(({ index, kind, raw, size, label, error }) => ({
     index,
     kind,
@@ -188,20 +226,24 @@ function jsonlStub(fixtures) {
 (function () {
   const summaries = ${JSON.stringify(summaries)};
   const fixtures = ${JSON.stringify(fixtures)};
+  const byteSize = summaries.reduce(function (total, s) { return total + (s.size || 0) + 1; }, 0);
   const cancelled = new Set();
   const api = {
     postMessage(msg) {
       if (!msg) return;
       if (msg.type === 'init') {
         setTimeout(function () {
-          window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: summaries.length ? 73482 : 0 } }, '*');
+          window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: byteSize } }, '*');
         }, 60);
       }
       if (msg.type === 'jsonlIndex') {
         const requestId = msg.content.requestId;
         const start = msg.content.start, end = msg.content.end;
+        // ?limit=N simulates a host byte budget that returns far fewer rows than asked;
+        // the directory then has to fill a short pane and offer its own "load more" row.
+        const stop = ${JSON.stringify(limit)} > 0 ? Math.min(end, start + ${JSON.stringify(limit)}) : end;
         setTimeout(function () {
-          window.postMessage({ type: 'jsonlEntries', content: { requestId, start, entries: summaries.slice(start, end) } }, '*');
+          window.postMessage({ type: 'jsonlEntries', content: { requestId, start, entries: summaries.slice(start, stop) } }, '*');
         }, 60);
       }
       if (msg.type === 'jsonlSearchCancel') {
@@ -548,6 +590,9 @@ export function startHarness(fixtures, port = 0) {
       const windowed = path === "/harness-route" && url.searchParams.get("window") === "1";
       const workbookView = path === "/harness-route" && url.searchParams.get("workbook") === "1";
       const legacyView = path === "/harness-route" && url.searchParams.get("legacy") === "1";
+      const many = Math.min(Math.max(Number(url.searchParams.get("many") ?? 0) || 0, 0), 5000);
+      const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 0) || 0, 0), 500);
+      const jsonl = many > 0 ? manyFixtures(many) : entries;
       const stub = guard
         ? excelGuardStub()
         : legacyView
@@ -560,7 +605,7 @@ export function startHarness(fixtures, port = 0) {
                 ? smokeStub(url.searchParams.get("route") ?? "html")
                 : route === "parquet"
                   ? parquetStub(fixtures)
-                  : jsonlStub(url.searchParams.get("empty") === "1" ? [] : entries);
+                  : jsonlStub(url.searchParams.get("empty") === "1" ? [] : jsonl, limit);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;

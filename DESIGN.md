@@ -48,6 +48,11 @@ typography:
     fontSize: "12px"
     fontWeight: 600
     lineHeight: 1.4
+  micro:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontSize: "11px"
+    fontWeight: 400
+    lineHeight: 1.5
   chrome-label:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
     fontSize: "10px"
@@ -203,6 +208,7 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 - **Data** (400, 12px 等宽, 22px 行高): 所有表格单元格与 JSONL 的键值文本。
 - **Input** (400, 12px, 30px 行高): 搜索框、行号跳转框。
 - **Meta value** (600, 12px, tabular): 顶栏的行数/列数/作者等计数。
+- **Micro** (400, 11px): 密集 chrome 的次级元数据——计数、路径、状态、行号、值面板的类型与字符数、截断说明。它不是正文，也不承担层级；正文最低 12px。
 - **Chrome label** (600, 10–10.5px, 0.045–0.08em 字距, 大写): 表头、侧栏标题、顶栏字段名。
 - **Badge** (400, 9.5px 等宽): 类型徽标（`STRING`、`INT64`、`LIST`）。
 
@@ -296,6 +302,23 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 
 两条全宽条是唯一的「横向贯穿」元素，都使用 `panel-surface-strong`。它们之间的差别只有高度（52 / 44）与内距（`8px 16px` / `6px 16px`）——不做不同的底色、不加投影。
 
+### Selection panel (JSONL, signature)
+
+详情树的行只承担摘要：一行、单行省略、120 字符。**选中行之后，完整值在树的下沿一块停靠面板里读**，它不遮住树，也不是弹窗——检查值本来就是「读一个、对照下一个」的任务。
+
+- **位置与形态**：停靠在底栏正上方，全宽，底色 `panel`；收起时 34px 一行，展开时正文 `max-height: 200px` 并在内部滚动。它属于详情面板，不改变底栏的 44px 结构。
+- **收起行**：`路径`（11px 等宽、Skeleton Violet，最多 34% 宽、超出省略）＋`预览`（12px 等宽、单行省略）＋`类型 · 字符数`（11px 等宽、muted、tabular）＋方向朝上的 chevron。整行是一个 `<button>`，`aria-expanded` 说明状态；动作名走 `aria-label`（"Show full value" / "Collapse value"），视觉文本已经是路径和值、不再重复。
+- **窄窗口**：≤720px 时隐藏字符数（它是最可牺牲的一段），把宽度让给路径与预览；路径仍最多 34%。
+- **展开正文**：`pre-wrap` + `overflow-wrap: anywhere` 的等宽文本，最多 200,000 字符；超过时正文之前给一条 `--jl-warn` 的字符数说明。**复制永远是整值**，不是这个被截断的正文。正文是滚动区，`tabIndex=0`，否则键盘无法到达滚出 200px 的那部分。
+- **交互**：点击收起行或按 `Enter` 切换；`Esc` 收起并把焦点还给收起行；`Ctrl+C` 复制值、`Ctrl+Shift+C` 复制路径。焦点用 1px `focusBorder` 内描边。
+- **标量根**：一条记录本身就是长字符串时没有树行可选，面板直接把该条目当作选中值（路径显示 `L<n>`）。
+
+### Directory load-more row (JSONL)
+
+目录窗口按字节预算，极端行下可能只返回一两行；这种窗口填不满一屏，滚动条不会出现，滚动事件永远不会触发。因此目录末尾有一行显式的 **Load more entries**：11px、muted、hover 转前景色、加载中显示 `Loading…` 且禁用；它只在还有未加载条目时出现，不替代滚动到底自动加载。面板先自动补最多四轮，仍填不满就交给这一行。
+
+- **禁止**：不要用 `title`、tooltip 或「复制到别处再读」承担这个职责；也不要把树改成换行来塞下全文（那会把虚拟列表和密度一起拆掉）。
+
 ### Empty & error states
 
 - **Empty:** 居中、muted、13px、`min-height: 200px`；不带插画，不带「开始使用吧」这类话术。
@@ -314,6 +337,7 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 - **Do** 用 10px 大写 + 600 字重 + ≥0.045em 字距表达标签层级，并把其余文字留给 12–13px 常规字重。
 - **Do** 用 `color-mix(in srgb, var(--fg) 8%, var(--panel))` 这一族混合造控件底，让深浅主题自动成立。
 - **Do** 在新增数据色时同时更新 `scripts/ui-verify` 的对比度断言（浅色主题 ≥ 4.5:1），否则闸门会红。
+- **Do** 给每个被摘要截断的值一条可选中、可复制的全文通道（JSONL 的停靠值面板），而不是 `title`、tooltip 或「复制出去再看」。
 - **Do** 让窗口化视图的 `aria-rowcount` / `aria-colcount` 说**文件**的行列数，不是 DOM 里渲染的那一窗；`aria-rowindex` 与 `aria-colindex` 在表头与单元格两侧都要写。
 
 ### Don't:

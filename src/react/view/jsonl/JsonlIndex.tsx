@@ -19,9 +19,19 @@ interface Props {
   emptyText?: string;
   /** Active search term, used to highlight matches in each row. */
   highlight?: string;
+  /** True when `items` ends before the file does: renders a row and auto-fills short panes. */
+  hasMore?: boolean;
+  /** Start of the current directory window; a replace (jump) resets the auto-fill budget. */
+  windowStart?: number;
 }
 
 const PAGE_STEP = 10;
+/**
+ * How many chunks a short window may pull in before the "Load more" row takes over. A byte
+ * budget can return one or two rows, and a window that does not overflow the pane emits no
+ * scroll event — the directory would be stuck permanently without this.
+ */
+const AUTO_FILL_ROUNDS = 4;
 
 /** Left pane: the directory of entries. One line = one row, never nested. */
 export default function JsonlIndex({
@@ -32,9 +42,12 @@ export default function JsonlIndex({
   onNeedMore,
   emptyText,
   highlight,
+  hasMore = false,
+  windowStart = 0,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState(320);
+  const autoFilled = useRef(0);
 
   const holder = useCallback((): HTMLElement | null => {
     return containerRef.current?.querySelector<HTMLElement>(".ant-tree-list-holder") ?? null;
@@ -48,6 +61,37 @@ export default function JsonlIndex({
     setHeight(Math.max(120, element.clientHeight));
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    autoFilled.current = 0;
+  }, [windowStart]);
+
+  // A reload empties the window before the next one arrives; the start can stay 0, so the
+  // windowStart reset alone would keep an exhausted auto-fill budget.
+  useEffect(() => {
+    if (items.length === 0) autoFilled.current = 0;
+  }, [items.length]);
+
+  // A window that fits entirely in the pane never scrolls, so the scroll listener below can
+  // never fire. Pull a bounded number of chunks until it overflows; the Load more row covers
+  // the rest (a single 8 MB line still cannot fill a 754px pane on its own).
+  useEffect(() => {
+    if (!onNeedMore || !hasMore || loading || items.length === 0) return;
+    const frame = requestAnimationFrame(() => {
+      const element = holder();
+      const pane = containerRef.current;
+      if (!element || !pane) return;
+      // The holder is content-sized up to `max-height`, so `clientHeight` is not the pane
+      // height: two rows and the load-more row already make scrollHeight 3px larger than
+      // clientHeight. Compare against the pane instead, or a short window looks scrollable
+      // and the auto-fill never runs.
+      if (element.scrollHeight >= pane.clientHeight) return;
+      if (autoFilled.current >= AUTO_FILL_ROUNDS) return;
+      autoFilled.current += 1;
+      onNeedMore();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [holder, loading, onNeedMore, hasMore, items.length, windowStart]);
 
   useEffect(() => {
     const element = holder();
@@ -95,7 +139,7 @@ export default function JsonlIndex({
     [highlight],
   );
   const treeData = useMemo<DataNode[]>(() => {
-    return items.map((entry) => {
+    const rows: DataNode[] = items.map((entry) => {
       const index = entry.index;
       let title: ReactNode;
       if (entry.kind === "empty") {
@@ -110,9 +154,7 @@ export default function JsonlIndex({
           <span className="jsonl-entry">
             <span className="jsonl-lineno">{index + 1}</span>
             <span className="jsonl-chip jsonl-chip--error">{$t("jsonl.chipInvalid")}</span>
-            <span className="jsonl-entry__raw jsonl-entry__raw--error" title={entry.raw}>
-              {renderText(entry)}
-            </span>
+            <span className="jsonl-entry__raw jsonl-entry__raw--error">{renderText(entry)}</span>
           </span>
         );
       } else if (entry.kind === "too-large") {
@@ -130,15 +172,36 @@ export default function JsonlIndex({
             {entry.kind === "value" && entry.label !== undefined && (
               <span className="jsonl-entry__label">{entry.label}</span>
             )}
-            <span className="jsonl-entry__raw" title={entry.snippet ?? entry.raw}>
-              {renderText(entry)}
-            </span>
+            <span className="jsonl-entry__raw">{renderText(entry)}</span>
           </span>
         );
       }
       return { key: String(index), title, isLeaf: true };
     });
-  }, [items, renderText]);
+    if (hasMore && onNeedMore) {
+      rows.push({
+        key: "__load_more__",
+        isLeaf: true,
+        selectable: false,
+        title: (
+          <span className="jsonl-entry">
+            <button
+              type="button"
+              className="jsonl-load-more"
+              disabled={loading}
+              onClick={(event) => {
+                event.stopPropagation();
+                onNeedMore();
+              }}
+            >
+              {loading ? $t("jsonl.loading") : $t("jsonl.loadMore")}
+            </button>
+          </span>
+        ),
+      });
+    }
+    return rows;
+  }, [items, renderText, hasMore, loading, onNeedMore]);
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -176,7 +239,13 @@ export default function JsonlIndex({
   );
 
   return (
-    <div className="jsonl-index" ref={containerRef} tabIndex={0} onKeyDown={onKeyDown}>
+    <div
+      className="jsonl-index"
+      ref={containerRef}
+      tabIndex={0}
+      data-loaded={items.length}
+      onKeyDown={onKeyDown}
+    >
       {items.length === 0 ? (
         <div className="jsonl-empty">{emptyText ?? $t("jsonl.empty")}</div>
       ) : (

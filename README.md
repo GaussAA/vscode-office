@@ -75,10 +75,21 @@ lists entries, the right pane renders the selected entry as a tree (or as raw te
   entries and one full value for the selected entry — never the file.
 - **Search across the whole file**, streamed in batches with a snippet around the match and
   the term highlighted.
-- **Long values wrap** instead of being clipped, and entries above 500 nodes fall back to a
-  fixed-height virtual list so a pathological line cannot freeze the UI.
-- Keyboard: `←`/`→` collapse/expand, `Space` toggles, `Enter` copies the value,
-  `Ctrl+Shift+C` copies the path.
+- **The directory reads identity**, not just the raw head: an entry's top-level identity key
+  is used when present, and an object-valued one is looked into one level (`id: { query }`).
+- **Long values are readable, not clipped.** The tree is an overview: large entries use one
+  fixed-height line per row with a 120-character string preview, while small entries (≤500
+  nodes) still wrap leaf strings up to 2,000 characters. Either way, selecting a row opens a
+  value panel docked under it with the full text, the path, the type, the character count and
+  a whole-value copy. Entries above 500 nodes fall back to a fixed-height virtual list so a
+  pathological line cannot freeze the UI.
+- **The limits say so.** A line above 8 MB is shown as raw text instead of a tree; a line above
+  1,000,000 characters is a marked prefix; the tree reports its 20,000-node cap instead of
+  ending without a word.
+- Keyboard: `←`/`→` collapse/expand, `Space` toggles, `Enter` opens or closes the value panel,
+  `Ctrl+C` copies the value, `Ctrl+Shift+C` copies the path, `Esc` closes the panel.
+
+![JSONL value panel](docs/screenshots/jsonl-value-panel.png)
 
 ### Spreadsheets: large files stay usable
 
@@ -111,6 +122,14 @@ CI runs all three on every push, together with `pnpm build` and `pnpm run packag
   a local CSV/TSV may be windowed up to 200 MB. All workbook formats (`.xlsx`, `.xlsm`, `.xls`, `.ods`) are windowed
   as row text, so they are read-only above 8 MB too.
 - JSONL search matches raw text, not JSON paths.
+- A JSONL line above 8 MB is shown as raw text instead of a parsed tree, and the raw view
+  ships the first 1,000,000 characters (with a notice) rather than the whole line.
+- The JSONL tree is bounded: 20,000 nodes, 200 children per level, 12 levels. The tree says
+  when it stopped; the raw view is the way to see the rest.
+- A directory window is bounded by bytes (4 MB), so a file of very large lines shows fewer
+  entries around the selection rather than parsing a whole chunk. Use the entry-number field
+  to move; the window only appends downward, and a window too short to fill the pane carries
+  an explicit "Load more entries" row.
 - Upstream telemetry has been removed entirely.
 
 ## Git History

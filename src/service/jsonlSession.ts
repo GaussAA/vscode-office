@@ -10,7 +10,9 @@
  * provider that happens to receive the message.
  */
 import {
+  JSONL_RANGE_BYTE_BUDGET,
   JSONL_SEARCH_BATCH,
+  JSONL_SEARCH_BYTE_BUDGET,
   JSONL_SEARCH_MAX_MATCHES,
   type JsonlEntriesPayload,
   type JsonlEntryPayload,
@@ -71,9 +73,40 @@ export class JsonlSession {
     this.file.close();
   }
 
-  async readRange(requestId: number, start: number, end: number): Promise<JsonlEntriesPayload> {
-    const from = Math.max(0, Math.min(start, this.file.lineCount));
-    const to = Math.max(from, Math.min(end, this.file.lineCount));
+  async readRange(
+    requestId: number,
+    start: number,
+    end: number,
+    anchor?: number,
+  ): Promise<JsonlEntriesPayload> {
+    const requestedFrom = Math.max(0, Math.min(start, this.file.lineCount));
+    const requestedTo = Math.max(requestedFrom, Math.min(end, this.file.lineCount));
+    if (requestedTo <= requestedFrom) return { requestId, start: requestedFrom, entries: [] };
+
+    // Keep the selected line inside the window. Without this, a 4 MB budget over 500 KB
+    // records would return the first eight rows and leave the row the user jumped to
+    // outside the directory. For ordinary files the bytes fit and `from` does not move.
+    let from = requestedFrom;
+    if (
+      typeof anchor === "number" &&
+      Number.isInteger(anchor) &&
+      anchor >= requestedFrom &&
+      anchor < requestedTo
+    ) {
+      if (this.file.byteLength(requestedFrom, anchor + 1) > JSONL_RANGE_BYTE_BUDGET) {
+        from = anchor;
+        // Walk back for context while it stays inside half the budget (at most 40 rows).
+        while (
+          from > requestedFrom &&
+          anchor - from < 40 &&
+          this.file.byteLength(from - 1, anchor + 1) <= JSONL_RANGE_BYTE_BUDGET / 2
+        ) {
+          from--;
+        }
+      }
+    }
+
+    const to = this.file.advance(from, requestedTo - from, JSONL_RANGE_BYTE_BUDGET);
     if (to <= from) return { requestId, start: from, entries: [] };
     const window = await this.file.window(from, to);
     return {
@@ -150,7 +183,12 @@ export class JsonlSession {
 
     const stepOnce = async () => {
       if (cancelled()) return;
-      const until = Math.min(total, scanned + step);
+      // Lines alone do not bound the read: 20,000 lines of a 500 KB transcript is 10 GB.
+      // `advance` stops on whichever limit comes first, and always moves at least one line.
+      const until = Math.max(
+        scanned + 1,
+        Math.min(total, this.file.advance(scanned, step, JSONL_SEARCH_BYTE_BUDGET)),
+      );
       let window;
       try {
         window = await this.file.window(scanned, until);

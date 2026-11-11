@@ -358,6 +358,8 @@ body:has(.jsonl-viewer) {
     display: flex;
     align-items: center;
     width: 100%;
+    /* `ROW_HEIGHT` in jsonlFormat.ts owns the virtual list's slot. Keep 26px + these two
+       1px margins equal to it (28), or the list stops rendering before its last rows. */
     margin: 1px 0;
     padding: 0 2px;
   }
@@ -507,6 +509,33 @@ body:has(.jsonl-viewer) {
   overflow-wrap: anywhere;
 }
 
+/* The notice is part of the text pane, so the pane, not the <pre>, owns the scroll. */
+.jsonl-detail__rawpane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.jsonl-detail__rawpane .jsonl-detail__raw {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+/* A fact about what is on screen, not an error: muted, one line, no illustration. */
+.jsonl-detail__notice {
+  color: var(--jl-warn);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.jsonl-detail__rawpane .jsonl-detail__notice {
+  flex: 0 0 auto;
+  padding: 8px 18px 0;
+}
+
 .jsonl-detail__error {
   display: flex;
   flex-direction: column;
@@ -534,6 +563,121 @@ body:has(.jsonl-viewer) {
     width: 16px;
     height: var(--jl-row-height);
   }
+}
+
+/* ---------- selection panel ---------- */
+
+/* Docked above the bottom bar, not a modal: inspecting a value is a read-and-compare task,
+   and a modal would hide the tree the next value lives in. Collapsed it is one 34px row;
+   open it takes at most 220px of the detail pane. */
+.jsonl-valuebar {
+  flex: 0 0 auto;
+  min-width: 0;
+  background: var(--jl-panel);
+}
+
+.jsonl-valuebar__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  margin: 0;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--jl-fg);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: start;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.jsonl-valuebar__toggle:hover {
+  background: var(--jl-control-hover);
+}
+
+.jsonl-valuebar__toggle:active {
+  background: var(--jl-control-active);
+}
+
+.jsonl-valuebar__toggle:focus-visible {
+  outline: 1px solid var(--jl-focus);
+  outline-offset: -1px;
+}
+
+.jsonl-valuebar__path {
+  /* The path is identity, not content: it keeps its width (up to a third) and the preview
+     shrinks instead. A long key is ellipsized here; Ctrl+Shift+C still copies the full path. */
+  flex: 0 0 auto;
+  max-width: 34%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--jl-key);
+  font-family: var(--jl-mono);
+  font-size: 11px;
+}
+
+.jsonl-valuebar__preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--jl-fg);
+  font-family: var(--jl-mono);
+  font-size: var(--vscode-editor-font-size, 12.5px);
+}
+
+.jsonl-valuebar__count {
+  flex: 0 0 auto;
+  color: var(--jl-muted);
+  font-family: var(--jl-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.jsonl-valuebar__toggle .codicon {
+  flex: 0 0 auto;
+  color: var(--jl-muted);
+  font-size: 11px;
+}
+
+.jsonl-valuebar__body {
+  padding: 0 16px 10px;
+}
+
+.jsonl-valuebar__notice {
+  padding: 0 0 6px;
+  color: var(--jl-warn);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.jsonl-valuebar__text {
+  max-height: 200px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: var(--jl-radius-sm);
+  background: var(--vscode-textCodeBlock-background, var(--jl-control));
+  color: var(--jl-fg);
+  font-family: var(--jl-mono);
+  font-size: var(--vscode-editor-font-size, 12.5px);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* A scrollable region has to be focusable, or the keyboard cannot reach the part that
+   scrolled out of the 200px window. */
+.jsonl-valuebar__text:focus-visible {
+  outline: 1px solid var(--jl-focus);
+  outline-offset: -1px;
 }
 
 /* ---------- bottom status bar (the detail actions live here) ---------- */
@@ -779,6 +923,23 @@ body:has(.jsonl-viewer) {
   .jsonl-splitter > .ant-splitter-panel:first-child {
     max-width: max(240px, 42vw);
   }
+
+  /* antd sizes the detail panel from the sidebar's unclamped basis (340px). Reducing the
+     sidebar with `max-width` left that difference unclaimed — 80px of dead space at 620px.
+     The detail pane is the one that should absorb it. */
+  .jsonl-splitter > .ant-splitter-panel:last-child {
+    flex-grow: 1 !important;
+  }
+
+  /* The bar is ~280px wide here; the count is the one part that can go without losing the
+     value itself. Path and preview keep their room. */
+  .jsonl-valuebar__count {
+    display: none;
+  }
+
+  .jsonl-valuebar__toggle {
+    gap: 8px;
+  }
 }
 
 @media (max-width: 1080px) {
@@ -843,4 +1004,38 @@ body:has(.jsonl-viewer) {
   .jsonl-detail__header .ant-segmented {
     font-size: 10px;
   }
+}
+
+/* The directory's explicit "more" row. It is the fallback for a byte-budgeted window that
+   still does not fill the pane after the automatic rounds; a scrollbar would not exist to
+   request the next chunk. */
+.jsonl-load-more {
+  height: 26px;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--jl-radius-sm);
+  background: transparent;
+  color: var(--jl-muted);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.jsonl-load-more:not(:disabled):hover {
+  background: var(--jl-control-hover);
+  color: var(--jl-fg);
+}
+
+.jsonl-load-more:focus-visible {
+  outline: 1px solid var(--jl-focus);
+  outline-offset: 1px;
+}
+
+.jsonl-load-more:disabled {
+  cursor: default;
+  opacity: 0.55;
 }

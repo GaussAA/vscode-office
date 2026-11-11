@@ -215,3 +215,46 @@ test("search: a scan over several steps still reports absolute line numbers", as
   assert.ok(last, "a scan always reports at least one batch");
   assert.equal(last.done, true);
 });
+
+test("readRange: a byte budget bounds one window, not the whole file", async () => {
+  const lines = Array.from(
+    { length: 20 },
+    (_, index) => `{"id":${index},"pad":"${"x".repeat(600 * 1024)}"}`,
+  );
+  const session = await makeSession(lines);
+
+  const payload = await session.readRange(1, 0, 20);
+  assert.equal(payload.start, 0);
+  assert.ok(payload.entries.length < 20, `returned every line: ${payload.entries.length}`);
+  assert.ok(payload.entries.length >= 1);
+  assert.deepEqual(
+    payload.entries.map((entry) => entry.index),
+    Array.from({ length: payload.entries.length }, (_, index) => index),
+    "the window still starts at the requested line and stays contiguous",
+  );
+});
+
+test("readRange: the anchor is kept even when the budget would cut before it", async () => {
+  const lines = Array.from(
+    { length: 20 },
+    (_, index) => `{"id":${index},"pad":"${"x".repeat(600 * 1024)}"}`,
+  );
+  const session = await makeSession(lines);
+
+  const payload = await session.readRange(2, 0, 20, 18);
+  assert.ok(payload.start <= 18, `the window starts after the selected row: ${payload.start}`);
+  assert.ok(
+    payload.entries.some((entry) => entry.index === 18),
+    "the anchored line is in the window",
+  );
+  assert.ok(payload.entries.length >= 1);
+  // Context above the anchor is bounded too: the reply cannot grow back to the whole file.
+  assert.ok(payload.start > 0, "a byte-bounded window does not restart at line 0");
+});
+
+test("readRange: small lines keep their context above the anchor", async () => {
+  const session = await makeSession(Array.from({ length: 40 }, (_, index) => `{"id":${index}}`));
+  const payload = await session.readRange(3, 0, 40, 30);
+  assert.equal(payload.start, 0, "no byte pressure means no recentring");
+  assert.equal(payload.entries.length, 40);
+});

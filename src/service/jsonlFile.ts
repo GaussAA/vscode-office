@@ -115,6 +115,38 @@ export class JsonlFile {
     return { start, end };
   }
 
+  /** Bytes covered by lines `[from, to)`. O(1): the index already has both offsets. */
+  byteLength(from: number, to: number): number {
+    const first = Math.max(0, Math.min(from, this.index.lineCount));
+    const last = Math.max(first, Math.min(to, this.index.lineCount));
+    if (last <= first) return 0;
+    const start = this.index.offsets[first] ?? this.source.size;
+    const end = last < this.index.lineCount ? this.index.offsets[last] : this.source.size;
+    return end - start;
+  }
+
+  /**
+   * End line for a window that starts at `from` and is bounded by both `maxLines` and
+   * `maxBytes`. One line is always included: a single record larger than the budget still
+   * has to render, otherwise the directory would be empty forever.
+   */
+  advance(from: number, maxLines: number, maxBytes: number): number {
+    const start = Math.max(0, Math.min(from, this.index.lineCount));
+    const requestedEnd = Math.min(this.index.lineCount, start + Math.max(1, maxLines));
+    let end = requestedEnd;
+    let bytes = 0;
+    for (let line = start; line < requestedEnd; line++) {
+      const range = this.lineRange(line);
+      const width = range.end - range.start;
+      if (line > start && bytes + width > maxBytes) {
+        end = line;
+        break;
+      }
+      bytes += width;
+    }
+    return end;
+  }
+
   /**
    * Read lines `[from, to)` in one call and index them locally. Callers add the line offset
    * back when they build summaries, so absolute line numbers survive.

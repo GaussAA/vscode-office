@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { JSONL_MAX_LINE_BYTES, JSONL_MAX_TEXT_CHARS } from "@/common/jsonlTypes";
 import {
   buildJsonlEntry,
   buildJsonlIndex,
@@ -57,6 +58,31 @@ test("label: derives identity from configured top-level keys only", () => {
   assert.equal(deriveLabel("scalar"), undefined);
 });
 
+test("label: a top-level identity object is read one level deep", () => {
+  // Agent transcripts commonly store `id: { query, ... }`. Reading that one level is what
+  // keeps the directory from becoming a wall of identical raw JSON lines.
+  assert.equal(deriveLabel({ id: { query: "  hello  " } }), "hello");
+  assert.equal(deriveLabel({ id: { name: "alpha", query: "beta" } }), "beta");
+  assert.equal(deriveLabel({ id: { query: 42 } }), "42");
+  assert.equal(
+    deriveLabel({ id: { ori_level_1_task: "category" } }),
+    undefined,
+    "only the documented nested identity keys are read",
+  );
+  assert.equal(
+    deriveLabel({ id: {}, name: "beta" }),
+    "beta",
+    "an empty identity object falls through",
+  );
+  assert.equal(deriveLabel({ id: [] }), undefined, "an array is not an identity container");
+  // A child record's id is still not this entry's identity.
+  assert.equal(deriveLabel({ nested: { id: { query: "child" } } }), undefined);
+  // A one-element string array is a common transcript identity; arrays of records are not.
+  assert.equal(deriveLabel({ query_search: ["  a search query  "] }), "a search query");
+  assert.equal(deriveLabel({ query_search: [{ id: 1 }] }), undefined);
+  assert.equal(deriveLabel({ query_search: [] }), undefined);
+});
+
 test("label: truncates long values to 40 characters plus an ellipsis", () => {
   const label = deriveLabel({ name: "x".repeat(60) });
   assert.ok(label, "a name yields a label");
@@ -87,13 +113,52 @@ test("snippet: matching is case-insensitive against the text", () => {
 
 test("classify: a line is exactly one of four kinds", () => {
   const { bytes, index } = open(
-    ['{"id":1,"name":"alpha"}', "", "not json", `{"big":"${"x".repeat(1024 * 1024 + 1)}"}`].join(
-      "\n",
-    ),
+    [
+      '{"id":1,"name":"alpha"}',
+      "",
+      "not json",
+      `{"big":"${"x".repeat(JSONL_MAX_LINE_BYTES)}"}`,
+    ].join("\n"),
   );
 
   const kinds = [0, 1, 2, 3].map((line) => buildJsonlSummary(bytes, index, line).kind);
   assert.deepEqual(kinds, ["value", "empty", "invalid", "too-large"]);
+});
+
+test("classify: 600 KB of a real tool schema is a value, not 'too large'", () => {
+  // Regression: the 512 KB cap refused the 541 KB line in the report's file. A cap that is
+  // smaller than one realistic record turns a previewer into a "cannot read this" panel.
+  const line = `{"big":"${"x".repeat(600 * 1024)}"}`;
+  const { bytes, index } = open(line);
+  assert.equal(buildJsonlSummary(bytes, index, 0).kind, "value");
+  assert.equal(buildJsonlEntry(bytes, index, 0).kind, "value");
+});
+
+test("summary: a line over the parse cap decodes only its head", () => {
+  // The directory only needs the size and ~400 characters. Decoding the whole 8 MB+ line
+  // allocated in proportion to the file before this short-circuit existed.
+  const line = `{"blob":"${"A".repeat(JSONL_MAX_LINE_BYTES + 1_000)}"}`;
+  const { bytes, index } = open(line);
+  const summary = buildJsonlSummary(bytes, index, 0);
+  assert.equal(summary.kind, "too-large");
+  assert.equal(summary.size, line.length);
+  assert.ok(summary.raw.startsWith('{"blob":"AAAA'));
+  assert.ok(summary.raw.length <= 401, `summary raw is ${summary.raw.length} chars`);
+});
+
+test("detail: text past the cap is a marked prefix, not a silent cut", () => {
+  const text = "x".repeat(JSONL_MAX_TEXT_CHARS + 25);
+  const { bytes, index } = open(`{"text":"${text}"}`);
+  const entry = buildJsonlEntry(bytes, index, 0);
+  assert.equal(entry.textChars, text.length + 11);
+  assert.equal(entry.textTruncated, true);
+  assert.equal(entry.text.length, JSONL_MAX_TEXT_CHARS);
+  assert.ok(!entry.text.endsWith("…"), "a suffix would hide the fact that text is missing");
+
+  const small = open('{"a":1}');
+  const whole = buildJsonlEntry(small.bytes, small.index, 0);
+  assert.equal(whole.textTruncated, false);
+  assert.equal(whole.textChars, whole.text.length);
 });
 
 test("classify: the summary carries the identity label, not the value", () => {
