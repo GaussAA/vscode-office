@@ -1,6 +1,6 @@
 # ADR-0019 JSON 预览是命令式检查面，不是第四个 viewer
 
-- 状态：已接受（2026-11-11，6.6.0）
+- 状态：已接受（2026-11-11，6.7.0）
 - 日期：2026-11-11
 
 ## 背景
@@ -46,8 +46,8 @@ JSON 预览以**显式命令**打开，**不注册为 Viewer**：
 - 测试面增加：扫描器/索引单测、webview UI 场景、真实宿主命令 smoke、100 MB 性能预算。
 - 与 `ADR-0015` 的“不再扩展”不冲突：扩展的是**检查命令**，不是 Viewer 的格式集合；但以后若要把 JSON 变成第四个 viewer，仍需另写 ADR。
 
-## 实现结果（6.6.0）
+## 实现结果（6.7.0）
 
-- 100 MB 数组 fixture（91.6 MB、50,000 条记录）在宿主侧测得：索引 1.37 s、100 条记录窗口 3 ms、单条详情 <1 ms、全文件搜索 114 ms；闸门预算分别为 6 s / 2 s / 8 s。
+- 100 MB 数组 fixture（91.6 MB、50,000 条记录）在宿主侧测得：索引 0.49–1.37 s、100 条记录窗口 1–3 ms、单条详情 <1 ms、全文件搜索 63–114 ms；闸门预算分别为 6 s / 2 s / 8 s。
 - UI 场景覆盖记录列表虚拟化（500 条记录时 DOM <100 行）、记录搜索高亮、对象根路径搜索、buffer 标签、invalid / too-large / 空数组；真实 VS Code smoke 覆盖命令打开 webview 面板，并断言 `.json` 没有 custom editor 声明。
 - JSON 的 tree/value panel/keyboard 复用 `JsonlDetail`，只给它加了可选的 `entryLabel`、`highlight`、`revealKey`；JSONL 的既有场景保持通过。

@@ -5,6 +5,41 @@ All notable changes to the "vscode-office" extension will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [6.7.0] - 2026-11-11
+
+### Added
+
+- JSON: a command-opened read-only JSON inspector for `.json` files. It does not register
+  `.json`, does not take over the default editor and does not appear in
+  `contributes.customEditors`; the three entry points are the command palette
+  (`Data File Viewer: Preview JSON`), the Explorer context menu and the JSON editor title.
+  A top-level array up to 100 MB is scanned for record boundaries instead of being parsed
+  whole; the left rail is virtual and shows `[index]` plus a top-level identity label
+  (`deriveLabel`, raw-JSON fallback), and the right pane reuses the JSONL Splitter, tree,
+  value panel, keyboard and bottom bar. Object roots up to 20 MB are parsed whole. Whole-file
+  search returns matching records with snippets and counts; selecting one loads that record
+  and expands/highlights the first matching key, while object-root results are paths. Strict
+  JSON only: comments and trailing commas produce a line/column error and an **Open in Text
+  Editor** exit; an unsaved editor buffer is the source and is labelled. Single records above
+  8 MB are raw text, and search stops at 10,000 matches. The JSONL shell and detail gained
+  optional entry labels, highlight marks and reveal-key expansion for this surface.
+- JSON: `verify:perf` gains a host-side 100 MB array invariant (index in < 6 s, a 100-record
+  window in < 2 s, a whole-file search in < 8 s, and no whole-document parse); measured
+  0.49–1.37 s / 1–3 ms / 63–114 ms on a 91.6 MB, 50,000-record fixture. `verify:ui` gains the JSON
+  record rail, virtual list, record search, object-root search, buffer label, invalid,
+  too-large and empty-array scenarios.
+
+### Fixed
+
+- JSONL: entries above 500 nodes were forced into the fixed-height virtual list, so a long
+  `description`, `message` or prompt showed only its 120-character single-line preview and
+  the rest was silently clipped. The wrap threshold is now 2,000 nodes: the reported 8.2 MB
+  `codex-现网.jsonl` has 520–1,934-node entries whose initial expanded tree is at most 305
+  rows, and all of them now wrap. Entries above 2,000 nodes keep the virtual list and the
+  value panel, and the 2,000-character per-string wrap cap is unchanged.
+
 ## [6.6.0] - 2026-11-11
 
 ### Fixed
@@ -23,16 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sponsorBaseUrl` config and the `sponsorClick` / `openSponsor` webview messages went with it;
   the upstream credit moved to README's Credits section and NOTICE.md.
 
-## [Unreleased]
-
-### Fixed
-
-- JSONL: entries above 500 nodes were forced into the fixed-height virtual list, so a long
-  `description`, `message` or prompt showed only its 120-character single-line preview and
-  the rest was silently clipped. The wrap threshold is now 2,000 nodes: the reported 8.2 MB
-  `codex-现网.jsonl` has 520–1,934-node entries whose initial expanded tree is at most 305
-  rows, and all of them now wrap. Entries above 2,000 nodes keep the virtual list and the
-  value panel, and the 2,000-character per-string wrap cap is unchanged.
+## [6.5.0] - 2026-11-11
 
 ### Added
 
