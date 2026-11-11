@@ -197,6 +197,55 @@ curl -s https://open-vsx.org/api/GaussAA/office-viewer-plus | head -c 200
 
 结论：即使挂起到截止日之后，也只是"每次发布手动上传"，不会失去发布能力。
 
+## G. 实测记录：第一次真正跑通时踩的三个坑
+
+2026-11-11，两个注册表第一次都走 trusted publishing 发到了同一个版本（6.4.6），过程中踩了三处，
+都写在这里，因为每一个都会以「看起来像配置坏了」的形式出现。
+
+### G1. 删掉的版本会被永久占用，不能重发
+
+`6.4.5` 曾在 Open VSX 上发布过又被删除。再发同一个版本号时得到的是：
+
+```
+❌ Extension GaussAA.office-viewer-plus 6.4.5 is already published and was removed.
+   Extension versions are immutable, so this version's identity stays permanently
+   reserved and cannot be republished.
+```
+
+注意此时 `GET /api/GaussAA/office-viewer-plus` 是 **200**、`allVersions` 里却没有 6.4.5 ——
+**墓碑不出现在版本列表里**，只看列表会以为版本号还空着。唯一可行的补救是**升版本号重发**
+（我们发了 6.4.6，代码与 6.4.5 相同），或者请 Open VSX 管理员 purge。
+
+**推论**：任何一次「发布成功后又在网页上删除」都会烧掉一个版本号。想撤回，用
+`ovsx unpublish <ns>.<name>@<version>` 之前先确认这是最后手段。
+
+> 本次实测：6.4.6 在 Open VSX 上约 **1 分钟**可见（latest 从 6.4.3 变为 6.4.6），
+> 在 Marketplace 上约 **6 分钟**（gallery API 才把 6.4.6 列出来）。发布步骤 success 之后别马上断言失败——
+> 两个注册表都有传播延迟，Open VSX 还会先经历一段「已发布但 404」。
+
+### G2. 受信发布者的三个字段必须逐字匹配
+
+`repository` = `GaussAA/vscode-office`，`workflow file` = **`release.yml`**（只是文件名），
+`environment` **留空**（job 里没有 `environment:`；填了就必须两边同时加，否则永远匹配不上）。
+
+成功时日志里先出现这一行，之后才是上传：
+
+```
+🔐  Trusted publishing token issued for GaussAA.office-viewer-plus, expires at ...
+```
+
+**看到这一行就说明登记是对的**，后续失败与 trusted publishing 无关 —— 分清这点能省掉一次
+「把配置改坏」的排查。
+
+### G3. 发布顺序：先 Open VSX，后 Marketplace
+
+两个注册表都不可撤回。新链路（Open VSX）先发，验证 `curl -s https://open-vsx.org/api/<ns>/<name>`
+返回的 `version` 正确之后，再发已经稳定的 Marketplace。反过来一旦 Marketplace 成功、
+Open VSX 因新问题失败，就只能再升一个版本号。
+
+补发其中一半时用 `workflow_dispatch` 的两个输入分别控制，不要重跑整个 job ——
+已成功的那个注册表会因为「版本号已被占用」而红。
+
 ## 参考
 
 - [Publishing Extensions — Secure automated publishing](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#secure-automated-publishing-to-visual-studio-marketplace)
