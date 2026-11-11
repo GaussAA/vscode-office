@@ -1,16 +1,17 @@
 # Performance gate
 
 `pnpm verify:perf` runs the built viewers in headless Chrome **and the JSONL host services in
-Node** and asserts six numbers that used to be catastrophic and invisible:
+Node** and asserts seven numbers that used to be catastrophic and invisible:
 
-| invariant                                | budget                                    | why it exists                                                                                                                                                                      |
-| ---------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| first paint reads at most 1.25x the file | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file                                        |
-| a whole-file search is one pass          | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                                                             |
-| a 21 MB CSV paints its windowed view     | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows                                                  |
-| a page turn on 60 columns stays usable   | best of 3: warm < 2 s, cold < 5 s         | idle: 210 ms warm (render of 3,000 cells), 520 ms cold (one decoded data page per column). Loose on purpose — load inflates samples 2-4x, and the regression this catches is 5-10x |
-| a JSONL directory window stays in budget | 80 MB / 40 lines: ≤ 3 rows, < 1.5 s       | a 500-line request without the 4 MB byte budget parses all 40 × 2 MB lines before the first row; measured 15 ms / 1 row                                                            |
-| a whole-file JSONL search is one pass    | 200k lines < 5 s, `scanned == total`      | the line window per turn must stay byte-bounded; a per-batch re-read or an unbounded window shows up as an order-of-magnitude jump. Measured 0.3–0.5 s                             |
+| invariant                                  | budget                                    | why it exists                                                                                                                                                                                                                               |
+| ------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| first paint reads at most 1.25x the file   | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file                                                                                                 |
+| a whole-file search is one pass            | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                                                                                                                      |
+| a 21 MB CSV paints its windowed view       | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows                                                                                                           |
+| a page turn on 60 columns stays usable     | best of 3: warm < 2 s, cold < 5 s         | idle: 210 ms warm (render of 3,000 cells), 520 ms cold (one decoded data page per column). Loose on purpose — load inflates samples 2-4x, and the regression this catches is 5-10x                                                          |
+| a JSONL directory window stays in budget   | 80 MB / 40 lines: ≤ 3 rows, < 1.5 s       | a 500-line request without the 4 MB byte budget parses all 40 × 2 MB lines before the first row; measured 15 ms / 1 row                                                                                                                     |
+| a whole-file JSONL search is one pass      | 200k lines < 5 s, `scanned == total`      | the line window per turn must stay byte-bounded; a per-batch re-read or an unbounded window shows up as an order-of-magnitude jump. Measured 0.3–0.5 s                                                                                      |
+| a 100 MB JSON array is indexed, not parsed | index < 6 s, window < 2 s, search < 8 s   | a `JSON.parse` of the whole file would allocate hundreds of MB and block the host; the scanner must only record boundaries and parse the 100 records in the requested window. Measured 1.37 s / 3 ms / 114 ms on 91.6 MB and 50,000 records |
 
 It is separate from `pnpm verify:ui` on purpose: that suite answers "does the DOM look
 right" with small fixtures; this one answers "what did it cost" with large files, and byte
@@ -21,11 +22,13 @@ counts — not DOM assertions — are the evidence.
 ```
 scripts/perf/
 ├── runner.mjs    scenarios + budgets + CLI (exit code is the gate)
-├── jsonl.mjs     the two Node-only checks; bundles the host services with esbuild
+├── jsonl.mjs     the two JSONL Node-only checks; bundles the host services with esbuild
+├── json.mjs      the JSON array index/window/search check; bundles jsonPreview.ts
 ├── expect.mjs    the assertion primitive shared by both scenario modules
 ├── harness.mjs   HTTP server: built HTML from out/webview, fake bridge, Range + byte counting
 └── fixtures.mjs  generates two ONE-ROW-GROUP parquet files with hyparquet-writer, plus the
-                  JSONL fixtures (40 × 2 MB lines, 200k log lines) into .perf/
+                  JSONL fixtures (40 × 2 MB lines, 200k log lines) and the 100 MB JSON array
+                  into .perf/
 ```
 
 Both fixtures are written with a single row group, which is what PyArrow produces by default
@@ -40,6 +43,11 @@ happen in the extension host, so the browser harness cannot see them. The JSONL 
 `jsonlFile.ts`, `jsonlSession.ts` and `jsonlFormat.ts` with esbuild into a temp directory and
 imports the ESM output. The window check asserts the **returned row count** (≤3 for 2 MB
 lines), not only time: that is the deterministic proof that the 4 MB budget is applied.
+
+The JSON check bundles `jsonPreview.ts` and reads the 91.6 MB fixture once. It asserts the
+record count, the 100-record window size, the last-record match and the scanned character
+count, so a whole-file `JSON.parse` or a per-record re-scan fails on both time and result
+shape, not only on a stopwatch.
 
 ## Commands
 
@@ -69,6 +77,9 @@ The message names the usual cause, because both budgets fail for exactly one rea
 - **JSONL search over budget** → the per-turn window grew back to a line count with no byte
   bound, or a batch re-decodes the same lines. Check `JSONL_SEARCH_BYTE_BUDGET` and
   `JsonlSession.search`'s `advance` call.
+- **JSON index/window/search over budget** → the top-level array is being parsed whole, or
+  `recordsInWindow`/`search` is re-parsing records. Check that `indexJsonArray` only records
+  boundaries, and that `JsonPreviewSession.recordsInWindow` parses at most 100 records.
 
 Both were verified by mutation: deleting the `inFlight` lookup takes first paint to 2.10x
 (FAIL), and restoring the per-batch search takes the 1M-row scan to ~28 s (FAIL, budget

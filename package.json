@@ -37,7 +37,8 @@
   },
   "activationEvents": [
     "workspaceContains:.git/HEAD",
-    "onWebviewPanel:office-git-history"
+    "onWebviewPanel:office-git-history",
+    "onCommand:GaussAA.office.previewJson"
   ],
   "main": "./out/extension.js",
   "type": "module",
@@ -71,6 +72,11 @@
         "command": "GaussAA.office.gitHistory.quickSync",
         "title": "Git: Quick Sync",
         "icon": "$(sync)"
+      },
+      {
+        "command": "GaussAA.office.previewJson",
+        "title": "Preview JSON",
+        "category": "Data File Viewer"
       }
     ],
     "menus": {
@@ -109,6 +115,11 @@
           "command": "GaussAA.office.csv.switch",
           "when": "resourceExtname == '.csv' || resourceExtname == '.tsv'",
           "group": "navigation@-2"
+        },
+        {
+          "command": "GaussAA.office.previewJson",
+          "group": "navigation",
+          "when": "resourceExtname == '.json'"
         }
       ],
       "editor/context": [
@@ -123,6 +134,11 @@
           "command": "GaussAA.office.gitHistory.viewFileHistory",
           "group": "git",
           "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file"
+        },
+        {
+          "command": "GaussAA.office.previewJson",
+          "group": "navigation",
+          "when": "resourceExtname == '.json'"
         }
       ]
     },

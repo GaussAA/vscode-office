@@ -3,6 +3,7 @@ import { $t } from "../../i18n/i18nConfig.ts";
 import { Button, Modal, Segmented, Tree } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { highlightRuns } from "../../common/highlight.ts";
 import type { JsonlEntryDetail } from "../../../common/jsonlTypes.ts";
 import { JSONL_MAX_LINE_BYTES } from "../../../common/jsonlTypes.ts";
 import type { DataNode } from "antd/es/tree";
@@ -14,7 +15,9 @@ import {
   formatBytes,
   isComposite,
   jsonText,
+  makePathKey,
   preview,
+  readPathKey,
   typeLabel,
   type NodeModel,
 } from "./jsonlFormat.ts";
@@ -38,6 +41,12 @@ interface Props {
   onModeChange: (mode: DetailMode) => void;
   /** The bottom bar owns the row; the detail's identity and actions portal into it. */
   actionsHost: HTMLElement | null;
+  /** Row prefix; JSONL defaults to `L<n>`, JSON preview passes `[n]` or `root`. */
+  entryLabel?: string;
+  /** Search term to mark in keys and values. */
+  highlight?: string;
+  /** Key to expand, select and reveal after a search result is chosen. */
+  revealKey?: string | null;
 }
 
 function chipClass(entry: JsonlEntryDetail): string {
@@ -67,7 +76,20 @@ function chipLabel(entry: JsonlEntryDetail): string {
 }
 
 /** The only adapter between the tree model and antd. */
-function toAntdNodes(nodes: NodeModel[], wrap: boolean): DataNode[] {
+function renderHighlighted(text: string, highlight?: string): React.ReactNode {
+  if (!highlight) return text;
+  return highlightRuns(text, highlight).map((part, index) =>
+    part.hit ? (
+      <mark key={index} className="jsonl-hit">
+        {part.text}
+      </mark>
+    ) : (
+      <span key={index}>{part.text}</span>
+    ),
+  );
+}
+
+function toAntdNodes(nodes: NodeModel[], wrap: boolean, highlight?: string): DataNode[] {
   return nodes.map((node) => {
     if (node.overflow !== undefined) {
       return {
@@ -81,15 +103,15 @@ function toAntdNodes(nodes: NodeModel[], wrap: boolean): DataNode[] {
     return {
       key: node.key,
       isLeaf: !node.composite,
-      children: node.composite ? toAntdNodes(node.children, wrap) : undefined,
+      children: node.composite ? toAntdNodes(node.children, wrap, highlight) : undefined,
       title: (
         <span className={`jsonl-kv${wrap ? " jsonl-kv--wrap" : ""}`}>
-          <span className="jsonl-key">{node.label}</span>
+          <span className="jsonl-key">{renderHighlighted(node.label, highlight)}</span>
           <span className="jsonl-colon">:</span>
           <span
             className={`jsonl-val jsonl-val--${node.kind}${longString ? " jsonl-val--wrap" : ""}`}
           >
-            {node.preview}
+            {renderHighlighted(node.preview, highlight)}
           </span>
           {node.composite && <span className="jsonl-type">{node.typeLabel}</span>}
           {node.depthCapped !== undefined && (
@@ -109,6 +131,9 @@ export default function JsonlDetail({
   mode,
   onModeChange,
   actionsHost,
+  entryLabel,
+  highlight,
+  revealKey,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -139,6 +164,21 @@ export default function JsonlDetail({
     return model.count <= AUTO_EXPAND_LIMIT ? model.keys : model.shallowKeys;
   }, [model]);
   const expandedKeys = expanded ?? defaultExpanded;
+
+  // A search result points at a key; expand its ancestors and select it. The record is keyed
+  // by index in the JSON preview, so this runs once per selected record/reveal.
+  useEffect(() => {
+    if (!revealKey || !model) return;
+    const segments = readPathKey(revealKey);
+    const ancestors = segments
+      .slice(1)
+      .map((_, position) => makePathKey(segments.slice(0, position + 1)));
+    // eslint-disable-next-line react/set-state-in-effect -- a reveal must expand its ancestors
+    setExpanded((previous) =>
+      Array.from(new Set([...(previous ?? defaultExpanded), ...ancestors, revealKey])),
+    );
+    setActiveKey(revealKey);
+  }, [defaultExpanded, model, revealKey]);
 
   useEffect(() => {
     // Measure the tree's own box, not the pane: the value bar takes height from the pane and
@@ -177,8 +217,8 @@ export default function JsonlDetail({
    * the user may never expand is the expensive half.
    */
   const selection = useMemo(
-    () => readSelection(entry, activeKey, index),
-    [entry, activeKey, index],
+    () => readSelection(entry, activeKey, index, entryLabel),
+    [entry, activeKey, index, entryLabel],
   );
   const panelText = useMemo(
     () => (valueOpen && selection ? readPanel(selection) : null),
@@ -189,7 +229,7 @@ export default function JsonlDetail({
   /** One adapter build per entry/expansion change; it used to run on every render. */
   const treeData = useMemo<DataNode[]>(() => {
     if (!model) return [];
-    const nodes = toAntdNodes(model.nodes, wrap);
+    const nodes = toAntdNodes(model.nodes, wrap, highlight);
     if (model.truncated) {
       nodes.push({
         key: "__truncated__",
@@ -203,7 +243,7 @@ export default function JsonlDetail({
       });
     }
     return nodes;
-  }, [model, wrap]);
+  }, [model, wrap, highlight]);
 
   const copyValue = useCallback(() => {
     if (!entry) return;
@@ -212,8 +252,8 @@ export default function JsonlDetail({
 
   const copyPath = useCallback(() => {
     if (!entry) return;
-    void copy(readCopyPath(entry, activeKey, index), "path");
-  }, [entry, activeKey, index, copy]);
+    void copy(readCopyPath(entry, activeKey, index, entryLabel), "path");
+  }, [entry, activeKey, index, entryLabel, copy]);
 
   const expandAll = useCallback(() => {
     if (!model) return;
@@ -308,7 +348,9 @@ export default function JsonlDetail({
 
   const header = (
     <div className="jsonl-detail__header">
-      {(entry || loading) && <span className="jsonl-detail__index">L{index + 1}</span>}
+      {(entry || loading) && (
+        <span className="jsonl-detail__index">{entryLabel ?? `L${index + 1}`}</span>
+      )}
       {entry && (
         <span className={`jsonl-chip jsonl-chip--${chipClass(entry)}`}>{chipLabel(entry)}</span>
       )}

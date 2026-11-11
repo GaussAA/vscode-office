@@ -57,12 +57,13 @@ mkdirSync(shotsDir, { recursive: true });
 
 import { expect, unexpected } from "./helpers.mjs";
 
+import json from "./scenarios/json.mjs";
 import jsonl from "./scenarios/jsonl.mjs";
 import parquetBasics from "./scenarios/parquet-basics.mjs";
 import parquetGrid from "./scenarios/parquet-grid.mjs";
 import other from "./scenarios/other.mjs";
 
-const scenarios = [...jsonl, ...parquetBasics, ...parquetGrid, ...other];
+const scenarios = [...json, ...jsonl, ...parquetBasics, ...parquetGrid, ...other];
 
 async function main() {
   const fixtures = createFixtures(join(repoRoot, ".ui-verify"));

@@ -189,3 +189,42 @@ export async function clickNextPage(page) {
   );
   expect(moved, `pager stayed on ${before}`);
 }
+/**
+ * Mount the command-opened JSON preview stub. `mode` is the harness `?mode=` selector:
+ * array (default), object, invalid, too-large, empty.
+ */
+export async function openJson(page, base, mode = "array", query = "") {
+  await page.navigate(`${base}/stats`);
+  await page.evaluate(`Object.keys(localStorage)
+        .filter(key => key.startsWith('json-preview:left:'))
+        .forEach(key => localStorage.removeItem(key))`);
+  await page.navigate(`${base}/harness-json?theme=dark&mode=${mode}${query}`);
+  // Do not accept the bare loading state: `.json-preview__state` exists before `jsonInfo`
+  // arrives. A record, a titled terminal state, or an object-root tree means data landed.
+  const ready = await page.waitFor(`!!document.querySelector(
+        '.json-record, .json-preview__state-title, .jsonl-detail__tree, .jsonl-detail__scalar'
+    )`);
+  if (!ready) {
+    const diagnostic = await page.evaluate(`JSON.stringify({
+      url: location.href,
+      bodyText: (document.body?.innerText ?? "").slice(0, 200).replace(/\\s+/g, " "),
+      records: document.querySelectorAll(".json-record").length,
+      state: document.querySelectorAll(".json-preview__state").length,
+      tree: document.querySelectorAll(".jsonl-detail__tree").length,
+    })`);
+    expect(false, `JSON preview did not render: ${diagnostic}`);
+  }
+}
+
+/** Set an input the way React sees it. */
+export function setInput(selector, value) {
+  return `(() => {
+    const input = document.querySelector(${JSON.stringify(selector)});
+    if (!input) return false;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    input.focus();
+    setter.call(input, ${JSON.stringify(value)});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`;
+}

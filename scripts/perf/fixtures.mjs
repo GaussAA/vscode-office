@@ -97,6 +97,7 @@ export function createPerfFixtures(cacheDir) {
     wideBytes: statSync(wide).size,
     wideNeedle: `s${WIDE_TEXT_COLUMNS - 1}-96`,
     ...createJsonlPerfFixtures(cacheDir),
+    ...createJsonPerfFixtures(cacheDir),
   };
 }
 
@@ -146,5 +147,42 @@ export function createJsonlPerfFixtures(cacheDir) {
     jsonlLogBytes: statSync(log).size,
     /** Appears once, in the last line: the scan cannot stop early. */
     jsonlLogNeedle: `processed ${JSONL_LOG_LINES - 1} rows`,
+  };
+}
+/**
+ * JSON host fixture: a top-level array just under the 100 MiB preview cap. Each record is a
+ * few kilobytes; the marker exists only in the last record so the search cannot stop early.
+ */
+const JSON_ARRAY_RECORDS = 50_000;
+const JSON_ARRAY_PAD = 1_800;
+
+export function createJsonPerfFixtures(cacheDir) {
+  mkdirSync(cacheDir, { recursive: true });
+  const array = writeIfMissing(join(cacheDir, "json-array-100mb.json"), () => {
+    const chunks = ["["];
+    for (let index = 0; index < JSON_ARRAY_RECORDS; index++) {
+      if (index > 0) chunks.push(",");
+      chunks.push(
+        JSON.stringify({
+          id: index,
+          ts: "2026-11-09T10:00:00.123Z",
+          level: "INFO",
+          service: "ingest",
+          message:
+            index === JSON_ARRAY_RECORDS - 1
+              ? "final-needle-marker processed the last record"
+              : `processed ${index} rows`,
+          pad: "x".repeat(JSON_ARRAY_PAD),
+        }),
+      );
+    }
+    chunks.push("]");
+    return Buffer.from(chunks.join(""), "utf8");
+  });
+  return {
+    jsonArray: array,
+    jsonArrayRecords: JSON_ARRAY_RECORDS,
+    jsonArrayBytes: statSync(array).size,
+    jsonArrayNeedle: "final-needle-marker",
   };
 }

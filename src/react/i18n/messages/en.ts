@@ -234,4 +234,19 @@ export default {
     body: "{file} is {size}. Above {limit}, a parquet file has to travel through the extension bridge in one piece, so it is not loaded until you ask.",
     open: "Open anyway",
   },
+  json: {
+    records: "records",
+    recordsCount: "{count} records",
+    searchRecords: "Search records",
+    noRecords: "No records",
+    openText: "Open in Text Editor",
+    fromBuffer: "Unsaved editor buffer",
+    tooLarge: "This document is too large to preview.",
+    tooLargeHint:
+      "Arrays are indexed up to {array}; object roots are parsed up to {object}. Open the file in the text editor for the rest.",
+    objectRoot: "root object",
+    scalarRoot: "root value",
+    results: "Search results",
+    lineColumn: "line {line}, column {column}",
+  },
 };

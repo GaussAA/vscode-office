@@ -1,6 +1,6 @@
 ---
 name: Data File Viewer (Parquet, JSONL, Excel)
-description: VS Code 里三件只读预览仪器的视觉体系 —— 主题是机身，颜色只给信号，密度就是效率。
+description: VS Code 里三件只读预览仪器 + 一件命令式 JSON 检查仪器的视觉体系 —— 主题是机身，颜色只给信号，密度就是效率。
 colors:
   editor-surface: "#1e1e1e"
   panel-surface: "#252526"
@@ -133,6 +133,8 @@ components:
 
 VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有自己的配色：它读宿主的变量，主题换一次，仪表跟着换一次。颜色因此是稀缺资源，只花在信号上——一个值是什么类型、这里能点、搜索命中了哪几个字、这一列刚被选中。其余一切（面板、表头、工具栏、行底纹）都只是同一块底色被混入不同比例的前景，一个色相都不新增。
 
+JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命令打开，不接管 `.json`，读数语言与 JSONL 同源。记录列表、树、值面板和键盘不另起一套，只是把左栏从“行目录”换成“记录目录”。
+
 密度就是效率。这套界面服务的是「打开一个 377 MB 的文件，三十秒内知道里面有什么」，所以行高、内距、字号都被压到还能读的下限：数据 12px 等宽，标签 10px 大写，顶栏 52px。装饰性留白、卡片、渐变、插画一概没有——它们不承担任何信息。
 
 语气是冷静、精确、不解释。不做引导层、不写欢迎语、不加图标墙；空状态与错误只给一条事实和下一步（`没有匹配的行` + 清除按钮，`这个文件太大` + 用文本编辑器打开）。界面像 IDE 自带的一部分，而不是一个装进去的应用。
@@ -144,6 +146,7 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 - 零分割线、零装饰阴影；层次 = 底色亮度差（92% 底 + 8% 前景的那一类混合）。
 - 所有数字 `tabular-nums`；所有「值」等宽，所有「标签」非等宽。
 - 焦点永远是 1px `focusBorder` 描边（outline 或 inset ring），没有光晕、没有位移。
+- JSON 预览是 Command preview：复用 JSONL 的 Splitter、记录行、树、值面板和键盘，不新增视觉世界，也不注册 `.json`。
 
 ## Colors
 
@@ -321,6 +324,18 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 
 - **禁止**：不要用 `title`、tooltip 或「复制到别处再读」承担这个职责；也不要把树改成换行来塞下全文（那会把虚拟列表和密度一起拆掉）。
 
+### JSON Preview (command surface, not a viewer)
+
+**Mode:** Operate。它是同一机身上的命令式检查探头，不是第四个 viewer：不注册 `.json`、不改默认编辑器，也不新增视觉世界。打开后复用 JSONL 的 Splitter、树、值面板和键盘；左栏从“行目录”换成“记录目录”。
+
+- **Shell**：与 JSONL 相同的 100vh 三件套；左栏默认 340px，可拖、按文件记住宽度；右栏是选中记录的树与底栏动作；值面板停靠在底栏上方。命令栏加文件身份（文件名、记录数）、搜索、刷新、“Open in Text Editor”；编辑器 buffer 来源用一枚 `--jl-warn` 小标记说明。
+- **Record rail**：虚拟列表，行高与 JSONL 目录一致；`[index]`（11px 等宽、muted、tabular）＋身份标签（12px 等宽、单行省略）；无身份时回退原始 JSON 头；选中态用同款底色，不使用类型徽标（类型在记录头里说）。
+- **Record detail**：复用 JSONL 的 `NodeModel` / `toAntdNodes` / 值面板；记录头显示 `[index] · type · size`；Tree/Raw 切换、Expand all/Collapse all、Copy value/path 全部复用。严格 JSON 的解析错误给行/列和“Open in Text Editor”。
+- **Search**：全文件记录级；结果替换左栏，每行是 `[index]` ＋片段（`highlightRuns` 的 `<mark>`）＋命中数；选中结果后右栏展开到首个命中并高亮，其他可见命中同色；`Esc`/清空恢复记录列表。无命中只给事实和“清除搜索”，不写欢迎语。
+- **Object root**：不显示记录列表，直接一棵树；对象根 ≤20 MB。搜索时左栏显示命中路径（不是记录），选中后展开并高亮；超过 20 MB 显示 too-large。
+- **States**：索引中给一条状态（不显示百分比、不挡内容）；空数组/空对象、无命中、文件读取失败、数组 >100 MB、对象根 >20 MB 分别有明确事实和出口；不能编辑，不能 `title` 代替全文。
+- **Entry**：命令面板 `Data File Viewer: Preview JSON`、资源管理器右键、JSON 编辑器标题三处；面板 tab 用文件名，不伪装成 `.json` 的默认编辑器。
+
 ### Empty & error states
 
 - **Empty:** 居中、muted、13px、`min-height: 200px`；不带插画，不带「开始使用吧」这类话术。
@@ -341,6 +356,7 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 - **Do** 在新增数据色时同时更新 `scripts/ui-verify` 的对比度断言（浅色主题 ≥ 4.5:1），否则闸门会红。
 - **Do** 给每个被摘要截断的值一条可选中、可复制的全文通道（JSONL 的停靠值面板），而不是 `title`、tooltip 或「复制出去再看」。
 - **Do** 让窗口化视图的 `aria-rowcount` / `aria-colcount` 说**文件**的行列数，不是 DOM 里渲染的那一窗；`aria-rowindex` 与 `aria-colindex` 在表头与单元格两侧都要写。
+- **Do** 让 JSON 预览复用 JSONL 的机身、记录行、树、值面板和键盘；它是命令打开的检查面，不注册 `.json`，也不改默认编辑器。
 
 ### Don't:
 
@@ -352,3 +368,4 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 - **Don't** 让超过 420px 的单元格换行，或用 tooltip 代替「点开看全文」。
 - **Don't** 加引导层、欢迎语、插画或空状态营销文案；空状态只给事实和下一步。
 - **Don't** 把继承来的 `x-spreadsheet` 网格与 Git History 面板当作参照——它们是遗留例外（只被部分重新着色），不属于这套系统。
+- **Don't** 为 JSON 预览新造布局、颜色或字体，或把它写成第四个 viewer；也不要把 JSON 数组做成表格（本轮不是数据表）。

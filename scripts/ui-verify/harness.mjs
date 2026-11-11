@@ -305,6 +305,179 @@ function jsonlStub(fixtures, limit = 0) {
 </script>`;
 }
 
+function jsonPreviewFixtures(count = 5) {
+  const seeded = [
+    { id: "alpha", name: "Alpha", description: "first record" },
+    {
+      id: "beta",
+      name: "Beta",
+      description: "second record with a longer value that must wrap in the value panel",
+    },
+    { id: "gamma", name: "Gamma", nested: { level: 2, enabled: true } },
+    {
+      id: "delta",
+      name: "Delta",
+      tools: [
+        { name: "search", input: { q: "alpha" } },
+        { name: "read", input: { path: "/tmp/alpha.txt" } },
+      ],
+    },
+    { id: "epsilon", name: "Epsilon", description: "x".repeat(517) + "-tail-marker" },
+  ];
+  const values = seeded.slice(0, Math.min(seeded.length, count));
+  for (let index = values.length; index < count; index++) {
+    values.push({ id: `id-${index}`, name: `Record ${index}` });
+  }
+  return values.map((value, index) => {
+    const raw = JSON.stringify(value);
+    return {
+      index,
+      kind: "value",
+      raw,
+      text: raw,
+      textChars: raw.length,
+      size: raw.length,
+      textTruncated: false,
+      key: value.id ?? value.name,
+      value,
+    };
+  });
+}
+
+/**
+ * JSON preview stub. `mode` selects array / object / invalid / too-large / empty; the array
+ * mode speaks the same five messages as the real panel, including a two-batch search.
+ */
+function jsonStub(mode = "array", count = 5, fromBuffer = false) {
+  const fixtures = jsonPreviewFixtures(count);
+  const summaries = fixtures.map((entry) => ({
+    index: entry.index,
+    kind: entry.kind,
+    size: entry.size,
+    raw: entry.raw,
+    label: entry.key,
+  }));
+  const byteSize = fixtures.reduce((total, entry) => total + entry.size + 1, 0);
+  const objectValue = {
+    service: "demo",
+    endpoints: [
+      { path: "/a", method: "GET" },
+      { path: "/b", method: "POST" },
+    ],
+    meta: { version: 1 },
+  };
+  const objectRaw = JSON.stringify(objectValue);
+  const entry = {
+    index: 0,
+    kind: "value",
+    raw: objectRaw,
+    text: objectRaw,
+    textChars: objectRaw.length,
+    size: objectRaw.length,
+    textTruncated: false,
+    value: objectValue,
+  };
+  return `<script>
+(function () {
+  const fixtures = ${JSON.stringify(fixtures)};
+  const summaries = ${JSON.stringify(summaries)};
+  const mode = ${JSON.stringify(mode)};
+  const count = ${JSON.stringify(count)};
+  const byteSize = ${JSON.stringify(byteSize)};
+  const rootEntry = ${JSON.stringify(entry)};
+  const fromBuffer = ${JSON.stringify(fromBuffer)};
+  const cancelled = new Set();
+
+  function post(type, content) {
+    window.postMessage({ type: type, content: content }, '*');
+  }
+
+  function info() {
+    if (mode === 'object') {
+      post('jsonInfo', { fileName: 'records.json', cacheId: 'demo:json-object', byteSize: rootEntry.size, rootKind: 'object', recordCount: 0, fromBuffer: fromBuffer });
+      setTimeout(function () { post('jsonRoot', { entry: rootEntry }); }, 20);
+      return;
+    }
+    if (mode === 'invalid') {
+      post('jsonInfo', { fileName: 'records.json', cacheId: 'demo:json-invalid', byteSize: 40, rootKind: 'invalid', recordCount: 0, fromBuffer: false, error: { message: 'Unexpected token } in JSON', line: 3, column: 7 } });
+      return;
+    }
+    if (mode === 'too-large') {
+      post('jsonInfo', { fileName: 'records.json', cacheId: 'demo:json-too-large', byteSize: 120 * 1024 * 1024, rootKind: 'too-large', recordCount: 0, fromBuffer: false });
+      return;
+    }
+    if (mode === 'empty') {
+      post('jsonInfo', { fileName: 'records.json', cacheId: 'demo:json-empty', byteSize: 2, rootKind: 'array', recordCount: 0, fromBuffer: false });
+      return;
+    }
+    post('jsonInfo', { fileName: 'records.json', cacheId: 'demo:json', byteSize: byteSize, rootKind: 'array', recordCount: fixtures.length, fromBuffer: fromBuffer });
+  }
+
+  const api = {
+    postMessage(msg) {
+      if (!msg) return;
+      if (msg.type === 'init') {
+        setTimeout(info, 60);
+      }
+      if (msg.type === 'jsonReload') {
+        setTimeout(info, 30);
+      }
+      if (msg.type === 'jsonRecords') {
+        const requestId = msg.content.requestId;
+        const start = Math.max(0, msg.content.start);
+        const end = Math.min(fixtures.length, msg.content.end);
+        setTimeout(function () {
+          post('jsonRecordsData', { requestId: requestId, records: summaries.slice(start, end) });
+        }, 40);
+      }
+      if (msg.type === 'jsonRecord') {
+        const requestId = msg.content.requestId;
+        const index = msg.content.index;
+        setTimeout(function () {
+          post('jsonRecordData', { requestId: requestId, index: index, entry: fixtures[index] ?? null });
+        }, 40);
+      }
+      if (msg.type === 'jsonSearchCancel') {
+        cancelled.add(msg.content.requestId);
+      }
+      if (msg.type === 'jsonSearch') {
+        const requestId = msg.content.requestId;
+        const query = String(msg.content.query || '');
+        const needle = query.toLowerCase();
+        const matched = fixtures.filter(function (entry) {
+          return (entry.raw || '').toLowerCase().indexOf(needle) >= 0;
+        }).map(function (entry) {
+          const raw = entry.raw || '';
+          const at = raw.toLowerCase().indexOf(needle);
+          const snippet = at < 0 ? raw.slice(0, 80) : (at > 20 ? '…' : '') + raw.slice(Math.max(0, at - 20), at + needle.length + 30) + (at + needle.length + 30 < raw.length ? '…' : '');
+          return { index: entry.index, count: 1, snippet: snippet };
+        });
+        const half = Math.ceil(matched.length / 2);
+        setTimeout(function () {
+          if (cancelled.has(requestId)) return;
+          post('jsonSearchBatch', { requestId: requestId, query: query, records: matched.slice(0, half), scanned: Math.floor(rawLength() / 2), total: rawLength(), matches: half, done: matched.length === 0, capped: false });
+        }, 80);
+        setTimeout(function () {
+          if (cancelled.has(requestId)) return;
+          post('jsonSearchBatch', { requestId: requestId, query: query, records: matched.slice(half), scanned: rawLength(), total: rawLength(), matches: matched.length, done: true, capped: false });
+        }, 180);
+      }
+      if (msg.type === 'jsonOpenText') {
+        window.__jsonOpenText = true;
+      }
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+
+  function rawLength() {
+    return fixtures.reduce(function (total, entry) { return total + (entry.raw || '').length; }, 0);
+  }
+
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
 function parquetStub(fixtures) {
   // A virtual document arrives inline; the host sends it base64-encoded because a `number[]`
   // costs 5-8x the file on the JSON bridge. `?inline=1` exercises that decode path.
@@ -599,13 +772,20 @@ export function startHarness(fixtures, port = 0) {
       return;
     }
 
-    if (path === "/harness" || path === "/harness-parquet" || path === "/harness-route") {
+    if (
+      path === "/harness" ||
+      path === "/harness-parquet" ||
+      path === "/harness-route" ||
+      path === "/harness-json"
+    ) {
       const route =
-        path === "/harness-parquet"
-          ? "parquet"
-          : path === "/harness-route"
-            ? (url.searchParams.get("route") ?? "html")
-            : "jsonl";
+        path === "/harness-json"
+          ? "json"
+          : path === "/harness-parquet"
+            ? "parquet"
+            : path === "/harness-route"
+              ? (url.searchParams.get("route") ?? "html")
+              : "jsonl";
       const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
       const guard = path === "/harness-route" && url.searchParams.get("guard") === "1";
       const windowed = path === "/harness-route" && url.searchParams.get("window") === "1";
@@ -622,11 +802,17 @@ export function startHarness(fixtures, port = 0) {
             ? excelWorkbookStub()
             : windowed
               ? excelWindowStub()
-              : path === "/harness-route"
-                ? smokeStub(url.searchParams.get("route") ?? "html")
-                : route === "parquet"
-                  ? parquetStub(fixtures)
-                  : jsonlStub(url.searchParams.get("empty") === "1" ? [] : jsonl, limit);
+              : path === "/harness-json"
+                ? jsonStub(
+                    url.searchParams.get("mode") ?? "array",
+                    Math.min(Math.max(Number(url.searchParams.get("records") ?? 5) || 5, 1), 5000),
+                    url.searchParams.get("buffer") === "1",
+                  )
+                : path === "/harness-route"
+                  ? smokeStub(url.searchParams.get("route") ?? "html")
+                  : route === "parquet"
+                    ? parquetStub(fixtures)
+                    : jsonlStub(url.searchParams.get("empty") === "1" ? [] : jsonl, limit);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;

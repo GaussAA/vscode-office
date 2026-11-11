@@ -3,6 +3,7 @@ import { customEditorOptions } from "@/common/customEditorOptions";
 import { Global } from "./common/global";
 import { OfficeViewerProvider } from "./provider/officeViewerProvider";
 import { JsonlViewerProvider } from "./provider/jsonlViewerProvider";
+import { activateJsonPreview } from "./provider/jsonPreview";
 import { switchCsvEditor } from "./service/csvService";
 import { FileUtil } from "./common/fileUtil";
 import { ReactApp } from "./common/reactApp";
@@ -25,6 +26,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const viewOption = customEditorOptions;
   FileUtil.init(context);
   ReactApp.init(context);
+  activateJsonPreview(context);
   const viewerInstance = new OfficeViewerProvider(context);
   const jsonlViewerInstance = new JsonlViewerProvider(context);
   context.subscriptions.push(

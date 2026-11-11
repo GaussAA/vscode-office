@@ -48,8 +48,9 @@ export function readCopyPath(
   entry: JsonlEntryDetail | null,
   activeKey: string | null,
   index: number,
+  entryLabel?: string,
 ): string {
-  const line = lineLabel(index);
+  const line = entryLabel ?? lineLabel(index);
   return activeKey ? `${line} › ${pathToText(readPathKey(activeKey))}` : line;
 }
 
@@ -58,6 +59,7 @@ export function readSelection(
   entry: JsonlEntryDetail | null,
   activeKey: string | null,
   index: number,
+  entryLabel?: string,
 ): JsonlSelection | null {
   if (entry?.kind !== "value") return null;
   // A composite root has no row to select; the bar waits for one. A scalar root has no row but
@@ -66,7 +68,7 @@ export function readSelection(
 
   const segments = activeKey ? readPathKey(activeKey) : [];
   const value = activeKey ? valueAtPath(entry.value, segments) : entry.value;
-  const line = lineLabel(index);
+  const line = entryLabel ?? lineLabel(index);
   return {
     value,
     panelPath: activeKey ? pathToText(segments) : line,

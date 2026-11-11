@@ -229,4 +229,18 @@ export default {
     body: "{file} 有 {size}。超过 {limit} 的 parquet 无法在预览里按需分块读取，要整份经扩展桥传过来，所以暂不自动加载。",
     open: "仍然打开",
   },
+  json: {
+    records: "记录",
+    recordsCount: "{count} 条记录",
+    searchRecords: "搜索记录",
+    noRecords: "没有记录",
+    openText: "在文本编辑器中打开",
+    fromBuffer: "未保存的编辑器缓冲区",
+    tooLarge: "这个文档太大，无法预览。",
+    tooLargeHint: "数组最多索引 {array}，对象根最多解析 {object}。其余内容请在文本编辑器中打开。",
+    objectRoot: "对象根",
+    scalarRoot: "标量根",
+    results: "搜索结果",
+    lineColumn: "第 {line} 行，第 {column} 列",
+  },
 };

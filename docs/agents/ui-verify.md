@@ -17,7 +17,8 @@ scripts/ui-verify/
 ```
 
 The fake bridge posts the same messages the extension host does (`jsonlInfo`,
-`jsonlEntries`, `jsonlSearchBatch`, `jsonlEntryData`, `open`), so the real React bundles
+`jsonlEntries`, `jsonlSearchBatch`, `jsonlEntryData`, `jsonInfo`, `jsonRecordsData`,
+`jsonRecordData`, `jsonSearchBatch`, `jsonRoot`, `open`), so the real React bundles
 run unchanged. Parquet fixtures are served with `Range` support and every request is
 counted in `/stats` — that counter is how lazy loading and the next-page prefetch are
 asserted (`0` new range reads when paging forward).
@@ -72,7 +73,7 @@ shared utilities), **not** rendering correctness. It polls for the mount (`page.
 rather than sleeping a fixed delay: the excel chunk is ~1.3 MB and mounts slower on a loaded
 machine than any fixed delay we would pick.
 
-`parquet` (`parquet-*`) and `jsonl` (`jsonl-*`) have their own scenarios instead.
+`parquet` (`parquet-*`), `jsonl` (`jsonl-*`) and `json` (`json-*`) have their own scenarios instead.
 `test/unit/viewer-registry.test.ts` asserts that every route in `main.tsx` is covered one way
 or the other, so adding a route without coverage fails the build instead of silently shrinking
 the suite.

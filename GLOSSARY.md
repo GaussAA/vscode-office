@@ -16,6 +16,10 @@ _Avoid_: 预览器, 面板, 功能
 某个 viewer 呈现内容的具体形态：树、网格、画布、纯文本。一个 viewer 只给一个形态，形态是选择而不是选项。
 _Avoid_: 界面, UI
 
+**Command preview（命令预览）**:
+由命令而不是文件关联打开的 Preview surface。它不改变 Format 的呈现权归属，因此不参与 Native preview 的去重裁决；去重管的是 Viewer 与默认接管。JSON Preview 是第一个 Command preview。
+_Avoid_: 临时预览、弹窗（它可以是完整的 webview 面板）；也别把它叫 Viewer
+
 **Editable surface（可编辑预览面）**:
 会把握改的结果写回文件的预览面。6.0.0 起只剩表格（Excel/CSV）；我们自己写的 viewer（parquet、jsonl）是只读的。只读不是可编辑面的退化版本，而是另一种承诺。
 _Avoid_: 编辑器（与 VS Code 自己的 editor 冲突）；也别把只读的 viewer 叫「缺功能」
@@ -44,8 +48,24 @@ _Avoid_: 把 zstd 说成「一种格式」
 parquet 的一条记录，全部行共享同一 schema。
 
 **JSONL Line（行）**:
-jsonl 的一行就是一个自包含的 JSON 文档，键可以与其他行完全不同。它是树的节点，不是表格里的一行；因此「行数」在两个格式里不是同一个概念。
+jsonl 的一行就是一个自包含的 JSON 值，键可以与其他行完全不同。它是树的节点，不是表格里的一行；因此「行数」在两个格式里不是同一个概念。
 _Avoid_: 把 jsonl 的 line 叫 row，把 jsonl 做成表格
+
+**JSON Document（JSON 文档）**:
+一个 `.json` 文件里的单一 JSON 值（对象、数组或标量）。它是 JSON 预览的读取单位；JSONL 文件的每一行虽然也是 JSON 值，但不是这里的读取单位，也没有文件级文档边界。
+_Avoid_: JSON 行；把 JSONL Line 当成 JSON Document
+
+**JSON Record（JSON 记录）**:
+一个 JSON Document 的顶层数组中的一个元素。它是 JSON 预览记录列表的导航单位；记录可以不是对象，也不是表格的一行或 JSONL 的一行。
+_Avoid_: row、line、条目（太泛）
+
+**JSON Preview（JSON 预览）**:
+由命令显式打开的只读 JSON 检查面：记录列表 + 记录树 + 值面板。它不注册文件选择器、不接管 `.json`、不属于三种 Viewer 的格式集合。
+_Avoid_: JSON viewer、第四个 viewer（它不是 viewer）
+
+**Record index（记录索引）**:
+JSON Record 在顶层数组中的零基位置，是记录列表的稳定地址；不是文件行号，也不是表格行号。
+_Avoid_: line number、row number
 
 **Session（会话）**:
 一个 viewer 与 host 之间、跨多次消息存活的唯一状态所有者（`ParquetSession`、`JsonlSession`）。它既不认识 React 也不认识 `vscode`；组件只通过它读写状态，因此分页、预取、过期保护可以被单元测试直接覆盖。

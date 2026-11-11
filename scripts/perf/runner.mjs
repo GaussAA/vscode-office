@@ -6,7 +6,7 @@
  *   node scripts/perf/runner.mjs --headed   # watch it run
  *   node scripts/perf/runner.mjs --filter=jsonl
  *
- * Four invariants, all learned from measuring the shipped bundle on large files:
+ * Five invariants, all learned from measuring the shipped bundle on large files:
  *
  *  1. **First paint is bounded by the file, not twice the file.** hyparquet plans a read per
  *     call and the viewer issues the visible page and its prefetch back to back; before the
@@ -21,7 +21,7 @@
  *     future change that materialises the page or re-decodes it shows up here first.
  *  4. **A JSONL window is bounded by bytes, and a whole-file search is one pass.** A 500-line
  *     request over 2 MB records parses 80 MB without the 4 MB budget; the host-side checks
- *     live in `jsonl.mjs`, which bundles the services with esbuild for Node.
+ *     live in `jsonl.mjs`, which bundles the services with esbuild for Node.\n *  5. **A 100 MB JSON array is indexed, not parsed.** The top-level scanner records record\n *     boundaries; the 100-record window parses only those records; search is one lowercased\n *     pass. `json.mjs` measures all three against a 91.6 MB fixture.
  *
  * Both parquet files are written with one row group (PyArrow's default), because that is the
  * shape where the difference shows.
@@ -33,6 +33,7 @@ import { repoRoot } from "../ui-verify/fixtures.mjs";
 import { expect } from "./expect.mjs";
 import { createPerfFixtures } from "./fixtures.mjs";
 import { startPerfHarness } from "./harness.mjs";
+import { jsonScenarios, loadJsonHost } from "./json.mjs";
 import { jsonlScenarios, loadJsonlHost } from "./jsonl.mjs";
 
 /** First paint may cost at most this many times the file size. */
@@ -379,10 +380,12 @@ const scenarios = [
     },
   },
   ...jsonlScenarios,
+  ...jsonScenarios,
 ];
 async function main() {
   const fixtures = createPerfFixtures(join(repoRoot, ".perf"));
   const jsonlHost = await loadJsonlHost();
+  const jsonHost = await loadJsonHost();
   const harness = await startPerfHarness(fixtures);
   let browser;
   const results = [];
@@ -403,6 +406,7 @@ async function main() {
           harness,
           fixtures,
           jsonlHost,
+          jsonHost,
         });
         results.push({ name: scenario.name, ok: true, detail, ms: Date.now() - started });
       } catch (error) {
@@ -421,13 +425,15 @@ async function main() {
         `fixtures: flat ${(fixtures.flatBytes / MB).toFixed(1)} MB / ${fixtures.flatRows.toLocaleString()} rows, ` +
           `wide ${(fixtures.wideBytes / MB).toFixed(1)} MB / ${fixtures.wideRows.toLocaleString()} rows, ` +
           `jsonl huge ${(fixtures.jsonlHugeBytes / MB).toFixed(1)} MB / ${fixtures.jsonlHugeLines} lines, ` +
-          `jsonl log ${(fixtures.jsonlLogBytes / MB).toFixed(1)} MB / ${fixtures.jsonlLogLines.toLocaleString()} lines`,
+          `jsonl log ${(fixtures.jsonlLogBytes / MB).toFixed(1)} MB / ${fixtures.jsonlLogLines.toLocaleString()} lines, ` +
+          `json array ${(fixtures.jsonArrayBytes / MB).toFixed(1)} MB / ${fixtures.jsonArrayRecords.toLocaleString()} records`,
       );
     }
   } finally {
     if (browser) await browser.close();
     await harness.close();
     jsonlHost.cleanup();
+    jsonHost.cleanup();
   }
 
   for (const result of results) {

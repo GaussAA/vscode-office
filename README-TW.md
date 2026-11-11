@@ -17,6 +17,9 @@ ICNS、XMind、HTML、Java `.class`、壓縮檔——都在 **6.0.0** 移除：�
 原生已經支援，其餘都有更成熟的專用閱讀器。理由見
 [ADR-0015](docs/adr/0015-narrow-to-three-viewers.md)，升級說明見 [CHANGELOG.md](CHANGELOG.md)。
 
+除此之外還有一個命令式開啟的唯讀 JSON 檢查器，用來讀大的 `.json` 頂層陣列；它不註冊
+`.json`、不改變預設編輯器，見下面的 [JSON 陣列](#json-陣列不開啟文字編輯器也能讀)。
+
 ## 本倉庫：Data File Viewer (Parquet, JSONL, Excel)（fork）
 
 本倉庫 fork 自 [cweijan/vscode-office](https://github.com/cweijan/vscode-office)（MIT，見
@@ -72,6 +75,30 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解碼。
 
 ![JSONL 值面板](docs/screenshots/jsonl-value-panel.png)
 
+### JSON 陣列：不開啟文字編輯器也能讀
+
+唯讀檢查器，面向頂層是陣列或物件的 `.json` 檔案。它是命令，不是第四個 viewer：不註冊
+`.json`、不接管預設編輯器、不寫 `contributes.customEditors`。入口是命令面板
+（**Data File Viewer: Preview JSON**）、檔案總管右鍵和 JSON 編輯器標題。
+
+![JSON 預覽](docs/screenshots/json-records.png)
+
+- **大陣列只建索引，不整份 parse。** 頂層陣列最多 100 MB，按記錄邊界串流掃描；webview 只為可見列要
+  `[index]` 標籤，並一次只要一筆記錄。物件根（最多 20 MB）整份解析。
+- **先找記錄，再找鍵。** 全檔案搜尋回傳命中的記錄、片段與命中數；選取後載入該記錄，展開並醒目顯示
+  第一個命中的鍵；物件根的結果是路徑。
+- **只接受嚴格 JSON。** 註解和尾逗號會給出帶行列的解析錯誤，並留一個 **Open in Text Editor** 出口；
+  編輯器有未儲存修改時優先讀 buffer，並在工具列標明。
+- **唯讀是承諾。** 沒有編輯、schema 驗證或 JSONC；所有動作最終都回到文字編輯器。
+- 鍵盤：記錄清單 `↑`/`↓`/`Home`/`End`；樹 `←`/`→`/`Space` 收合展開、`Enter` 切換值面板、
+  `Ctrl+C` / `Ctrl+Shift+C` 複製值/路徑、`Esc` 清除搜尋或收合面板。
+
+![JSON 搜尋結果](docs/screenshots/json-search.png)
+
+上限：100 MB 陣列、20 MB 物件根、單筆記錄 8 MB（超過按原文顯示）、每筆原文最多
+1,000,000 字元、每次搜尋最多 10,000 個命中。記錄清單是虛擬清單；樹沿用 JSONL 的
+20,000 節點/每層 200 子項/12 層上限。
+
 ### 表格：大檔案也能直接看
 
 超過 8 MB 後，CSV/TSV 與活頁簿進入唯讀視窗檢視：DOM 裡只有視窗內的行，21 MB 的 CSV 首屏
@@ -106,6 +133,9 @@ CI 在每次 push 時都會跑這三項，以及 `pnpm build` 和 `pnpm run pack
 - 目錄視窗按位元組（4 MB）而不是列數封頂：由超大列組成的檔案只在選取處附近列出少量項目，
   不會為了填滿一屏先解析整塊。用項目編號跳轉；視窗只會向下追加，填不滿一屏時末尾有一列
   顯式的「載入更多項目」。
+- JSON 預覽的陣列上限 100 MB、物件根上限 20 MB；單筆記錄超過 8 MB 按原文顯示，搜尋最多
+  10,000 個命中，JSONC/尾逗號會被拒絕。它是命令式面板，視窗重新載入後不恢復上一次預覽的
+  文件，需要重新執行命令。
 - 上游的遙測已完全移除。
 
 ## Git 歷史

@@ -1,0 +1,187 @@
+/* The JSON preview reuses the JSONL shell, tree, value panel and bottom bar. Only the record
+   rail and search rows are new: the JSONL directory is an antd Tree with a contiguous window,
+   while JSON records are addressed by absolute index. */
+
+.json-preview__rail,
+.json-preview__single {
+  height: 100%;
+  min-height: 0;
+}
+
+.json-preview__single {
+  display: flex;
+  flex: 1;
+}
+
+.json-preview__single > .jsonl-detail {
+  flex: 1;
+  height: auto;
+}
+
+.json-record-list,
+.json-search-list {
+  height: 100%;
+  padding: 6px 0;
+  overflow: auto;
+  background: var(--jl-panel);
+  outline: none;
+  scrollbar-color: var(--jl-scroll-thumb) transparent;
+}
+
+.json-record-list:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, var(--jl-key));
+  outline-offset: -1px;
+}
+
+.json-record {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 54px;
+  font-family: var(--jl-mono);
+  font-size: var(--vscode-editor-font-size, 12.5px);
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: var(--jl-radius-sm);
+}
+
+.json-record:hover {
+  background: var(--jl-hover);
+}
+
+.json-record--selected {
+  background: var(--jl-active-bg);
+  color: var(--jl-active-fg);
+}
+
+.json-record__index {
+  position: absolute;
+  left: 8px;
+  width: 40px;
+  text-align: right;
+  color: var(--jl-gutter);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  pointer-events: none;
+}
+
+.json-record--selected .json-record__index,
+.json-record--selected .json-record__label,
+.json-record--selected .json-record__pending {
+  color: var(--jl-active-fg) !important;
+}
+
+.json-record__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--jl-key);
+  font-weight: 600;
+}
+
+.json-record__pending {
+  color: var(--jl-muted);
+}
+
+.json-record--invalid .json-record__label {
+  color: var(--jl-error);
+}
+
+.json-record--warn .json-record__label {
+  color: var(--jl-warn);
+}
+
+.json-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  font-family: var(--jl-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: var(--jl-radius-sm);
+}
+
+.json-search-row:hover {
+  background: var(--jl-hover);
+}
+
+.json-search-row--selected {
+  background: var(--jl-active-bg);
+  color: var(--jl-active-fg);
+}
+
+.json-search-row__lead {
+  flex: 0 0 auto;
+  min-width: 36px;
+  text-align: right;
+  color: var(--jl-gutter);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.json-search-row__lead--path {
+  max-width: 46%;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  color: var(--jl-key);
+}
+
+.json-search-row__snippet {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--jl-muted);
+}
+
+.json-search-row__count {
+  flex: 0 0 auto;
+  color: var(--jl-muted);
+  font-size: 10.5px;
+}
+
+.json-search-row--selected .json-search-row__lead,
+.json-search-row--selected .json-search-row__snippet,
+.json-search-row--selected .json-search-row__count {
+  color: var(--jl-active-fg);
+}
+
+.json-preview__state {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 32px;
+  color: var(--jl-muted);
+  text-align: center;
+}
+
+.json-preview__state-title {
+  color: var(--jl-fg);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.json-preview__state p {
+  max-width: 560px;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.json-buffer {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--jl-warn) 12%, transparent);
+  color: var(--jl-warn);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

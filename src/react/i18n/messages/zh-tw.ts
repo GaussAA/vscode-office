@@ -228,4 +228,18 @@ export default {
     body: "{file} 有 {size}。超過 {limit} 的 parquet 無法在預覽中按需分塊讀取，要整份經擴充功能橋傳過來，所以暫不自動載入。",
     open: "仍然開啟",
   },
+  json: {
+    records: "記錄",
+    recordsCount: "{count} 筆記錄",
+    searchRecords: "搜尋記錄",
+    noRecords: "沒有記錄",
+    openText: "在文字編輯器中開啟",
+    fromBuffer: "未儲存的編輯器緩衝區",
+    tooLarge: "這個文件太大，無法預覽。",
+    tooLargeHint: "陣列最多索引 {array}，物件根最多解析 {object}。其餘內容請在文字編輯器中開啟。",
+    objectRoot: "物件根",
+    scalarRoot: "純量根",
+    results: "搜尋結果",
+    lineColumn: "第 {line} 行，第 {column} 欄",
+  },
 };

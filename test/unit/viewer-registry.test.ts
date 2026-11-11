@@ -154,6 +154,7 @@ test("every React route is covered by the smoke list or a dedicated scenario", (
   const dedicated: Record<string, string> = {
     parquet: "parquet-paging",
     jsonl: "jsonl-directory",
+    json: "json-records",
   };
 
   // The source is formatted by oxfmt, which emits double quotes — every scraper in this file

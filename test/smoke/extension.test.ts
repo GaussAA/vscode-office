@@ -182,3 +182,51 @@ describe("custom editors", () => {
     });
   }
 });
+
+describe("JSON preview command", () => {
+  afterEach(async () => {
+    await closeAllEditors();
+  });
+
+  it("opens a read-only webview panel for a .json file", async () => {
+    const dir = vscode.Uri.file(path.join(os.tmpdir(), "office-viewer-smoke"));
+    await vscode.workspace.fs.createDirectory(dir);
+    const uri = vscode.Uri.joinPath(dir, "preview.json");
+    await vscode.workspace.fs.writeFile(
+      uri,
+      new TextEncoder().encode('[{"id":1,"name":"alpha"},{"id":2,"name":"beta"}]'),
+    );
+
+    await vscode.commands.executeCommand("GaussAA.office.previewJson", uri);
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      for (const group of vscode.window.tabGroups.all) {
+        for (const tab of group.tabs) {
+          const input = tab.input;
+          if (
+            input instanceof vscode.TabInputWebview &&
+            input.viewType.endsWith("GaussAA.jsonPreview")
+          ) {
+            return;
+          }
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error(`no JSON preview webview tab appeared; tabs: ${describeTabs()}`);
+  });
+
+  it("does not claim .json as a custom editor", async () => {
+    const extension = vscode.extensions.getExtension(EXTENSION_ID)!;
+    const customEditors: Array<{ filenamePattern?: string; viewType?: string }> =
+      extension.packageJSON?.contributes?.customEditors ?? [];
+    assert.ok(
+      !customEditors.some(
+        (entry) =>
+          entry.viewType === "GaussAA.jsonPreview" ||
+          entry.filenamePattern?.toLowerCase().endsWith(".json"),
+      ),
+      "the JSON preview must stay a command, not a .json custom editor",
+    );
+  });
+});

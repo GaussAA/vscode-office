@@ -18,6 +18,10 @@ VS Code already covers some of them, and the rest have better dedicated readers.
 is in [ADR-0015](docs/adr/0015-narrow-to-three-viewers.md); the upgrade notes are in
 [CHANGELOG.md](CHANGELOG.md).
 
+Beyond the three viewers, a command-opened read-only JSON inspector handles large `.json`
+arrays without registering `.json` or changing the default editor; see
+[JSON arrays](#json-arrays-inspect-without-the-text-editor).
+
 ## This fork
 
 This repository is a fork of [cweijan/vscode-office](https://github.com/cweijan/vscode-office)
@@ -91,6 +95,37 @@ lists entries, the right pane renders the selected entry as a tree (or as raw te
 
 ![JSONL value panel](docs/screenshots/jsonl-value-panel.png)
 
+### JSON arrays: inspect without the text editor
+
+A read-only inspector for `.json` files whose top-level value is an array or an object. It is a
+command, not a fourth viewer: it does not register `.json`, does not take over the default
+editor, and never appears in `contributes.customEditors`. Open it from the command palette
+(**Data File Viewer: Preview JSON**), the Explorer context menu, or the JSON editor title.
+
+![JSON preview](docs/screenshots/json-records.png)
+
+- **Big arrays are indexed, not parsed whole.** A top-level array up to 100 MB is scanned for
+  record boundaries; the webview asks for `[index]` labels for the visible rows and for one
+  record at a time. Object roots (up to 20 MB) are parsed whole.
+- **Find the record, then the key.** Whole-file search returns matching records with snippets
+  and counts; selecting a result loads that record and expands/highlights the first matching
+  key. For object roots the results are paths.
+- **Strict JSON only.** Comments and trailing commas are an explicit parse error with a line
+  and column, plus an **Open in Text Editor** exit. An unsaved editor buffer wins and is
+  labelled in the toolbar.
+- **Read-only, by contract.** There is no editing path, no schema validation, no JSONC; every
+  action ends in the text editor.
+- Keyboard: `↑`/`↓`/`Home`/`End` in the record list; `←`/`→`/`Space` expand and collapse the
+  record tree; `Enter` toggles the value panel; `Ctrl+C` / `Ctrl+Shift+C` copy the value/path;
+  `Esc` clears the search or closes the value panel.
+
+![JSON search results](docs/screenshots/json-search.png)
+
+Limits: 100 MB arrays, 20 MB object roots, 8 MB per record (above that the record is raw
+text), 1,000,000 characters of raw text per record, and 10,000 matches per search. The record
+list is virtual; the tree reuses the JSONL bounds (20,000 nodes, 200 children per level, 12
+levels).
+
 ### Spreadsheets: large files stay usable
 
 Above 8 MB, CSV/TSV and workbook files open in a read-only windowed table: only the rows the
@@ -130,6 +165,10 @@ CI runs all three on every push, together with `pnpm build` and `pnpm run packag
   entries around the selection rather than parsing a whole chunk. Use the entry-number field
   to move; the window only appends downward, and a window too short to fill the pane carries
   an explicit "Load more entries" row.
+- The JSON preview stops at 100 MB for a top-level array and 20 MB for an object root; a
+  single record above 8 MB is raw text, search stops at 10,000 matches, and JSONC/trailing
+  commas are rejected. It is a command-opened panel, so a window reload does not restore the
+  last previewed document; use the command again.
 - Upstream telemetry has been removed entirely.
 
 ## Git History
