@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [6.5.0] - 2026-11-11
+### Fixed
+
+- JSONL: entries above 500 nodes were forced into the fixed-height virtual list, so a long
+  `description`, `message` or prompt showed only its 120-character single-line preview and
+  the rest was silently clipped. The wrap threshold is now 2,000 nodes: the reported 8.2 MB
+  `codex-现网.jsonl` has 520–1,934-node entries whose initial expanded tree is at most 305
+  rows, and all of them now wrap. Entries above 2,000 nodes keep the virtual list and the
+  value panel, and the 2,000-character per-string wrap cap is unchanged.
 
 ### Added
 

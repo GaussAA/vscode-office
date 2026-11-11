@@ -132,10 +132,31 @@ function jsonlFixtures() {
     },
   ];
   const bigEntry = { longValue: `L${"o".repeat(4997)}ng` };
-  for (let i = 0; i < 600; i++) bigEntry[`key_${i}`] = `value-${i}`;
+  for (let i = 0; i < 2500; i++) bigEntry[`key_${i}`] = `value-${i}`;
   sample.push(bigEntry);
   // A scalar root has no tree row to select; the value panel has to open without one.
   sample.push(`scalar root ${"s".repeat(300)}`);
+  // A >500-node entry that is still small enough to wrap: the regression this guards is the
+  // 500-node threshold sending every transcript-shaped entry to the single-line virtual list.
+  const denseDescription = "A long tool description. ".repeat(20) + "tail-marker-heavy";
+  sample.push({
+    name: "dense",
+    tools: Array.from({ length: 14 }, (_, i) => ({
+      name: `tool_${i}`,
+      description: i === 1 ? denseDescription : `Short description ${i}`,
+      parameters: {
+        type: "object",
+        properties: { input: { type: "string" } },
+        required: ["input"],
+      },
+    })),
+    messages: Array.from({ length: 80 }, (_, i) => ({
+      role: i % 2 ? "assistant" : "user",
+      content: [{ type: "text", text: `message ${i} ` + "x".repeat(20) }],
+      meta: { index: i, ok: true },
+    })),
+    note: "a heavy but wrap-eligible entry",
+  });
 
   return sample.map((value, index) => {
     if (index === 2) {

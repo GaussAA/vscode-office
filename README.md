@@ -78,10 +78,10 @@ lists entries, the right pane renders the selected entry as a tree (or as raw te
 - **The directory reads identity**, not just the raw head: an entry's top-level identity key
   is used when present, and an object-valued one is looked into one level (`id: { query }`).
 - **Long values are readable, not clipped.** The tree is an overview: large entries use one
-  fixed-height line per row with a 120-character string preview, while small entries (≤500
+  fixed-height line per row with a 120-character string preview, while small entries (≤2,000
   nodes) still wrap leaf strings up to 2,000 characters. Either way, selecting a row opens a
   value panel docked under it with the full text, the path, the type, the character count and
-  a whole-value copy. Entries above 500 nodes fall back to a fixed-height virtual list so a
+  a whole-value copy. Entries above 2,000 nodes fall back to a fixed-height virtual list so a
   pathological line cannot freeze the UI.
 - **The limits say so.** A line above 8 MB is shown as raw text instead of a tree; a line above
   1,000,000 characters is a marked prefix; the tree reports its 20,000-node cap instead of

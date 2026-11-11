@@ -5,6 +5,7 @@ import {
   MAX_DEPTH,
   buildEntryModel,
   countNodes,
+  WRAP_NODE_LIMIT,
   fullValueText,
   makePathKey,
 } from "@/react/view/jsonl/jsonlFormat";
@@ -27,11 +28,11 @@ function maxDepth(nodes: ChainNode[], depth = 1): number {
 }
 
 test("countNodes: exactly the limit still fits, one more does not", () => {
-  assert.equal(countNodes(objectOfSize(500)), 500);
-  // Regression: returning exactly `limit` here made a 501-node entry look wrappable.
+  assert.equal(countNodes(objectOfSize(WRAP_NODE_LIMIT)), WRAP_NODE_LIMIT);
+  // Regression: returning exactly `limit` here made one-more-node entries look wrappable.
   assert.equal(
-    countNodes(objectOfSize(501)),
-    501,
+    countNodes(objectOfSize(WRAP_NODE_LIMIT + 1)),
+    WRAP_NODE_LIMIT + 1,
     "crossing the cap must be reported as limit + 1",
   );
 });
@@ -100,13 +101,13 @@ test("buildEntryModel: decides wrapping itself, in the same walk that builds the
   const small = buildEntryModel({ a: 1, b: "two" });
   assert.equal(small.wrap, true);
 
-  const big = buildEntryModel(objectOfSize(600));
+  const big = buildEntryModel(objectOfSize(WRAP_NODE_LIMIT + 1));
   assert.equal(big.wrap, false);
 
   // The boundary is inclusive: exactly `wrapNodeLimit` nodes still wrap.
-  const atLimit = buildEntryModel(objectOfSize(500));
+  const atLimit = buildEntryModel(objectOfSize(WRAP_NODE_LIMIT));
   assert.equal(atLimit.wrap, true);
-  assert.equal(buildEntryModel(objectOfSize(501)).wrap, false);
+  assert.equal(buildEntryModel(objectOfSize(WRAP_NODE_LIMIT + 1)).wrap, false);
 });
 
 test("buildEntryModel: wrap mode cuts very long strings, single-line mode does not", () => {

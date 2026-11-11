@@ -295,12 +295,46 @@ export default [
             })()`);
       const state = json(reached);
       expect(!state.missing, "the virtual tree has no scroll holder");
-      expect(/401 more keys/.test(state.text ?? ""), `overflow row is ${state.text}`);
+      expect(/2301 more keys/.test(state.text ?? ""), `overflow row is ${state.text}`);
       expect(
         state.visible,
         `overflow row is outside the viewport (${state.scrollTop}/${state.max})`,
       );
-      return `last row "${state.text}" reached at ${state.scrollTop}/${state.max}px`;
+      return `2,500-key entry: last row "${state.text}" reached at ${state.scrollTop}/${state.max}px`;
+    },
+  },
+  {
+    name: "jsonl-heavy-entry-wraps",
+    async run({ page, base }) {
+      await openJsonl(page, base);
+      await jumpJsonl(page, 16);
+      const ready = await page.waitFor(
+        `document.querySelector('.jsonl-detail__index')?.innerText === 'L16' && !!document.querySelector('.jsonl-detail__tree')`,
+      );
+      expect(ready, "the heavy entry never rendered");
+      const state = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const values = [...document.querySelectorAll('.jsonl-detail__tree .jsonl-val')]
+                    .map(node => node.textContent ?? "");
+                const description = values.find(text => text.includes("tail-marker-heavy")) ?? "";
+                return {
+                    scroll: !!document.querySelector('.jsonl-detail__scroll'),
+                    wraps: document.querySelectorAll('.jsonl-detail__tree .jsonl-val--wrap').length,
+                    description,
+                };
+            })())`),
+      );
+      expect(state.scroll, "the heavy entry stayed in the single-line virtual list");
+      expect(state.wraps > 0, "no wrapped values in the heavy entry");
+      expect(
+        state.description.length > 400,
+        `description is only ${state.description.length} chars`,
+      );
+      expect(
+        state.description.endsWith("tail-marker-heavy"),
+        `description tail is ${state.description.slice(-40)}`,
+      );
+      return `${state.wraps} wrapped values; heavy-entry description ${state.description.length} chars`;
     },
   },
   {

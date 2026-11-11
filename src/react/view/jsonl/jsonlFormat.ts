@@ -28,7 +28,7 @@ export const AUTO_EXPAND_LIMIT = 300;
 /** Default expansion depth for larger entries. */
 export const DEFAULT_EXPAND_DEPTH = 2;
 /** Entries at or below this node count render with wrapping (virtual scrolling off). */
-export const WRAP_NODE_LIMIT = 500;
+export const WRAP_NODE_LIMIT = 2_000;
 /** Strings longer than this are cut even in wrap mode. */
 export const WRAP_TEXT_LIMIT = 2000;
 
