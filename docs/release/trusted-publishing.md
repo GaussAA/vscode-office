@@ -12,14 +12,14 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 
 ## 已经查过的现状（2026-11-06）
 
-| 事实                                                | 怎么查的                                                  | 结论                                         |
-| --------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------- |
-| Marketplace 上没有 `GaussAA.office-viewer-plus`     | Gallery `extensionquery` API，`filterType: 7`             | 未发布过                                     |
-| 同一个查询能查到上游 `cweijan.vscode-office` v4.2.3 | 同上                                                      | 说明查询本身有效，上一条的"查不到"是有意义的 |
-| Open VSX 上没有 `GaussAA/office-viewer-plus`        | `GET https://open-vsx.org/api/GaussAA/office-viewer-plus` | 404                                          |
-| Open VSX 没有 `GaussAA` 命名空间                    | `GET https://open-vsx.org/api/namespace/GaussAA`          | 404                                          |
-| 仓库里没有任何发布用 secret                         | `gh secret list`                                          | 空（符合设计：两边都不存 secret）            |
-| 仓库是**公开**的                                    | `gh repo view`                                            | 公开 —— Open VSX 的私有仓库注册码流程用不上  |
+| 事实                                                | 怎么查的                                                  | 结论                                                                                                                           |
+| --------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Marketplace 上没有 `GaussAA.office-viewer-plus`     | Gallery `extensionquery` API，`filterType: 7`             | 未发布过                                                                                                                       |
+| 同一个查询能查到上游 `cweijan.vscode-office` v4.2.3 | 同上                                                      | 说明查询本身有效，上一条的"查不到"是有意义的                                                                                   |
+| Open VSX 上没有 `GaussAA/office-viewer-plus`        | `GET https://open-vsx.org/api/GaussAA/office-viewer-plus` | 404                                                                                                                            |
+| Open VSX 没有 `GaussAA` 命名空间                    | `GET https://open-vsx.org/api/GaussAA`                    | **400/404 才是缺失**；`200` 表示存在。不要用 `/api/namespace/<ns>` —— 该端点不存在，对 `cweijan` 也返回 404，是假阴性（见 B1） |
+| 仓库里没有任何发布用 secret                         | `gh secret list`                                          | 空（符合设计：两边都不存 secret）                                                                                              |
+| 仓库是**公开**的                                    | `gh repo view`                                            | 公开 —— Open VSX 的私有仓库注册码流程用不上                                                                                    |
 
 所以这不是"把已有的 PAT 发布改成 OIDC"，而是**两个仓库的首次发布**。这降低了风险：
 没有已存在的版本会被占用，首次失败也不会留下半个版本。
@@ -79,7 +79,6 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 **验证**：`curl -s -o /dev/null -w '%{http_code}' https://open-vsx.org/api/GaussAA` 返回 `200`
 （返回体里 `verified` 为 `true`、`extensions` 为空即「命名空间已就绪、尚无扩展」）。
 
-> 校验命令曾经写成 `/api/namespace/GaussAA`。**那个端点在 Open VSX 上根本不存在**：
 > `/api/namespace/cweijan`（一个确定存在、有 6 个扩展的命名空间）同样返回 404，所以它永远
 > 报「缺失」，是假阴性。正确路径是 `/api/<namespace>`。
 
