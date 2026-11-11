@@ -193,7 +193,6 @@
     "@cweijan/exceljs": "^5.0.3",
     "@vscode/codicons": "^0.0.45",
     "antd": "^6.7.0",
-    "axios": "^1.18.1",
     "buffer": "^6.0.3",
     "hyparquet": "^1.26.1",
     "hyparquet-compressors": "^1.1.2",

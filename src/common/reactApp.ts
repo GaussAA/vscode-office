@@ -1,4 +1,3 @@
-import axios from "axios";
 import * as vscode from "vscode";
 import { extensionResource, getExtensionUri, readExtensionText } from "./extensionResource";
 import { IconService } from "../service/icon/iconService";
@@ -39,9 +38,8 @@ export class ReactApp {
   private static async readContent(): Promise<string> {
     if (this.IS_DEV) {
       const devServerUrl = "http://127.0.0.1:5739";
-      const data: string = (
-        await axios.get(`${devServerUrl}/index.html`, { transformResponse: [] })
-      ).data;
+      const response = await fetch(`${devServerUrl}/index.html`);
+      const data = await response.text();
       return data.replace(/(["'])\/(?=(?:@|src\/|index\.html\?))/g, `$1${devServerUrl}/`);
     }
     return readExtensionText(this.context, "out", "webview", "index.html");

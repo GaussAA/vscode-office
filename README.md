@@ -171,15 +171,7 @@ CI runs all three on every push, together with `pnpm build` and `pnpm run packag
   last previewed document; use the command again.
 - Upstream telemetry has been removed entirely.
 
-## Git History
-
-The extension still ships the Git History workspace (it is a commit browser, not a file
-preview, so the 6.0.0 narrowing did not touch it). Open it from the Source Control view, the
-editor title bar, the editor context menu, or the file explorer context menu.
-
-![Git history](image/README/1783342874748.png)
-
-## Other features
+#### Other features
 
 - YAML: document outline and anchor navigation (Go to Definition for alias references)
 - XML: document formatting
