@@ -4,7 +4,7 @@ import { Button, Modal, Segmented, Tree } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { JsonlEntryDetail } from "../../../common/jsonlTypes.ts";
-import { JSONL_MAX_LINE_BYTES, JSONL_VALUE_TEXT_LIMIT } from "../../../common/jsonlTypes.ts";
+import { JSONL_MAX_LINE_BYTES } from "../../../common/jsonlTypes.ts";
 import type { DataNode } from "antd/es/tree";
 import {
   AUTO_EXPAND_LIMIT,
@@ -12,16 +12,21 @@ import {
   ROW_HEIGHT,
   buildEntryModel,
   formatBytes,
-  fullValueText,
   isComposite,
   jsonText,
-  pathToText,
   preview,
-  readPathKey,
   typeLabel,
-  valueAtPath,
   type NodeModel,
 } from "./jsonlFormat.ts";
+import JsonlValuePanel from "./JsonlValuePanel.tsx";
+import { detailKeyAction } from "./jsonlKeys.ts";
+import {
+  collapsedChars,
+  readActiveValue,
+  readCopyPath,
+  readPanel,
+  readSelection,
+} from "./jsonlSelection.ts";
 
 export type DetailMode = "tree" | "raw";
 
@@ -163,47 +168,23 @@ export default function JsonlDetail({
     [flash],
   );
 
-  const activeValue = useCallback(() => {
-    if (entry?.kind !== "value") return undefined;
-    if (!activeKey) return entry.value;
-    return valueAtPath(entry.value, readPathKey(activeKey));
-  }, [entry, activeKey]);
+  const activeValue = useCallback(() => readActiveValue(entry, activeKey), [entry, activeKey]);
 
   /**
    * The selection panel is the read channel for a value the single-line tree can only
-   * abbreviate. It is the same idea as the parquet inspector, but inline: a modal would
-   * interrupt a task that is literally "read this value and compare it with the next one".
-   *
-   * A scalar root has no tree row to select, so it is always "selected"; otherwise the panel
-   * waits for a row. The full text is built only when the panel opens — computing it on every
-   * selection would stringify a whole subtree for a bar the user may never expand.
+   * abbreviate. `readSelection` owns the rules (scalar root, active key, labels); the full
+   * text is built only when the panel opens, because stringifying a whole subtree for a bar
+   * the user may never expand is the expensive half.
    */
-  const scalarRoot = entry?.kind === "value" && !isComposite(entry.value);
-  const selectedValue = useMemo(() => {
-    if (entry?.kind !== "value") return null;
-    if (!activeKey && !scalarRoot) return null;
-    return {
-      value: activeKey ? valueAtPath(entry.value, readPathKey(activeKey)) : entry.value,
-      path: activeKey ? pathToText(readPathKey(activeKey)) : `L${index + 1}`,
-    };
-  }, [entry, activeKey, index, scalarRoot]);
-  const panelText = useMemo(
-    () => (valueOpen && selectedValue ? fullValueText(selectedValue.value) : null),
-    [valueOpen, selectedValue],
+  const selection = useMemo(
+    () => readSelection(entry, activeKey, index),
+    [entry, activeKey, index],
   );
-  const selectedPreview = useMemo(() => {
-    if (!selectedValue) return "";
-    if (isComposite(selectedValue.value)) return preview(selectedValue.value);
-    const source =
-      typeof selectedValue.value === "string" ? selectedValue.value : String(selectedValue.value);
-    const firstLine = (source.slice(0, 400).trimStart().split("\n", 1)[0] ?? "").trim();
-    return firstLine.length > 160 ? `${firstLine.slice(0, 160)}…` : firstLine;
-  }, [selectedValue]);
-  // A string's length is free; everything else needs the pretty-printed text, so the count
-  // appears only after the panel has been opened.
-  const valueChars =
-    panelText?.chars ??
-    (typeof selectedValue?.value === "string" ? selectedValue.value.length : null);
+  const panelText = useMemo(
+    () => (valueOpen && selection ? readPanel(selection) : null),
+    [valueOpen, selection],
+  );
+  const valueChars = panelText?.chars ?? (selection ? collapsedChars(selection) : null);
 
   /** One adapter build per entry/expansion change; it used to run on every render. */
   const treeData = useMemo<DataNode[]>(() => {
@@ -231,10 +212,7 @@ export default function JsonlDetail({
 
   const copyPath = useCallback(() => {
     if (!entry) return;
-    const text = activeKey
-      ? `L${index + 1} › ${pathToText(readPathKey(activeKey))}`
-      : `L${index + 1}`;
-    void copy(text, "path");
+    void copy(readCopyPath(entry, activeKey, index), "path");
   }, [entry, activeKey, index, copy]);
 
   const expandAll = useCallback(() => {
@@ -264,69 +242,68 @@ export default function JsonlDetail({
   );
 
   const toggleValue = useCallback(() => {
-    if (!selectedValue) return;
+    if (!selection) return;
     setValueOpen((open) => !open);
-  }, [selectedValue]);
+  }, [selection]);
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       // The value toggle, the segmented control and the panel's own scroll area are real
-      // controls; let them handle Enter/Space/arrows themselves or the panel would open and
-      // immediately close, and arrow keys would expand the tree instead of scrolling text.
+      // controls; the keymap lets them handle Enter/Space/arrows themselves or the panel
+      // would open and immediately close. Copy stays ahead of that guard.
       const target = event.target;
       const onControl =
         target instanceof Element &&
         !!target.closest("button, input, textarea, [role=radio], .jsonl-valuebar__body");
       const nativeText =
         target instanceof Element && !!target.closest("input, textarea, .jsonl-valuebar__body");
-      if (event.key === "Escape" && valueOpen) {
-        event.preventDefault();
-        setValueOpen(false);
-        // The panel's scroll area is unmounted here; leaving focus on <body> would strand a
-        // keyboard user at the top of the document.
-        toggleRef.current?.focus();
-        return;
-      }
-      // rc-tree handles Arrow/Enter/Space on its focused rows and calls preventDefault.
-      // Running our expansion/toggle after that is the double-handling this guard removes.
-      if (event.defaultPrevented) return;
-      // Copy works from the toggle and the segmented control too, not only from the tree;
-      // inputs and the panel's text keep the browser's own copy.
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c" && !nativeText) {
-        event.preventDefault();
-        if (event.shiftKey) copyPath();
-        else copyValue();
-        return;
-      }
-      if (onControl) return;
-      if (selectedValue && event.key === "Enter") {
-        event.preventDefault();
-        toggleValue();
-        return;
-      }
-      if (activeKey) {
-        if (event.key === "ArrowRight") {
+      const action = detailKeyAction({
+        key: event.key,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+        defaultPrevented: event.defaultPrevented,
+        onControl,
+        nativeText,
+        hasSelection: !!selection,
+        panelOpen: valueOpen,
+        hasActiveKey: !!activeKey,
+      });
+      switch (action.type) {
+        case "close-panel":
           event.preventDefault();
-          mutateExpansion((keys) => (keys.includes(activeKey) ? keys : [...keys, activeKey]));
+          setValueOpen(false);
+          // The panel's scroll area is unmounted here; leaving focus on <body> would strand
+          // a keyboard user at the top of the document.
+          toggleRef.current?.focus();
+          return;
+        case "copy":
+          event.preventDefault();
+          if (action.target === "path") copyPath();
+          else copyValue();
+          return;
+        case "toggle-panel":
+          event.preventDefault();
+          toggleValue();
+          return;
+        case "expand":
+        case "collapse":
+        case "toggle-expand": {
+          if (!activeKey) return;
+          event.preventDefault();
+          mutateExpansion((keys) => {
+            const open = keys.includes(activeKey);
+            if (action.type === "expand") return open ? keys : [...keys, activeKey];
+            if (action.type === "collapse") return keys.filter((key) => key !== activeKey);
+            return open ? keys.filter((key) => key !== activeKey) : [...keys, activeKey];
+          });
           return;
         }
-        if (event.key === "ArrowLeft") {
-          event.preventDefault();
-          mutateExpansion((keys) => keys.filter((key) => key !== activeKey));
+        case "ignore":
           return;
-        }
-        if (event.key === " " || event.key === "Spacebar") {
-          event.preventDefault();
-          mutateExpansion((keys) =>
-            keys.includes(activeKey)
-              ? keys.filter((key) => key !== activeKey)
-              : [...keys, activeKey],
-          );
-          return;
-        }
       }
     },
-    [activeKey, copyPath, copyValue, mutateExpansion, selectedValue, toggleValue, valueOpen],
+    [activeKey, copyPath, copyValue, mutateExpansion, selection, toggleValue, valueOpen],
   );
 
   const header = (
@@ -445,46 +422,17 @@ export default function JsonlDetail({
     body = <div className="jsonl-empty">{$t("jsonl.noTree")}</div>;
   }
 
-  const valuePanel = selectedValue ? (
-    <div className={`jsonl-valuebar${valueOpen ? " jsonl-valuebar--open" : ""}`}>
-      <button
-        ref={toggleRef}
-        type="button"
-        className="jsonl-valuebar__toggle"
-        aria-expanded={valueOpen}
-        aria-label={valueOpen ? $t("jsonl.hideValue") : $t("jsonl.showValue")}
-        onClick={() => setValueOpen((open) => !open)}
-        title={valueOpen ? $t("jsonl.hideValue") : $t("jsonl.showValue")}
-      >
-        <span className="jsonl-valuebar__path">{selectedValue.path}</span>
-        <span className="jsonl-valuebar__preview">{selectedPreview || "—"}</span>
-        {valueChars !== null && valueChars !== 1 && (
-          <span className="jsonl-valuebar__count">
-            {typeLabel(selectedValue.value)} ·{" "}
-            {$t("jsonl.valueChars", { count: valueChars.toLocaleString() })}
-          </span>
-        )}
-        <span
-          className={`codicon ${valueOpen ? "codicon-chevron-down" : "codicon-chevron-up"}`}
-          aria-hidden="true"
-        />
-      </button>
-      {valueOpen && panelText && (
-        <div className="jsonl-valuebar__body">
-          {panelText.truncated && (
-            <div className="jsonl-valuebar__notice">
-              {$t("jsonl.valueTruncated", {
-                shown: JSONL_VALUE_TEXT_LIMIT.toLocaleString(),
-                total: panelText.chars.toLocaleString(),
-              })}
-            </div>
-          )}
-          <pre className="jsonl-valuebar__text" tabIndex={0}>
-            {panelText.text}
-          </pre>
-        </div>
-      )}
-    </div>
+  const valuePanel = selection ? (
+    <JsonlValuePanel
+      path={selection.panelPath}
+      preview={selection.preview}
+      typeLabel={selection.typeLabel}
+      chars={valueChars}
+      open={valueOpen}
+      panel={panelText}
+      toggleRef={toggleRef}
+      onToggle={toggleValue}
+    />
   ) : null;
 
   return (

@@ -20,8 +20,9 @@ counts — not DOM assertions — are the evidence.
 
 ```
 scripts/perf/
-├── runner.mjs    scenarios + budgets + CLI (exit code is the gate); bundles the JSONL
-│                 host services with esbuild for the two Node-only checks
+├── runner.mjs    scenarios + budgets + CLI (exit code is the gate)
+├── jsonl.mjs     the two Node-only checks; bundles the host services with esbuild
+├── expect.mjs    the assertion primitive shared by both scenario modules
 ├── harness.mjs   HTTP server: built HTML from out/webview, fake bridge, Range + byte counting
 └── fixtures.mjs  generates two ONE-ROW-GROUP parquet files with hyparquet-writer, plus the
                   JSONL fixtures (40 × 2 MB lines, 200k log lines) into .perf/
@@ -35,7 +36,7 @@ workspace; the in-page stopwatch (`window.__bench.t0` → `ready`, two frames af
 row paints) keeps DevTools round-trip time out of the duration.
 
 The JSONL checks are host-side on purpose: indexing, window parsing and the whole-file scan
-happen in the extension host, so the browser harness cannot see them. The runner bundles
+happen in the extension host, so the browser harness cannot see them. The JSONL module bundles
 `jsonlFile.ts`, `jsonlSession.ts` and `jsonlFormat.ts` with esbuild into a temp directory and
 imports the ESM output. The window check asserts the **returned row count** (≤3 for 2 MB
 lines), not only time: that is the deterministic proof that the 4 MB budget is applied.
