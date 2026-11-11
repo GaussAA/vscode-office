@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-10T04:55:00Z",
-  "title": "Design System: Office Viewer Plus",
+  "generatedAt": "2026-11-11T08:01:41.015Z",
+  "title": "Design System: Data File Viewer (Parquet, JSONL, Excel)",
   "extensions": {
     "colorMeta": {
       "editor-surface": {
@@ -306,13 +306,22 @@
       }
     },
     "typographyMeta": {
-      "title": { "displayName": "Title", "purpose": "决策面板标题，整个扩展最多两处。" },
-      "body": { "displayName": "Body", "purpose": "说明文字、空状态、错误正文、决策正文。" },
+      "title": {
+        "displayName": "Title",
+        "purpose": "决策面板标题，整个扩展最多两处。"
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "说明文字、空状态、错误正文、决策正文。"
+      },
       "data": {
         "displayName": "Data",
         "purpose": "表格单元格与 JSONL 键值文本；一切「值」都用它。"
       },
-      "input": { "displayName": "Input", "purpose": "搜索框与行号跳转框内的文字。" },
+      "input": {
+        "displayName": "Input",
+        "purpose": "搜索框与行号跳转框内的文字。"
+      },
       "meta-value": {
         "displayName": "Meta Value",
         "purpose": "顶栏计数（行数、列数、命中数），必须等宽数字。"
@@ -324,18 +333,22 @@
       "badge": {
         "displayName": "Badge",
         "purpose": "类型徽标（STRING / INT64 / LIST），9.5px 等宽。"
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "计数、路径、状态、行号、值面板类型与字符数、截断说明；正文最低 12px。"
       }
     },
     "shadows": [
       {
-        "name": "floating-sponsor",
-        "value": "0 4px 14px rgba(0, 0, 0, 0.18)",
-        "purpose": "唯一一处自造阴影：停在视口左下角、确实浮在所有内容之上的赞助条。"
+        "name": "grid-end-hairline",
+        "value": "inset 0 -1px 0 color-mix(in srgb, #cccccc 12%, transparent)",
+        "purpose": "表格铺满视口后，数据可能停在底部之前；这条内阴影说表格到此为止。用 box-shadow 而不是 border，避免改变决定一屏行数的测量值。"
       },
       {
         "name": "inset-focus-ring",
         "value": "inset 0 0 0 1px #0078d4",
-        "purpose": "输入类控件的焦点描边。用 inset ring 而不是外发光。"
+        "purpose": "输入类控件的焦点描边；用 inset ring 而不是外发光。"
       }
     ],
     "motion": [
@@ -344,7 +357,11 @@
         "value": "0.12s ease",
         "purpose": "图标按钮、分页按钮、字段行的背景与前景变化。"
       },
-      { "name": "surface-state", "value": "0.15s ease", "purpose": "搜索框聚焦、拖拽手柄高亮。" },
+      {
+        "name": "surface-state",
+        "value": "0.15s ease",
+        "purpose": "搜索框聚焦、拖拽手柄高亮。"
+      },
       {
         "name": "row-tint",
         "value": "0.1s ease",
@@ -357,7 +374,11 @@
       }
     ],
     "breakpoints": [
-      { "name": "wide-meta", "value": "1080px", "purpose": "隐掉顶栏 meta 的字段名，只留数值。" },
+      {
+        "name": "wide-meta",
+        "value": "1080px",
+        "purpose": "隐掉顶栏 meta 的字段名，只留数值。"
+      },
       {
         "name": "drop-author",
         "value": "860px",
@@ -366,7 +387,7 @@
       {
         "name": "compact",
         "value": "720px",
-        "purpose": "隐掉整块 meta，侧栏最大 40vw，浮动赞助条隐藏。"
+        "purpose": "隐掉整块 meta，侧栏最大 40vw；JSON 预览左栏也收窄。"
       },
       {
         "name": "jsonl-tight",
@@ -381,7 +402,7 @@
       "kind": "button",
       "refersTo": "icon-button",
       "description": "搜索框内的清除/上一个/下一个。26px 方块，默认 muted，hover 才出现底色。",
-      "html": "<button class=\"ds-icon-button\" aria-label=\"上一个匹配\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" aria-hidden=\"true\"><path d=\"M10 3 5 8l5 5\"/></svg></button>",
+      "html": "<button class=\"ds-icon-button\" aria-label=\"Previous match\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" aria-hidden=\"true\"><path d=\"M10 3 5 8l5 5\"/></svg></button>",
       "css": ".ds-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #9d9d9d; cursor: pointer; transition: color 0.12s ease, background 0.12s ease; } .ds-icon-button:hover { color: #cccccc; background: color-mix(in srgb, #cccccc 13%, #252526); } .ds-icon-button:active { background: color-mix(in srgb, #cccccc 18%, #252526); } .ds-icon-button:focus-visible { outline: 1px solid #0078d4; outline-offset: 1px; }"
     },
     {
@@ -389,7 +410,7 @@
       "kind": "button",
       "refersTo": "pager-button",
       "description": "底栏分页按钮。28px 高，11px/500 文字；页码本身是固定宽度的信息块，翻页不抖动。",
-      "html": "<button class=\"ds-pager-button\">首页</button>",
+      "html": "<button class=\"ds-pager-button\">First page</button>",
       "css": ".ds-pager-button { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 5px; border: 0; border-radius: 6px; background: transparent; color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; font-size: 11px; font-weight: 500; cursor: pointer; transition: color 0.12s ease, background 0.12s ease; } .ds-pager-button:hover:not(:disabled) { background: color-mix(in srgb, #cccccc 13%, #252526); } .ds-pager-button:active:not(:disabled) { background: color-mix(in srgb, #cccccc 18%, #252526); } .ds-pager-button:focus-visible { outline: 1px solid #0078d4; outline-offset: 1px; } .ds-pager-button:disabled { opacity: 0.35; cursor: default; }"
     },
     {
@@ -397,8 +418,8 @@
       "kind": "input",
       "refersTo": "search-field",
       "description": "顶栏的文件内搜索。32px 高、8px 圆角、无边框；聚焦时加 inset 1px 焦点环，不加外发光。",
-      "html": "<div class=\"ds-search-field\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" aria-hidden=\"true\"><circle cx=\"7\" cy=\"7\" r=\"4.5\"/><path d=\"m10.5 10.5 3 3\"/></svg><input class=\"ds-search-input\" type=\"text\" placeholder=\"在文件内查找\"><button class=\"ds-icon-button\" aria-label=\"清除\">✕</button></div>",
-      "css": ".ds-search-field { display: flex; align-items: center; gap: 6px; width: 340px; max-width: 100%; height: 32px; box-sizing: border-box; padding: 0 4px 0 10px; border-radius: 8px; background: color-mix(in srgb, #cccccc 8%, #252526); color: #9d9d9d; transition: background 0.15s ease, box-shadow 0.15s ease; } .ds-search-field:focus-within { box-shadow: inset 0 0 0 1px #0078d4; } .ds-search-input { flex: 1; min-width: 0; height: 30px; border: 0; outline: none; background: transparent; color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; font-size: 12px; } .ds-search-input::placeholder { color: #9d9d9d; }"
+      "html": "<div class=\"ds-search-field\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" aria-hidden=\"true\"><circle cx=\"7\" cy=\"7\" r=\"4.5\"/><path d=\"m10.5 10.5 3 3\"/></svg><input class=\"ds-search-input\" type=\"text\" placeholder=\"Search in file\"><button class=\"ds-search-clear\" type=\"button\" aria-label=\"Clear\">✕</button></div>",
+      "css": ".ds-search-field { display: flex; align-items: center; gap: 6px; width: 340px; max-width: 100%; height: 32px; box-sizing: border-box; padding: 0 4px 0 10px; border-radius: 8px; background: color-mix(in srgb, #cccccc 8%, #252526); color: #9d9d9d; transition: background 0.15s ease, box-shadow 0.15s ease; } .ds-search-field:focus-within { box-shadow: inset 0 0 0 1px #0078d4; } .ds-search-input { flex: 1; min-width: 0; height: 30px; border: 0; outline: none; background: transparent; color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; font-size: 12px; } .ds-search-input::placeholder { color: #9d9d9d; } .ds-search-clear { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #9d9d9d; font: 12px/1 -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; cursor: pointer; transition: color 0.12s ease, background 0.12s ease; } .ds-search-clear:hover { color: #cccccc; background: color-mix(in srgb, #cccccc 13%, #252526); } .ds-search-clear:focus-visible { outline: 1px solid #0078d4; outline-offset: 1px; }"
     },
     {
       "name": "Field Row",
@@ -406,7 +427,7 @@
       "refersTo": "list-row",
       "description": "标志性组件：侧栏 schema 字段行。整行是 button，aria-pressed 表示当前跳转到的列。",
       "html": "<button class=\"ds-field-row\" aria-pressed=\"true\"><svg class=\"ds-field-row__icon\" width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" aria-hidden=\"true\"><path d=\"M2 4h12M2 8h12M2 12h7\"/></svg><span class=\"ds-field-row__name\">tags_json</span><span class=\"ds-field-row__type\">LIST</span></button>",
-      "css": ".ds-field-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; box-sizing: border-box; padding: 6px 8px; margin-bottom: 1px; border: 0; border-radius: 6px; background: color-mix(in srgb, #3794ff 12%, transparent); color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; text-align: left; cursor: pointer; transition: background 0.12s ease; } .ds-field-row:hover { background: color-mix(in srgb, #3794ff 16%, transparent); } .ds-field-row:focus-visible { outline: 1px solid #0078d4; outline-offset: -1px; } .ds-field-row__icon { flex-shrink: 0; color: #4db6ac; } .ds-field-row__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3794ff; font-size: 12px; font-weight: 500; } .ds-field-row__type { flex-shrink: 0; max-width: 94px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 6px; border-radius: 4px; background: color-mix(in srgb, #cccccc 8%, #252526); color: #9d9d9d; font-family: ui-monospace, Consolas, monospace; font-size: 9.5px; line-height: 1.4; }"
+      "css": ".ds-field-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; box-sizing: border-box; padding: 6px 8px; margin-bottom: 1px; border: 0; border-radius: 6px; background: color-mix(in srgb, #3794ff 12%, transparent); color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; text-align: left; cursor: pointer; transition: background 0.12s ease; } .ds-field-row:hover { background: color-mix(in srgb, #3794ff 16%, transparent); } .ds-field-row:focus-visible { outline: 1px solid #0078d4; outline-offset: -1px; } .ds-field-row__icon { flex-shrink: 0; color: #b180d7; } .ds-field-row__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3794ff; font-size: 12px; font-weight: 500; } .ds-field-row__type { flex-shrink: 0; max-width: 94px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 6px; border-radius: 4px; background: color-mix(in srgb, #cccccc 8%, #252526); color: #9d9d9d; font-family: ui-monospace, Consolas, monospace; font-size: 9.5px; line-height: 1.4; }"
     },
     {
       "name": "Type Badge",
@@ -437,34 +458,59 @@
       "kind": "nav",
       "refersTo": "command-bar",
       "description": "唯一横向贯穿的元素。52px 高，与底栏只差高度与内距，不做不同底色。",
-      "html": "<div class=\"ds-command-bar\"><div class=\"ds-search-field\"><input class=\"ds-search-input\" type=\"text\" placeholder=\"在文件内查找\"></div><span class=\"ds-meta-label\">行</span><span class=\"ds-meta-value\">250,000</span></div>",
-      "css": ".ds-command-bar { display: flex; align-items: center; gap: 12px; height: 52px; box-sizing: border-box; padding: 8px 16px; background: color-mix(in srgb, #cccccc 8%, #2d2d2d); } .ds-meta-label { margin-left: auto; color: #9d9d9d; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; } .ds-meta-value { color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }"
+      "html": "<div class=\"ds-command-bar\"><div class=\"ds-command-bar__search\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" aria-hidden=\"true\"><circle cx=\"7\" cy=\"7\" r=\"4.5\"/><path d=\"m10.5 10.5 3 3\"/></svg><input class=\"ds-command-bar__input\" type=\"text\" placeholder=\"Search in file\"></div><span class=\"ds-meta-label\">ROWS</span><span class=\"ds-meta-value\">250,000</span></div>",
+      "css": ".ds-command-bar { display: flex; align-items: center; gap: 12px; height: 52px; box-sizing: border-box; padding: 8px 16px; background: color-mix(in srgb, #cccccc 8%, #2d2d2d); } .ds-command-bar__search { display: flex; align-items: center; gap: 6px; width: 340px; max-width: 50%; height: 32px; box-sizing: border-box; padding: 0 10px; border-radius: 8px; background: color-mix(in srgb, #cccccc 8%, #252526); color: #9d9d9d; transition: background 0.15s ease, box-shadow 0.15s ease; } .ds-command-bar__search:focus-within { box-shadow: inset 0 0 0 1px #0078d4; } .ds-command-bar__input { flex: 1; min-width: 0; height: 30px; border: 0; outline: none; background: transparent; color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; font-size: 12px; } .ds-command-bar__input::placeholder { color: #9d9d9d; } .ds-meta-label { margin-left: auto; color: #9d9d9d; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; } .ds-meta-value { color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "JSON Record Row",
+      "kind": "custom",
+      "description": "JSON 预览的记录行：虚拟列表的一行，`[index]` 是稳定地址，身份标签来自顶层身份键。选中态用列表激活底色，不新增色相。",
+      "html": "<div class=\"ds-json-record ds-json-record--selected\" role=\"option\" aria-selected=\"true\"><span class=\"ds-json-record__index\">[12]</span><span class=\"ds-json-record__label\">alpha</span></div>",
+      "css": ".ds-json-record { display: flex; align-items: center; gap: 8px; height: 28px; box-sizing: border-box; padding: 0 8px; border-radius: 6px; background: #252526; color: #cccccc; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; white-space: nowrap; cursor: pointer; } .ds-json-record:hover { background: rgba(90, 93, 94, 0.28); } .ds-json-record--selected { background: color-mix(in srgb, #04395e 82%, #252526); color: #ffffff; } .ds-json-record__index { flex: 0 0 40px; overflow: hidden; color: #6e7681; font-size: 10.5px; text-align: right; text-overflow: ellipsis; font-variant-numeric: tabular-nums; } .ds-json-record__label { min-width: 0; overflow: hidden; color: #b180d7; font-weight: 600; text-overflow: ellipsis; } .ds-json-record--selected .ds-json-record__index, .ds-json-record--selected .ds-json-record__label { color: #ffffff; } .ds-json-record:focus-visible { outline: 1px solid #0078d4; outline-offset: -1px; }"
+    },
+    {
+      "name": "Selection Panel",
+      "kind": "custom",
+      "description": "JSONL / JSON 的停靠值面板：折叠时 34px 一行给路径、预览和类型；展开正文最多 200px 并内部滚动。它是详情的一部分，不遮住树。",
+      "html": "<div class=\"ds-value-panel\"><button class=\"ds-value-panel__toggle\" type=\"button\" aria-expanded=\"true\" aria-label=\"Collapse value\"><span class=\"ds-value-panel__path\">tools[0].input.q</span><span class=\"ds-value-panel__preview\">alpha</span><span class=\"ds-value-panel__count\">string · 5 chars</span><svg width=\"10\" height=\"10\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" aria-hidden=\"true\"><path d=\"m3 6 5 5 5-5\"/></svg></button><pre class=\"ds-value-panel__body\" tabindex=\"0\">alpha</pre></div>",
+      "css": ".ds-value-panel { background: #252526; color: #cccccc; } .ds-value-panel__toggle { display: flex; align-items: center; gap: 10px; width: 100%; height: 34px; box-sizing: border-box; padding: 0 16px; border: 0; background: transparent; color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; font-size: 12px; text-align: left; cursor: pointer; } .ds-value-panel__toggle:hover { background: color-mix(in srgb, #cccccc 13%, #252526); } .ds-value-panel__toggle:active { background: color-mix(in srgb, #cccccc 18%, #252526); } .ds-value-panel__toggle:focus-visible { outline: 1px solid #0078d4; outline-offset: -1px; } .ds-value-panel__path { flex: 0 0 auto; max-width: 34%; overflow: hidden; color: #b180d7; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; } .ds-value-panel__preview { flex: 1 1 auto; min-width: 0; overflow: hidden; color: #cccccc; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; } .ds-value-panel__count { flex: 0 0 auto; color: #9d9d9d; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-value-panel__toggle svg { flex: 0 0 auto; color: #9d9d9d; } .ds-value-panel__body { max-height: 200px; margin: 0; padding: 8px 10px; overflow: auto; border-radius: 6px; background: #1e1e1e; color: #cccccc; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; } .ds-value-panel__body:focus-visible { outline: 1px solid #0078d4; outline-offset: -1px; }"
     }
   ],
   "narrative": {
     "northStar": "仪器舱 The Instrument Bay",
-    "overview": "VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有自己的配色：它读宿主的变量，主题换一次，仪表跟着换一次。颜色因此是稀缺资源，只花在信号上——一个值是什么类型、这里能点、搜索命中了哪几个字、这一列刚被选中。其余一切（面板、表头、工具栏、行底纹）都只是同一块底色被混入不同比例的前景，一个色相都不新增。\n\n密度就是效率。这套界面服务的是「打开一个 377 MB 的文件，一眼知道里面有什么」，所以行高、内距、字号都被压到还能读的下限：数据 12px 等宽，标签 10px 大写，顶栏 52px。装饰性留白、卡片、渐变、插画一概没有——它们不承担任何信息。\n\n语气是冷静、精确、不解释。不做引导层、不写欢迎语、不加图标墙；空状态与错误只给一条事实和下一步。界面像 IDE 自带的一部分，而不是一个装进去的应用。",
+    "overview": "VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有自己的配色：它读宿主的变量，主题换一次，仪表跟着换一次。颜色因此是稀缺资源，只花在信号上——一个值是什么类型、这里能点、搜索命中了哪几个字、这一列刚被选中。其余一切（面板、表头、工具栏、行底纹）都只是同一块底色被混入不同比例的前景，一个色相都不新增。\n\nJSON 预览不是第四个 viewer，它是同一机身上的检查探头：命令打开，不接管 `.json`，读数语言与 JSONL 同源。记录列表、树、值面板和键盘不另起一套，只是把左栏从“行目录”换成“记录目录”。\n\n密度就是效率。这套界面服务的是「打开一个 377 MB 的文件，三十秒内知道里面有什么」，所以行高、内距、字号都被压到还能读的下限：数据 12px 等宽，标签 10px 大写，顶栏 52px。装饰性留白、卡片、渐变、插画一概没有——它们不承担任何信息。\n\n语气是冷静、精确、不解释。不做引导层、不写欢迎语、不加图标墙；空状态与错误只给一条事实和下一步（`没有匹配的行` + 清除按钮，`这个文件太大` + 用文本编辑器打开）。界面像 IDE 自带的一部分，而不是一个装进去的应用。",
     "keyCharacteristics": [
       "每个表面都是「顶栏 / 主体 / 底栏」的 100vh flex 三件套，只有中间滚动。",
-      "颜色 100% 来自 --vscode-*，缺失时用暗色兜底；仅有的自造色是 light 主题下六个对比度修正值。",
+      "颜色 100% 来自 `--vscode-*`，缺失时用暗色兜底；自造色只有两处，都必须在这里登记：① light 主题下的对比度修正值（六个数据色 + 一个 `--pv-muted: #5c5c5c`，后者不在调色板里，只修对比度）；② `highlight.less` 的 JSON token 色 `#f2cc60` / `#1f2328`（宿主没有等价的语法高亮 token，理由见该文件注释）。",
       "零分割线、零装饰阴影；层次 = 底色亮度差（92% 底 + 8% 前景的那一类混合）。",
-      "所有数字 tabular-nums；所有「值」等宽，所有「标签」非等宽。",
-      "焦点永远是 1px focusBorder 描边（outline 或 inset ring），没有光晕、没有位移。"
+      "所有数字 `tabular-nums`；所有「值」等宽，所有「标签」非等宽。",
+      "焦点永远是 1px `focusBorder` 描边（outline 或 inset ring），没有光晕、没有位移。",
+      "JSON 预览是 Command preview：复用 JSONL 的 Splitter、记录行、树、值面板和键盘，不新增视觉世界，也不注册 `.json`。"
     ],
     "rules": [
       {
         "name": "The Borrowed Palette Rule",
-        "body": "界面不拥有任何颜色。每个色值都写成 var(--vscode-<token>, <兜底>)；兜底只保证「主题变量缺失时仍然像 VS Code」，不构成一套独立配色。禁止新增与主题无关的品牌色。",
+        "body": "界面不拥有任何颜色。每个色值都写成 `var(--vscode-<token>, <兜底>)`；兜底只保证「主题变量缺失时仍然像 VS Code」，不构成一套独立配色。禁止新增与主题无关的品牌色。",
+        "section": "colors"
+      },
+      {
+        "name": "The One Host Lookup Rule",
+        "body": "同一个宿主变量只读一次，语义差异用别名表达。parquet 的十个图标色原本各自重复读取四个 `--vscode-charts-*`：改一次颜色要改三处，且随时可能漂移。现在六个 `--pv-chart-*` 各读一次，图标色是它们的别名（`--pv-icon-rows` → `--pv-chart-blue`），由 `verify:ui` 的 `parquet-tokens` 断言别名图真的一致 —— 设计 token 只有在解析值一致时才算单一事实来源。",
+        "section": "colors"
+      },
+      {
+        "name": "The One Token Layer Rule",
+        "body": "这个仓库只有一层 token：各组件的 `--pv-*` / `--jl-*` / 各自前缀，每个都写在**被引入的**样式表里。曾有一个 `viewerTheme.css` 定义十四变量 `--viewer-*` 层，声明得像其它视图在用：没有一处 import，构建产物里一个字都没有，`--viewer-accent` 指 `textLink-foreground` 而 `--pv-accent` 指 `button-background`。已删除；`test/unit/stylesheets.test.ts` 现在断言「`src/react` 下每个样式表都被某处引入」，孤儿样式表读起来像活代码，正是最难被发现的死代码。",
         "section": "colors"
       },
       {
         "name": "The Chart-Colour Is Not Text Rule",
-        "body": "--vscode-charts-* 是为图形调过的色。12px 文本需要更高的对比度，所以浅色主题下这六个色被显式覆盖为同色相的更深值（-on-light 系列），并由 verify:ui 的 ≥4.5:1 断言守住。新增数据色必须同时给出浅色值，否则只能在图标上用。",
+        "body": "`--vscode-charts-*` 是为图形调过的色。12px 文本需要更高的对比度，所以浅色主题下这六个色被显式覆盖为同色相的更深值（`-on-light` 系列），并由 `verify:ui` 的 ≥4.5:1 断言守住。新增数据色必须同时给出浅色值，否则只能在图标上用。",
         "section": "colors"
       },
       {
         "name": "The Thin Mix Rule",
-        "body": "层次只允许用 3.5%–18% 的前景混入表达：隔行底纹 3.5%、控件底 8%（hover 13%、按下 18%）、搜索命中 18%、目标行 18%、列高亮 7%（hover 11%）、激活行底 12%（hover 16%）。超过 18% 就不再是层次，而是第二个界面。",
+        "body": "层次只允许用 3.5%–22% 的前景混入表达：隔行底纹 3.5%、控件底 8%（hover 13%、按下 18%）、列高亮 7%（hover 11%）、激活行底 12%（hover 16%）、目标行 18%、搜索命中 22%。超过 22% 就不再是层次，而是第二个界面。",
         "section": "colors"
       },
       {
@@ -479,17 +525,22 @@
       },
       {
         "name": "The Tabular Rule",
-        "body": "任何可能对齐的数字都加 font-variant-numeric: tabular-nums：计数、行号、页码、单元格数字、JSON token 数字。数字在表里跳宽是不可接受的。",
+        "body": "任何可能对齐的数字都加 `font-variant-numeric: tabular-nums`：计数、行号、页码、单元格数字、JSON token 数字。数字在表里跳宽是不可接受的。",
         "section": "typography"
       },
       {
+        "name": "The Grid Reaches the Floor Rule",
+        "body": "网格铺满到视口底部，不是长到内容高度就停。antd 6 把 loading 包装层渲染成 `.ant-spin`（4/5 叫 `.ant-spin-nested-loading`），类名对不上时下面连串的 `height: 100%` 会在 `auto` 父层上退化成内容高度 —— 整页差一行的余数（23px），六行的短页差 703px，露出编辑器底色，读起来像「多了一行空行」。空出来的那一截用行底色收边，再补一条 1px 细线说明表格到此为止；细线用 `box-shadow` 而不是 `border`，否则它会改变决定「一屏装几行」的那个测量值。`verify:ui` 的 `parquet-table-fills-viewport` 按几何断言守住整页与短页两种情况。",
+        "section": "layout"
+      },
+      {
         "name": "The Never-Scroll-the-Page Rule",
-        "body": "页面本身永不滚动。用户在任何状态下都必须看得见顶栏与底栏；滚动条只允许出现在 .ant-table-body、.parquet-viewer__list、树容器这类明确的内容区内。",
+        "body": "页面本身永不滚动。用户在任何状态下都必须看得见顶栏与底栏；滚动条只允许出现在 `.ant-table-body`、`.parquet-viewer__list`、树容器这类明确的内容区内。",
         "section": "layout"
       },
       {
         "name": "The 420 Rule",
-        "body": "数据单元格的 max-width 是 420px。要在单元格里放下更多信息，办法是点开看全文，不是让它换行把整张表撑高。",
+        "body": "数据单元格的 `max-width` 是 420px。要在单元格里放下更多信息，办法是点开看全文，不是让它换行把整张表撑高。",
         "section": "layout"
       },
       {
@@ -499,29 +550,32 @@
       },
       {
         "name": "The Inset Focus Rule",
-        "body": "输入类焦点的表现是 inset 0 0 0 1px var(--focus) 的环；可聚焦的按钮/行是 outline: 1px solid var(--focus) 加 1px 或 -1px 偏移。两者都不加 blur、chevron、位移或颜色渐变。",
+        "body": "输入类焦点的表现是 `inset 0 0 0 1px var(--focus)` 的环；可聚焦的按钮/行是 `outline: 1px solid var(--focus)` 加 1px 或 -1px 偏移。两者都不加 blur、chevron、位移或颜色渐变。",
         "section": "elevation"
       }
     ],
     "dos": [
-      "Do 给每个新颜色写 var(--vscode-<token>, <暗色兜底>)，并在浅色主题的头像块里给出同色相的 text-safe 值。",
-      "Do 用 8px 包表面、6px 包控件、4px 包徽标、3px 包单元格焦点；不要发明第四种半径。",
-      "Do 给每个可交互元素同时写 :hover、:active、:focus-visible 三态，焦点用 1px focusBorder。",
-      "Do 让所有数字带 tabular-nums，让所有「值」用等宽字体。",
-      "Do 用 10px 大写 + 600 字重 + ≥0.045em 字距表达标签层级，并把其余文字留给 12–13px 常规字重。",
-      "Do 用 color-mix(in srgb, var(--fg) 8%, var(--panel)) 这一族混合造控件底，让深浅主题自动成立。",
-      "Do 在新增数据色时同时更新 scripts/ui-verify 的对比度断言（浅色主题 ≥ 4.5:1），否则闸门会红。",
-      "Do 让窗口化视图的 aria-rowcount / aria-colcount 说文件的行列数，不是 DOM 里渲染的那一窗；aria-rowindex 与 aria-colindex 在表头与单元格两侧都要写。"
+      "给每个新颜色写 `var(--vscode-<token>, <暗色兜底>)`，并在浅色主题的头像块里给出同色相的 text-safe 值。",
+      "用 8px 包表面、6px 包控件、4px 包徽标、3px 包单元格焦点；不要发明第四种半径。",
+      "给每个可交互元素同时写 `:hover`、`:active`、`:focus-visible` 三态，焦点用 1px `focusBorder`。",
+      "让所有数字带 `tabular-nums`，让所有「值」用等宽字体。",
+      "用 10px 大写 + 600 字重 + ≥0.045em 字距表达标签层级，并把其余文字留给 12–13px 常规字重。",
+      "用 `color-mix(in srgb, var(--fg) 8%, var(--panel))` 这一族混合造控件底，让深浅主题自动成立。",
+      "在新增数据色时同时更新 `scripts/ui-verify` 的对比度断言（浅色主题 ≥ 4.5:1），否则闸门会红。",
+      "给每个被摘要截断的值一条可选中、可复制的全文通道（JSONL 的停靠值面板），而不是 `title`、tooltip 或「复制出去再看」。",
+      "让窗口化视图的 `aria-rowcount` / `aria-colcount` 说**文件**的行列数，不是 DOM 里渲染的那一窗；`aria-rowindex` 与 `aria-colindex` 在表头与单元格两侧都要写。",
+      "让 JSON 预览复用 JSONL 的机身、记录行、树、值面板和键盘；它是命令打开的检查面，不注册 `.json`，也不改默认编辑器。"
     ],
     "donts": [
-      "Don't 引入自带配色、明暗开关或品牌渐变；主题是唯一色源。",
-      "Don't 用 box-shadow 表达层级或 hover 抬起；只有真正浮在所有内容之上的东西才能有阴影。",
-      "Don't 在区域之间加 1px 分割线——用底色混合与内距。",
-      "Don't 用 --vscode-charts-* 直接渲染 12px 文本而不给浅色覆盖；那是为图形调的色。",
-      "Don't 让 antd 的默认字号、颜色或边框漏出来；antd 只提供结构与交互，样式必须被 --pv-* / --jl-* 接管。",
-      "Don't 让超过 420px 的单元格换行，或用 tooltip 代替「点开看全文」。",
-      "Don't 加引导层、欢迎语、插画或空状态营销文案；空状态只给事实和下一步。",
-      "Don't 把继承来的 x-spreadsheet 网格与 Git History 面板当作参照——它们是遗留例外（只被部分重新着色），不属于这套系统。"
+      "引入自带配色、明暗开关或品牌渐变；主题是唯一色源。",
+      "用 `box-shadow` 表达层级或 hover 抬起；只有真正浮在所有内容之上的东西才能有阴影。",
+      "在区域之间加 1px 分割线——用底色混合与内距。",
+      "用 `--vscode-charts-*` 直接渲染 12px 文本而不给浅色覆盖；那是为图形调的色。",
+      "让 antd 的默认字号、颜色或边框漏出来；antd 只提供结构与交互，样式必须被 `--pv-*` / `--jl-*` 接管。",
+      "让超过 420px 的单元格换行，或用 tooltip 代替「点开看全文」。",
+      "加引导层、欢迎语、插画或空状态营销文案；空状态只给事实和下一步。",
+      "把继承来的 `x-spreadsheet` 网格与 Git History 面板当作参照——它们是遗留例外（只被部分重新着色），不属于这套系统。",
+      "为 JSON 预览新造布局、颜色或字体，或把它写成第四个 viewer；也不要把 JSON 数组做成表格（本轮不是数据表）。"
     ]
   }
 }

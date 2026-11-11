@@ -186,7 +186,7 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 
 **The One Host Lookup Rule.** 同一个宿主变量只读一次，语义差异用别名表达。parquet 的十个图标色原本各自重复读取四个 `--vscode-charts-*`：改一次颜色要改三处，且随时可能漂移。现在六个 `--pv-chart-*` 各读一次，图标色是它们的别名（`--pv-icon-rows` → `--pv-chart-blue`），由 `verify:ui` 的 `parquet-tokens` 断言别名图真的一致 —— 设计 token 只有在解析值一致时才算单一事实来源。
 
-**The One Token Layer Rule.** 这个仓库只有一层 token：各组件的 `--pv-*` / `--sponsor-*` / 各自前缀，每个都写在**被引入的**样式表里。曾有一个 `viewerTheme.css` 定义十四变量 `--viewer-*` 层，声明得像其它视图在用：没有一处 import，构建产物里一个字都没有，`--viewer-accent` 指 `textLink-foreground` 而 `--pv-accent` 指 `button-background`。已删除；`test/unit/stylesheets.test.ts` 现在断言「`src/react` 下每个样式表都被某处引入」，孤儿样式表读起来像活代码，正是最难被发现的死代码。
+**The One Token Layer Rule.** 这个仓库只有一层 token：各组件的 `--pv-*` / `--jl-*` / 各自前缀，每个都写在**被引入的**样式表里。曾有一个 `viewerTheme.css` 定义十四变量 `--viewer-*` 层，声明得像其它视图在用：没有一处 import，构建产物里一个字都没有，`--viewer-accent` 指 `textLink-foreground` 而 `--pv-accent` 指 `button-background`。已删除；`test/unit/stylesheets.test.ts` 现在断言「`src/react` 下每个样式表都被某处引入」，孤儿样式表读起来像活代码，正是最难被发现的死代码。
 
 若将来真要共享一层 token，顺序是：先把同名不同义的（accent：按钮 vs 链接）拆成两个名字，再让 token 声明**不带任何副作用**（字号、字体、滚动条另行作用域化），最后才谈合并 —— 否则「去重」就是悄悄改配色。
 
@@ -247,7 +247,7 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 
 **没有阴影语义。** 层次完全由色调分层表达：同一块底色混入不同比例的前景（见 The Thin Mix Rule），相邻区域之间的边界是「亮度变化 + 8–16px 内距」，没有 1px 分割线。
 
-只有两处真正的 `box-shadow`：浮动在视口左下角的赞助条（`0 4px 14px rgba(0,0,0,0.18)`，因为它确实浮在所有内容之上），以及 antd 自带的弹层/下拉菜单。输入类控件的「描边」用 `inset 0 0 0 1px` 模拟，不是阴影。
+本仓库自己的样式不再声明浮层阴影。唯一保留的 `box-shadow` 是 antd 自带的弹层/下拉菜单；表格铺满视口后底部那条 1px 内阴影（`inset 0 -1px 0`）只是收边，不是层级。输入类控件的「描边」用 `inset 0 0 0 1px` 模拟，不是阴影。
 
 ### Named Rules
 
@@ -259,7 +259,7 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 
 形态语言是**方块 + 小圆角**，没有斜角、没有裁切、没有装饰性轮廓。
 
-- 表面与浮层：**8px**（搜索框、错误条、决策面板、浮动赞助条）。
+- 表面与浮层：**8px**（搜索框、错误条、决策面板）。
 - 控件：**6px**（图标按钮、分页按钮、字段行、文本输入）。
 - 徽标与工具提示内的小块：**4px**；单元格焦点：**3px**；高亮 `<mark>`：**2px**。
 - 药丸 **999px** 只给三种：滚动条滑块、侧栏计数、拖拽手柄的高亮条。
