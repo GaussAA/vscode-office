@@ -433,6 +433,48 @@ export default [
     },
   },
   {
+    name: "parquet-table-fills-viewport",
+    async run({ page, base }) {
+      // A page is one screenful, so the grid is supposed to reach the bottom bar. It did not:
+      // antd 6 renders the loading wrapper as `.ant-spin`, the stylesheet still named antd 4/5's
+      // `.ant-spin-nested-loading`, and the broken height chain let the table stop at its content
+      // height — 23px short on a full page, 703px short on a six-row page. Both cases are asserted
+      // here because the short one is the one a human notices.
+      const gapOf = async () =>
+        json(
+          await page.evaluate(`JSON.stringify((() => {
+                    const wrap = document.querySelector('.parquet-viewer__table-wrap');
+                    const table = document.querySelector('.ant-table');
+                    if (!wrap || !table) return { gap: null, rows: 0 };
+                    return {
+                        gap: Math.round(wrap.getBoundingClientRect().bottom - table.getBoundingClientRect().bottom),
+                        rows: document.querySelectorAll('.ant-table-row').length,
+                        wrap: Math.round(wrap.getBoundingClientRect().height),
+                    };
+                })())`),
+        );
+
+      await openParquet(page, base, "?mixed=1");
+      const full = await gapOf();
+      expect(full.rows > 0, "the mixed fixture rendered no rows");
+      expect(
+        full.gap === 0,
+        `a full page leaves ${full.gap}px between the grid and the bottom bar`,
+      );
+
+      // A short page: six rows in a viewport that fits ~26. This is the same defect at 30x the size.
+      await openParquet(page, base, "?preview=1");
+      const short = await gapOf();
+      expect(short.rows > 0, "the preview fixture rendered no rows");
+      expect(
+        short.gap === 0,
+        `a short page leaves ${short.gap}px of bare background below the grid`,
+      );
+
+      return `grid reaches the bottom bar (${full.rows} rows, then ${short.rows})`;
+    },
+  },
+  {
     name: "parquet-tokens",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");

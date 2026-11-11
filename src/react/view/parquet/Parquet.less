@@ -585,7 +585,13 @@ body:has(.parquet-app) {
     outline-offset: -1px;
   }
 
+  /* antd 6 renders the loading wrapper as `.ant-spin`; `.ant-spin-nested-loading` is the antd 4/5
+     name and no longer matches. Missing either one silently breaks the whole height chain: a
+     percentage height below an `auto` parent resolves to the content, so the table grew to
+     917px inside a 940px container and the leftover showed as an empty band above the bottom
+     bar. Both names are kept so an antd upgrade cannot reintroduce the gap. */
   .ant-table-wrapper,
+  .ant-spin,
   .ant-spin-nested-loading,
   .ant-spin-container,
   .ant-table,
@@ -602,6 +608,12 @@ body:has(.parquet-app) {
     color: var(--pv-fg);
     background: transparent;
     font-size: 12px;
+    /* The grid now fills the viewport, so the data can stop short of the bottom (a short page, the
+       last page, or the remainder of a whole-row page). That tail is the same `--pv-bg` as the
+       cells, which left it reading as one more empty row; a hairline at the grid's bottom edge
+       says where the table ends instead. `box-shadow` rather than `border`: a border would change
+       the measured height that decides how many rows fit. */
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--pv-fg) 12%, transparent);
   }
 
   .ant-table-header {

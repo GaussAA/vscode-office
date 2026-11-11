@@ -222,6 +222,8 @@ VS Code 是机身，每个 viewer 是拧在机身上的仪表。仪表不拥有�
 
 ## Layout
 
+**The Grid Reaches the Floor Rule.** 网格铺满到视口底部，不是长到内容高度就停。antd 6 把 loading 包装层渲染成 `.ant-spin`（4/5 叫 `.ant-spin-nested-loading`），类名对不上时下面连串的 `height: 100%` 会在 `auto` 父层上退化成内容高度 —— 整页差一行的余数（23px），六行的短页差 703px，露出编辑器底色，读起来像「多了一行空行」。空出来的那一截用行底色收边，再补一条 1px 细线说明表格到此为止；细线用 `box-shadow` 而不是 `border`，否则它会改变决定「一屏装几行」的那个测量值。`verify:ui` 的 `parquet-table-fills-viewport` 按几何断言守住整页与短页两种情况。
+
 每个表面都是一个 `100vh` 的 flex column，`body` 被锁成 `100vw × 100vh` 且 `overflow: hidden`；只有内部容器滚动。
 
 - **顶栏** 52px（`8px 16px`）：搜索框（32px 高，`flex: 0 1 340px`）、计数、元信息；右侧信息用 `margin-left: auto` 推到边缘。
