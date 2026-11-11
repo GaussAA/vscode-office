@@ -273,11 +273,35 @@ function jsonlStub(fixtures, limit = 0) {
       if (msg.type === 'jsonlSearch') {
         const requestId = msg.content.requestId;
         const q = String(msg.content.query || '').toLowerCase();
+        // Mirrors the host's classifyHit (src/service/jsonlDocument.ts): the harness reimplements
+        // the search, so the key/value badge has to be derived here too, from the same rule.
+        function hitKind(text, needle) {
+          var value;
+          try { value = JSON.parse(text); } catch (error) { return undefined; }
+          var stack = [value], visited = 0, inKey = false, inValue = false;
+          while (stack.length > 0 && visited < 20000 && !(inKey && inValue)) {
+            var node = stack.pop();
+            visited++;
+            if (Array.isArray(node)) { node.forEach(function (item) { stack.push(item); }); continue; }
+            if (node !== null && typeof node === 'object') {
+              Object.keys(node).forEach(function (key) {
+                if (key.toLowerCase().indexOf(needle) >= 0) inKey = true;
+                stack.push(node[key]);
+              });
+              continue;
+            }
+            if (node !== null && node !== undefined && String(node).toLowerCase().indexOf(needle) >= 0) inValue = true;
+          }
+          if (inKey && inValue) return 'both';
+          if (inKey) return 'key';
+          if (inValue) return 'value';
+          return undefined;
+        }
         const matched = summaries.filter(function (s) { return (s.raw || '').toLowerCase().indexOf(q) >= 0; }).map(function (s) {
           const text = s.raw || '';
           const at = text.toLowerCase().indexOf(q);
           const snippet = at < 0 ? undefined : (at > 24 ? '…' : '') + text.slice(Math.max(0, at - 24), at + q.length + 24) + (at + q.length + 24 < text.length ? '…' : '');
-          return Object.assign({}, s, { snippet: snippet });
+          return Object.assign({}, s, { snippet: snippet, hit: s.kind === 'value' ? hitKind(text, q) : undefined });
         });
         const head = matched.slice(0, 3);
         setTimeout(function () {

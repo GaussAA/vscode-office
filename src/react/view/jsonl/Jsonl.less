@@ -1039,3 +1039,20 @@ body:has(.jsonl-viewer) {
   cursor: default;
   opacity: 0.55;
 }
+
+/* Search hit kind. A neutral chip on purpose: it answers "did the query hit a key or a value",
+   which is structure (`key`/`value` stay untranslated like `LIST`), not emphasis. Colouring the
+   key hit differently is enough to scan a result list without reading every chip. */
+.jsonl-chip--hit {
+  font-family: var(--jl-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+}
+
+.jsonl-chip--hit-key {
+  color: var(--jl-key);
+}
+
+.jsonl-chip--hit-both {
+  color: var(--jl-muted);
+}

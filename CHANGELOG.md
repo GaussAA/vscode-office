@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The native `title` on parquet cells and on the bottom-bar value. A tooltip cannot be wrapped,
   selected or copied, and DESIGN.md forbids it as the only way to read a value.
 
+### Added
+
+- JSONL search marks each hit as `key`, `value` or `key+value`. The substring scan reports a row
+  for both cases identically, so "is `status` a field here, or does some value contain the word"
+  had no answer short of opening the entry. The matched line is parsed anyway to derive its label,
+  so the distinction costs nothing extra; a hit that lives only in JSON punctuation carries no
+  badge rather than a guessed one. `key`/`value` are structure, like `LIST`, and stay untranslated.
+
 ## [Unreleased]
 
 ## [6.7.0] - 2026-11-11

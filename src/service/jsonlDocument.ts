@@ -147,9 +147,56 @@ export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: nu
   return { text, size };
 }
 
-/** Build a summary for a line whose text has already been decoded. */
-export function summarizeDecodedLine(line: number, decoded: DecodedLine): JsonlEntrySummary {
-  return classify(line, decoded);
+/**
+ * Build a summary for a line whose text has already been decoded.
+ *
+ * `needle` turns the summary into a search hit and adds `hit`: the line is parsed anyway, so
+ * saying whether the match was in a key or in a value costs nothing extra.
+ */
+export function summarizeDecodedLine(
+  line: number,
+  decoded: DecodedLine,
+  needle?: string,
+): JsonlEntrySummary {
+  return classify(line, decoded, needle);
+}
+
+/**
+ * Where does `needle` occur — in a key path component, in a leaf value, or both?
+ *
+ * Iterative and budgeted: a transcript line can nest deeply and hold thousands of nodes, and the
+ * scan already reads the whole file, so this tiebreaker must not become the expensive part of a
+ * search. `undefined` means the match was only in syntax (punctuation, number formatting), which
+ * is honest: the row still matched the substring, it just has no key/value story.
+ */
+export function classifyHit(value: unknown, needle: string): "key" | "value" | "both" | undefined {
+  if (!needle) return undefined;
+  const stack: unknown[] = [value];
+  let visited = 0;
+  let inKey = false;
+  let inValue = false;
+  while (stack.length > 0 && visited < 20_000 && !(inKey && inValue)) {
+    const node = stack.pop();
+    visited++;
+    if (Array.isArray(node)) {
+      for (const item of node) stack.push(item);
+      continue;
+    }
+    if (node !== null && typeof node === "object") {
+      for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
+        if (key.toLowerCase().includes(needle)) inKey = true;
+        stack.push(child);
+      }
+      continue;
+    }
+    if (typeof node === "string" || typeof node === "number" || typeof node === "boolean") {
+      if (String(node).toLowerCase().includes(needle)) inValue = true;
+    }
+  }
+  if (inKey && inValue) return "both";
+  if (inKey) return "key";
+  if (inValue) return "value";
+  return undefined;
 }
 
 /**
@@ -166,7 +213,7 @@ export function matchSnippet(text: string, needle: string, radius = 48): string 
 }
 
 /** One line of JSONL is exactly one of four things; this is where that is decided. */
-function classify(line: number, decoded: DecodedLine): JsonlEntrySummary {
+function classify(line: number, decoded: DecodedLine, needle?: string): JsonlEntrySummary {
   const { text, size } = decoded;
   const raw = truncate(text, JSONL_RAW_PREVIEW_CHARS);
   if (text.trim() === "") {
@@ -177,7 +224,18 @@ function classify(line: number, decoded: DecodedLine): JsonlEntrySummary {
   }
   try {
     const value = JSON.parse(text);
-    return { index: line, size, raw, kind: "value", label: deriveLabel(value) };
+    const summary: JsonlEntrySummary = {
+      index: line,
+      size,
+      raw,
+      kind: "value",
+      label: deriveLabel(value),
+    };
+    if (needle) {
+      const hit = classifyHit(value, needle);
+      if (hit) summary.hit = hit;
+    }
+    return summary;
   } catch (error) {
     return {
       index: line,

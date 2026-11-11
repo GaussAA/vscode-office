@@ -100,6 +100,56 @@ export default [
     },
   },
   {
+    name: "jsonl-search-hit-kind",
+    async run({ page, base }) {
+      // Issue #3, the "distinguish a key hit from a value hit" half. The substring scan cannot
+      // say which; the matched line is parsed anyway to derive its label, so the badge costs
+      // nothing extra. `key` and `value` are structure, not prose — untranslated, like LIST.
+      const search = async (needle, kind) => {
+        await page.evaluate(`(() => {
+                    const input = document.querySelector('.jsonl-search input');
+                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    input.focus();
+                    setter.call(input, ${JSON.stringify(needle)});
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                })()`);
+        await page.waitFor(
+          `(() => {
+                    const text = document.querySelector('.jsonl-search-status')?.innerText ?? '';
+                    return /\\d+ match/.test(text) && !text.includes('Searching');
+                })()`,
+          8000,
+        );
+        // The status settles a tick before the rows do; wait for the badge this query must produce.
+        const shown = await page.waitFor(
+          `document.querySelectorAll('.jsonl-chip--hit-${kind}').length > 0`,
+          8000,
+        );
+        expect(shown, `no .jsonl-chip--hit-${kind} rendered for "${needle}"`);
+        return json(
+          await page.evaluate(`JSON.stringify({
+                        badges: [...document.querySelectorAll('.jsonl-chip--hit')].map((chip) => chip.innerText.trim()),
+                    })`),
+        );
+      };
+
+      await openJsonl(page, base);
+      // `id`/`name`/`tags` are keys in every fixture line; `processed` appears only inside values.
+      const keyHits = await search("id", "key");
+      expect(
+        keyHits.badges.every((badge) => !badge.includes("value")),
+        `a key-only query was labelled as a value hit: ${JSON.stringify(keyHits.badges)}`,
+      );
+      const valueHits = await search("processed", "value");
+      expect(
+        valueHits.badges.every((badge) => badge.includes("value")),
+        `a value-only query was not labelled as a value hit: ${JSON.stringify(valueHits.badges)}`,
+      );
+
+      return `key query → ${keyHits.badges.length} key chips, value query → ${valueHits.badges.length} value chips`;
+    },
+  },
+  {
     name: "jsonl-empty",
     async run({ page, base }) {
       await openEmptyJsonl(page, base);

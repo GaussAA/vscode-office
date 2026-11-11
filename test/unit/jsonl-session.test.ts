@@ -258,3 +258,34 @@ test("readRange: small lines keep their context above the anchor", async () => {
   assert.equal(payload.start, 0, "no byte pressure means no recentring");
   assert.equal(payload.entries.length, 40);
 });
+
+test("search: reports whether the match was in a key, a value, or both (#3)", async () => {
+  const session = await makeSession([
+    '{"id":1,"status":"ok"}',
+    '{"level":"status report"}',
+    '{"meta":{"status":"status"}}',
+  ]);
+  const batches = await runSearch(session, "status");
+  const entries = batches.flatMap((batch) => batch.entries);
+  assert.deepEqual(
+    entries.map((entry) => [entry.index, entry.kind === "value" ? entry.hit : undefined]),
+    [
+      // key only (`status` is a key, no value contains it)
+      [0, "key"],
+      // value only
+      [1, "value"],
+      // both: the key `status` and its value
+      [2, "both"],
+    ],
+  );
+});
+
+test("search: a hit that lives only in JSON punctuation gets no badge", async () => {
+  // `}}` closes two nested objects. It is present in the raw text and in no key or value, so the
+  // row is honestly "matched, nothing to classify" rather than a guessed badge.
+  const session = await makeSession(['{"a":{"b":1}}']);
+  const batches = await runSearch(session, "}}");
+  const entries = batches.flatMap((batch) => batch.entries);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].kind === "value" ? entries[0].hit : "missing", undefined);
+});

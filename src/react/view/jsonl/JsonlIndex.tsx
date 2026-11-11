@@ -172,6 +172,14 @@ export default function JsonlIndex({
             {entry.kind === "value" && entry.label !== undefined && (
               <span className="jsonl-entry__label">{entry.label}</span>
             )}
+            {entry.hit !== undefined && (
+              // Structure, not prose: `key`/`value` name JSON parts the way `LIST` and `STRUCT`
+              // do, so they stay untranslated. That is also why this needs no message key and
+              // does not touch the translation budget of the seven fallback locales.
+              <span className={`jsonl-chip jsonl-chip--hit jsonl-chip--hit-${entry.hit}`}>
+                {entry.hit === "key" ? "key" : entry.hit === "value" ? "value" : "key+value"}
+              </span>
+            )}
             <span className="jsonl-entry__raw">{renderText(entry)}</span>
           </span>
         );

@@ -95,6 +95,16 @@ interface JsonlEntryBase {
   raw: string;
   /** Search-only: a window of text around the match, instead of the line's head. */
   snippet?: string;
+  /**
+   * Search-only: where the query was found.
+   *
+   * Substring search alone cannot answer "is this field named `status`, or does some value
+   * contain the word status" — it reports both hits as identical rows. Parsing the matched line
+   * (it is parsed anyway to derive the label) makes that distinction free, and "key" versus
+   * "value" is the part of structured search people actually ask for. `undefined` means the hit
+   * was only in syntax (whitespace, number formatting), which deserves no badge.
+   */
+  hit?: "key" | "value" | "both";
 }
 
 export type JsonlEntrySummary =

@@ -209,7 +209,7 @@ export class JsonlSession {
         if (!decoded.text.toLowerCase().includes(needle)) continue;
         matches++;
         pending.push({
-          ...summarizeDecodedLine(scanned + offset, decoded),
+          ...summarizeDecodedLine(scanned + offset, decoded, needle),
           snippet: matchSnippet(decoded.text, needle),
         });
         if (pending.length >= batchSize) flush(false);
