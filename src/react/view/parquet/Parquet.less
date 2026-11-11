@@ -1268,3 +1268,87 @@ body:has(.parquet-app) {
 .parquet-viewer__too-large-open {
   align-self: flex-start;
 }
+
+/* The value panel: an overlay anchored to the bottom bar's top edge, not a flex sibling of the
+   grid. In flow it would shrink the measured body, which changes the page size and re-paginates
+   the table the moment the reader opens a value — a page is one screenful, so that would move the
+   rows they were reading. */
+.parquet-viewer__bottombar {
+  position: relative;
+}
+
+.parquet-viewer__inspector {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  padding: 8px 16px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--pv-fg) 12%, transparent);
+  background: var(--pv-panel-strong);
+  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.22);
+}
+
+.parquet-viewer__inspector-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.parquet-viewer__inspector-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--pv-fg);
+  font-family: var(--pv-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.parquet-viewer__inspector-type {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: var(--pv-radius-sm);
+  background: var(--pv-type-bg);
+  color: var(--pv-muted);
+  font-family: var(--pv-mono);
+  font-size: 9.5px;
+  text-transform: lowercase;
+}
+
+.parquet-viewer__inspector-meta {
+  flex: 0 0 auto;
+  color: var(--pv-muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.parquet-viewer__inspector-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.parquet-viewer__inspector-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: var(--pv-radius-sm);
+  background: var(--pv-bg);
+  color: var(--pv-fg);
+  font-family: var(--pv-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

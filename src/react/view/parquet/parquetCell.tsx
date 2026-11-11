@@ -153,7 +153,6 @@ export function ParquetCell({
       tabIndex={isCursor ? 0 : -1}
       aria-label={`${column.name}, row ${rowIndex + 1}: ${labelText}${externalUrl ? ", external link" : ""}`}
       aria-keyshortcuts={externalUrl ? "Enter" : undefined}
-      title={isNull ? "null" : displayText}
       onClick={onActivate}
       onKeyDown={(event) => {
         // The anchor is not a separate tab stop (one per URL cell would flood the grid);

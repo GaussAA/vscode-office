@@ -52,6 +52,12 @@ import {
 import "./Parquet.less";
 
 /**
+ * How much of a value the expanded panel renders. A LIST column can hold thousands of elements;
+ * the panel is a reader, not a dump, and copy still receives the untruncated value.
+ */
+const INSPECT_PREVIEW_LIMIT = 20_000;
+
+/**
  * Run background work when the page is idle.
  *
  * Prefetching the next chunk is a full data page per column (~1.2 s on a 60-column file) and it
@@ -104,6 +110,14 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     column: string;
     value: unknown;
   } | null>(null);
+  /**
+   * The value panel. Collapsed, the bottom bar stays one line; expanded, it shows the whole value
+   * wrapped over a few lines with its size and a raw/formatted switch. This replaces the native
+   * `title` the cells used to carry — a tooltip cannot be selected, wrapped or copied, and
+   * DESIGN.md forbids it as the only way to read a value.
+   */
+  const [expandedInspectKey, setExpandedInspectKey] = useState<string | null>(null);
+  const [inspectedRaw, setInspectedRaw] = useState(false);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchProgress, setSearchProgress] = useState<{
@@ -1109,6 +1123,49 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       ? jsonPreviewText(inspected.value)
       : inspectedFull;
 
+  /**
+   * What the expanded panel renders. Two forms, because the two questions differ: "is this the
+   * value I think it is" wants the compact one on one line, "what exactly is in there" wants the
+   * formatted one. Both are capped for rendering only — copy always takes `inspectedFull` — so a
+   * 5 000-element LIST cannot turn every arrow key into a megabyte of layout.
+   */
+  const inspectedBody = useMemo(() => {
+    if (!inspected) return "";
+    // `raw` means two different things, both of them "as the file stores it": a container becomes
+    // compact JSON instead of indented, and a string becomes escaped instead of literal (so a
+    // `\n` or a quote shows up as itself rather than breaking the line or the layout).
+    if (typeof inspected.value === "string") {
+      return inspectedRaw ? JSON.stringify(inspected.value) : inspected.value;
+    }
+    if (inspected.value === null || inspected.value === undefined) return inspectedFull;
+    if (typeof inspected.value === "object") {
+      try {
+        return JSON.stringify(inspected.value, null, inspectedRaw ? 0 : 2);
+      } catch {
+        return inspectedFull;
+      }
+    }
+    return inspectedFull;
+  }, [inspected, inspectedFull, inspectedRaw]);
+
+  const inspectedSize = useMemo(() => {
+    const capped = inspectedBody.slice(0, INSPECT_PREVIEW_LIMIT);
+    return {
+      chars: inspectedFull.length,
+      bytes: new TextEncoder().encode(inspectedFull).length,
+      shown: capped,
+      truncated: inspectedBody.length > capped.length,
+    };
+  }, [inspectedBody, inspectedFull]);
+
+  /**
+   * Expansion is derived from the selection's identity, not reset by an effect: a new cell is a
+   * new key, so it starts collapsed, and no setState-in-effect is needed (which React's lint rule
+   * forbids for exactly this reason — it renders twice for a state that was already implied).
+   */
+  const inspectKey = inspected ? `${inspected.row}:${inspected.column}` : "";
+  const inspectedExpanded = inspectKey !== "" && expandedInspectKey === inspectKey;
+
   useEffect(() => {
     inspectedCopyRef.current = inspectedFull;
   }, [inspectedFull]);
@@ -1608,6 +1665,69 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             </main>
           </div>
           <footer className="parquet-viewer__bottombar">
+            {inspected && inspectedExpanded && (
+              <section
+                className="parquet-viewer__inspector"
+                aria-label={inspected.column}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setExpandedInspectKey(null);
+                    tableWrapRef.current?.focus();
+                  }
+                }}
+              >
+                <header className="parquet-viewer__inspector-head">
+                  <span className="parquet-viewer__inspector-name">{inspected.column}</span>
+                  {inspectedType ? (
+                    <span className="parquet-viewer__inspector-type">{inspectedType}</span>
+                  ) : null}
+                  <span className="parquet-viewer__inspector-meta">
+                    {$t("parquet.inspectMeta", {
+                      row: (inspected.row + 1).toLocaleString(),
+                      chars: inspectedSize.chars.toLocaleString(),
+                      bytes: inspectedSize.bytes.toLocaleString(),
+                    })}
+                  </span>
+                  <span className="parquet-viewer__inspector-actions">
+                    <button
+                      type="button"
+                      className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
+                      aria-pressed={inspectedRaw}
+                      onClick={() => setInspectedRaw((raw) => !raw)}
+                    >
+                      {inspectedRaw ? $t("parquet.inspectRaw") : $t("parquet.inspectFormatted")}
+                    </button>
+                    <button
+                      type="button"
+                      className="parquet-viewer__pager-btn"
+                      onClick={() => copyValue(inspectedFull)}
+                      aria-label={$t("parquet.copyValue")}
+                    >
+                      <span className="codicon codicon-copy" />
+                    </button>
+                    <button
+                      type="button"
+                      className="parquet-viewer__pager-btn"
+                      onClick={() => {
+                        setExpandedInspectKey(null);
+                        tableWrapRef.current?.focus();
+                      }}
+                      aria-label={$t("parquet.inspectCollapse")}
+                    >
+                      <span className="codicon codicon-chevron-down" />
+                    </button>
+                  </span>
+                </header>
+                <pre className="parquet-viewer__inspector-body">
+                  {inspectedSize.shown}
+                  {inspectedSize.truncated
+                    ? $t("parquet.cappedSuffix", { max: INSPECT_PREVIEW_LIMIT.toLocaleString() })
+                    : ""}
+                </pre>
+              </section>
+            )}
+
             {/* One announcement per settled selection. The visible bar updates on every arrow
                 key, and aria-live on it queued a message per keystroke. */}
             <span className="parquet-viewer__sr-only" role="status" aria-live="polite">
@@ -1619,9 +1739,15 @@ function ParquetViewer({ dark }: { dark: boolean }) {
                   <span className="parquet-viewer__selection-label">
                     {inspected.column} · row {inspected.row + 1}
                   </span>
-                  <span className="parquet-viewer__selection-value" title={inspectedFull}>
+                  <button
+                    type="button"
+                    className="parquet-viewer__selection-value"
+                    aria-expanded={inspectedExpanded}
+                    aria-label={$t("parquet.inspectExpand", { name: inspected.column })}
+                    onClick={() => setExpandedInspectKey(inspectedExpanded ? null : inspectKey)}
+                  >
                     {inspectedText}
-                  </span>
+                  </button>
                   <button
                     type="button"
                     className="parquet-viewer__pager-btn"

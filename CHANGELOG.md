@@ -5,6 +5,20 @@ All notable changes to the "vscode-office" extension will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Added
+
+- Parquet values can be read in full. Clicking the value in the bottom bar opens a panel anchored
+  above the bar: it wraps, scrolls after a few lines, switches between formatted and raw (indented
+  versus compact JSON for a LIST/STRUCT, literal versus escaped for a string), reports the row,
+  character count and UTF-8 byte count, and copies the untruncated value. The panel overlays the
+  grid instead of shrinking it, so opening it does not re-page the table. Rendering is capped at
+  20 000 characters; copy is not.
+
+### Removed
+
+- The native `title` on parquet cells and on the bottom-bar value. A tooltip cannot be wrapped,
+  selected or copied, and DESIGN.md forbids it as the only way to read a value.
+
 ## [Unreleased]
 
 ## [6.7.0] - 2026-11-11

@@ -611,17 +611,16 @@ export default [
         5000,
       );
       expect(previewed, "a JSON cell never reached the inspector");
+      // The bar caps the preview; the full value is no longer smuggled through a native tooltip
+      // (issue #46 removed it) — it lives in the panel, which is copyable and wraps.
       const capped = json(
         await page.evaluate(`JSON.stringify({
                 shown: document.querySelector('.parquet-viewer__selection-value')?.innerText ?? '',
-                full: document.querySelector('.parquet-viewer__selection-value')?.getAttribute('title') ?? '',
+                hasTitle: document.querySelector('.parquet-viewer__selection-value')?.hasAttribute('title') ?? null,
             })`),
       );
       expect(capped.shown.length <= 340, `the inspector dumped ${capped.shown.length} chars`);
-      expect(
-        capped.full.length >= capped.shown.length,
-        "the title no longer carries the full value for copying",
-      );
+      expect(capped.hasTitle === false, "the bar still hides the full value behind a native title");
 
       // Clicking a link opens it *and* selects it: the one value a reader most wants to copy
       // must not be the only one the inspector can never hold.
@@ -671,6 +670,111 @@ export default [
       await page.waitFor(`!document.querySelector('[aria-label="Copied"]')`, 4000);
 
       return `${state.label} = ${state.value}`;
+    },
+  },
+  {
+    name: "parquet-value-panel",
+    docs: "parquet-value-panel.png",
+    async run({ page, base }) {
+      // Issue #46: the only way to read a value used to be a native tooltip — unselectable,
+      // unwrappable, uncopyable — and DESIGN.md forbids a tooltip as the only channel.
+      await openParquet(page, base, "?nested=1");
+      // `nested.parquet` has a LIST and a STRUCT column: the bar can only preview a container,
+      // while the panel shows the whole thing indented — exactly the meta_json case in the issue.
+      const metaIndex = await page.evaluate(`(() => {
+                const cells = [...(${ROWS}[0])?.children ?? []];
+                return cells.findIndex((cell) => { const text = (cell.innerText ?? "").trim(); return text.startsWith("[") || text.startsWith("{"); });
+            })()`);
+      expect(metaIndex >= 0, `no container column found (index ${metaIndex})`);
+
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                hasTitle: (${ROWS}[0])?.children[${metaIndex}]?.querySelector('.parquet-viewer__cell')?.hasAttribute('title') ?? null,
+                selectionTag: document.querySelector('.parquet-viewer__selection-value')?.tagName ?? null,
+            })`),
+      );
+      expect(
+        state.hasTitle === false,
+        `the cell still carries a native title (${state.hasTitle}) instead of the panel`,
+      );
+
+      await page.evaluate(`(() => {
+                const cell = ${firstRowCell(metaIndex)}.querySelector('.parquet-viewer__cell');
+                cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      await page.waitFor(`!!document.querySelector('.parquet-viewer__selection-value')`, 4000);
+
+      const before = json(
+        await page.evaluate(`JSON.stringify({
+                tag: document.querySelector('.parquet-viewer__selection-value')?.tagName ?? null,
+                expanded: document.querySelector('.parquet-viewer__selection-value')?.getAttribute('aria-expanded'),
+                barText: document.querySelector('.parquet-viewer__selection-value')?.innerText ?? '',
+                pageSize: document.querySelector('[data-page-size]')?.getAttribute('data-page-size'),
+            })`),
+      );
+      expect(before.tag === "BUTTON", `the value is not an expandable control (${before.tag})`);
+      expect(
+        before.expanded === "false",
+        `aria-expanded should start false, got ${before.expanded}`,
+      );
+
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__selection-value').dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const opened = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__inspector')`,
+        4000,
+      );
+      expect(opened, "the value panel never opened");
+
+      const panel = json(
+        await page.evaluate(`JSON.stringify((() => {
+                    const body = document.querySelector('.parquet-viewer__inspector-body');
+                    const rect = body?.getBoundingClientRect();
+                    return {
+                        name: document.querySelector('.parquet-viewer__inspector-name')?.innerText ?? null,
+                        meta: document.querySelector('.parquet-viewer__inspector-meta')?.innerText ?? null,
+                        text: body?.innerText ?? '',
+                        height: rect ? Math.round(rect.height) : 0,
+                        pageSize: document.querySelector('[data-page-size]')?.getAttribute('data-page-size'),
+                    };
+                })())`),
+      );
+      expect(
+        panel.text.length > before.barText.length,
+        `the panel shows no more than the bar (${panel.text.length} vs ${before.barText.length})`,
+      );
+      expect(panel.text.includes("\n"), "the formatted JSON is not wrapped over several lines");
+      expect(panel.height > 20, `the panel body is only ${panel.height}px tall`);
+      expect(
+        /\d+\s*(chars|字符)/.test(panel.meta ?? ""),
+        `no size in the meta line: ${panel.meta}`,
+      );
+      expect(
+        panel.pageSize === before.pageSize,
+        `opening the panel re-paged the table (${before.pageSize} → ${panel.pageSize})`,
+      );
+
+      // Formatted ⇄ raw: the raw form is one line, so the two are visibly different.
+      await page.evaluate(
+        `[...document.querySelectorAll('.parquet-viewer__inspector-actions button')][0].dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      await page.waitFor(
+        `!document.querySelector('.parquet-viewer__inspector-body')?.innerText.includes('\\n')`,
+        4000,
+      );
+
+      // Escape collapses the panel and returns focus to the grid.
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__inspector-body').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+      );
+      const closed = await page.waitFor(
+        `!document.querySelector('.parquet-viewer__inspector')`,
+        4000,
+      );
+      expect(closed, "Escape did not collapse the panel");
+
+      return `panel ${panel.text.length} chars over ${panel.height}px, raw toggle, Escape closes`;
     },
   },
   {
