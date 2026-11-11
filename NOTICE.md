@@ -8,6 +8,13 @@ Fork identity: `GaussAA.office-viewer-plus` (display name "Data File Viewer (Par
 
 ## What this fork changed
 
+- **The upstream sponsor bar is gone (6.6.0).** Every viewer floated a "Supported by Database
+  Client" bar (`position: fixed`, bottom-left) — in the parquet viewer it sat on top of the
+  pager. Upstream's development was funded by [Database Client](https://database-client.com/)
+  by Weijan Chen; that credit now lives in [README.md](README.md#credits) and here instead of
+  over the table, and the sponsor components, assets and webview message handlers were removed
+  with it. MIT permits the removal; the attribution it does require is kept.
+
 - **Narrowed to three viewers (6.0.0).** Only spreadsheets (`.xls`, `.xlsx`, `.xlsm`, `.csv`,
   `.tsv`, `.ods`), parquet and JSONL remain. Word, PowerPoint, PDF, ePub, fonts, images, PSD,
   ICNS, XMind, HTML, Java `.class` and archives were removed: VS Code covers some of them and a

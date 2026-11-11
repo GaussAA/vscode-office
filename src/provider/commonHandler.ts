@@ -120,12 +120,7 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
         void vscode.window.showWarningMessage("This file has no location in the file explorer.");
       }
     })
-    .on("sponsorClick", () => {})
-    .on("openSponsor", () => {
-      vscode.commands.executeCommand("workbench.extensions.action.showExtensionsWithIds", [
-        "cweijan.vscode-database-client2",
-      ]);
-    })
+
     .on("openExternal", (url: string) => {
       // The webview is not trusted. Re-validate at the only place that can actually ask the
       // operating system to open something: http(s) only, no userinfo, no control characters.

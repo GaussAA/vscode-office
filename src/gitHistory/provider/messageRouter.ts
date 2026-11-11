@@ -161,14 +161,7 @@ export class MessageRouter {
           this.onUpdateConfig(content as { key: string; value: unknown }),
         ),
       )
-      .on(
-        "openSponsor",
-        this.wrapHandler(() => {
-          void vscode.commands.executeCommand("workbench.extensions.action.showExtensionsWithIds", [
-            "cweijan.vscode-database-client2",
-          ]);
-        }),
-      )
+
       .on(
         "openExternal",
         this.wrapHandler((content) => {

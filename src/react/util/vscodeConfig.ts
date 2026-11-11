@@ -10,7 +10,6 @@ export interface WebviewConfigs {
   fileName?: string;
   iconBaseUrl?: string;
   maps?: Record<string, string>;
-  sponsorBaseUrl?: string;
   gitHistoryInit?: unknown;
   gitHistorySettings?: { quickSyncButton: boolean };
   config?: Record<string, unknown>;

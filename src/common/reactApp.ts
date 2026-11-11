@@ -27,15 +27,12 @@ export class ReactApp {
   public static async view(webview: vscode.Webview, option: ViewOption) {
     const html = await this.readContent();
     const iconConfig = IconService.getInstance().getWebviewConfig(this.context, webview);
-    const sponsorBaseUrl = webview
-      .asWebviewUri(extensionResource(this.context, "resource", "sponsor"))
-      .toString();
+
     webview.html = applyWebviewConfig(
       this.buildPath(html, webview).replace(`{{csp}}`, buildWebviewCsp(webview.cspSource)),
       {
         ...option,
         ...iconConfig,
-        sponsorBaseUrl,
         language: vscode.env.language,
         config: vscode.workspace.getConfiguration("vscode-office"),
       },

@@ -13,7 +13,6 @@ import { ParquetSession } from "./parquetSession.ts";
 import { searchParquetValues } from "./parquetSearch.ts";
 import { describeParquetFailure } from "./parquetError.ts";
 import { jsonPreviewText } from "./parquetPreview.ts";
-import SponsorBar from "../components/SponsorBar.tsx";
 import {
   formatCellValue,
   PARQUET_CHUNK_SIZE,
@@ -1735,9 +1734,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           </footer>
         </>
       ) : null}
-      <div className="parquet-viewer__corner-actions">
-        {!loading && <SponsorBar placement="left" />}
-      </div>
     </div>
   );
 }

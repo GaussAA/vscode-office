@@ -88,7 +88,3 @@ export function useVscodeDarkTheme(): boolean {
   useEffect(() => observeVscodeThemeChange(() => setDark(isVscodeDarkTheme())), []);
   return dark;
 }
-
-export function useVscodeSponsorDark(): boolean {
-  return useVscodeDarkTheme();
-}
