@@ -5,15 +5,9 @@ All notable changes to the "vscode-office" extension will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [6.4.6] - 2026-11-11
-
-Same code as 6.4.5. One version number for two registries: 6.4.5's identity is permanently
-reserved on Open VSX — it was published there and then removed, and Open VSX never frees a
-published version number — so the first Open VSX publication had to happen under a fresh one.
-Nothing in the extension changed; if 6.4.5 is already installed there is nothing to gain by
-updating.
-
 ## [Unreleased]
+
+## [6.5.0] - 2026-11-11
 
 ### Added
 
@@ -27,10 +21,10 @@ updating.
   window shorter than the pane, which has no scrollbar and therefore emitted no scroll event;
   the directory now tops itself up a bounded number of times and keeps a visible row for the
   rest.
-- JSONL: a top-level identity key whose value is an object is now read one level deep
-  (`id: { query }`), which is how agent transcripts store their identity. The 50-line
-  `openclaw.jsonl` sample goes from 0 to 42 labelled rows; arbitrary nested `id`s are still
-  deliberately ignored.
+- JSONL: a top-level identity key whose value is an object (or a string array) is now read
+  one level deep (`id: { query }`, `query_search: ["…"]`), which is how agent transcripts
+  store their identity. The 50-line `openclaw.jsonl` sample goes from 0 to 50 labelled
+  rows; arbitrary nested `id`s are still deliberately ignored.
 - JSONL: `verify:perf` gains two host-side invariants — a 4 MB directory window over 2 MB
   lines returns one row (≤3, measured 15 ms), and a 200k-line search is one pass
   (measured 0.3–0.5 s). They run in Node against the esbuild-bundled `JsonlSession`, because
@@ -69,6 +63,14 @@ updating.
 
 - JSONL: the directory's raw-text preview no longer relies on a native `title` tooltip; the
   entry detail is the reading channel (DESIGN.md already banned tooltips as content).
+
+## [6.4.6] - 2026-11-11
+
+Same code as 6.4.5. One version number for two registries: 6.4.5's identity is permanently
+reserved on Open VSX — it was published there and then removed, and Open VSX never frees a
+published version number — so the first Open VSX publication had to happen under a fresh one.
+Nothing in the extension changed; if 6.4.5 is already installed there is nothing to gain by
+updating.
 
 ## [6.4.5] - 2026-11-11
 
