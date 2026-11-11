@@ -23,7 +23,7 @@ on:
         default: true
 
 permissions:
-  contents: read
+  contents: write # read + create GitHub Release
   # Required by `vsce publish --oidc`: without it there is no id-token to exchange.
   id-token: write
 
@@ -95,3 +95,35 @@ jobs:
       - name: Publish to Open VSX (trusted publishing)
         if: (startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_ENABLED == 'true') || inputs.publish_openvsx
         run: pnpm exec ovsx publish --no-dependencies --trusted-publishing ./office-viewer-plus-*.vsix
+
+      # Create GitHub Release automatically on tag push. Extract the version from the tag
+      # (refs/tags/v6.4.5 → 6.4.5), pull the corresponding CHANGELOG section, compute the VSIX
+      # SHA256, and attach the VSIX. Idempotent: `gh release create` exits 0 if the release
+      # already exists. Only runs on tag pushes when both registries succeeded; manual dispatch
+      # does not create a release (it is for republishing an existing version to one registry).
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_ENABLED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          BODY=$(node scripts/extract-changelog.mjs "$VERSION")
+          VSIX=$(ls office-viewer-plus-*.vsix)
+          SHA256=$(sha256sum "$VSIX" | awk '{print $1}')
+          NOTES=$(cat <<EOF
+          $BODY
+
+          ## Install
+
+          Download \`$VSIX\` and run \`code --install-extension $VSIX\`, or install \`GaussAA.office-viewer-plus\` from the VS Code Marketplace or Open VSX.
+
+          SHA256: \`$SHA256\`
+
+          Built by the Release workflow after \`check:full\` and the release preflight passed. Published to the VS Code Marketplace and Open VSX through OIDC trusted publishing.
+          EOF
+          )
+          gh release create "v$VERSION" "$VSIX" \
+            --repo "${{ github.repository }}" \
+            --title "Data File Viewer (Parquet, JSONL, Excel) v$VERSION" \
+            --notes "$NOTES" \
+            --latest || true
