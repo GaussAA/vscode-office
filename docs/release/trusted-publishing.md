@@ -237,14 +237,23 @@ curl -s https://open-vsx.org/api/GaussAA/office-viewer-plus | head -c 200
 **看到这一行就说明登记是对的**，后续失败与 trusted publishing 无关 —— 分清这点能省掉一次
 「把配置改坏」的排查。
 
-### G3. 发布顺序：先 Open VSX，后 Marketplace
+### G3. 发布顺序：严格的那个先发
 
-两个注册表都不可撤回。新链路（Open VSX）先发，验证 `curl -s https://open-vsx.org/api/<ns>/<name>`
-返回的 `version` 正确之后，再发已经稳定的 Marketplace。反过来一旦 Marketplace 成功、
-Open VSX 因新问题失败，就只能再升一个版本号。
+两个注册表都不可撤回，所以顺序的唯一标准是**失败时烧掉几个版本号**。
 
-补发其中一半时用 `workflow_dispatch` 的两个输入分别控制，不要重跑整个 job ——
-已成功的那个注册表会因为「版本号已被占用」而红。
+Marketplace 是验证更严的一方（6.4.4 就因为图标「太相似」被它拒了，同样的包 Open VSX 照收），
+也就会更早失败：
+
+| 顺序               | 失败位置    | 代价                                                                                     |
+| ------------------ | ----------- | ---------------------------------------------------------------------------------------- |
+| **Marketplace 先** | Marketplace | 什么都没发出去，改完重试同一个版本号即可                                                 |
+| Marketplace 先     | Open VSX    | 两个都烧了，必须升版本 —— 但只在 Marketplace 已接受、Open VSX 才出问题时发生             |
+| Open VSX 先        | Open VSX    | 无损失，可重试                                                                           |
+| Open VSX 先        | Marketplace | Open VSX 已发出、Marketplace 被拒 → 一边有 6.4.6、一边没有，且版本号在 Open VSX 上已用掉 |
+
+所以工作流按 **Marketplace → Open VSX** 的顺序执行（`.github/workflows/release.yml`），
+让最可能被拒的一步先跑。补发其中一半时用 `workflow_dispatch` 的两个输入分别控制，不要重跑整个
+job —— 已成功的注册表会因为「版本号已被占用」而红。
 
 ## 参考
 
