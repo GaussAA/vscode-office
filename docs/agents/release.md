@@ -23,6 +23,27 @@
 3. **正文与 CHANGELOG 同源**：Release 正文 = CHANGELOG 里该版本小节的内容，去掉那一行标题。
    不同步就是两份事实。
 
+### 产品名分界：6.4.4 及以前用旧名
+
+产品的 Marketplace 显示名在 **6.4.4** 改成 `Data File Viewer (Parquet, JSONL, Excel)`
+（原因见 CHANGELOG：`Office Viewer Plus` 被 Marketplace 判定为「显示名已被占用」）。所以标题有且只有
+两个年代，边界不是随意的：
+
+| 版本            | 标题前缀                                              |
+| --------------- | ----------------------------------------------------- |
+| `v6.4.4` 及更早 | `Office Viewer Plus v<version>`                       |
+| `v6.4.5` 及以后 | `Data File Viewer (Parquet, JSONL, Excel) v<version>` |
+
+**不要**为了「列表看起来齐整」把旧 Release 改成新名：那等于声称 4.x 时代的产品就叫这个名字，
+是改写事实。分界本身是统一的，因为它对应一次真实的重命名。
+
+### 打了 tag 却没发布出去的版本
+
+版本号是消耗品，但**tag 不保证发布成功**。`v6.4.4`（Marketplace 因图标相似拒绝）和更早的
+`v4.4.0` 都属于这种：tag 在、两个注册表都没有。这种版本仍然要建 Release，正文写明
+「never reached a registry / 没有附件、无法安装，请用后续版本」—— 让它成为一条**记录**，而不是一个
+看起来能装的洞。
+
 ## 谁在发
 
 两个注册表都由 `.github/workflows/release.yml` 发布，**打 tag 即触发**。两边都用 OIDC 换短期凭据
