@@ -2,7 +2,5 @@
   "ext.common.yes": "ДА",
   "ext.common.no": "НЕТ",
   "ext.git.unableToFindGit": "Git не найден. Установите Git или укажите \"git.path\" в настройках VS Code.",
-  "ext.git.notInRepo": "Файл не находится в репозитории Git текущей рабочей области.",
-  "ext.git.openFileFirst": "Откройте файл, чтобы просмотреть его историю Git.",
-  "ext.git.statusBarTooltip": "Открыть историю Git"
+  "ext.git.notInRepo": "Файл не находится в репозитории Git текущей рабочей области."
 }

@@ -85,13 +85,11 @@ vscode-office/
 ├── src/                      # Source code
 │   ├── common/              # Shared utilities
 │   ├── config/              # Configuration constants
-│   ├── gitHistory/          # Git history viewer (backend)
 │   ├── react/               # React components (frontend)
 │   │   ├── view/           # Viewer components
 │   │   │   ├── excel/      # Excel/CSV viewer
 │   │   │   ├── parquet/    # Parquet viewer
 │   │   │   ├── jsonl/      # JSONL viewer
-│   │   │   └── gitHistory/ # Git history viewer (UI)
 │   │   └── hooks/          # React hooks
 │   └── extension.ts         # Extension entry point
 ├── test/                    # Tests

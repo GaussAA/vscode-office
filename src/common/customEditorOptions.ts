@@ -15,7 +15,7 @@ import type * as vscode from "vscode";
  *   - the parquet viewer remembers the page per document (`localStorage`, keyed by path);
  *   - the JSONL viewer remembers selection, split width and mode the same way;
  *   - the rest rebuild cheaply from the document on `resolveCustomEditor`.
- * The two dedicated panels that still keep it (git history, HTML preview) say why on site.
+ * The HTML preview still keeps it and says why on site.
  */
 export type CustomEditorOptions = {
   webviewOptions?: vscode.WebviewPanelOptions;

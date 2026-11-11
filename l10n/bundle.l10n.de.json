@@ -2,7 +2,5 @@
   "ext.common.yes": "JA",
   "ext.common.no": "NEIN",
   "ext.git.unableToFindGit": "Git wurde nicht gefunden. Installieren Sie Git oder legen Sie \"git.path\" in den VS Code-Einstellungen fest.",
-  "ext.git.notInRepo": "Die Datei befindet sich in keinem Git-Repository im aktuellen Arbeitsbereich.",
-  "ext.git.openFileFirst": "Öffnen Sie eine Datei, um deren Git-Verlauf anzuzeigen.",
-  "ext.git.statusBarTooltip": "Git-Verlauf öffnen"
+  "ext.git.notInRepo": "Die Datei befindet sich in keinem Git-Repository im aktuellen Arbeitsbereich."
 }

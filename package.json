@@ -20,7 +20,6 @@
     "jsonl",
     "ndjson",
     "git",
-    "git-history",
     "spreadsheet"
   ],
   "categories": [
@@ -36,8 +35,6 @@
     "url": "https://github.com/GaussAA/vscode-office.git"
   },
   "activationEvents": [
-    "workspaceContains:.git/HEAD",
-    "onWebviewPanel:office-git-history",
     "onCommand:GaussAA.office.previewJson"
   ],
   "main": "./out/extension.js",
@@ -59,58 +56,13 @@
         "icon": "$(edit)"
       },
       {
-        "command": "GaussAA.office.gitHistory.view",
-        "title": "View Git History",
-        "icon": "$(history)"
-      },
-      {
-        "command": "GaussAA.office.gitHistory.viewFileHistory",
-        "title": "Git: View File History",
-        "icon": "$(git-commit)"
-      },
-      {
-        "command": "GaussAA.office.gitHistory.quickSync",
-        "title": "Git: Quick Sync",
-        "icon": "$(sync)"
-      },
-      {
         "command": "GaussAA.office.previewJson",
         "title": "Preview JSON",
         "category": "Data File Viewer"
       }
     ],
     "menus": {
-      "scm/title": [
-        {
-          "command": "GaussAA.office.gitHistory.view",
-          "group": "navigation",
-          "when": "scmProvider == git"
-        },
-        {
-          "command": "GaussAA.office.gitHistory.quickSync",
-          "group": "navigation",
-          "when": "scmProvider == git && config.vscode-office.gitHistory.quickSyncButton"
-        }
-      ],
-      "scm/repository": [
-        {
-          "command": "GaussAA.office.gitHistory.view",
-          "group": "navigation",
-          "when": "scmProvider == git"
-        }
-      ],
-      "scm/resourceState/context": [
-        {
-          "command": "GaussAA.office.gitHistory.viewFileHistory",
-          "when": "config.git.enabled && gitOpenRepositoryCount != 0"
-        }
-      ],
       "editor/title": [
-        {
-          "command": "GaussAA.office.gitHistory.viewFileHistory",
-          "group": "navigation@4",
-          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file"
-        },
         {
           "command": "GaussAA.office.csv.switch",
           "when": "resourceExtname == '.csv' || resourceExtname == '.tsv'",
@@ -122,19 +74,8 @@
           "when": "resourceExtname == '.json'"
         }
       ],
-      "editor/context": [
-        {
-          "command": "GaussAA.office.gitHistory.viewFileHistory",
-          "group": "git",
-          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file"
-        }
-      ],
+      "editor/context": [],
       "explorer/context": [
-        {
-          "command": "GaussAA.office.gitHistory.viewFileHistory",
-          "group": "git",
-          "when": "config.git.enabled && gitOpenRepositoryCount != 0 && resourceScheme == file"
-        },
         {
           "command": "GaussAA.office.previewJson",
           "group": "navigation",
@@ -195,19 +136,6 @@
             "filenamePattern": "*.ndjson"
           }
         ]
-      }
-    ],
-    "configuration": [
-      {
-        "title": "Git History",
-        "order": 98,
-        "properties": {
-          "vscode-office.gitHistory.quickSyncButton": {
-            "type": "boolean",
-            "default": false,
-            "description": "Show Quick Sync button in Source Control (Git) title toolbar."
-          }
-        }
       }
     ]
   },

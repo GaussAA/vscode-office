@@ -347,7 +347,7 @@ export default [
       // The routes without a behavioural scenario of their own: the spreadsheet viewer and the
       // Git History panel. Mount-only is enough — their real assertions live in unit tests
       // (excel_find) and in the smoke suite's routing checks.
-      const routes = ["excel", "gitHistory"];
+      const routes = ["excel"];
       const failures = [];
       for (const route of routes) {
         page.clearExceptions();

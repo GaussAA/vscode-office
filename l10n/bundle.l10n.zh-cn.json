@@ -2,7 +2,5 @@
   "ext.common.yes": "是",
   "ext.common.no": "否",
   "ext.git.unableToFindGit": "找不到 Git。请安装 Git 或在 VS Code 设置中配置 \"git.path\"。",
-  "ext.git.notInRepo": "该文件不在当前工作区的 Git 仓库中。",
-  "ext.git.openFileFirst": "请先打开一个文件以查看其 Git 历史。",
-  "ext.git.statusBarTooltip": "打开 Git 历史"
+  "ext.git.notInRepo": "该文件不在当前工作区的 Git 仓库中。"
 }

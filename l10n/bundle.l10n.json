@@ -2,7 +2,5 @@
   "ext.common.yes": "YES",
   "ext.common.no": "NO",
   "ext.git.unableToFindGit": "Unable to find Git. Install Git or set \"git.path\" in VS Code settings.",
-  "ext.git.notInRepo": "The file is not within a Git repository in the current workspace.",
-  "ext.git.openFileFirst": "Open a file to view its Git history.",
-  "ext.git.statusBarTooltip": "Open Git History"
+  "ext.git.notInRepo": "The file is not within a Git repository in the current workspace."
 }

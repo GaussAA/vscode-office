@@ -7,7 +7,6 @@ import "./main.css";
 import { ConfigProvider } from "antd";
 import { lazy } from "react";
 import { antThemeConfig } from "./antThemeConfig.ts";
-import GitHistory from "./view/gitHistory/GitHistory.tsx";
 const Excel = lazy(() => import("./view/excel/Excel.tsx"));
 const Parquet = lazy(() => import("./view/parquet/Parquet.tsx"));
 const Jsonl = lazy(() => import("./view/jsonl/Jsonl.tsx"));
@@ -29,8 +28,6 @@ export default function App() {
       return <Jsonl />;
     case "json":
       return <JsonPreview />;
-    case "gitHistory":
-      return <GitHistory />;
     default:
       return null;
   }

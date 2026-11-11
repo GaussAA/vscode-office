@@ -8,9 +8,6 @@ import { buildWebviewCsp } from "./webviewCsp";
 interface ViewOption {
   route: string;
   fileName?: string;
-  gitHistoryInit?: import("../gitHistory/util/gitHistoryInitPayload").GitHistoryEmbeddedInit;
-  /** Forwarded to the webview as `configs.gitHistorySettings`; the graph reads it back. */
-  gitHistorySettings?: { quickSyncButton: boolean };
 }
 
 export class ReactApp {
