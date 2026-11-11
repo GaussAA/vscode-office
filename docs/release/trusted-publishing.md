@@ -76,7 +76,12 @@ OIDC 标志、tag 与 `package.json` 是否一致）已经做成 `pnpm check:rel
 3. **主张所有权**。只建命名空间不会给你独占发布权——按
    [Namespace Access](https://github.com/eclipse/openvsx/wiki/Namespace-Access) 的流程提出主张。
 
-**验证**：`curl -s https://open-vsx.org/api/namespace/GaussAA` 不再返回 404。
+**验证**：`curl -s -o /dev/null -w '%{http_code}' https://open-vsx.org/api/GaussAA` 返回 `200`
+（返回体里 `verified` 为 `true`、`extensions` 为空即「命名空间已就绪、尚无扩展」）。
+
+> 校验命令曾经写成 `/api/namespace/GaussAA`。**那个端点在 Open VSX 上根本不存在**：
+> `/api/namespace/cweijan`（一个确定存在、有 6 个扩展的命名空间）同样返回 404，所以它永远
+> 报「缺失」，是假阴性。正确路径是 `/api/<namespace>`。
 
 ### B2. 注册受信发布者
 
