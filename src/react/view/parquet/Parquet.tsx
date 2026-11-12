@@ -19,8 +19,6 @@ import {
 } from "./parquetParser.ts";
 import { parquetAntdTheme } from "./parquetAntdTheme.ts";
 import {
-  DATA_COLUMN_WIDTH,
-  INDEX_COLUMN_WIDTH,
   MIN_ROWS_PER_PAGE,
   PARQUET_MAX_PAGE_SIZE,
   ROW_HEIGHT,
@@ -30,7 +28,7 @@ import {
 } from "./parquetLayout.ts";
 import { loadPersistedRow, savePersistedRow } from "./parquetPersistence.ts";
 import { PresentationTable, ResizableHeaderCell } from "./parquetHeaders.tsx";
-import { CursorContext, ParquetCell, type CellCursor, type TableRow } from "./parquetCell.tsx";
+import { CursorContext, type CellCursor, type TableRow } from "./parquetCell.tsx";
 
 import ParquetTopBar from "./ParquetTopBar.tsx";
 import ParquetPager from "./ParquetPager.tsx";
@@ -43,6 +41,7 @@ import { useParquetColumnLayout } from "./useParquetColumnLayout.ts";
 import { useParquetSiderResize } from "./useParquetSiderResize.ts";
 import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
 import { useParquetSearch } from "./useParquetSearch.ts";
+import { buildParquetColumns } from "./parquetColumns.tsx";
 import "./Parquet.less";
 
 /**
@@ -599,91 +598,34 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     return () => window.clearTimeout(focusTimer.current);
   }, [cursor, pageRows]);
 
-  const tableColumns = useMemo<ColumnsType<TableRow>>(() => {
-    if (!fileInfo) return [];
-    const cols: ColumnsType<TableRow> = [
-      {
-        title: "#",
-        key: "__index",
-        width: INDEX_COLUMN_WIDTH,
-        // Numbers line up on their right edge everywhere in this surface, the row index
-        // included: centring one of them made the column read as a label.
-        align: "right",
-        fixed: "left",
-        className: "parquet-viewer__index-cell",
-        onCell: () => ({ role: "rowheader", "aria-colindex": 1 }),
-        onHeaderCell: () => ({ role: "columnheader", "aria-colindex": 1 }),
-        render: (_value, _row, index) => loadedStart + index + 1,
-      },
-    ];
-    fileInfo.columns.forEach((column, position) => {
-      const kind = column.category;
-      const active = activeColumn === position;
-      cols.push({
-        title: column.name,
-        dataIndex: column.name,
-        key: column.name,
-        ellipsis: true,
-        width: columnLayout.widths[position] ?? DATA_COLUMN_WIDTH,
-        align: kind === "numeric" ? "right" : "left",
-        className: active ? "parquet-viewer__column--active" : undefined,
-        // A grid whose header and body are separate scroll surfaces has to state the column
-        // ordinal on both sides: assistive tech maps a cell to its header by `aria-colindex`,
-        // and the header itself needs the matching number.
-        onHeaderCell: () => ({
-          role: "columnheader",
-          "aria-colindex": position + 2,
-          columnKey: column.name,
-          onResizeColumn: (width: number) => setColumnWidth(column.name, width),
-          onResetColumn: () => resetColumnWidth(column.name),
-        }),
-        onCell: () => ({ role: "gridcell", "aria-colindex": position + 2 }),
-        render: (value: unknown, _row, index) => {
-          const rowIndex = loadedStart + index;
-          return (
-            <ParquetCell
-              value={value}
-              rowIndex={rowIndex}
-              pageIndex={index}
-              position={position}
-              column={column}
-              query={query}
-              onActivate={() => {
-                selectCell({ row: index, col: position });
-                setActiveColumn(position);
-                setInspected({ row: rowIndex, column: column.name, value });
-              }}
-            />
-          );
-        },
-      });
-    });
-    // A column with no data: it exists so the capped layout can own the leftover width instead
-    // of having rc-table spread it over the real columns. Hidden from assistive tech, since it
-    // is not a column of the file.
-    if (columnLayout.filler > 0) {
-      cols.push({
-        title: "",
-        key: "__filler",
-        width: columnLayout.filler,
-        className: "parquet-viewer__filler-cell",
-        onHeaderCell: () => ({ "aria-hidden": true, role: "presentation" }),
-        onCell: () => ({ "aria-hidden": true, role: "presentation" }),
-        render: () => null,
-      });
-    }
-    return cols;
-  }, [
-    fileInfo,
-    loadedStart,
-    query,
-    selectCell,
-    activeColumn,
-    columnLayout,
-    setActiveColumn,
-    setColumnWidth,
-    resetColumnWidth,
-  ]);
+  const tableColumns = useMemo<ColumnsType<TableRow>>(
+    () =>
+      // oxlint-disable-next-line react/refs -- selectCell is only called by cell handlers; its ref keeps rapid key repeats in sync.
+      buildParquetColumns({
+        fileInfo,
+        loadedStart,
+        query,
+        activeColumn,
+        columnLayout,
+        onSelectCell: (cell) => selectCell(cell),
+        onActivateColumn: (position) => setActiveColumn(position),
+        onInspect: (selection) => setInspected(selection),
+        onResizeColumn: (name, width) => setColumnWidth(name, width),
+        onResetColumn: (name) => resetColumnWidth(name),
+      }),
+    [
+      fileInfo,
+      loadedStart,
+      query,
+      selectCell,
+      activeColumn,
+      columnLayout,
+      setActiveColumn,
+      setInspected,
+      setColumnWidth,
+      resetColumnWidth,
+    ],
+  );
 
   useEffect(() => {
     handler
