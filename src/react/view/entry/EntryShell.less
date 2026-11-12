@@ -1,0 +1,429 @@
+/* Shared viewer shell: variables, top bar, splitter, bottom bar and breakpoints. */
+
+body:has(.jsonl-viewer) {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vscode-editor-background, #1f1f1f);
+}
+
+.jsonl-viewer {
+  --jl-bg: var(--vscode-editor-background, #1f1f1f);
+  --jl-panel: color-mix(
+    in srgb,
+    var(--vscode-sideBar-background, #252526) 92%,
+    var(--vscode-foreground, #cccccc) 8%
+  );
+  --jl-panel-strong: color-mix(
+    in srgb,
+    var(--vscode-editorGroupHeader-tabsBackground, #2d2d2d) 92%,
+    var(--vscode-foreground, #cccccc) 8%
+  );
+  --jl-fg: var(--vscode-foreground, #cccccc);
+  --jl-muted: var(--vscode-descriptionForeground, #9d9d9d);
+  --jl-gutter: var(
+    --vscode-editorLineNumber-foreground,
+    var(--vscode-descriptionForeground, #6e7681)
+  );
+  --jl-hover: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.28));
+  --jl-active-bg: color-mix(
+    in srgb,
+    var(--vscode-list-activeSelectionBackground, #04395e) 82%,
+    var(--jl-panel)
+  );
+  --jl-active-fg: var(--vscode-list-activeSelectionForeground, #ffffff);
+  --jl-focus: var(--vscode-focusBorder, #0078d4);
+  --jl-error: var(--vscode-errorForeground, #f85149);
+  --jl-warn: var(--vscode-editorWarning-foreground, #cca700);
+  --jl-key: var(--vscode-symbolIcon-propertyForeground, var(--vscode-charts-purple, #b180d7));
+  --jl-string: var(--vscode-charts-green, #89d185);
+  --jl-number: var(--vscode-charts-blue, #3794ff);
+  --jl-boolean: var(--vscode-charts-red, #f14c4c);
+  --jl-null: var(--vscode-charts-orange, #d18616);
+  --jl-control: color-mix(in srgb, var(--jl-fg) 8%, var(--jl-panel));
+  --jl-control-hover: color-mix(in srgb, var(--jl-fg) 13%, var(--jl-panel));
+  --jl-control-active: color-mix(in srgb, var(--jl-fg) 18%, var(--jl-panel));
+  --jl-scroll-thumb: color-mix(in srgb, var(--jl-fg) 22%, transparent);
+  --jl-scroll-thumb-hover: color-mix(in srgb, var(--jl-fg) 38%, transparent);
+  --jl-mono: var(--vscode-editor-font-family, Consolas, "Cascadia Mono", monospace);
+  --jl-row-height: 26px;
+  --jl-radius: 8px;
+  --jl-radius-sm: 6px;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 100vh;
+  color: var(--jl-fg);
+  background: var(--jl-bg);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  overflow: hidden;
+  scrollbar-color: var(--jl-scroll-thumb) transparent;
+}
+
+.jsonl-viewer--light {
+  --jl-key: #0451a5;
+  --jl-string: #2e7d32;
+  --jl-number: #005cc5;
+  --jl-boolean: #9a5b00;
+  --jl-null: #9a5b00;
+  --jl-error: #b00000;
+  --jl-warn: #7a5200;
+}
+
+.jsonl-viewer *,
+.jsonl-viewer *::before,
+.jsonl-viewer *::after {
+  scrollbar-color: var(--jl-scroll-thumb) transparent;
+}
+
+.jsonl-viewer ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.jsonl-viewer ::-webkit-scrollbar-track,
+.jsonl-viewer ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.jsonl-viewer ::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: var(--jl-scroll-thumb);
+  background-clip: padding-box;
+}
+
+.jsonl-viewer ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--jl-scroll-thumb-hover);
+}
+
+.jsonl-viewer ::selection {
+  color: var(--jl-active-fg);
+  background: color-mix(in srgb, var(--vscode-button-background, #0e639c) 55%, transparent);
+}
+
+/* ---------- shared viewer shell ---------- */
+
+/* ---------- top command bar ---------- */
+
+.jsonl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  min-height: 52px;
+  padding: 8px 16px;
+  background: var(--jl-panel-strong);
+}
+
+.jsonl-toolbar__left,
+.jsonl-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.jsonl-toolbar__left {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.jsonl-toolbar__right {
+  flex: 0 1 auto;
+}
+
+.jsonl-file-name {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.jsonl-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--jl-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.jsonl-dot {
+  color: var(--jl-muted);
+  font-size: 11px;
+}
+
+.jsonl-search-status {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--jl-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* antd controls in a VS Code webview: filled controls, no hard outlines. */
+
+.jsonl-viewer .ant-input-affix-wrapper.jsonl-search {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 280px;
+  width: 280px;
+  min-width: 160px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--jl-radius);
+  background: var(--vscode-input-background, var(--jl-control));
+  box-shadow: none;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.jsonl-viewer .ant-input-affix-wrapper.jsonl-search:hover {
+  background: var(--vscode-input-background, var(--jl-control));
+}
+
+.jsonl-viewer .ant-input-affix-wrapper.jsonl-search.ant-input-affix-wrapper-focused {
+  background: var(--vscode-input-background, var(--jl-control));
+  box-shadow: inset 0 0 0 1px var(--jl-focus);
+}
+
+.jsonl-viewer .jsonl-search .ant-input {
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--jl-fg);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.jsonl-viewer .jsonl-search .ant-input::placeholder {
+  color: var(--jl-muted);
+}
+
+.jsonl-viewer .jsonl-search .ant-input-prefix {
+  margin-inline-end: 6px;
+  color: var(--jl-muted);
+}
+
+.jsonl-viewer .jsonl-search .ant-input-clear-icon {
+  color: var(--jl-muted);
+}
+
+.jsonl-viewer .jsonl-search .ant-input-clear-icon:hover {
+  color: var(--jl-fg);
+}
+
+.jsonl-viewer .jsonl-jump.ant-input-number {
+  width: 92px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--jl-radius);
+  background: var(--vscode-input-background, var(--jl-control));
+  box-shadow: none;
+}
+
+.jsonl-viewer .jsonl-jump .ant-input-number-input {
+  height: 30px;
+  padding: 0 9px;
+  color: var(--jl-fg);
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.jsonl-viewer .jsonl-jump .ant-input-number-input::placeholder {
+  color: var(--jl-muted);
+}
+
+.jsonl-viewer .jsonl-jump.ant-input-number-focused {
+  background: var(--vscode-input-background, var(--jl-control));
+  box-shadow: inset 0 0 0 1px var(--jl-focus);
+}
+
+.jsonl-viewer .jsonl-toolbar .ant-btn {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--jl-radius);
+  background: var(--jl-control);
+  color: var(--jl-fg);
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 11px;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.jsonl-viewer .jsonl-toolbar .ant-btn:not(:disabled):hover {
+  background: var(--jl-control-hover);
+  color: var(--jl-fg);
+}
+
+.jsonl-viewer .jsonl-toolbar .ant-btn:not(:disabled):active {
+  background: var(--jl-control-active);
+}
+
+.jsonl-viewer .jsonl-toolbar .ant-btn:focus-visible {
+  outline: 1px solid var(--jl-focus);
+  outline-offset: 1px;
+}
+
+.jsonl-viewer .jsonl-toolbar .ant-btn:disabled {
+  color: var(--jl-muted);
+  opacity: 0.45;
+}
+
+.jsonl-viewer .jsonl-toolbar .ant-btn-icon-only {
+  width: 32px;
+  padding: 0;
+}
+
+/* ---------- split body ---------- */
+
+.jsonl-splitter {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--jl-bg);
+}
+
+.jsonl-splitter .ant-splitter-panel {
+  overflow: hidden;
+  min-width: 0;
+  height: 100%;
+  background: var(--jl-bg);
+}
+
+.jsonl-splitter > .ant-splitter-panel:first-child {
+  background: var(--jl-panel);
+}
+
+.jsonl-splitter .ant-splitter-bar {
+  position: relative;
+  background: transparent;
+}
+
+.jsonl-splitter .ant-splitter-bar-dragger {
+  width: 7px;
+}
+
+.jsonl-splitter .ant-splitter-bar-dragger::before,
+.jsonl-splitter .ant-splitter-bar-dragger::after {
+  background: transparent !important;
+}
+
+.jsonl-splitter .ant-splitter-bar-dragger:hover::before,
+.jsonl-splitter .ant-splitter-bar-dragger-active::before {
+  background: color-mix(
+    in srgb,
+    var(--vscode-button-background, #0e639c) 50%,
+    transparent
+  ) !important;
+}
+
+.jsonl-splitter .ant-splitter-bar-dragger:focus-visible {
+  outline: 1px solid var(--jl-focus);
+  outline-offset: 1px;
+}
+
+/* ---------- shared bottom bar ---------- */
+
+/* ---------- bottom status bar (the detail actions live here) ---------- */
+
+.jsonl-bottombar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 6px 16px;
+  background: var(--jl-panel-strong);
+}
+
+.jsonl-bottombar__detail {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ---------- shared shell breakpoints ---------- */
+
+@media (max-width: 720px) {
+  .jsonl-splitter > .ant-splitter-panel:first-child {
+    max-width: max(240px, 42vw);
+  }
+
+  /* antd sizes the detail panel from the sidebar's unclamped basis (340px). Reducing the
+     sidebar with `max-width` left that difference unclaimed — 80px of dead space at 620px.
+     The detail pane is the one that should absorb it. */
+  .jsonl-splitter > .ant-splitter-panel:last-child {
+    flex-grow: 1 !important;
+  }
+
+  /* The bar is ~280px wide here; the count is the one part that can go without losing the
+     value itself. Path and preview keep their room. */
+}
+
+@media (max-width: 1080px) {
+  .jsonl-file-name {
+    max-width: 200px;
+  }
+
+  .jsonl-search-status {
+    max-width: 120px;
+  }
+
+  .jsonl-viewer .ant-input-affix-wrapper.jsonl-search {
+    flex-basis: 220px;
+    width: 220px;
+  }
+}
+
+@media (max-width: 860px) {
+  .jsonl-meta,
+  .jsonl-dot {
+    display: none;
+  }
+
+  .jsonl-file-name {
+    max-width: 180px;
+  }
+
+  .jsonl-viewer .ant-input-affix-wrapper.jsonl-search {
+    flex: 1 1 200px;
+    width: 200px;
+  }
+}
+
+@media (max-width: 620px) {
+  .jsonl-toolbar {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .jsonl-file-name {
+    max-width: 110px;
+  }
+
+  .jsonl-search-status,
+  .jsonl-jump,
+  .jsonl-toolbar__right > .ant-btn:not(.ant-btn-icon-only) {
+    display: none;
+  }
+
+  .jsonl-bottombar {
+    padding: 6px 12px;
+  }
+}
