@@ -13,6 +13,7 @@ import { limitForView, sheetViewFor } from "./sheetView";
 import type { ExcelTooLarge } from "./ExcelGuard";
 import { useExcelSave } from "./useExcelSave";
 import { mountExcelSpreadsheet } from "./excelSpreadsheetHost";
+import { excelWindowKind, excelWorkbookParser, planExcelOpen } from "./excelOpenPlan";
 
 export type ExcelOpenPayload = OfficeOpenMessage;
 
@@ -187,11 +188,12 @@ export function useExcelDocumentSession({
               virtual: payload.scheme !== "file",
             });
             if (view === "window") {
-              if (/\.(xlsx|xlsm|xls|ods)$/i.test(payload.ext ?? "")) {
-                const legacy = /\.(xls|ods)$/i.test(payload.ext ?? "");
-                const rows = legacy
-                  ? await loadLegacyWorkbookRows(buffer)
-                  : await loadWorkbookRows(buffer);
+              if (excelWindowKind(payload.ext ?? "") === "workbook") {
+                const parser = excelWorkbookParser(payload.ext ?? "");
+                const rows =
+                  parser === "legacy"
+                    ? await loadLegacyWorkbookRows(buffer)
+                    : await loadWorkbookRows(buffer);
                 if (seq !== openSeqRef.current) return;
                 const source = createWorkbookSheetSource(rows);
                 workbookRef.current = source;
@@ -258,7 +260,9 @@ export function useExcelDocumentSession({
         const view = sheetViewFor(payload.ext ?? "", payload.size, {
           virtual: payload.scheme !== "file",
         });
-        if (!forcedRef.current && (payload.tooLarge || view === "refused")) {
+        if (
+          planExcelOpen({ forced: forcedRef.current, tooLarge: payload.tooLarge, view }) === "guard"
+        ) {
           setTooLarge({
             size: payload.size ?? 0,
             name: payload.fileName ?? "",
