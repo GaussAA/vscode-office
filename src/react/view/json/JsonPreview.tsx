@@ -21,7 +21,6 @@ import JsonPreviewToolbar from "./JsonPreviewToolbar.tsx";
 import JsonPreviewState from "./JsonPreviewState.tsx";
 import JsonSearchRail, { type JsonSearchRow } from "./JsonSearchRail.tsx";
 import { collectMatchPaths, firstMatchKey } from "./jsonPreviewFormat.ts";
-import "../jsonl/Jsonl.less";
 import "./JsonPreview.less";
 
 const DEFAULT_LEFT_WIDTH = 340;

@@ -1,3 +1,4 @@
+import "./Entry.less";
 import { CopyOutlined } from "@ant-design/icons";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { Button, Modal, Segmented, Tree } from "antd";
