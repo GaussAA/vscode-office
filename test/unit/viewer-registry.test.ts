@@ -146,6 +146,7 @@ test("every React route is covered by the smoke list or a dedicated scenario", (
     parquet: "parquet-paging",
     jsonl: "jsonl-directory",
     json: "json-records",
+    compare: "compare-same-schema",
   };
 
   // The source is formatted by oxfmt, which emits double quotes — every scraper in this file

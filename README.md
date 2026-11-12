@@ -76,6 +76,18 @@ under a dark view. There is no separate light/dark switch.
 
 ![Column profile](docs/screenshots/parquet-profile.png)
 
+### Comparing two parquet files
+
+Two files, one table. The command picks a left and a right file and shows each column's null
+share and range on both sides, grouped by what happened: added, removed, type changed, changed,
+cannot compare, same. It reads only each file's footer — no column is decoded and no rows are
+compared — so a pair of 377 MB files still opens instantly.
+
+A row-count difference is a finding in the header, not an error, and a side written without
+statistics says "cannot compare" instead of pretending nothing moved.
+
+![Comparing two parquet files](docs/screenshots/parquet-compare.png)
+
 ### JSONL / NDJSON: a directory, not a grid
 
 One JSON value per line is not a table, so the fork ships a two-pane viewer: the left pane

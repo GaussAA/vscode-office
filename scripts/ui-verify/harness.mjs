@@ -693,6 +693,133 @@ function smokeStub(route) {
 }
 
 /**
+ * Bridge for the comparison panel (ADR-0021): answer `compareReload` with a canned diff.
+ *
+ * `?case=` picks the finding — same schema, a column added/removed, a type change, a side that
+ * cannot be read, or a row-count move. The payloads are computed host-side because the panel's
+ * job is to render a diff someone else computed; a browser-side fixture would let the shape
+ * drift away from `ParquetCompare` without any test noticing.
+ */
+function compareStub(mode) {
+  const column = (name, type, nullRatio, min, max) => ({
+    name,
+    type,
+    state: "available",
+    groupsWithStatistics: 10,
+    nullCount: Math.round(nullRatio * 1_000_000),
+    nullRatio,
+    min,
+    max,
+  });
+  const side = (fileName, rowCount) => ({
+    fileName,
+    rowCount,
+    rowGroupCount: 10,
+    columnCount: 3,
+    hasAnyStatistics: true,
+  });
+  const diff = (name, state, left, right, nullRatioDelta) => ({
+    name,
+    state,
+    ...(left ? { left } : {}),
+    ...(right ? { right } : {}),
+    ...(nullRatioDelta === undefined ? {} : { nullRatioDelta }),
+  });
+  const idLeft = column("id", "INT32", 0, "1", "1000000");
+  const idRight = column("id", "INT32", 0, "1", "1000000");
+
+  const compare = {
+    left: side("orders-2026-11-11.parquet", 1_000_000),
+    right: side("orders-2026-11-12.parquet", 1_000_000),
+    rowCountDelta: 0,
+    columns: [
+      diff("id", "same", idLeft, idRight, 0),
+      diff(
+        "region",
+        "same",
+        column("region", "UTF8", 0, "cn", "us"),
+        column("region", "UTF8", 0, "cn", "us"),
+        0,
+      ),
+    ],
+    summary: { same: 2, changed: 0, added: 0, removed: 0, "type-changed": 0, uncomparable: 0 },
+  };
+
+  if (mode === "added-removed") {
+    compare.columns = [
+      diff("id", "same", idLeft, idRight, 0),
+      diff("coupon", "added", undefined, column("coupon", "UTF8", 0.02, "av", "zz"), undefined),
+      diff(
+        "legacy_note",
+        "removed",
+        column("legacy_note", "UTF8", 0.5, "a", "z"),
+        undefined,
+        undefined,
+      ),
+    ];
+    compare.summary = {
+      same: 1,
+      changed: 0,
+      added: 1,
+      removed: 1,
+      "type-changed": 0,
+      uncomparable: 0,
+    };
+  } else if (mode === "type") {
+    compare.columns = [
+      diff("id", "same", idLeft, idRight, 0),
+      diff(
+        "amount",
+        "type-changed",
+        column("amount", "INT32", 0.01, "0", "9999"),
+        column("amount", "DOUBLE", 0.02, "0", "9999.5"),
+        0.01,
+      ),
+    ];
+    compare.summary = {
+      same: 1,
+      changed: 0,
+      added: 0,
+      removed: 0,
+      "type-changed": 1,
+      uncomparable: 0,
+    };
+  } else if (mode === "rows") {
+    compare.right = side("orders-2026-11-12.parquet", 1_005_000);
+    compare.rowCountDelta = 5_000;
+  }
+
+  const payload = {
+    requestId: 0,
+    compare: mode === "unreadable" ? null : compare,
+    ...(mode === "unreadable"
+      ? { failedSide: "right", error: "not a parquet file (footer != PAR1)" }
+      : {}),
+  };
+  return `<script>
+(function () {
+  const api = {
+    postMessage(msg) {
+      if (!msg || (msg.type !== 'compareReload' && msg.type !== 'init')) return;
+      const requestId = msg.content && msg.content.requestId;
+      setTimeout(function () {
+        window.postMessage({
+          type: 'compareData',
+          content: Object.assign({}, ${JSON.stringify(payload)}, {
+            requestId: typeof requestId === 'number' ? requestId : 0,
+          }),
+        }, '*');
+      }, 40);
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
+
+/**
  * Bridge for the spreadsheet size guard: a `file:` payload that claims to be 900 MB.
  *
  * The guard is a payload decision, not a file decision — the viewer must refuse before it
@@ -977,11 +1104,13 @@ export function startHarness(fixtures, port = 0) {
                       ),
                       url.searchParams.get("buffer") === "1",
                     )
-                  : path === "/harness-route"
-                    ? smokeStub(url.searchParams.get("route") ?? "html")
-                    : route === "parquet"
-                      ? parquetStub(fixtures)
-                      : jsonlStub(url.searchParams.get("empty") === "1" ? [] : jsonl, limit);
+                  : route === "compare"
+                    ? compareStub(url.searchParams.get("case") ?? "same")
+                    : path === "/harness-route"
+                      ? smokeStub(url.searchParams.get("route") ?? "html")
+                      : route === "parquet"
+                        ? parquetStub(fixtures)
+                        : jsonlStub(url.searchParams.get("empty") === "1" ? [] : jsonl, limit);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;

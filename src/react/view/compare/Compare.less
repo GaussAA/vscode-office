@@ -78,22 +78,27 @@
   cursor: pointer;
 }
 
-.compare-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.compare-group-title {
+/*
+ * One heading row per finding. It is a `th` inside the table, so it has to out-specify the
+ * generic header rule below — hence the compound selector rather than a bare class.
+ */
+.compare-table .compare-group-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 8px 0 0;
+  padding: 14px 8px 4px;
+  border: 0;
   color: var(--cmp-muted);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.07em;
+  text-align: left;
   text-transform: uppercase;
+}
+
+/* The stripe rule counts rows per tbody, so a group head would land on its own odd index. */
+.compare-table .compare-group-head {
+  background: none;
 }
 
 .compare-group-count {

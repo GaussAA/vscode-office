@@ -44,7 +44,8 @@ function rangeOf(min: string | undefined, max: string | undefined): string {
 function deltaOf(delta: number | undefined): string {
   if (delta === undefined) return "";
   const points = delta * 100;
-  if (Math.abs(points) < 0.05) return "0%";
+  // A delta of zero is noise: it would print "(0%)" on every unchanged row of every file.
+  if (Math.abs(points) < 0.05) return "";
   return `${points > 0 ? "+" : ""}${points.toFixed(1)}%`;
 }
 
@@ -154,42 +155,44 @@ export default function Compare() {
         </label>
       </header>
 
-      {groups.map((group) => (
-        <section className="compare-group" key={group.state}>
-          <h2 className="compare-group-title">
-            {$t(STATE_LABEL[group.state])}
-            <span className="compare-group-count">{group.rows.length}</span>
-          </h2>
-          <table className="compare-table">
-            <thead>
-              <tr>
-                <th scope="col">{$t("compare.column")}</th>
-                <th scope="col">{$t("compare.type")}</th>
-                <th scope="col">{$t("compare.nullShare")}</th>
-                <th scope="col">{$t("compare.range")}</th>
-                <th scope="col">{$t("compare.state")}</th>
+      <table className="compare-table">
+        <thead>
+          <tr>
+            <th scope="col">{$t("compare.column")}</th>
+            <th scope="col">{$t("compare.type")}</th>
+            <th scope="col">{$t("compare.nullShare")}</th>
+            <th scope="col">{$t("compare.range")}</th>
+            <th scope="col">{$t("compare.state")}</th>
+          </tr>
+        </thead>
+        {groups.map((group) => (
+          <tbody key={group.state} className="compare-group">
+            {/* One heading row per finding, not one table per finding: three copies of the
+                column headers on one screen is noise, not structure. */}
+            <tr className="compare-group-head">
+              <th scope="colgroup" colSpan={5} className="compare-group-title">
+                {$t(STATE_LABEL[group.state])}
+                <span className="compare-group-count">{group.rows.length}</span>
+              </th>
+            </tr>
+            {group.rows.map((column) => (
+              <tr
+                key={column.name}
+                className={`compare-row compare-row--${column.state}`}
+                data-state={column.state}
+              >
+                <td className="compare-name">{column.name}</td>
+                <td className="compare-type">{typeCell(column)}</td>
+                <td className="compare-null">{nullCell(column)}</td>
+                <td className="compare-range">{rangeCell(column)}</td>
+                <td className="compare-state">
+                  <span className="compare-badge">{$t(STATE_LABEL[column.state])}</span>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {group.rows.map((column) => (
-                <tr
-                  key={column.name}
-                  className={`compare-row compare-row--${column.state}`}
-                  data-state={column.state}
-                >
-                  <td className="compare-name">{column.name}</td>
-                  <td className="compare-type">{typeCell(column)}</td>
-                  <td className="compare-null">{nullCell(column)}</td>
-                  <td className="compare-range">{rangeCell(column)}</td>
-                  <td className="compare-state">
-                    <span className="compare-badge">{$t(STATE_LABEL[column.state])}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ))}
+            ))}
+          </tbody>
+        ))}
+      </table>
     </main>
   );
 }
