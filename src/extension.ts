@@ -4,6 +4,7 @@ import { Global } from "./common/global";
 import { OfficeViewerProvider } from "./provider/officeViewerProvider";
 import { JsonlViewerProvider } from "./provider/jsonlViewerProvider";
 import { activateJsonPreview } from "./provider/jsonPreview";
+import { activateCompare } from "./provider/comparePanel";
 import { switchCsvEditor } from "./service/csvService";
 import { FileUtil } from "./common/fileUtil";
 import { ReactApp } from "./common/reactApp";
@@ -20,6 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
   FileUtil.init(context);
   ReactApp.init(context);
   activateJsonPreview(context);
+  activateCompare(context);
   const viewerInstance = new OfficeViewerProvider(context);
   const jsonlViewerInstance = new JsonlViewerProvider(context);
   context.subscriptions.push(

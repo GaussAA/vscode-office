@@ -11,6 +11,7 @@ const Excel = lazy(() => import("./view/excel/Excel.tsx"));
 const Parquet = lazy(() => import("./view/parquet/Parquet.tsx"));
 const Jsonl = lazy(() => import("./view/jsonl/Jsonl.tsx"));
 const JsonPreview = lazy(() => import("./view/json/JsonPreview.tsx"));
+const Compare = lazy(() => import("./view/compare/Compare.tsx"));
 
 const defaultStyles = document.getElementById("_defaultStyles");
 if (defaultStyles?.parentNode) defaultStyles.parentNode.removeChild(defaultStyles);
@@ -28,6 +29,8 @@ export default function App() {
       return <Jsonl />;
     case "json":
       return <JsonPreview />;
+    case "compare":
+      return <Compare />;
     default:
       return null;
   }
