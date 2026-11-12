@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.9.0] - 2026-11-12
+
 ### Added
 
 - Parquet: the schema sidebar reports each column's null share, read from row-group statistics —
