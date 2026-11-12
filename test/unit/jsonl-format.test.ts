@@ -5,6 +5,7 @@ import {
   MAX_DEPTH,
   buildEntryModel,
   countNodes,
+  readPathKey,
   WRAP_NODE_LIMIT,
   fullValueText,
   makePathKey,
@@ -182,4 +183,16 @@ test("fullValueText: a cap is reported, and Copy still has the whole value", () 
   const fits = fullValueText(value, 50);
   assert.equal(fits.truncated, false);
   assert.equal(fits.text, value);
+});
+
+test("countNodes: honours a caller-supplied depth cap", () => {
+  const chain = { a: { b: { c: { d: { e: 1 } } } } };
+  assert.ok(countNodes(chain, 100, 2) <= 2);
+});
+
+test("buildEntryModel: the overflow row has a key that cannot collide with a real path", () => {
+  const model = buildEntryModel(objectOfSize(MAX_CHILDREN + 2));
+  const more = model.nodes[model.nodes.length - 1];
+  assert.equal(more?.overflow, 2);
+  assert.throws(() => readPathKey(more?.key ?? ""));
 });

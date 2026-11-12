@@ -92,11 +92,11 @@ function wrappedText(text: string, limit: number): string {
 }
 
 /** Cheap node count used to decide whether wrapping is affordable. */
-export function countNodes(value: unknown, limit = WRAP_NODE_LIMIT): number {
+export function countNodes(value: unknown, limit = WRAP_NODE_LIMIT, maxDepth = MAX_DEPTH): number {
   let count = 0;
   let capped = false;
   const walk = (current: unknown, depth: number) => {
-    if (capped || !isComposite(current) || depth >= MAX_DEPTH) return;
+    if (capped || !isComposite(current) || depth >= maxDepth) return;
     const entries = Array.isArray(current) ? current : Object.values(current);
     for (const child of entries) {
       if (count >= limit) {
@@ -174,7 +174,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
   const defaultExpandDepth = options.defaultExpandDepth ?? DEFAULT_EXPAND_DEPTH;
 
   const composite = isComposite(value);
-  const wrap = composite && countNodes(value, wrapNodeLimit) <= wrapNodeLimit;
+  const wrap = composite && countNodes(value, wrapNodeLimit, maxDepth) <= wrapNodeLimit;
 
   const keys: string[] = [];
   const shallowKeys: string[] = [];
@@ -224,7 +224,9 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
     }
     if (entries.length > visible.length) {
       nodes.push({
-        key: makePathKey([...path, "__more__"]),
+        // Not a JSON path: a real object can contain a "__more__" key, and that collision
+        // gave antd two nodes with the same identity.
+        key: `__more__:${makePathKey(path)}`,
         path: [...path, "__more__"],
         label: "",
         value: undefined,

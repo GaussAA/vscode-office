@@ -3,10 +3,9 @@ import { $t } from "../../i18n/i18nConfig.ts";
 import { Button, Modal, Segmented, Tree } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { highlightRuns } from "../../common/highlight.ts";
+import type { DataNode } from "antd/es/tree";
 import type { JsonlEntryDetail } from "../../../common/jsonlTypes.ts";
 import { JSONL_MAX_LINE_BYTES } from "../../../common/jsonlTypes.ts";
-import type { DataNode } from "antd/es/tree";
 import {
   AUTO_EXPAND_LIMIT,
   EXPAND_ALL_CONFIRM,
@@ -19,9 +18,9 @@ import {
   preview,
   readPathKey,
   typeLabel,
-  type NodeModel,
 } from "./jsonlFormat.ts";
 import JsonlValuePanel from "./JsonlValuePanel.tsx";
+import { chipClass, chipLabel, toAntdNodes } from "./jsonlTreeAdapter.tsx";
 import { detailKeyAction } from "./jsonlKeys.ts";
 import {
   collapsedChars,
@@ -47,80 +46,8 @@ interface Props {
   highlight?: string;
   /** Key to expand, select and reveal after a search result is chosen. */
   revealKey?: string | null;
-}
-
-function chipClass(entry: JsonlEntryDetail): string {
-  switch (entry.kind) {
-    case "empty":
-      return "empty";
-    case "invalid":
-      return "error";
-    case "too-large":
-      return "warn";
-    default:
-      return "type";
-  }
-}
-
-function chipLabel(entry: JsonlEntryDetail): string {
-  switch (entry.kind) {
-    case "empty":
-      return $t("jsonl.chipEmpty");
-    case "invalid":
-      return $t("jsonl.invalidJson");
-    case "too-large":
-      return $t("jsonl.chipTooLarge");
-    default:
-      return typeLabel(entry.value);
-  }
-}
-
-/** The only adapter between the tree model and antd. */
-function renderHighlighted(text: string, highlight?: string): React.ReactNode {
-  if (!highlight) return text;
-  return highlightRuns(text, highlight).map((part, index) =>
-    part.hit ? (
-      <mark key={index} className="jsonl-hit">
-        {part.text}
-      </mark>
-    ) : (
-      <span key={index}>{part.text}</span>
-    ),
-  );
-}
-
-function toAntdNodes(nodes: NodeModel[], wrap: boolean, highlight?: string): DataNode[] {
-  return nodes.map((node) => {
-    if (node.overflow !== undefined) {
-      return {
-        key: node.key,
-        isLeaf: true,
-        selectable: false,
-        title: <span className="jsonl-more">{$t("jsonl.moreKeys", { count: node.overflow })}</span>,
-      };
-    }
-    const longString = wrap && typeof node.value === "string";
-    return {
-      key: node.key,
-      isLeaf: !node.composite,
-      children: node.composite ? toAntdNodes(node.children, wrap, highlight) : undefined,
-      title: (
-        <span className={`jsonl-kv${wrap ? " jsonl-kv--wrap" : ""}`}>
-          <span className="jsonl-key">{renderHighlighted(node.label, highlight)}</span>
-          <span className="jsonl-colon">:</span>
-          <span
-            className={`jsonl-val jsonl-val--${node.kind}${longString ? " jsonl-val--wrap" : ""}`}
-          >
-            {renderHighlighted(node.preview, highlight)}
-          </span>
-          {node.composite && <span className="jsonl-type">{node.typeLabel}</span>}
-          {node.depthCapped !== undefined && (
-            <span className="jsonl-more"> {$t("jsonl.moreKeys", { count: node.depthCapped })}</span>
-          )}
-        </span>
-      ),
-    };
-  });
+  /** Bumped when the same key is chosen again; a value-only reveal would bail out. */
+  revealNonce?: number;
 }
 
 /** Right pane: the full tree (or raw text) of exactly one entry. */
@@ -134,10 +61,11 @@ export default function JsonlDetail({
   entryLabel,
   highlight,
   revealKey,
+  revealNonce,
 }: Props) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const toggleRef = useRef<HTMLButtonElement | null>(null);
+  const copyTimer = useRef(0);
   const [height, setHeight] = useState(320);
   /**
    * null means "follow the default expansion for this entry"; the first toggle pins an
@@ -178,7 +106,7 @@ export default function JsonlDetail({
       Array.from(new Set([...(previous ?? defaultExpanded), ...ancestors, revealKey])),
     );
     setActiveKey(revealKey);
-  }, [defaultExpanded, model, revealKey]);
+  }, [defaultExpanded, model, revealKey, revealNonce]);
 
   useEffect(() => {
     // Measure the tree's own box, not the pane: the value bar takes height from the pane and
@@ -191,9 +119,12 @@ export default function JsonlDetail({
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => () => window.clearTimeout(copyTimer.current), []);
+
   const flash = useCallback((kind: "value" | "path") => {
     setCopied(kind);
-    window.setTimeout(() => setCopied(null), 1200);
+    window.clearTimeout(copyTimer.current);
+    copyTimer.current = window.setTimeout(() => setCopied(null), 1200);
   }, []);
 
   const copy = useCallback(
@@ -478,7 +409,7 @@ export default function JsonlDetail({
   ) : null;
 
   return (
-    <div className="jsonl-detail" ref={containerRef} tabIndex={-1} onKeyDown={onKeyDown}>
+    <div className="jsonl-detail" tabIndex={-1} onKeyDown={onKeyDown}>
       {actionsHost ? createPortal(header, actionsHost) : null}
       <div className="jsonl-detail__body" ref={bodyRef}>
         {body}
