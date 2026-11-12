@@ -37,6 +37,22 @@ Chrome or Edge is auto-detected; set `CHROME_PATH` to override. Node >= 22 is re
 (global `WebSocket`). No network access is needed: the 4 KB ZSTD sample is committed and
 the other fixtures are generated locally.
 
+### Reproducing a CI-only flake
+
+A scenario that passes locally and fails in CI is almost always a timing difference, and
+re-running it locally proves nothing. `UI_VERIFY_CPU=8` throttles the browser through
+`Emulation.setCPUThrottlingRate`, which makes the machine behave like a loaded runner:
+
+```bash
+UI_VERIFY_CPU=8 node scripts/ui-verify/runner.mjs --filter=parquet-json-links-column-jump
+```
+
+Note what it does _not_ prove: at high rates an unrelated earlier wait (mounting the table)
+times out first, so a failure under throttling is not automatically the same failure you saw
+in CI. Read the message — `table did not render` and `did not bring the column into view` are
+different bugs. Prefer making the scenario wait for the _precondition_ its assertion needs
+("the table can scroll sideways") over adding a retry: a retry hides the next real regression.
+
 ## Adding a scenario
 
 Append to `scenarios` in `runner.mjs`:

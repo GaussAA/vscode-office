@@ -148,6 +148,22 @@ export default [
         `the link cell does not advertise its key: ${JSON.stringify(before.linkShortcuts)}`,
       );
 
+      // A jump only means something once the table can scroll sideways. Before the virtual list
+      // has measured its content, every retry inside the jump lands on a table that is still one
+      // viewport wide, so the click is spent on arithmetic that cannot move anything.
+      const scrollable = await page.waitFor(
+        `(() => {
+                const wrap = document.querySelector('.parquet-viewer__table-wrap');
+                const inner = wrap?.querySelector('.ant-table-tbody-virtual-holder-inner');
+                return !!wrap && !!inner && inner.scrollWidth > wrap.clientWidth + 1;
+            })()`,
+        6000,
+      );
+      expect(
+        scrollable,
+        "the table never overflowed horizontally: a column jump has nothing to measure",
+      );
+
       const jump = json(
         await page.evaluate(`(() => {
                 const item = [...document.querySelectorAll('.parquet-viewer__list-item')]
@@ -156,8 +172,7 @@ export default [
                 return JSON.stringify({ found: !!item });
             })()`),
       );
-      expect(jump.found, "the url field is missing from the schema sidebar");
-      // What has to become visible is the cell the user would click. The header is a second,
+      expect(jump.found, "the url field is missing from the schema sidebar"); // What has to become visible is the cell the user would click. The header is a second,
       // separately synced surface: measuring it here failed whenever the body had already
       // scrolled to its limit and the header had not caught up (body 1624 wide, scrolled to
       // its 385 px maximum, header still at 1749 against a 1500 right edge).
