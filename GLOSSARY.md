@@ -102,6 +102,8 @@ _Avoid_: 筛选、定位行（那是 jump-to-row）
 **Column profile（列画像）**:
 一份 parquet 文件里每一列的统计摘要：空值数与占比、取值范围、基数与 top-N。它先用 row-group
 statistics 回答，不为了显示一行摘要去解码整列；它不是筛选，也不改变当前页或行选择。
+答案有四种状态且不可互相替代：完整（available）、只有部分行组带统计（partial）、writer
+没写统计（missing）、结构列不做画像（nested，叶子统计不是一行的值）。
 口径见 [ADR-0020](./docs/adr/0020-column-profile-direction.md)。
 _Avoid_: 概览、统计报告、profiling（太泛，且暗示要整份扫）
 

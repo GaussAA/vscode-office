@@ -201,7 +201,58 @@ function generateParquetFixtures() {
     console.log(`   ⏭️  nested.parquet 已存在`);
   }
 
-  // 10. 损坏文件
+  // 10. 多行组 + 统计：列画像的「按行组回答」只有在多于一个组时才有意义
+  const multiGroupPath = join(parquetDir, "multigroup.parquet");
+  if (!existsSync(multiGroupPath)) {
+    const rows = 3000;
+    const ids = new Int32Array(rows);
+    const names = new Array(rows);
+    const scores = new Float64Array(rows);
+    for (let i = 0; i < rows; i++) {
+      ids[i] = i + 1;
+      // 每 7 个空一个，统计里才有 null_count 可读
+      names[i] = i % 7 === 0 ? null : `user-${i % 100}`;
+      scores[i] = (i % 1000) / 10;
+    }
+    const buffer = parquetWriteBuffer({
+      columnData: [
+        { name: "id", data: ids, type: "INT32" },
+        { name: "name", data: names, type: "STRING", nullable: true },
+        { name: "score", data: scores, type: "DOUBLE" },
+      ],
+      rowGroupSize: 1000,
+    });
+    writeFileSync(multiGroupPath, new Uint8Array(buffer));
+    console.log(`   ✅ multigroup.parquet (${rows} 行 / 3 个 row group / 含 NULL 列)`);
+  } else {
+    console.log(`   ⏭️  multigroup.parquet 已存在`);
+  }
+
+  // 11. 没有 row-group statistics：统计是 writer 可选的，「未写统计」必须是一种可断言的状态
+  const noStatsPath = join(parquetDir, "nostats.parquet");
+  if (!existsSync(noStatsPath)) {
+    const rows = 2000;
+    const ids = new Int32Array(rows);
+    const names = new Array(rows);
+    for (let i = 0; i < rows; i++) {
+      ids[i] = i + 1;
+      names[i] = i % 11 === 0 ? null : `user-${i % 50}`;
+    }
+    const buffer = parquetWriteBuffer({
+      columnData: [
+        { name: "id", data: ids, type: "INT32" },
+        { name: "name", data: names, type: "STRING", nullable: true },
+      ],
+      rowGroupSize: 1000,
+      statistics: false,
+    });
+    writeFileSync(noStatsPath, new Uint8Array(buffer));
+    console.log(`   ✅ nostats.parquet (${rows} 行 / 2 个 row group / statistics: false)`);
+  } else {
+    console.log(`   ⏭️  nostats.parquet 已存在`);
+  }
+
+  // 12. 损坏文件
   const corruptedPath = join(parquetDir, "corrupted.parquet");
   if (!existsSync(corruptedPath)) {
     const text = new TextEncoder().encode("This is not a valid parquet file\n");

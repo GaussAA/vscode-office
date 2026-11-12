@@ -135,9 +135,23 @@ function isAsyncBuffer(source: ArrayBuffer | AsyncBuffer): source is AsyncBuffer
   return typeof candidate?.slice === "function" && typeof candidate?.byteLength === "number";
 }
 
-export async function openParquetFile(source: ArrayBuffer | AsyncBuffer): Promise<ParquetFileInfo> {
+export async function openParquetFile(
+  source: ArrayBuffer | AsyncBuffer,
+  options: {
+    /**
+     * Bytes hyparquet may pull from the tail before it knows how big the footer is.
+     *
+     * The default (512 KB) is a latency trade: one request, slightly too many bytes. The
+     * profile gate is a byte-count invariant, so it asks for the 8-byte footer magic instead
+     * and lets the second, exact-sized read fetch the metadata.
+     */
+    initialFetchSize?: number;
+  } = {},
+): Promise<ParquetFileInfo> {
   const file = isAsyncBuffer(source) ? source : asyncBufferFromArrayBuffer(source);
-  const metadata = await parquetMetadataAsync(file);
+  const metadata = await parquetMetadataAsync(file, {
+    initialFetchSize: options.initialFetchSize,
+  });
   const schemaTree = parquetSchema(metadata);
   // Top-level columns only. `getPhysicalColumns` returns leaf paths, so a LIST column
   // named `tags` came out as three "columns" (`tags.list.element`…), while the row

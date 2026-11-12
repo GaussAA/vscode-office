@@ -5,6 +5,8 @@ import * as vscode from "vscode";
 import { Handler } from "../common/handler";
 import { getExtensionResourceRoots } from "@/common/extensionResource";
 import { handleCommonEvent } from "./commonHandler";
+import { openByteSource } from "@/service/jsonlSource";
+import { createParquetHandlers } from "./parquetHandlers";
 
 /**
  * Spreadsheet and parquet viewers.
@@ -64,6 +66,18 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
         void vscode.commands.executeCommand("vscode.openWith", uri, "default");
         return;
     }
+
+    if (route === "parquet") {
+      // The one message the host answers for parquet today: the profile is read from row-group
+      // metadata, so it never pulls a data page through `openByteSource`.
+      const parquet = createParquetHandlers({
+        openSource: () =>
+          openByteSource(uri, async (target) => vscode.workspace.fs.readFile(target as vscode.Uri)),
+        emit: (type, payload) => handler.emit(type, payload),
+      });
+      handler.on("parquetProfile", (request) => parquet.profile(request));
+    }
+
     return ReactApp.view(webview, { route });
   }
 }
