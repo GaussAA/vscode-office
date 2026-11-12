@@ -57,6 +57,12 @@ Reading is lazy and stays usable on big files:
   extension host; other schemes and URLs with credentials are never opened.
 - **Click a schema field to jump to its column.** The table scrolls horizontally to that
   column and leaves a quiet tint behind, without changing rows or filters.
+- **A column profile in the sidebar.** Each field reports its share of null rows, read from the
+  file's row-group statistics — footer metadata, never a column decode. A file written without
+  statistics says so instead of showing `0%`, a partial answer is labelled partial, and a nested
+  column is left unprofiled because leaf statistics do not describe a row. Click the badge (or
+  press `i` on the focused field) for that column's top values and counts: the scan decodes only
+  that column, stops after 200,000 rows, and the panel says how much it covered.
 
 ![Parquet types](docs/screenshots/parquet-types.png)
 
@@ -67,6 +73,8 @@ The viewer follows the VS Code theme — including the antd widgets, which used 
 under a dark view. There is no separate light/dark switch.
 
 ![Parquet in a light theme](docs/screenshots/parquet-light.png)
+
+![Column profile](docs/screenshots/parquet-profile.png)
 
 ### JSONL / NDJSON: a directory, not a grid
 
@@ -147,16 +155,20 @@ pnpm verify:perf # byte/time budgets on large files
 CI runs all three on every push, together with `pnpm build` and `pnpm run package`. Add
 `--docs` to `verify:ui` to refresh the screenshots above.
 
-### Known limits
+### Non-goals
+
+- Parquet stays read-only: there is no writer.
+- JSONL search matches raw text, not JSON paths.
+- Editing above 8 MB stays in the text editor; the windowed view is read-only by design.
+
+### Known gaps
 
 - Whole-file parquet search on a very large file is I/O bound because it reads every row
   group it visits.
-- Parquet is read-only; there is no writer.
-- Spreadsheets above 8 MB open in a read-only windowed view (viewport rows only). Workbooks
+- Spreadsheets above 8 MB open in a read-only windowed view (viewport rows only), and every
+  workbook format — `.xlsx`, `.xlsm`, `.xls`, `.ods` — is windowed as row text. Workbooks
   above 15 MB, and CSV/TSV from a virtual workspace above 25 MB, ask before loading at all;
-  a local CSV/TSV may be windowed up to 200 MB. All workbook formats (`.xlsx`, `.xlsm`, `.xls`, `.ods`) are windowed
-  as row text, so they are read-only above 8 MB too.
-- JSONL search matches raw text, not JSON paths.
+  a local CSV/TSV may be windowed up to 200 MB.
 - A JSONL line above 8 MB is shown as raw text instead of a parsed tree, and the raw view
   ships the first 1,000,000 characters (with a notice) rather than the whole line.
 - The JSONL tree is bounded: 20,000 nodes, 200 children per level, 12 levels. The tree says
@@ -169,7 +181,8 @@ CI runs all three on every push, together with `pnpm build` and `pnpm run packag
   single record above 8 MB is raw text, search stops at 10,000 matches, and JSONC/trailing
   commas are rejected. It is a command-opened panel, so a window reload does not restore the
   last previewed document; use the command again.
-- Upstream telemetry has been removed entirely.
+
+Upstream telemetry has been removed entirely.
 
 #### Other features
 

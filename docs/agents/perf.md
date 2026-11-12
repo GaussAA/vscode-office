@@ -1,17 +1,20 @@
 # Performance gate
 
-`pnpm verify:perf` runs the built viewers in headless Chrome **and the JSONL host services in
-Node** and asserts seven numbers that used to be catastrophic and invisible:
+`pnpm verify:perf` runs the built viewers in headless Chrome **and the JSONL / JSON / parquet
+profile host services in Node** and asserts nine numbers that used to be catastrophic and
+invisible:
 
-| invariant                                  | budget                                    | why it exists                                                                                                                                                                                                                               |
-| ------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| first paint reads at most 1.25x the file   | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file                                                                                                 |
-| a whole-file search is one pass            | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                                                                                                                      |
-| a 21 MB CSV paints its windowed view       | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows                                                                                                           |
-| a page turn on 60 columns stays usable     | best of 3: warm < 2 s, cold < 5 s         | idle: 210 ms warm (render of 3,000 cells), 520 ms cold (one decoded data page per column). Loose on purpose — load inflates samples 2-4x, and the regression this catches is 5-10x                                                          |
-| a JSONL directory window stays in budget   | 80 MB / 40 lines: ≤ 3 rows, < 1.5 s       | a 500-line request without the 4 MB byte budget parses all 40 × 2 MB lines before the first row; measured 15 ms / 1 row                                                                                                                     |
-| a whole-file JSONL search is one pass      | 200k lines < 5 s, `scanned == total`      | the line window per turn must stay byte-bounded; a per-batch re-read or an unbounded window shows up as an order-of-magnitude jump. Measured 0.3–0.5 s                                                                                      |
-| a 100 MB JSON array is indexed, not parsed | index < 6 s, window < 2 s, search < 8 s   | a `JSON.parse` of the whole file would allocate hundreds of MB and block the host; the scanner must only record boundaries and parse the 100 records in the requested window. Measured 1.37 s / 3 ms / 114 ms on 91.6 MB and 50,000 records |
+| invariant                                       | budget                                    | why it exists                                                                                                                                                                                                                               |
+| ----------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| first paint reads at most 1.25x the file        | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file                                                                                                 |
+| a whole-file search is one pass                 | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                                                                                                                      |
+| a 21 MB CSV paints its windowed view            | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows                                                                                                           |
+| a page turn on 60 columns stays usable          | best of 3: warm < 2 s, cold < 5 s         | idle: 210 ms warm (render of 3,000 cells), 520 ms cold (one decoded data page per column). Loose on purpose — load inflates samples 2-4x, and the regression this catches is 5-10x                                                          |
+| a JSONL directory window stays in budget        | 80 MB / 40 lines: ≤ 3 rows, < 1.5 s       | a 500-line request without the 4 MB byte budget parses all 40 × 2 MB lines before the first row; measured 15 ms / 1 row                                                                                                                     |
+| a whole-file JSONL search is one pass           | 200k lines < 5 s, `scanned == total`      | the line window per turn must stay byte-bounded; a per-batch re-read or an unbounded window shows up as an order-of-magnitude jump. Measured 0.3–0.5 s                                                                                      |
+| a 100 MB JSON array is indexed, not parsed      | index < 6 s, window < 2 s, search < 8 s   | a `JSON.parse` of the whole file would allocate hundreds of MB and block the host; the scanner must only record boundaries and parse the 100 records in the requested window. Measured 1.37 s / 3 ms / 114 ms on 91.6 MB and 50,000 records |
+| a column profile reads the footer, not the file | ≤ 256 KB read, < 300 ms                   | the 4.3 MB fixture decodes whole in ~1.5 s, so a wall-clock budget alone accepts a full decode; hyparquet's default tail fetch is 512 KB, so dropping the explicit 8-byte probe also fails here. Measured 5 ms / 5.7 KB of 4.3 MB           |
+| scanning one column reads one column            | 200k rows < 2 s, read < ½ the file        | the scan is the half that decodes, so the invariant is one column's chunks rather than the whole row. Measured 287 ms / 178 KB of 4.3 MB, 500 distinct values, 15,385 nulls skipped                                                         |
 
 It is separate from `pnpm verify:ui` on purpose: that suite answers "does the DOM look
 right" with small fixtures; this one answers "what did it cost" with large files, and byte
@@ -21,22 +24,30 @@ counts — not DOM assertions — are the evidence.
 
 ```
 scripts/perf/
-├── runner.mjs    scenarios + budgets + CLI (exit code is the gate)
-├── jsonl.mjs     the two JSONL Node-only checks; bundles the host services with esbuild
-├── json.mjs      the JSON array index/window/search check; bundles jsonPreview.ts
-├── expect.mjs    the assertion primitive shared by both scenario modules
-├── harness.mjs   HTTP server: built HTML from out/webview, fake bridge, Range + byte counting
-└── fixtures.mjs  generates two ONE-ROW-GROUP parquet files with hyparquet-writer, plus the
-                  JSONL fixtures (40 × 2 MB lines, 200k log lines) and the 100 MB JSON array
-                  into .perf/
+├── runner.mjs         scenarios + budgets + CLI (exit code is the gate)
+├── jsonl.mjs          the two JSONL Node-only checks; bundles the host services with esbuild
+├── json.mjs           the JSON array index/window/search check; bundles jsonPreview.ts
+├── parquet-profile.mjs the column-profile check; bundles parquetProfile.ts and counts bytes read
+├── expect.mjs         the assertion primitive shared by the scenario modules
+├── harness.mjs        HTTP server: built HTML from out/webview, fake bridge, Range + byte counting
+└── fixtures.mjs       generates the two ONE-ROW-GROUP parquet files, the TEN-ROW-GROUP profile
+                       file, plus the JSONL fixtures (40 × 2 MB lines, 200k log lines) and the
+                       100 MB JSON array into .perf/
 ```
 
-Both fixtures are written with a single row group, which is what PyArrow produces by default
+`flat` and `wide` are written with a single row group, which is what PyArrow produces by default
 (`_DEFAULT_ROW_GROUP_SIZE = 1024 * 1024` rows). That shape is where the difference between
 "read the pages you need" and "read the row group" is largest, so it is the shape the gate
-measures. The server counts **bytes served**, which is the number that matters for a remote
-workspace; the in-page stopwatch (`window.__bench.t0` → `ready`, two frames after the first
+measures. `profile` is the opposite shape on purpose: ten row groups, which is what polars
+(512² rows) and DuckDB (122 880) emit, and the only shape in which row-group statistics can be
+aggregated at all. The server counts **bytes served**, which is the number that matters for a
+remote workspace; the in-page stopwatch (`window.__bench.t0` → `ready`, two frames after the first
 row paints) keeps DevTools round-trip time out of the duration.
+
+The profile check is host-side for the opposite reason: ADR-0020 moved the first parquet
+capability into the host, so it never touches the browser. It asserts the **bytes the host read**
+rather than the duration, because the fixture is small enough that a full decode fits any
+reasonable wall-clock budget.
 
 The JSONL checks are host-side on purpose: indexing, window parsing and the whole-file scan
 happen in the extension host, so the browser harness cannot see them. The JSONL module bundles

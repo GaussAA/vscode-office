@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Parquet: the schema sidebar reports each column's null share, read from row-group statistics —
+  footer metadata, never a column decode. A file whose writer omitted statistics says so instead
+  of showing `0%`; an answer that covers only some row groups is labelled partial; nested columns
+  are not profiled, because leaf statistics do not describe a row. The field row's accessible
+  name carries the same sentence, so the percentage is never a bare number.
+- Parquet: a column's top values and counts are one click away (or `i` on the focused field). The
+  panel docks above the bottom bar without re-paging the table, and it states the coverage it
+  actually got (`Scanned 200,000 of 1,000,000 rows · 500 distinct values`) instead of implying a
+  total. The scan decodes only that column; a column whose writer omitted statistics is not
+  scanned until you ask, because a scan is the half that costs something.
+
 ## [6.8.0] - 2026-11-12
 
 ### Added

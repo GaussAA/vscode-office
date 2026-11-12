@@ -14,7 +14,7 @@ import {
   unexpected,
 } from "../helpers.mjs";
 
-/** 8 scenario(s); the runner concatenates these lists. */
+/** 12 scenario(s); the runner concatenates these lists. */
 export default [
   {
     name: "parquet-empty",
@@ -513,6 +513,152 @@ export default [
         `the teal icons do not share one token: ${JSON.stringify(tokens)}`,
       );
       return `icon tokens alias 6 chart colours (blue ${tokens.blue})`;
+    },
+  },
+  {
+    name: "parquet-profile-badges",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1&profile=1");
+      const ready = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-null').length === 4`,
+      );
+      expect(ready, "the profile badges never rendered");
+      const state = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const rows = [...document.querySelectorAll('.parquet-viewer__list-item')];
+                return {
+                    badges: rows.map(row => row.querySelector('.parquet-viewer__list-null')?.textContent ?? null),
+                    labels: rows.map(row => row.getAttribute('aria-label')),
+                };
+            })())`),
+      );
+      // id 0%, name 12% (360 of 3000), active missing, score partial — four distinct answers.
+      expect(state.badges[0] === "null 0%", `id badge is ${state.badges[0]}`);
+      expect(state.badges[1] === "null 12%", `name badge is ${state.badges[1]}`);
+      expect(state.badges[2] === "—", `missing statistics badge is ${state.badges[2]}`);
+      expect(state.badges[3] === "—", `partial statistics badge is ${state.badges[3]}`);
+      // The badge is aria-hidden; the sentence has to reach the row's accessible name.
+      expect(
+        state.labels[1].includes("12% of rows are null"),
+        `the field row never says what 12% means: ${state.labels[1]}`,
+      );
+      expect(
+        state.labels[2].includes("No row-group statistics"),
+        `a missing-statistics row appears to have statistics: ${state.labels[2]}`,
+      );
+      expect(
+        state.labels[3].includes("Partial statistics"),
+        `a partial answer reads as a complete one: ${state.labels[3]}`,
+      );
+      return "null share + missing + partial, each spoken in aria-label";
+    },
+  },
+  {
+    name: "parquet-profile-silent-host",
+    async run({ page, base }) {
+      // No `profile=1`: the fake host never answers, so the rail must stay bare. A viewer that
+      // paints `0%` from an absent answer would fail here.
+      await openParquet(page, base, "?mixed=1");
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                badges: document.querySelectorAll('.parquet-viewer__list-null').length,
+                firstLabel: document.querySelector('.parquet-viewer__list-item')?.getAttribute('aria-label') ?? null,
+            })`),
+      );
+      expect(state.badges === 0, `a silent host still produced ${state.badges} badge(s)`);
+      expect(
+        state.firstLabel && !state.firstLabel.includes("null"),
+        `a silent host still claimed something about nulls: ${state.firstLabel}`,
+      );
+      return "no host answer, no number";
+    },
+  },
+  {
+    name: "parquet-profile-panel",
+    docs: "parquet-profile.png",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1&profile=1");
+      // Keyboard path: focus the first field row and press `i`.
+      const opened = await page.evaluate(`(() => {
+        const row = document.querySelector('.parquet-viewer__list-item');
+        row.focus();
+        row.dispatchEvent(new KeyboardEvent('keydown', { key: 'i', bubbles: true }));
+        return true;
+      })()`);
+      expect(opened, "could not focus the first field row");
+      const ready = await page.waitFor(`!!document.querySelector('.parquet-viewer__profile')`);
+      expect(ready, "the profile panel never opened");
+      // The automatic scan is a round trip; wait for its result, not only for the shell.
+      const scanned = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__profile-row').length === 2`,
+      );
+      expect(scanned, "the automatic scan produced no top-N");
+      const panel = json(
+        await page.evaluate(`JSON.stringify((() => {
+          const root = document.querySelector('.parquet-viewer__profile');
+          return {
+            name: root.querySelector('.parquet-viewer__profile-name')?.textContent ?? null,
+            values: [...root.querySelectorAll('.parquet-viewer__profile-value')].map(n => n.textContent),
+            counts: [...root.querySelectorAll('.parquet-viewer__profile-count')].map(n => n.textContent),
+            note: root.querySelector('.parquet-viewer__profile-note')?.textContent ?? null,
+            scanButton: [...root.querySelectorAll('button')].some(b => b.textContent.includes('Scan this column')),
+          };
+        })())`),
+      );
+      expect(panel.name === "id", `panel header is ${panel.name}`);
+      expect(panel.values.length === 2, `panel shows ${panel.values.length} values`);
+      expect(panel.values[0] === "service-a-0", `top value is ${panel.values[0]}`);
+      // The note has to admit how much of the file the scan covered.
+      expect(panel.note.includes("Scanned"), `note is ${panel.note}`);
+      expect(panel.note.includes("98 distinct"), `note is ${panel.note}`);
+      // Esc closes and puts focus back on the row that opened it.
+      await page.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+      const closed = await page.waitFor(`!document.querySelector('.parquet-viewer__profile')`);
+      expect(closed, "Escape did not close the panel");
+      const focus = json(
+        await page.evaluate(
+          `JSON.stringify({ column: document.activeElement?.dataset?.column ?? null })`,
+        ),
+      );
+      expect(focus.column === "id", `focus returned to ${focus.column}`);
+      // Reopen and leave it open: this scenario supplies the documentation screenshot, and a
+      // screenshot of a closed panel documents nothing.
+      await page.evaluate(
+        `document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'i', bubbles: true }))`,
+      );
+      await page.waitFor(`document.querySelectorAll('.parquet-viewer__profile-row').length === 2`);
+      return `top-N ${panel.values[0]} ×${panel.counts[0]}, note admits coverage, Esc returns focus`;
+    },
+  },
+  {
+    name: "parquet-profile-missing-column",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1&profile=1");
+      // Mouse path on the `active` badge: no statistics, so the scan must be asked for, not assumed.
+      await page.evaluate(`(() => {
+        const badges = document.querySelectorAll('.parquet-viewer__list-null');
+        badges[2].click();
+      })()`);
+      const ready = await page.waitFor(`!!document.querySelector('.parquet-viewer__profile')`);
+      expect(ready, "clicking a badge did not open the panel");
+      const before = json(
+        await page.evaluate(`JSON.stringify({
+          name: document.querySelector('.parquet-viewer__profile-name')?.textContent ?? null,
+          scanButton: [...document.querySelectorAll('.parquet-viewer__profile button')].some(b => b.textContent === 'Scan this column'),
+          rows: document.querySelectorAll('.parquet-viewer__profile-row').length,
+        })`),
+      );
+      expect(before.name === "active", `panel header is ${before.name}`);
+      expect(before.scanButton === true, "a column without statistics started scanning on its own");
+      expect(before.rows === 0, `a scan happened before it was asked for: ${before.rows} rows`);
+      await page.evaluate(`[...document.querySelectorAll('.parquet-viewer__profile button')]
+        .find(b => b.textContent === 'Scan this column')?.click()`);
+      const scanned = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__profile-row').length === 2`,
+      );
+      expect(scanned, "the explicit scan never produced a top-N");
+      return "no statistics: explicit scan, then top-N";
     },
   },
 ];

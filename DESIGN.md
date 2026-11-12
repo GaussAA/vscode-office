@@ -288,7 +288,8 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 侧栏的 schema 字段行是一个 `<button>`，整行可点，`aria-pressed` 表示当前列。
 
 - **Shape:** 6px 圆角、`6px 8px` 内距、最小高度 32px、行间 1px 空隙。
-- **Contents:** 类型图标（14px，按类型取色）+ 字段名（12px/500，单行省略）+ 类型徽标（右对齐）。
+- **Contents:** 类型图标（14px，按类型取色）+ 字段名（12px/500，单行省略）+ 空值率徽标（有统计时）+ 类型徽标（右对齐）。
+- **Null share:** `null 12%`（9.5px 等宽、muted、无底色、`tabular-nums`）。它是视觉徽标，无统计时退成 `—`；整句走字段行的 `aria-label`（"Jump to column name — 12% of rows are null"），所以读者不需要猜这个百分数是什么。低于 1% 且非零显示 `null <1%`，不四舍五入成 0。
 - **States:** hover 用 `list-hoverBackground`；激活行用 Signal Blue 12% 混入底色、字段名转 Signal Blue；`focus-visible` 用 `outline-offset: -1px`（贴内边，避免与相邻行粘连）。
 
 ### Type badges
@@ -333,6 +334,18 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 渲染上限 20 000 字符只约束面板，不约束复制 —— 一个 5 000 元素的 LIST 不能因为按了方向键就把整串塞进布局。
 
 **禁止**：不要用 `title`、tooltip 或「复制到别处再读」承担这个职责（这也是 [P1-4](#) 的来源）；单元格与底栏都不再挂原生 `title`。
+
+### Column profile panel (parquet)
+
+停靠在底栏正上方，与值面板共用同一个槽位（`bottom: 100%`），所以打开它不会让表格重新分页。
+一次只开一个：选中单元格会收起画像面板，打开画像面板会收起值面板。
+
+- **打开方式**：字段行聚焦时按 `i`，或用鼠标点该行的 `null N%` 徽标。徽标不是独立焦点（行内嵌套可交互元素是无效 HTML），键盘路径就是 `i`。
+- **头部**：字段名、类型、`null N%` 与 `min … max`（都有统计时才出现）；关闭按钮贴右。
+- **正文**：top-N 每行 `值  次数`（等宽、`tabular-nums`）；底部一行 `Scanned N of M rows · K distinct values`，N 必须是真实扫描行数，不能写总数。
+- **没有统计的文件**：不自动扫描，正文是一个「Scan this column」按钮——扫描要解码，得先问。
+- **键盘**：`Esc` 关闭并把焦点还给打开它的字段行；焦点环沿用 1px `focusBorder`。
+- **禁止**：不要把它做成第二个侧栏、不要用 tooltip 承载覆盖率、不要在扫描中显示百分比。
 
 ### JSON Preview (command surface, not a viewer)
 

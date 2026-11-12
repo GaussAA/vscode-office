@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { ParquetProfile } from "@/common/parquetProfileTypes";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { COLUMN_ICONS } from "./parquetCell";
 import type { ParquetColumnInfo } from "./parquetParser";
@@ -7,7 +8,22 @@ interface ParquetSchemaProps {
   columns: ParquetColumnInfo[];
   activeColumn: number | null;
   siderWidth: number;
+  /** Null while the host has not answered; every row then simply has no badge. */
+  profile?: ParquetProfile | null;
   onFocusColumn: (position: number) => void;
+  /** Open the profile panel for this column (mouse on the badge, or `i` on the focused row). */
+  onInspectColumn: (column: ParquetColumnInfo) => void;
+}
+
+/**
+ * `0.4%` must not render as `0%`: the number is the answer, so it rounds only when the
+ * difference stays visible.
+ */
+function formatNullShare(ratio: number): { badge: string; percent: string } {
+  if (ratio <= 0) return { badge: "null 0%", percent: "0" };
+  if (ratio < 0.01) return { badge: "null <1%", percent: "<1" };
+  const percent = String(Math.round(ratio * 100));
+  return { badge: `null ${percent}%`, percent };
 }
 
 /**
@@ -18,10 +34,19 @@ export default function ParquetSchema({
   columns,
   activeColumn,
   siderWidth,
+  profile,
   onFocusColumn,
+  onInspectColumn,
 }: ParquetSchemaProps) {
   const [fieldFilter, setFieldFilter] = useState("");
   const [fieldCursor, setFieldCursor] = useState(0);
+
+  // Keyed by column name: the profile carries names, not positions, because a nested schema
+  // collapses to one name per top-level column.
+  const statsByName = useMemo(
+    () => new Map((profile?.columns ?? []).map((column) => [column.name, column])),
+    [profile],
+  );
 
   const visibleColumns = useMemo(() => {
     const all = columns.map((column, position) => ({ column, position }));
@@ -86,8 +111,16 @@ export default function ParquetSchema({
             Home: -Infinity,
             End: Infinity,
           };
+          const target = visibleColumns[fieldCursor];
           const move = keys[event.key];
-          if (move === undefined) return;
+          if (move === undefined) {
+            // `i` inspects the focused field; the row's own activation is still the jump.
+            if ((event.key === "i" || event.key === "I") && target) {
+              event.preventDefault();
+              onInspectColumn(target.column);
+            }
+            return;
+          }
           event.preventDefault();
           const last = Math.max(0, visibleColumns.length - 1);
           const next = Math.max(
@@ -98,9 +131,9 @@ export default function ParquetSchema({
             ),
           );
           setFieldCursor(next);
-          const target = visibleColumns[next];
-          if (target) {
-            onFocusColumn(target.position);
+          const moved = visibleColumns[next];
+          if (moved) {
+            onFocusColumn(moved.position);
             const item = event.currentTarget.querySelectorAll<HTMLElement>(
               ".parquet-viewer__list-item",
             )[next];
@@ -112,6 +145,24 @@ export default function ParquetSchema({
           const icon = COLUMN_ICONS[column.category];
           const kind = column.category;
           const active = activeColumn === position;
+          const stats = statsByName.get(column.name);
+          // The badge is visual only; the row's accessible name carries the same sentence, so
+          // a screen reader hears "Jump to column name — 12% of rows are null" rather than a
+          // bare percentage the surrounding UI cannot explain.
+          let badge: string | null = null;
+          let summary: string | null = null;
+          if (stats?.state === "available" && stats.nullRatio !== undefined) {
+            const share = formatNullShare(stats.nullRatio);
+            badge = share.badge;
+            summary = $t("parquet.nullShare", { percent: share.percent });
+          } else if (stats?.state === "partial") {
+            badge = "—";
+            summary = $t("parquet.partialStatistics");
+          } else if (stats?.state === "missing") {
+            badge = "—";
+            summary = $t("parquet.noStatistics");
+          }
+          const label = $t("parquet.jumpToColumn", { name: column.name });
           return (
             <button
               key={column.name}
@@ -119,8 +170,9 @@ export default function ParquetSchema({
               role="option"
               className={`parquet-viewer__list-item${active ? " parquet-viewer__list-item--active" : ""}`}
               aria-selected={active}
-              aria-label={$t("parquet.jumpToColumn", { name: column.name })}
+              aria-label={summary ? `${label} — ${summary}` : label}
               title={`${column.name} · ${column.type}`}
+              data-column={column.name}
               tabIndex={index === fieldCursor ? 0 : -1}
               onFocus={() => setFieldCursor(index)}
               onClick={() => onFocusColumn(position)}
@@ -131,6 +183,20 @@ export default function ParquetSchema({
               <span className="parquet-viewer__list-name" title={column.name}>
                 {column.name}
               </span>
+              {badge && (
+                <span
+                  className="parquet-viewer__list-null"
+                  aria-hidden="true"
+                  onClick={(event) => {
+                    // Mouse convenience only: an interactive element inside the row button
+                    // would be invalid HTML, so the keyboard path is `i` on the focused row.
+                    event.stopPropagation();
+                    onInspectColumn(column);
+                  }}
+                >
+                  {badge}
+                </span>
+              )}
               <span className="parquet-viewer__list-type" title={column.type}>
                 {column.type}
               </span>

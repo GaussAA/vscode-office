@@ -517,6 +517,20 @@ body:has(.parquet-app) {
   font-weight: 500;
 }
 
+/* The null share answers the question the schema rail is opened for. Visual only: the field
+   row's aria-label carries the same sentence, so it stays quiet — mono, muted, no background,
+   and it never takes width from the column name (`flex-shrink: 0` is on the badge, the name
+   owns the ellipsis). */
+.parquet-viewer__list-null {
+  flex-shrink: 0;
+  color: var(--pv-muted);
+  font-family: var(--pv-mono);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 /* Two lines instead of one clipped one: `TIMESTAMP_MILLIS` and `TIMESTAMP_MICROS` were becoming
    the same `TIMESTAMP_MIL…`, and the badge is the thing that makes the legend unnecessary. */
 .parquet-viewer__list-type {
@@ -1275,6 +1289,100 @@ body:has(.parquet-app) {
    rows they were reading. */
 .parquet-viewer__bottombar {
   position: relative;
+}
+
+/* The column profile shares the value panel's slot: it overlays the grid instead of shrinking
+   it, so opening it never re-pages the table under the reader (the reason DESIGN.md gives for
+   the value panel is the same one here). */
+.parquet-viewer__profile {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  padding: 8px 16px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--pv-fg) 12%, transparent);
+  background: var(--pv-panel-strong);
+  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.22);
+}
+
+.parquet-viewer__profile-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.parquet-viewer__profile-name {
+  overflow: hidden;
+  color: var(--pv-fg);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parquet-viewer__profile-type,
+.parquet-viewer__profile-null,
+.parquet-viewer__profile-range {
+  flex-shrink: 0;
+  color: var(--pv-muted);
+  font-family: var(--pv-mono);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.parquet-viewer__profile-close {
+  margin-left: auto;
+}
+
+.parquet-viewer__profile-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parquet-viewer__profile-row {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  min-height: 22px;
+  font-family: var(--pv-mono);
+  font-size: 12px;
+}
+
+.parquet-viewer__profile-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pv-fg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parquet-viewer__profile-count {
+  flex-shrink: 0;
+  color: var(--pv-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.parquet-viewer__profile-note {
+  margin: 0;
+  color: var(--pv-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.parquet-viewer__profile-note--error {
+  color: var(--pv-error);
 }
 
 .parquet-viewer__inspector {
