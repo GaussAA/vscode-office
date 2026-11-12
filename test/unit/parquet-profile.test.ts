@@ -5,7 +5,11 @@ import type { ParquetColumnProfile, ParquetProfile } from "@/common/parquetProfi
 import { createParquetHandlers } from "@/provider/parquetHandlers";
 import { openParquetFile } from "@/react/view/parquet/parquetParser";
 import { memoryByteSource, type ByteSource } from "@/service/jsonlFile";
-import { profileFromParquet, readParquetProfile } from "@/service/parquetProfile";
+import {
+  profileFromParquet,
+  readParquetProfile,
+  scanParquetColumn,
+} from "@/service/parquetProfile";
 
 const fixture = (name: string) => new URL(`../fixtures/parquet/${name}.parquet`, import.meta.url);
 
@@ -198,4 +202,82 @@ test("handlers: a file that is not parquet reports the footer error instead of t
   assert.ok(message, "expected exactly one reply");
   assert.equal(message.payload.profile, null);
   assert.match(message.payload.error, /footer != PAR1/);
+});
+
+// ------------------------------------------------------------------ the scan
+
+test("scan: top-N counts values and skips nulls the profile already reports", async () => {
+  const scan = await scanParquetColumn(memoryByteSource(await bytesOf("multigroup")), "name");
+
+  assert.equal(scan.name, "name");
+  assert.equal(scan.rowCount, 3000);
+  assert.equal(scan.scanned, 3000);
+  assert.equal(scan.complete, true);
+  assert.equal(scan.nulls, 429, "the 429 null names belong to the profile, not to top-N");
+  assert.ok(scan.distinct > 0 && scan.distinct <= 100, `distinct is ${scan.distinct}`);
+  assert.equal(scan.top.length, 10);
+  assert.ok(
+    scan.top.every((entry) => entry.value.startsWith("user-")),
+    `a null value leaked into top-N: ${JSON.stringify(scan.top[0])}`,
+  );
+  // Every non-null name is a `user-N`, so the counts must add up to the non-null rows.
+  const topSum = scan.top.reduce((total, entry) => total + entry.count, 0);
+  assert.ok(topSum <= 3000 - 429, `counts exceed rows: ${topSum}`);
+});
+
+test("scan: a row cap is reported as a prefix, not as the file", async () => {
+  const scan = await scanParquetColumn(memoryByteSource(await bytesOf("multigroup")), "name", {
+    maxRows: 100,
+  });
+
+  assert.equal(scan.scanned, 100);
+  assert.equal(scan.complete, false);
+  assert.equal(scan.rowCount, 3000);
+});
+
+test("scan: an unknown column is an error, not an empty histogram", async () => {
+  await assert.rejects(
+    scanParquetColumn(memoryByteSource(await bytesOf("multigroup")), "nope"),
+    /no column named nope/,
+  );
+});
+
+test("handlers: a column scan is answered with its requestId and a close", async () => {
+  const bytes = await bytesOf("multigroup");
+  let closed = false;
+  const source = memoryByteSource(bytes);
+  const { handlers, emitted } = harness(async () => ({
+    ...source,
+    close: () => {
+      closed = true;
+    },
+  }));
+
+  await handlers.columnScan({ requestId: 11, name: "name" });
+
+  assert.equal(emitted.length, 1);
+  const message = emitted[0];
+  assert.ok(message, "expected exactly one reply");
+  assert.equal(message.type, "parquetColumnScanData");
+  assert.equal(message.payload.requestId, 11);
+  assert.equal(message.payload.scan.complete, true);
+  assert.equal(closed, true);
+});
+
+test("handlers: a scan request without a name is ignored", async () => {
+  const { handlers, emitted } = harness(async () => memoryByteSource(new Uint8Array(0)));
+  await handlers.columnScan({ requestId: 1 });
+  assert.deepEqual(emitted, []);
+});
+
+test("handlers: a failed scan still answers with the error attached", async () => {
+  const { handlers, emitted } = harness(async () => memoryByteSource(await bytesOf("multigroup")));
+
+  await handlers.columnScan({ requestId: 2, name: "nope" });
+
+  assert.equal(emitted.length, 1);
+  const message = emitted[0];
+  assert.ok(message, "expected exactly one reply");
+  assert.equal(message.payload.scan, null);
+  assert.match(message.payload.error, /no column named nope/);
 });

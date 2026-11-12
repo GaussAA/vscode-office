@@ -51,3 +51,40 @@ export interface ParquetProfilePayload {
   profile: ParquetProfile | null;
   error?: string;
 }
+
+/**
+ * The on-demand half of the profile: cardinality and top-N for **one** column.
+ *
+ * This one decodes, so it is a separate request from the metadata answer and it reports what it
+ * actually covered. A scan is a prefix, never a promise about the whole file.
+ */
+export interface ParquetColumnScanRequest {
+  requestId: number;
+  name: string;
+}
+
+export interface ParquetColumnScanValue {
+  /** Display text, already truncated for the panel; the row's identity for counting. */
+  value: string;
+  count: number;
+}
+
+export interface ParquetColumnScan {
+  name: string;
+  /** Rows the scan read. Equals `rowCount` when `complete`. */
+  scanned: number;
+  rowCount: number;
+  /** False when the row cap stopped the scan; the numbers describe the prefix only. */
+  complete: boolean;
+  /** Distinct non-null values in the scanned prefix. */
+  distinct: number;
+  /** Nulls seen and skipped — the profile already reports their share. */
+  nulls: number;
+  top: ParquetColumnScanValue[];
+}
+
+export interface ParquetColumnScanPayload {
+  requestId: number;
+  scan: ParquetColumnScan | null;
+  error?: string;
+}

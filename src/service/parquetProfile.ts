@@ -10,9 +10,12 @@
  * the single place a parquet type string is decoded (`categorizeType`), and re-deriving column
  * types host-side would create the second place that can disagree with the schema rail.
  */
-import type { AsyncBuffer, FileMetaData } from "hyparquet";
+import { parquetReadObjects, type AsyncBuffer, type FileMetaData } from "hyparquet";
+import { compressors } from "hyparquet-compressors";
+import { toDisplayText } from "@/common/displayText";
 import type {
   ParquetColumnProfile,
+  ParquetColumnScan,
   ParquetProfile,
   ParquetProfileState,
 } from "@/common/parquetProfileTypes";
@@ -191,4 +194,94 @@ export async function readParquetProfile(source: ByteSource): Promise<ParquetPro
     initialFetchSize: PROFILE_TAIL_PROBE_BYTES,
   });
   return profileFromParquet(info);
+}
+
+// ---------------------------------------------------------------- the scan
+//
+// Cardinality and top-N cannot come from statistics: they need the values. This is therefore a
+// separate, opt-in request that decodes **one column** and reports how much of the file it
+// covered. Everything about it is shaped by that cost.
+
+/** Rows a scan visits before it stops. A prefix is reported as a prefix. */
+export const PARQUET_SCAN_ROWS = 200_000;
+/** Rows decoded per call; small enough that a 1M-row column never lands in memory at once. */
+const PARQUET_SCAN_CHUNK = 25_000;
+/** How many values the top-N keeps. */
+const PARQUET_SCAN_TOP = 10;
+/** Longest display text per value; a LIST whose JSON is 40 KB is not a useful top-N row. */
+const PARQUET_SCAN_VALUE_CHARS = 120;
+/** Distinct values tracked before the histogram stops growing (cardinality becomes a floor). */
+const PARQUET_SCAN_MAX_VALUES = 200_000;
+
+function scanDisplayText(value: unknown): string {
+  const text = toDisplayText(value);
+  return text.length > PARQUET_SCAN_VALUE_CHARS
+    ? `${text.slice(0, PARQUET_SCAN_VALUE_CHARS)}…`
+    : text;
+}
+
+/**
+ * Count values of one column over a bounded prefix.
+ *
+ * Nulls are skipped rather than counted: their share is already a property of the column in the
+ * profile, and letting `NULL` win every top-N makes the panel useless.
+ */
+export async function scanParquetColumn(
+  source: ByteSource,
+  name: string,
+  options: { maxRows?: number; top?: number } = {},
+): Promise<ParquetColumnScan> {
+  const info = await openParquetFile(asyncBufferFrom(source), {
+    initialFetchSize: PROFILE_TAIL_PROBE_BYTES,
+  });
+  const column = info.columns.find((candidate) => candidate.name === name);
+  if (!column) {
+    throw new Error(`no column named ${name}`);
+  }
+
+  const maxRows = Math.max(1, Math.min(options.maxRows ?? PARQUET_SCAN_ROWS, info.rowCount));
+  const top = Math.max(1, options.top ?? PARQUET_SCAN_TOP);
+  const counts = new Map<string, number>();
+  let scanned = 0;
+  let nulls = 0;
+
+  while (scanned < maxRows) {
+    const end = Math.min(scanned + PARQUET_SCAN_CHUNK, maxRows);
+    const rows = await parquetReadObjects({
+      file: info.file,
+      metadata: info.metadata,
+      // The whole point of this request: decode one column, not the row.
+      columns: [name],
+      rowStart: scanned,
+      rowEnd: end,
+      compressors,
+    });
+    for (const row of rows) {
+      const value = row[name];
+      if (value === null || value === undefined) {
+        nulls += 1;
+        continue;
+      }
+      const text = scanDisplayText(value);
+      const current = counts.get(text);
+      if (current !== undefined) counts.set(text, current + 1);
+      else if (counts.size < PARQUET_SCAN_MAX_VALUES) counts.set(text, 1);
+    }
+    scanned = end;
+  }
+
+  const ranked = [...counts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, top)
+    .map(([value, count]) => ({ value, count }));
+
+  return {
+    name,
+    scanned,
+    rowCount: info.rowCount,
+    complete: scanned >= info.rowCount,
+    distinct: counts.size,
+    nulls,
+    top: ranked,
+  };
 }

@@ -75,7 +75,9 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
           openByteSource(uri, async (target) => vscode.workspace.fs.readFile(target as vscode.Uri)),
         emit: (type, payload) => handler.emit(type, payload),
       });
-      handler.on("parquetProfile", (request) => parquet.profile(request));
+      handler
+        .on("parquetProfile", (request) => parquet.profile(request))
+        .on("parquetColumnScan", (request) => parquet.columnScan(request));
     }
 
     return ReactApp.view(webview, { route });

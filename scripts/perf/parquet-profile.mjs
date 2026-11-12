@@ -43,6 +43,7 @@ export async function loadProfileHost() {
   const module = await import(pathToFileURL(join(outdir, "parquetProfile.mjs")).href);
   return {
     readParquetProfile: module.readParquetProfile,
+    scanParquetColumn: module.scanParquetColumn,
     cleanup: () => rmSync(outdir, { recursive: true, force: true }),
   };
 }
@@ -127,6 +128,48 @@ export const profileScenarios = [
         `${elapsed} ms / ${counter.bytesRead} bytes in ${counter.reads} reads for ` +
         `${(fixtures.profileBytes / (1024 * 1024)).toFixed(1)} MB, ` +
         `${fixtures.profileRows.toLocaleString()} rows in ${fixtures.profileRowGroups} row groups`
+      );
+    },
+  },
+  {
+    name: "parquet-column-scan-one-column",
+    async run({ fixtures, profileHost }) {
+      const bytes = new Uint8Array(readFileSync(fixtures.profile));
+      const counter = countingSource(bytes);
+
+      const started = performance.now();
+      const scan = await profileHost.scanParquetColumn(counter.source, "name");
+      const elapsed = Math.round(performance.now() - started);
+
+      // The scan is a prefix by contract, and it says so. A gate that expected the whole file
+      // would be asking for the decode this path exists to avoid.
+      expect(scan.complete === false, "a 1M-row column cannot be complete within the row cap");
+      expect(
+        scan.scanned === 200_000,
+        `the scan covered ${scan.scanned} rows instead of its 200,000-row cap`,
+      );
+      expect(scan.nulls > 0, "every 13th name is null; the scan skipped all of them");
+      expect(scan.top.length === 10, `top-N has ${scan.top.length} entries`);
+      expect(
+        scan.top.every((entry) => entry.count > 0 && entry.value.length > 0),
+        "a top-N entry is empty",
+      );
+
+      expect(
+        elapsed <= 2000,
+        `scanning one column took ${elapsed} ms (budget 2000 ms); ` +
+          `it should decode one column, not the 7-column row`,
+      );
+      // One column out of seven; a whole-row scan would read most of the file.
+      expect(
+        counter.bytesRead < fixtures.profileBytes / 2,
+        `the scan read ${counter.bytesRead} of ${fixtures.profileBytes} bytes; ` +
+          `that is the file, not one column`,
+      );
+
+      return (
+        `${elapsed} ms / ${counter.bytesRead} bytes for ${scan.scanned.toLocaleString()} rows ` +
+        `of \`name\` (${scan.distinct} distinct, ${scan.nulls} nulls, top "${scan.top[0]?.value}")`
       );
     },
   },

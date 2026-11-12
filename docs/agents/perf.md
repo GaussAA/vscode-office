@@ -1,7 +1,7 @@
 # Performance gate
 
 `pnpm verify:perf` runs the built viewers in headless Chrome **and the JSONL / JSON / parquet
-profile host services in Node** and asserts eight numbers that used to be catastrophic and
+profile host services in Node** and asserts nine numbers that used to be catastrophic and
 invisible:
 
 | invariant                                       | budget                                    | why it exists                                                                                                                                                                                                                               |
@@ -14,6 +14,7 @@ invisible:
 | a whole-file JSONL search is one pass           | 200k lines < 5 s, `scanned == total`      | the line window per turn must stay byte-bounded; a per-batch re-read or an unbounded window shows up as an order-of-magnitude jump. Measured 0.3–0.5 s                                                                                      |
 | a 100 MB JSON array is indexed, not parsed      | index < 6 s, window < 2 s, search < 8 s   | a `JSON.parse` of the whole file would allocate hundreds of MB and block the host; the scanner must only record boundaries and parse the 100 records in the requested window. Measured 1.37 s / 3 ms / 114 ms on 91.6 MB and 50,000 records |
 | a column profile reads the footer, not the file | ≤ 256 KB read, < 300 ms                   | the 4.3 MB fixture decodes whole in ~1.5 s, so a wall-clock budget alone accepts a full decode; hyparquet's default tail fetch is 512 KB, so dropping the explicit 8-byte probe also fails here. Measured 5 ms / 5.7 KB of 4.3 MB           |
+| scanning one column reads one column            | 200k rows < 2 s, read < ½ the file        | the scan is the half that decodes, so the invariant is one column's chunks rather than the whole row. Measured 287 ms / 178 KB of 4.3 MB, 500 distinct values, 15,385 nulls skipped                                                         |
 
 It is separate from `pnpm verify:ui` on purpose: that suite answers "does the DOM look
 right" with small fixtures; this one answers "what did it cost" with large files, and byte

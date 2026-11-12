@@ -36,7 +36,7 @@ jobs:
       # The only layer that sees cost rather than appearance: bytes served, search passes,
       # window sizes. Its large fixtures are generated into .perf/, so the cache keeps a cold
       # run from regenerating 200 MB on every push; the key is the generator's own hash.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .perf
           key: perf-fixtures-${{ hashFiles('scripts/perf/fixtures.mjs') }}
