@@ -5,6 +5,10 @@ All notable changes to the "vscode-office" extension will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [6.8.0] - 2026-11-12
+
 ### Added
 
 - Parquet values can be read in full. Clicking the value in the bottom bar opens a panel anchored
@@ -13,21 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   character count and UTF-8 byte count, and copies the untruncated value. The panel overlays the
   grid instead of shrinking it, so opening it does not re-page the table. Rendering is capped at
   20 000 characters; copy is not.
-
-### Removed
-
-- The native `title` on parquet cells and on the bottom-bar value. A tooltip cannot be wrapped,
-  selected or copied, and DESIGN.md forbids it as the only way to read a value.
-
-### Added
-
 - JSONL search marks each hit as `key`, `value` or `key+value`. The substring scan reports a row
   for both cases identically, so "is `status` a field here, or does some value contain the word"
   had no answer short of opening the entry. The matched line is parsed anyway to derive its label,
   so the distinction costs nothing extra; a hit that lives only in JSON punctuation carries no
   badge rather than a guessed one. `key`/`value` are structure, like `LIST`, and stay untranslated.
-
-## [Unreleased]
 
 ### Changed
 
@@ -39,6 +33,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the windowed and guard views, and Ctrl+F now focuses the inline Find.
 - Excel: the editable read-only banner is now in flow instead of covering the spreadsheet
   toolbar; the documented guard, workbook and find screenshots show the state they name.
+
+### Removed
+
+- The native `title` on parquet cells and on the bottom-bar value. A tooltip cannot be wrapped,
+  selected or copied, and DESIGN.md forbids it as the only way to read a value.
+- The legacy Git History viewer, its commands, status-bar entry and preferences, and its README
+  references. The extension now ships only the three documented surfaces: Excel, Parquet and
+  JSONL.
+
+### Fixed
+
+- Excel: windowed files above Chromium's scroll-height limit no longer lose their final rows.
+  The scrollbar becomes a proportional seek bar over a capped 30M-px surface while the visible
+  block stays mounted; the 1.6M-row UI scenario reaches the last row.
+- Excel: CSV/TSV files are decoded once and the detected encoding is reused on save; TSV encoding
+  detection now follows the same rules as CSV.
+- Excel: the size guard traps focus and returns it to the safe action after the second-step
+  confirmation is cancelled, and the windowed grid exposes accurate ARIA row counts.
+- JSON/JSONL: search runs in cancellable batches, so a new query or a closed view does not leave
+  an unresponsive scan running.
 
 ## [6.7.0] - 2026-11-11
 

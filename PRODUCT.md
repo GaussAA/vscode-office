@@ -59,7 +59,7 @@ web
 - **零遥测**；上游的 telemetry 已被整体移除。
 - **webview 里的东西一律不可信**：字节、URL、文件系统读取都留在扩展宿主。外部链接只有一个判据函数 `normalizeExternalUrl`（只认完整 `http(s)`、拒绝 userinfo 与控制字符、限长 2048），webview 用它决定显示，宿主在 `vscode.env.openExternal` 之前再验一次。
 - **闸门 fail-closed**：typecheck 基线已清空，任何类型错误都会让构建失败；UI 验收断言主题感知对比度 ≥ 4.5:1；性能预算按 `pnpm verify:perf`。
-- **发布**：6.7.0 于 2026-11-11 发布到 VS Code Marketplace 与 Open VSX；tag、CI、Release 附件与两个注册表的校验步骤见 `docs/agents/release.md`。
+- **发布**：6.8.0 于 2026-11-12 发布到 VS Code Marketplace 与 Open VSX；tag、CI、Release 附件与两个注册表的校验步骤见 `docs/agents/release.md`。
 
 ## Brand Commitments
 
