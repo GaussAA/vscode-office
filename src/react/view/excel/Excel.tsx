@@ -1,5 +1,5 @@
 import { MoonOutlined, SunOutlined } from "@ant-design/icons";
-import { App, Button, Spin } from "antd";
+import { App, Spin } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { handler } from "../../util/vscode.ts";
 import { isVscodeEditorDark, observeVscodeThemeChange } from "../../util/vscodeTheme.ts";
@@ -8,12 +8,7 @@ import type { OfficeOpenMessage } from "@/common/openPayload";
 import "./Excel.less";
 import { MIN_VIEW_COLS, MIN_VIEW_ROWS } from "./excel_meta.ts";
 import { loadLegacyWorkbookRows, loadSheets, loadWorkbookRows } from "./excel_reader.ts";
-import {
-  export_xlsx,
-  exportSaveAs,
-  buildFormattingSnapshot,
-  hasFormattingChanged,
-} from "./excel_writer.ts";
+import { buildFormattingSnapshot } from "./excel_writer.ts";
 import Spreadsheet from "./x-spreadsheet/index";
 import FindReplacePanel, { type FindReplacePanelHandle } from "./FindReplacePanel";
 import { parseSpreadsheetLink } from "./excel_hyperlink";
@@ -25,6 +20,7 @@ import { limitForView, sheetViewFor } from "./sheetView";
 import ExcelGuard, { type ExcelTooLarge } from "./ExcelGuard";
 import ExcelLoadError from "./ExcelLoadError";
 import ExcelSaveAsDialog from "./ExcelSaveAsDialog";
+import { useExcelSave } from "./useExcelSave";
 import {
   loadExcelColorMode,
   saveExcelColorMode,
@@ -159,6 +155,18 @@ function ExcelViewer() {
     setSaveAsVisible(true);
   }, []);
 
+  const { handleSave, confirmSaveAs } = useExcelSave({
+    spreadsheetRef: spreadSheetRef,
+    readOnlyRef,
+    extRef,
+    csvEncodingRef,
+    csvDelimiterRef,
+    initialFormattingRef,
+    pendingSaveRef,
+    onSaveAs: handleSaveAs,
+    modal,
+  });
+
   const handleSelectSheet = useCallback((index: number) => {
     const source = workbookRef.current;
     if (!source) return;
@@ -186,121 +194,6 @@ function ExcelViewer() {
       return;
     }
     handler.emit("openForce");
-  }, []);
-
-  const handleSave = useCallback(async () => {
-    const spreadSheet = spreadSheetRef.current;
-    if (!spreadSheet || !gridReadyRef.current) return;
-    if (readOnlyRef.current) {
-      handleSaveAs();
-      return;
-    }
-
-    const ext = extRef.current.replace(/^\./, "").toLowerCase();
-    const sheets = spreadSheet.getData();
-    const csvEncoding = csvEncodingRef.current;
-    const csvDelimiter = csvDelimiterRef.current;
-
-    if (
-      ext !== "xlsx" &&
-      ext !== "xlsm" &&
-      hasFormattingChanged(initialFormattingRef.current, sheets)
-    ) {
-      await new Promise<void>((resolve) => {
-        const dialog = modal.confirm({
-          title: t("viewer.formatCannotPreserveTitle"),
-          content: t("viewer.formatCannotPreserveContent", ext.toUpperCase()),
-          okText: t("viewer.saveAsXlsx"),
-          cancelText: t("button.cancel"),
-          centered: true,
-          getContainer: () => document.body,
-          onOk: async () => {
-            try {
-              await export_xlsx(spreadSheet, "xlsx", csvEncoding, { saveAs: true }, csvDelimiter);
-            } catch (error) {
-              console.error(`Failed to save Excel file: ${(error as Error).message}`);
-              throw error;
-            }
-          },
-          onCancel: () => {},
-          footer: () => (
-            <>
-              <Button
-                style={{ padding: "3px 12px", height: "auto" }}
-                onClick={() => dialog.destroy()}
-              >
-                {t("button.cancel")}
-              </Button>
-              <Button
-                style={{ padding: "3px 12px", height: "auto" }}
-                onClick={() => {
-                  void (async () => {
-                    dialog.destroy();
-                    try {
-                      await export_xlsx(
-                        spreadSheet,
-                        extRef.current,
-                        csvEncoding,
-                        undefined,
-                        csvDelimiter,
-                      );
-                    } catch (error) {
-                      console.error(`Failed to save Excel file: ${(error as Error).message}`);
-                    }
-                  })();
-                }}
-              >
-                {t("viewer.saveAsOriginal")}
-              </Button>
-              <Button
-                type="primary"
-                style={{ padding: "3px 12px", height: "auto" }}
-                onClick={() => {
-                  void (async () => {
-                    try {
-                      dialog.destroy();
-                      await export_xlsx(
-                        spreadSheet,
-                        "xlsx",
-                        csvEncoding,
-                        { saveAs: true },
-                        csvDelimiter,
-                      );
-                    } catch (error) {
-                      console.error(`Failed to save Excel file: ${(error as Error).message}`);
-                    }
-                  })();
-                }}
-              >
-                {t("viewer.saveAsXlsx")}
-              </Button>
-            </>
-          ),
-          afterClose: () => resolve(),
-        });
-      });
-      return;
-    }
-
-    try {
-      await export_xlsx(spreadSheet, extRef.current, csvEncoding, undefined, csvDelimiter);
-      // export only posts the bytes; the host writes them. Clear dirty on saveDone, not here.
-      pendingSaveRef.current = true;
-    } catch (error) {
-      pendingSaveRef.current = false;
-      console.error(`Failed to save Excel file: ${(error as Error).message}`);
-    }
-  }, [modal, handleSaveAs]);
-
-  const confirmSaveAs = useCallback(async (fmt: string) => {
-    const spreadSheet = spreadSheetRef.current;
-    if (!spreadSheet) return;
-    try {
-      await exportSaveAs(spreadSheet, fmt, csvEncodingRef.current, csvDelimiterRef.current);
-      // Save As writes a different file; the document being edited is still dirty.
-    } catch (error) {
-      console.error(`Failed to save Excel file: ${(error as Error).message}`);
-    }
   }, []);
 
   useEffect(() => {
