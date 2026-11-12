@@ -678,9 +678,9 @@ export default [
   {
     name: "remaining-routes-smoke",
     async run({ page, base }) {
-      // The routes without a behavioural scenario of their own: the spreadsheet viewer and the
-      // Git History panel. Mount-only is enough — their real assertions live in unit tests
-      // (excel_find) and in the smoke suite's routing checks.
+      // The routes without a behavioural scenario of their own: the spreadsheet viewer (the
+      // Git History panel was removed in 6.8.0). Mount-only is enough — its real assertions
+      // live in unit tests (excel_find) and in the smoke suite's routing checks.
       const routes = ["excel"];
       const failures = [];
       for (const route of routes) {

@@ -35,8 +35,12 @@ status: accepted
   `filenamePattern` 从 62 条降到 12 条。
 - 删除 7 个 React 视图目录、6 个 provider、压缩包/HTML 的服务层、`resource/pdf`（5.66 MB）、
   `resource/java-decompiler.jar`（1.4 MB）、`public/`（334 KB）与 17 个运行时依赖。
-- CSP 相应收窄：`'wasm-unsafe-eval'`、`frame-src`、`media-src`、`worker-src` 全部移除；
-  `webview-csp.test.ts` 里改成「这些指令必须不存在」，防止它们悄悄回来。
-- **没有删除的**：Git 历史（不是格式预览）、YAML/XML 语言服务（不是预览、也不是写操作）、
+- CSP 相应收窄：`frame-src`、`media-src`、`worker-src` 全部移除；`webview-csp.test.ts` 里改成
+  「这些指令必须不存在」，防止它们悄悄回来。**`'wasm-unsafe-eval'` 现在仍在 `script-src`**：
+  `hyparquet-compressors` 用 WebAssembly 解码 SNAPPY/ZSTD，没有它 parquet 视图打不开压缩文件；
+  本条当时的删除记录已被后续版本推翻，事实来源是 `src/common/webviewCsp.ts` 与它的测试。
+- **当时没有删除的**：Git 历史（不是格式预览）、YAML/XML 语言服务（不是预览、也不是写操作）、
   图标主题（展示层）。这三块与格式去留无关，若要再收窄应另开 ADR。
+- **6.8.0 的更正**：Git 历史后来还是删了（它不在三种格式之内，是本仓最贵的继承债），见
+  CHANGELOG 6.8.0 的 Removed。本条记录的是 6.0.0 当时的范围，不改写。
 - 6.0.0 的 CHANGELOG 必须把每个被删格式逐条列出；三份 README 的格式清单重写为三项。

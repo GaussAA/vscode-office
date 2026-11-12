@@ -50,3 +50,9 @@ worker-src ${cspSource} blob:
 - 这条策略不是只写在文档里：`verify:ui` 每条场景结束都断言「本场景没有 CSP violation」，
   失败信息直接给出被拦的指令。负向验证做过一次：删掉 `style-src` 的 `'unsafe-inline'`，
   13/13 全部失败。
+
+## 后续（2026-11）
+
+webview 只剩三个（ADR-0015），`iframe srcdoc` 的 HTML 预览面板已随 6.0.0 删除，所以
+`frame-src` 与那条例外都不再存在。`'wasm-unsafe-eval'` 仍在 `script-src`：`hyparquet-compressors`
+用 WebAssembly 解码压缩列。事实来源始终是 `src/common/webviewCsp.ts` 与 `webview-csp.test.ts`。
