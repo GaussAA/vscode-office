@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
 import type { ParquetFileInfo } from "./parquetParser";
 import { savePersistedRow } from "./parquetPersistence";
 import type { ParquetSession } from "./parquetSession";
@@ -24,6 +24,7 @@ interface UseParquetPageArgs {
   documentKeyRef: RefObject<string | undefined>;
   restoreRowRef: RefObject<number>;
   restorePendingRef: RefObject<boolean>;
+  loadedStartRef: RefObject<number>;
   onError: (message: string) => void;
 }
 
@@ -40,11 +41,11 @@ export function useParquetPage({
   documentKeyRef,
   restoreRowRef,
   restorePendingRef,
+  loadedStartRef,
   onError,
 }: UseParquetPageArgs) {
   const [loadedPage, setLoadedPage] = useState(0);
   const [loadedStart, setLoadedStart] = useState(0);
-  const loadedStartRef = useRef(0);
   const [pageRows, setPageRows] = useState<Record<string, unknown>[]>([]);
   const [pageLoading, setPageLoading] = useState(false);
 
@@ -54,7 +55,7 @@ export function useParquetPage({
     setLoadedPage(0);
     setLoadedStart(0);
     setPageLoading(false);
-  }, []);
+  }, [loadedStartRef]);
 
   useEffect(() => {
     const session = sessionRef.current;
@@ -88,7 +89,16 @@ export function useParquetPage({
       controller.abort();
       cancelPrefetch?.();
     };
-  }, [fileInfo, onError, page, reloadToken, restorePendingRef, restoreRowRef, sessionRef]);
+  }, [
+    fileInfo,
+    loadedStartRef,
+    onError,
+    page,
+    reloadToken,
+    restorePendingRef,
+    restoreRowRef,
+    sessionRef,
+  ]);
 
   useEffect(() => {
     // Nothing to remember before the first page has actually arrived — and while a restore is

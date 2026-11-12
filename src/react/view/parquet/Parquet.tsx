@@ -12,20 +12,12 @@ import { ParquetSession } from "./parquetSession.ts";
 import { describeParquetFailure } from "./parquetError.ts";
 import {
   PARQUET_CHUNK_SIZE,
-  PARQUET_PAGE_SIZE,
   openParquetFile,
   readParquetRows,
   type ParquetFileInfo,
 } from "./parquetParser.ts";
 import { parquetAntdTheme } from "./parquetAntdTheme.ts";
-import {
-  MIN_ROWS_PER_PAGE,
-  PARQUET_MAX_PAGE_SIZE,
-  ROW_HEIGHT,
-  SIDER_DEFAULT,
-  SIDER_MAX,
-  SIDER_MIN,
-} from "./parquetLayout.ts";
+import { ROW_HEIGHT, SIDER_DEFAULT, SIDER_MAX, SIDER_MIN } from "./parquetLayout.ts";
 import { loadPersistedRow } from "./parquetPersistence.ts";
 import { PresentationTable, ResizableHeaderCell } from "./parquetHeaders.tsx";
 import { CursorContext, type CellCursor, type TableRow } from "./parquetCell.tsx";
@@ -42,6 +34,7 @@ import { useParquetSiderResize } from "./useParquetSiderResize.ts";
 import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
 import { useParquetSearch } from "./useParquetSearch.ts";
 import { useParquetPage } from "./useParquetPage.ts";
+import { useParquetTableSize } from "./useParquetTableSize.ts";
 import { buildParquetColumns } from "./parquetColumns.tsx";
 import { resolveParquetKey } from "./parquetKeymap.ts";
 import "./Parquet.less";
@@ -56,18 +49,12 @@ type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBas
 function ParquetViewer({ dark }: { dark: boolean }) {
   const { message } = App.useApp();
   const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
-  /**
-   * The page `pageRows` actually came from. Row identity — the `#` column, `aria-rowindex`, the
-   * inspector's row number — must derive from this, not from `page`: `page` changes on the click,
-   * the rows arrive 0.5–1.7 s later, and in between every row number was a lie (a stale value
-   * under a fresh label, and an `aria-live` announcement of it).
-   */
   /** Row to return to once the page size is known; consumed by the measuring effect. */
   const restoreRowRef = useRef(0);
   /** True until the restored page has actually loaded; nothing may be persisted before that. */
   const restorePendingRef = useRef(false);
-  /** Bumped when the page size changes, so the page loader runs again against the new slicing. */
-  const [reloadToken, setReloadToken] = useState(0);
+  /** First row of the loaded page, shared by sizing and the page loader. */
+  const loadedStartRef = useRef(0);
   const [rowJump, setRowJump] = useState<number | null>(null);
   const [inspected, setInspected] = useState<{
     row: number;
@@ -96,12 +83,20 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const lastPathRef = useRef<string | undefined>(undefined);
   /** Keyboard cursor into the grid; null until an arrow key (or a click) lands somewhere. */
   const [cursor, setCursor] = useState<CellCursor | null>(null);
+  /** Owns the page cache, cancellation and the page<->row arithmetic. */
+  const sessionRef = useRef<ParquetSession | null>(null);
   const { siderWidth, setSiderWidth, beginResize, moveResize, endResize } = useParquetSiderResize();
-  /** Rows per page. A page is one screenful, so this follows the body height. */
-  const [pageSize, setPageSize] = useState(PARQUET_PAGE_SIZE);
-  const pageSizeRef = useRef(PARQUET_PAGE_SIZE);
-  const [tableBodyHeight, setTableBodyHeight] = useState(320);
-  const [tableBodyWidth, setTableBodyWidth] = useState(0);
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const { pageSize, pageSizeRef, tableBodyHeight, tableBodyWidth, reloadToken } =
+    useParquetTableSize({
+      tableWrapRef,
+      fileInfo,
+      siderWidth,
+      sessionRef,
+      restoreRowRef,
+      loadedStartRef,
+      onPageChange: setPage,
+    });
   const {
     layout: columnLayout,
     setColumnWidth,
@@ -112,7 +107,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const tableRef = useRef<TableRef>(null);
   /** Pending focus retry while the virtual list renders the cursor's row. */
   const focusTimer = useRef(0);
-  const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<CellCursor | null>(null);
   /** The full text of the current selection, for Ctrl+C on the grid. */
   const inspectedCopyRef = useRef("");
@@ -124,8 +118,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const fileInfoRef = useRef<ParquetFileInfo | null>(null);
   /** localStorage key of the open document; empty for inline (virtual) buffers. */
   const documentKeyRef = useRef<string | undefined>(undefined);
-  /** Owns the page cache, cancellation and the page<->row arithmetic. */
-  const sessionRef = useRef<ParquetSession | null>(null);
 
   const { activeColumn, setActiveColumn, focusColumn } = useParquetColumnFocus({
     fileInfoRef,
@@ -161,17 +153,17 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   });
   const { query, matchRows, resetSearch } = search;
 
-  const { pageRows, loadedPage, loadedStart, pageLoading, loadedStartRef, resetPage } =
-    useParquetPage({
-      fileInfo,
-      page,
-      reloadToken,
-      sessionRef,
-      documentKeyRef,
-      restoreRowRef,
-      restorePendingRef,
-      onError: setError,
-    });
+  const { pageRows, loadedPage, loadedStart, pageLoading, resetPage } = useParquetPage({
+    fileInfo,
+    page,
+    reloadToken,
+    sessionRef,
+    documentKeyRef,
+    restoreRowRef,
+    restorePendingRef,
+    loadedStartRef,
+    onError: setError,
+  });
 
   /** Briefly true right after a copy, so the button can answer instead of staying silent. */
   const [copied, setCopied] = useState(false);
@@ -252,42 +244,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         setLoading(false);
       }
     },
-    [resetPage, resetSearch, selectCell, setActiveColumn],
+    [pageSizeRef, resetPage, resetSearch, selectCell, setActiveColumn],
   );
 
-  // The table body gets the height the flex column actually leaves it, instead of a
-  // `100vh - N` guess that turns into an unexplained gap whenever the bars change.
-  useEffect(() => {
-    const element = tableWrapRef.current;
-    if (!element || !fileInfo) return;
-    const update = () => {
-      const header = element.querySelector<HTMLElement>(".ant-table-header");
-      const headerHeight = header?.offsetHeight ?? 38;
-      const bodyHeight = Math.max(80, Math.round(element.clientHeight - headerHeight));
-      setTableBodyHeight(bodyHeight);
-      setTableBodyWidth(element.clientWidth);
-      // A page is one screenful: the pager's row range should describe the rows you can see.
-      // `setPageSize` keeps the decoded chunks, so re-paging never costs a read.
-      const rows = Math.max(MIN_ROWS_PER_PAGE, Math.floor(bodyHeight / ROW_HEIGHT));
-      if (rows !== pageSizeRef.current) {
-        const clamped = Math.min(rows, PARQUET_MAX_PAGE_SIZE);
-        pageSizeRef.current = clamped;
-        // Which page holds the row we want? On the very first sizing that is the persisted row
-        // (the page number cannot be computed before the page size is known); afterwards it is
-        // the row already on screen, so a resize does not move the reader.
-        const keepRow = restoreRowRef.current || loadedStartRef.current;
-        restoreRowRef.current = 0;
-        const session = sessionRef.current;
-        if (session) setPage(session.setPageSize(clamped, keepRow));
-        setPageSize(clamped);
-        setReloadToken((token) => token + 1);
-      }
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [fileInfo, loadedStartRef, siderWidth]);
   useEffect(() => {
     const onFind = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "f") return;
