@@ -62,11 +62,12 @@
   行级 `filter`、`rowStart` / `rowEnd` 范围读，以及 offset index 与 bloom filter 支持。这既说明
   画像不必自己解析 thrift 统计，也说明**将来做筛选时缺的是接缝与 UI，不是算法**。
 - **现有性能 fixture 测不到这件事**：`scripts/perf/fixtures.mjs` 里的两个 parquet 都是单 row group
-  （`rowGroupSize: FLAT_ROWS` / `WIDE_ROWS`）、5 列、无 NULL、无 list/JSON 列。单行组下裁剪不
-  成立（所有统计都来自同一组），所以本 ADR 的实现从新 fixture 开始：1M 行 / 10 组 / ZSTD /
-  含 NULL 的字符串列、JSON 字符串列与嵌套 list 列，另加一个 `statistics: false` 的文件。实测
-  `hyparquet-writer` 支持多行组、`node:zlib` 的 ZSTD、bloom filter 与 column index —— 它只自带
-  SNAPPY，其余 codec 若不注入 compressor 会把未压缩页标成目标 codec。
+  （`rowGroupSize: FLAT_ROWS` / `WIDE_ROWS`）、5 列、无 NULL、无 JSON 列。单行组下裁剪不成立
+  （所有统计都来自同一组），所以本 ADR 的实现从新 fixture 开始：1M 行 / 10 组 / ZSTD / 含 NULL 的
+  字符串列与 JSON 列，另加一个 `statistics: false` 的文件。实测 `hyparquet-writer` 支持多行组、
+  `node:zlib` 的 ZSTD、bloom filter 与 column index —— 它只自带 SNAPPY，其余 codec 若不注入
+  compressor 会把未压缩页标成目标 codec。**它写不出真正的 `LIST` 组**（数组列会被序列化成 JSON），
+  所以嵌套列的覆盖留在 `test/fixtures/parquet/nested.parquet`。
 - **新预算的逻辑是「零整份解码」**：在 377 MB / 1M 行的真实文件上，列画像 ≤ 2 s。但 CI 里的
   fixture 只有 4.3 MB，**整份解码也只要 1.5 s**——所以闸门不能只靠时间：主断言是「从 byte
   source 读出的字节数停留在 footer 量级」，时间与堆是辅助。否则一个偷偷解码整份的实现能在

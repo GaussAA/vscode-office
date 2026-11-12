@@ -33,6 +33,15 @@ jobs:
         run: xvfb-run -a pnpm test:smoke:min
       - name: UI verification (headless DOM assertions)
         run: xvfb-run -a pnpm verify:ui
+      # The only layer that sees cost rather than appearance: bytes served, search passes,
+      # window sizes. Its large fixtures are generated into .perf/, so the cache keeps a cold
+      # run from regenerating 200 MB on every push; the key is the generator's own hash.
+      - uses: actions/cache@v4
+        with:
+          path: .perf
+          key: perf-fixtures-${{ hashFiles('scripts/perf/fixtures.mjs') }}
+      - name: Performance gate (bytes and time budgets)
+        run: xvfb-run -a pnpm verify:perf
       # Same command a developer runs locally — one packaging path, pinned tool version.
       - name: Package vsix
         run: pnpm run package

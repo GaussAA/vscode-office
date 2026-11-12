@@ -197,10 +197,13 @@ export function createJsonPerfFixtures(cacheDir) {
  * Column-profile fixtures. Two shapes, because a profile has two paths to prove:
  *
  *  - `profile-1m-10rg.parquet`: 1M rows across **ten** row groups, ZSTD, and the columns the
- *    real files have — a nullable string, a JSON string, a nested list. Node's
+ *    real files have — a nullable string, a JSON string, and a column of JSON arrays. Node's
  *    `zstdCompressSync` supplies the compressor: `hyparquet-writer` only ships SNAPPY and would
  *    otherwise label uncompressed pages as ZSTD. `name` also carries a bloom filter, and the
  *    columns get a column index where the writer emits one, because pruning depends on both.
+ *    Note what this fixture is *not*: `hyparquet-writer` turns an array column into a JSON
+ *    string, so it cannot produce a real `LIST` group. Nested coverage stays on
+ *    `test/fixtures/parquet/nested.parquet`.
  *  - `profile-nostats-100k.parquet`: the same shape written with `statistics: false`. Row-group
  *    statistics are optional in the format, so "this file has no statistics" is a state the UI
  *    has to state rather than paper over.
@@ -224,7 +227,7 @@ export function createProfilePerfFixtures(cacheDir) {
     const oks = new Array(PROFILE_ROWS);
     const notes = new Array(PROFILE_ROWS);
     const metas = new Array(PROFILE_ROWS);
-    const tags = new Array(PROFILE_ROWS);
+    const tagLists = new Array(PROFILE_ROWS);
     for (let index = 0; index < PROFILE_ROWS; index++) {
       ids[index] = index + 1;
       // Every 13th name is null, so `null_count` has something to report.
@@ -234,7 +237,7 @@ export function createProfilePerfFixtures(cacheDir) {
       notes[index] = `note ${index} lorem ipsum dolor sit amet`;
       metas[index] =
         index % 17 === 0 ? null : JSON.stringify({ ok: index % 3 === 0, n: index % 5 });
-      tags[index] = index % 29 === 0 ? null : [`a${index % 4}`, `b${index % 6}`];
+      tagLists[index] = index % 29 === 0 ? null : [`a${index % 4}`, `b${index % 6}`];
     }
     return parquetWriteBuffer({
       columnData: [
@@ -251,7 +254,7 @@ export function createProfilePerfFixtures(cacheDir) {
         { name: "ok", data: oks, type: "BOOLEAN", columnIndex: true },
         { name: "note", data: notes, type: "STRING", columnIndex: true },
         { name: "meta_json", data: metas, type: "JSON", nullable: true, columnIndex: true },
-        { name: "tags", data: tags, nullable: true, columnIndex: true },
+        { name: "tags_json", data: tagLists, type: "JSON", nullable: true, columnIndex: true },
       ],
       rowGroupSize: PROFILE_ROW_GROUP,
       codec: "ZSTD",

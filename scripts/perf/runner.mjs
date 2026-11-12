@@ -11,7 +11,8 @@
  *  1. **First paint is bounded by the file, not twice the file.** hyparquet plans a read per
  *     call and the viewer issues the visible page and its prefetch back to back; before the
  *     range cache learned to deduplicate in-flight requests, that downloaded 2.04x the file.
- *     The gate allows 1.15x (the extra is the footer, which is inside the chunk range).
+ *     The gate allows 1.25x (`FIRST_PAINT_BUDGET`; the extra is the footer, which is inside the
+ *     chunk range).
  *  2. **A whole-file search is one pass.** Batching by 5000 rows re-decoded the data page
  *     containing each batch: 28 s for 1M rows and 40 s for 200k x 60. A single pass is ~1-3 s,
  *     so the budgets below are ~4-6x the measured value and still far under the old cost.
@@ -21,10 +22,17 @@
  *     future change that materialises the page or re-decodes it shows up here first.
  *  4. **A JSONL window is bounded by bytes, and a whole-file search is one pass.** A 500-line
  *     request over 2 MB records parses 80 MB without the 4 MB budget; the host-side checks
- *     live in `jsonl.mjs`, which bundles the services with esbuild for Node.\n *  5. **A 100 MB JSON array is indexed, not parsed.** The top-level scanner records record\n *     boundaries; the 100-record window parses only those records; search is one lowercased\n *     pass. `json.mjs` measures all three against a 91.6 MB fixture.
+ *     live in `jsonl.mjs`, which bundles the services with esbuild for Node.
+ *  5. **A 100 MB JSON array is indexed, not parsed.** The top-level scanner records record
+ *     boundaries; the 100-record window parses only those records; search is one lowercased
+ *     pass. `json.mjs` measures all three against a 91.6 MB fixture.
+ *  6. **A column profile reads the footer, not the file.** The fixture decodes whole in ~1.5 s,
+ *     so a wall-clock budget alone would accept a full decode; `parquet-profile.mjs` asserts
+ *     the bytes the host reads instead (ADR-0020).
  *
- * Both parquet files are written with one row group (PyArrow's default), because that is the
- * shape where the difference shows.
+ * The parquet fixtures cover both shapes: `flat` and `wide` are one row group (PyArrow's
+ * default, where the read-vs-file difference is largest), `profile` is ten row groups, which is
+ * what polars and DuckDB emit and the only shape where row-group statistics can be aggregated.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -35,6 +43,7 @@ import { createPerfFixtures } from "./fixtures.mjs";
 import { startPerfHarness } from "./harness.mjs";
 import { jsonScenarios, loadJsonHost } from "./json.mjs";
 import { jsonlScenarios, loadJsonlHost } from "./jsonl.mjs";
+import { loadProfileHost, profileScenarios } from "./parquet-profile.mjs";
 
 /** First paint may cost at most this many times the file size. */
 const FIRST_PAINT_BUDGET = 1.25;
@@ -381,11 +390,13 @@ const scenarios = [
   },
   ...jsonlScenarios,
   ...jsonScenarios,
+  ...profileScenarios,
 ];
 async function main() {
   const fixtures = createPerfFixtures(join(repoRoot, ".perf"));
   const jsonlHost = await loadJsonlHost();
   const jsonHost = await loadJsonHost();
+  const profileHost = await loadProfileHost();
   const harness = await startPerfHarness(fixtures);
   let browser;
   const results = [];
@@ -407,6 +418,7 @@ async function main() {
           fixtures,
           jsonlHost,
           jsonHost,
+          profileHost,
         });
         results.push({ name: scenario.name, ok: true, detail, ms: Date.now() - started });
       } catch (error) {
@@ -426,7 +438,8 @@ async function main() {
           `wide ${(fixtures.wideBytes / MB).toFixed(1)} MB / ${fixtures.wideRows.toLocaleString()} rows, ` +
           `jsonl huge ${(fixtures.jsonlHugeBytes / MB).toFixed(1)} MB / ${fixtures.jsonlHugeLines} lines, ` +
           `jsonl log ${(fixtures.jsonlLogBytes / MB).toFixed(1)} MB / ${fixtures.jsonlLogLines.toLocaleString()} lines, ` +
-          `json array ${(fixtures.jsonArrayBytes / MB).toFixed(1)} MB / ${fixtures.jsonArrayRecords.toLocaleString()} records`,
+          `json array ${(fixtures.jsonArrayBytes / MB).toFixed(1)} MB / ${fixtures.jsonArrayRecords.toLocaleString()} records, ` +
+          `profile ${(fixtures.profileBytes / MB).toFixed(1)} MB / ${fixtures.profileRows.toLocaleString()} rows in ${fixtures.profileRowGroups} groups`,
       );
     }
   } finally {
@@ -434,6 +447,7 @@ async function main() {
     await harness.close();
     jsonlHost.cleanup();
     jsonHost.cleanup();
+    profileHost.cleanup();
   }
 
   for (const result of results) {
