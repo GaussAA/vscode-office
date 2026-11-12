@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   actually got (`Scanned 200,000 of 1,000,000 rows · 500 distinct values`) instead of implying a
   total. The scan decodes only that column; a column whose writer omitted statistics is not
   scanned until you ask, because a scan is the half that costs something.
+- Parquet: two files can be compared from the command palette. The panel shows each column's null
+  share and range on both sides, grouped into added, removed, type changed, changed, cannot
+  compare and same. It reads only each file's footer — no column is decoded — so a pair of 377 MB
+  files opens instantly. A row-count difference is reported as a finding rather than an error,
+  and a side written without statistics says so instead of counting as unchanged.
 
 ## [6.8.0] - 2026-11-12
 

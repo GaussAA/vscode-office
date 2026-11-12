@@ -681,7 +681,7 @@ export default [
       // The routes without a behavioural scenario of their own: the spreadsheet viewer (the
       // Git History panel was removed in 6.8.0). Mount-only is enough — its real assertions
       // live in unit tests (excel_find) and in the smoke suite's routing checks.
-      const routes = ["excel", "compare"];
+      const routes = ["excel"];
       const failures = [];
       for (const route of routes) {
         page.clearExceptions();

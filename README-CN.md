@@ -65,6 +65,16 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解码。
 
 ![列画像](docs/screenshots/parquet-profile.png)
 
+### 对比两个 parquet 文件
+
+两个文件，一张表。命令里先后选左右两个文件，面板按列给出**两侧**的空值率与区间，并按结果分组：
+新增、消失、类型变化、变化、无法比较、相同。它只读两边的 footer——不解码任何一列、不比较任何
+一行，所以 377 MB × 2 也是点开就有。
+
+行数差是头部的一条结论，不是错误；某一侧没写统计时显示「无法比较」，而不是假装没有变化。
+
+![对比两个 parquet 文件](docs/screenshots/parquet-compare.png)
+
 ### JSONL / NDJSON：目录 + 树，而不是表格
 
 一行一个 JSON 值不适合表格，因此提供双栏视图：左侧列出条目，右侧把选中条目渲染成树（或原文）。
