@@ -17,8 +17,13 @@ _Avoid_: 预览器, 面板, 功能
 _Avoid_: 界面, UI
 
 **Command preview（命令预览）**:
-由命令而不是文件关联打开的 Preview surface。它不改变 Format 的呈现权归属，因此不参与 Native preview 的去重裁决；去重管的是 Viewer 与默认接管。JSON Preview 是第一个 Command preview。
+由命令而不是文件关联打开的 Preview surface。它不改变 Format 的呈现权归属，因此不参与 Native preview 的去重裁决；去重管的是 Viewer 与默认接管。JSON Preview 是第一个 Command preview，Comparison preview 是第二个。
 _Avoid_: 临时预览、弹窗（它可以是完整的 webview 面板）；也别把它叫 Viewer
+
+**Comparison preview（对比预览）**:
+由命令打开、同时读两个 parquet 文件的 Command preview。它比较的是**元数据与画像**，不是行；
+因此它的单位是「列」而不是「行」，行数差只是它的一条结论。
+_Avoid_: diff 工具、合并、三方对比（本轮都不做）
 
 **Editable surface（可编辑预览面）**:
 会把握改的结果写回文件的预览面。6.0.0 起只剩表格（Excel/CSV）；我们自己写的 viewer（parquet、jsonl）是只读的。只读不是可编辑面的退化版本，而是另一种承诺。
