@@ -3,89 +3,74 @@ import { App, Spin } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { handler } from "../../util/vscode.ts";
 import { isVscodeEditorDark, observeVscodeThemeChange } from "../../util/vscodeTheme.ts";
-import { loadOfficeBuffer } from "../../util/loadOfficeContent.ts";
-import type { OfficeOpenMessage } from "@/common/openPayload";
 import "./Excel.less";
-import { loadLegacyWorkbookRows, loadSheets, loadWorkbookRows } from "./excel_reader.ts";
-import { buildFormattingSnapshot } from "./excel_writer.ts";
-import Spreadsheet from "./x-spreadsheet/index";
 import FindReplacePanel, { type FindReplacePanelHandle } from "./FindReplacePanel";
 import { initExcelLocale, t } from "./excel_i18n";
 import WindowedSheet from "./WindowedSheet";
-import { createTextSheetSource, type SheetSource } from "./sheetSource";
-import { createWorkbookSheetSource, type WorkbookSheetSource } from "./workbookSource";
-import { limitForView, sheetViewFor } from "./sheetView";
-import ExcelGuard, { type ExcelTooLarge } from "./ExcelGuard";
+import ExcelGuard from "./ExcelGuard";
 import ExcelLoadError from "./ExcelLoadError";
 import ExcelSaveAsDialog from "./ExcelSaveAsDialog";
-import { useExcelSave } from "./useExcelSave";
-import { mountExcelSpreadsheet } from "./excelSpreadsheetHost";
+import { useExcelDocumentSession } from "./useExcelDocumentSession";
 import { loadExcelColorMode, saveExcelColorMode, type ExcelColorMode } from "./excelViewState";
 
 initExcelLocale();
 
-/** What the host sends on `open`, plus the fields the size guard needs. */
-type ExcelOpenPayload = OfficeOpenMessage;
-
-/** Bump a generation ref from an effect cleanup without touching it directly there. */
-function invalidateOpen(ref: { current: number }) {
-  ref.current += 1;
-}
-
 function ExcelViewer() {
   const { message, modal } = App.useApp();
-  const [loading, setLoading] = useState(true);
   const [colorMode, setColorMode] = useState(loadExcelColorMode);
   const [vscodeDark, setVscodeDark] = useState(isVscodeEditorDark);
-  const [readOnly, setReadOnly] = useState(false);
   const [findPanel, setFindPanel] = useState<"find" | "replace" | null>(null);
   const findPanelRef = useRef<"find" | "replace" | null>(null);
   const findReplacePanelRef = useRef<FindReplacePanelHandle>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  /**
-   * Set when the payload was refused by the size guard. The viewer then shows the refusal
-   * instead of parsing; nothing is fetched, because the fetch is already half the cost of a
-   * large CSV on a remote workspace.
-   */
-  const [tooLarge, setTooLarge] = useState<ExcelTooLarge | null>(null);
-  /**
-   * Set when a large text file is shown as a read-only window instead of the editable grid.
-   * `null` means the grid path is in charge.
-   */
-  const [windowSource, setWindowSource] = useState<SheetSource | null>(null);
-  /** Present only when the windowed document is a workbook; drives the sheet picker. */
-  const workbookRef = useRef<WorkbookSheetSource | null>(null);
-  const [sheetNames, setSheetNames] = useState<string[]>([]);
-  const [activeSheet, setActiveSheet] = useState(0);
-  /** Bumped per document; the windowed view keys on it so a new file starts at the top. */
-  const [windowLoad, setWindowLoad] = useState(0);
-  const [saveAsVisible, setSaveAsVisible] = useState(false);
-  const [activeSpreadsheet, setActiveSpreadsheet] = useState<Spreadsheet | null>(null);
-  const extRef = useRef("");
-  const documentCacheIdRef = useRef("");
-  const readOnlyRef = useRef(false);
-  const spreadSheetRef = useRef<Spreadsheet | null>(null);
-  const csvEncodingRef = useRef<"utf8" | "gbk">("utf8");
-  const csvDelimiterRef = useRef(",");
-  const initialFormattingRef = useRef("");
-  /** True once the user answered "open anyway": the retry must not be gated again. */
-  const forcedRef = useRef(false);
-  /** The payload the guard refused, kept so the retry does not need another round trip. */
-  const pendingPayloadRef = useRef<ExcelOpenPayload | null>(null);
-  /** Wired inside the boot effect; the guard panel lives outside it. */
-  const loadPayloadRef = useRef<((payload: ExcelOpenPayload, seq: number) => void) | null>(null);
-  /** Bumped for every open; stale async parses must not commit into the new document. */
-  const openSeqRef = useRef(0);
-  /** True only while the editable grid owns the document; save/auto-fit must check it. */
-  const gridReadyRef = useRef(false);
-  /** A direct save is waiting for the host's saveDone before clearing dirty. */
-  const pendingSaveRef = useRef(false);
   /** Ctrl+F in the windowed view focuses this input, not the dead grid Find panel. */
   const windowedFindInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     findPanelRef.current = findPanel;
   }, [findPanel]);
+
+  const focusFindPanel = useCallback(() => {
+    if (findPanelRef.current) {
+      if (findPanelRef.current !== "find") {
+        setFindPanel("find");
+      }
+      findReplacePanelRef.current?.focusFindInput(true);
+    } else {
+      setFindPanel("find");
+    }
+  }, []);
+
+  const resetFindPanel = useCallback(() => {
+    setFindPanel(null);
+  }, []);
+
+  const {
+    loading,
+    readOnly,
+    loadError,
+    tooLarge,
+    windowSource,
+    sheetNames,
+    activeSheet,
+    windowLoad,
+    activeSpreadsheet,
+    saveAsVisible,
+    setSaveAsVisible,
+    confirmSaveAs,
+    handleSave,
+    handleSaveAs,
+    handleAutoFitColumns,
+    handleOpenAnyway,
+    handleSelectSheet,
+    spreadSheetRef,
+    readOnlyRef,
+    fileName,
+  } = useExcelDocumentSession({
+    message,
+    modal,
+    onFind: focusFindPanel,
+    onResetFind: resetFindPanel,
+  });
 
   const adaptiveColorMode = colorMode === "adaptive";
   const themedDark = adaptiveColorMode && vscodeDark;
@@ -98,7 +83,7 @@ function ExcelViewer() {
       setVscodeDark(isVscodeEditorDark());
       requestAnimationFrame(() => spreadSheetRef.current?.reRender());
     });
-  }, [adaptiveColorMode]);
+  }, [adaptiveColorMode, spreadSheetRef]);
 
   useEffect(() => {
     document.body.classList.toggle("office-adaptive", adaptiveColorMode);
@@ -122,78 +107,7 @@ function ExcelViewer() {
 
   useEffect(() => {
     spreadSheetRef.current?.reRender();
-  }, [adaptiveColorMode, themedDark]);
-
-  const handleAutoFitColumns = useCallback(() => {
-    const spreadSheet = spreadSheetRef.current;
-    if (!spreadSheet || !gridReadyRef.current) return;
-    spreadSheet.autoFitColumns();
-    if (!readOnlyRef.current) {
-      spreadSheet.setSaveEnabled(true);
-      handler.emit("change");
-    }
-    message.success({
-      duration: 1.5,
-      content: t("viewer.autoFitDone"),
-      className: "excel-save-success-message",
-    });
-  }, [message]);
-
-  const handleSaveAs = useCallback(() => {
-    setSaveAsVisible(true);
-  }, []);
-
-  const focusFindPanel = useCallback(() => {
-    if (findPanelRef.current) {
-      if (findPanelRef.current !== "find") {
-        setFindPanel("find");
-      }
-      findReplacePanelRef.current?.focusFindInput(true);
-    } else {
-      setFindPanel("find");
-    }
-  }, []);
-
-  const { handleSave, confirmSaveAs } = useExcelSave({
-    spreadsheetRef: spreadSheetRef,
-    readOnlyRef,
-    extRef,
-    csvEncodingRef,
-    csvDelimiterRef,
-    initialFormattingRef,
-    pendingSaveRef,
-    onSaveAs: handleSaveAs,
-    modal,
-  });
-
-  const handleSelectSheet = useCallback((index: number) => {
-    const source = workbookRef.current;
-    if (!source) return;
-    const next = source.selectSheet(index);
-    workbookRef.current = next;
-    setWindowSource(next);
-    setActiveSheet(next.sheetIndex);
-    setWindowLoad((load) => load + 1);
-  }, []);
-
-  /**
-   * The user answered the size guard. A local file is fetched by this webview, so the retry
-   * is immediate; a virtual document was never read by the host, so ask for it.
-   */
-  const handleOpenAnyway = useCallback(() => {
-    const payload = pendingPayloadRef.current;
-    if (!payload) return;
-    forcedRef.current = true;
-    setTooLarge(null);
-    setLoadError(null);
-    setLoading(true);
-    const seq = ++openSeqRef.current;
-    if (payload.scheme === "file" || payload.bufferBase64 || payload.buffer?.length) {
-      loadPayloadRef.current?.(payload, seq);
-      return;
-    }
-    handler.emit("openForce");
-  }, []);
+  }, [adaptiveColorMode, spreadSheetRef, themedDark]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -232,201 +146,7 @@ function ExcelViewer() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [focusFindPanel, handleAutoFitColumns, handleSave, handleSaveAs, windowSource]);
-
-  useEffect(() => {
-    const container = document.getElementById("container");
-    if (!container) return;
-
-    let activeHost: ReturnType<typeof mountExcelSpreadsheet> | null = null;
-
-    const initSpreadsheet = async (buffer: ArrayBuffer, payload: any, seq: number) => {
-      const fileReadOnly = payload.readOnly === true;
-      const { sheets, maxLength, maxCols, csvDelimiter, csvEncoding } = await loadSheets(
-        buffer,
-        payload.ext,
-      );
-      if (seq !== openSeqRef.current) return;
-      if (csvDelimiter) {
-        csvDelimiterRef.current = csvDelimiter;
-      }
-      if (csvEncoding) {
-        csvEncodingRef.current = csvEncoding;
-      }
-      container.innerHTML = "";
-      const host = mountExcelSpreadsheet({
-        container,
-        sheets,
-        ext: payload.ext ?? "",
-        readOnly: fileReadOnly,
-        documentKey: documentCacheIdRef.current,
-        maxLength,
-        maxCols,
-        handlers: {
-          onAutoFit: handleAutoFitColumns,
-          onSave: () => void handleSave(),
-          onSaveAs: handleSaveAs,
-          onEditInVSCode: () => handler.emit("editInVSCode", true),
-          onFind: focusFindPanel,
-          onOpenExternal: (url) => handler.emit("openExternal", url),
-          onProtectedCell: () => {
-            message.info({
-              duration: 2,
-              content: t("viewer.protectedCell"),
-              className: "excel-protected-cell-message",
-            });
-          },
-          onValidationError: (errMessage) => {
-            message.warning({
-              duration: 2,
-              content: errMessage,
-              className: "excel-validation-error-message",
-            });
-          },
-        },
-      });
-      activeHost = host;
-      const spreadSheet = host.spreadSheet;
-      spreadSheetRef.current = spreadSheet;
-      gridReadyRef.current = true;
-      setActiveSpreadsheet(spreadSheet);
-      setLoadError(null);
-      setLoading(false);
-      initialFormattingRef.current = buildFormattingSnapshot(spreadSheet.getData());
-    };
-
-    const loadPayload = (payload: ExcelOpenPayload, seq: number) => {
-      setWindowSource(null);
-      void loadOfficeBuffer(payload)
-        .then(async (buffer) => {
-          if (seq !== openSeqRef.current) return;
-          try {
-            // A big text file is rendered by the windowed view: the grid would build one
-            // object per cell and hold the whole sheet (ADR-0017).
-            const view = sheetViewFor(payload.ext ?? "", payload.size, {
-              virtual: payload.scheme !== "file",
-            });
-            if (view === "window") {
-              if (/\.(xlsx|xlsm|xls|ods)$/i.test(payload.ext ?? "")) {
-                // ExcelJS parses the whole workbook (a zip cannot be seeked), but into plain
-                // row text instead of the grid's cell-object graph.
-                // ExcelJS reads xlsx/xlsm; `.xls`/`.ods` have to go through SheetJS.
-                const legacy = /\.(xls|ods)$/i.test(payload.ext ?? "");
-                const rows = legacy
-                  ? await loadLegacyWorkbookRows(buffer)
-                  : await loadWorkbookRows(buffer);
-                if (seq !== openSeqRef.current) return;
-                const source = createWorkbookSheetSource(rows);
-                workbookRef.current = source;
-                setSheetNames(source.sheetNames);
-                setActiveSheet(source.sheetIndex);
-                setWindowSource(source);
-              } else {
-                workbookRef.current = null;
-                setSheetNames([]);
-                setActiveSheet(0);
-                setWindowSource(createTextSheetSource(buffer));
-              }
-              setWindowLoad((load) => load + 1);
-              setLoadError(null);
-              setLoading(false);
-              return;
-            }
-            await initSpreadsheet(buffer, payload, seq);
-          } catch (e) {
-            if (seq !== openSeqRef.current) return;
-            const msg = (e as Error).message || String(e);
-            console.error(`Failed to load Excel file: ${msg}`, e);
-            setLoadError(msg);
-            setLoading(false);
-          }
-        })
-        .catch((error) => {
-          if (seq !== openSeqRef.current) return;
-          const msg = (error as Error).message || String(error);
-          console.error(`Failed to load Excel file: ${msg}`, error);
-          setLoadError(msg);
-          setLoading(false);
-        });
-    };
-    loadPayloadRef.current = loadPayload;
-
-    handler
-      .on("open", (payload: ExcelOpenPayload) => {
-        // Flush the previous document's pending view write before the container is replaced.
-        activeHost?.dispose();
-        activeHost = null;
-        const seq = ++openSeqRef.current;
-        setLoading(true);
-        setLoadError(null);
-        setTooLarge(null);
-        setWindowSource(null);
-        setFindPanel(null);
-        gridReadyRef.current = false;
-        spreadSheetRef.current = null;
-        setActiveSpreadsheet(null);
-        workbookRef.current = null;
-        setSheetNames([]);
-        setActiveSheet(0);
-        document.getElementById("container")?.replaceChildren();
-        const nextCacheId = payload.documentCacheId ?? "";
-        if (nextCacheId !== documentCacheIdRef.current) {
-          // A different document: "open anyway" does not carry over to it.
-          forcedRef.current = false;
-        }
-        documentCacheIdRef.current = nextCacheId;
-        extRef.current = payload.ext ?? "";
-        const fileReadOnly = payload.readOnly === true;
-        readOnlyRef.current = fileReadOnly;
-        setReadOnly(fileReadOnly);
-        pendingPayloadRef.current = payload;
-        const view = sheetViewFor(payload.ext ?? "", payload.size, {
-          virtual: payload.scheme !== "file",
-        });
-        if (!forcedRef.current && (payload.tooLarge || view === "refused")) {
-          // Refuse before fetching anything: on a remote workspace the download is already
-          // half the cost, and the parse is what takes the renderer down.
-          setTooLarge({
-            size: payload.size ?? 0,
-            name: payload.fileName ?? "",
-            ext: payload.ext ?? "",
-            limit: limitForView(payload.ext ?? "", { virtual: payload.scheme !== "file" }),
-          });
-          setLoading(false);
-          return;
-        }
-        loadPayload(payload, seq);
-      })
-      .on("saveDone", () => {
-        if (!pendingSaveRef.current) return;
-        pendingSaveRef.current = false;
-        spreadSheetRef.current?.setSaveEnabled(false);
-      })
-      .emit("init");
-
-    let themeTimer: ReturnType<typeof setTimeout>;
-    const themeObserver = new MutationObserver(() => {
-      clearTimeout(themeTimer);
-      themeTimer = setTimeout(() => spreadSheetRef.current?.reRender(), 120);
-    });
-    themeObserver.observe(document.head, { childList: true, subtree: true });
-
-    return () => {
-      activeHost?.dispose();
-      // An in-flight parse must not mount into a detached container after unmount.
-      invalidateOpen(openSeqRef);
-      gridReadyRef.current = false;
-      pendingSaveRef.current = false;
-      spreadSheetRef.current = null;
-      setActiveSpreadsheet(null);
-      themeObserver.disconnect();
-      clearTimeout(themeTimer);
-    };
-    // `handleAutoFitColumns` is deliberately omitted: this effect boots the spreadsheet
-    // and calls emit('init'), so re-running it when that callback's identity changes would
-    // re-initialise the whole sheet. It is stable enough that the stale closure is safe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusFindPanel, message, handleSave, handleSaveAs]);
+  }, [focusFindPanel, handleAutoFitColumns, handleSave, handleSaveAs, readOnlyRef, windowSource]);
 
   return (
     <div className="excel-viewer">
@@ -473,7 +193,7 @@ function ExcelViewer() {
           sheetNames={sheetNames}
           activeSheet={activeSheet}
           onSelectSheet={handleSelectSheet}
-          fileName={pendingPayloadRef.current?.fileName ?? ""}
+          fileName={fileName}
           onOpenInVSCode={() => handler.emit("editInVSCode", true)}
           findInputRef={windowedFindInputRef}
         />
