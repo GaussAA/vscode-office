@@ -6,12 +6,10 @@ import { isVscodeEditorDark, observeVscodeThemeChange } from "../../util/vscodeT
 import { loadOfficeBuffer } from "../../util/loadOfficeContent.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
 import "./Excel.less";
-import { MIN_VIEW_COLS, MIN_VIEW_ROWS } from "./excel_meta.ts";
 import { loadLegacyWorkbookRows, loadSheets, loadWorkbookRows } from "./excel_reader.ts";
 import { buildFormattingSnapshot } from "./excel_writer.ts";
 import Spreadsheet from "./x-spreadsheet/index";
 import FindReplacePanel, { type FindReplacePanelHandle } from "./FindReplacePanel";
-import { parseSpreadsheetLink } from "./excel_hyperlink";
 import { initExcelLocale, t } from "./excel_i18n";
 import WindowedSheet from "./WindowedSheet";
 import { createTextSheetSource, type SheetSource } from "./sheetSource";
@@ -21,20 +19,10 @@ import ExcelGuard, { type ExcelTooLarge } from "./ExcelGuard";
 import ExcelLoadError from "./ExcelLoadError";
 import ExcelSaveAsDialog from "./ExcelSaveAsDialog";
 import { useExcelSave } from "./useExcelSave";
-import {
-  loadExcelColorMode,
-  saveExcelColorMode,
-  loadViewState,
-  saveViewState,
-  restoreViewState,
-  type ExcelColorMode,
-} from "./excelViewState";
+import { mountExcelSpreadsheet } from "./excelSpreadsheetHost";
+import { loadExcelColorMode, saveExcelColorMode, type ExcelColorMode } from "./excelViewState";
 
 initExcelLocale();
-
-function isCsvLikeExt(ext: string): boolean {
-  return /^(csv|tsv)$/i.test(ext.replace(/^\./, ""));
-}
 
 /** What the host sends on `open`, plus the fields the size guard needs. */
 type ExcelOpenPayload = OfficeOpenMessage;
@@ -155,6 +143,17 @@ function ExcelViewer() {
     setSaveAsVisible(true);
   }, []);
 
+  const focusFindPanel = useCallback(() => {
+    if (findPanelRef.current) {
+      if (findPanelRef.current !== "find") {
+        setFindPanel("find");
+      }
+      findReplacePanelRef.current?.focusFindInput(true);
+    } else {
+      setFindPanel("find");
+    }
+  }, []);
+
   const { handleSave, confirmSaveAs } = useExcelSave({
     spreadsheetRef: spreadSheetRef,
     readOnlyRef,
@@ -214,14 +213,7 @@ function ExcelViewer() {
           windowedFindInputRef.current?.select();
           return;
         }
-        if (findPanelRef.current) {
-          if (findPanelRef.current !== "find") {
-            setFindPanel("find");
-          }
-          findReplacePanelRef.current?.focusFindInput(true);
-        } else {
-          setFindPanel("find");
-        }
+        focusFindPanel();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyH") {
@@ -240,13 +232,13 @@ function ExcelViewer() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleAutoFitColumns, handleSave, handleSaveAs, windowSource]);
+  }, [focusFindPanel, handleAutoFitColumns, handleSave, handleSaveAs, windowSource]);
 
   useEffect(() => {
     const container = document.getElementById("container");
     if (!container) return;
-    let viewTimer: ReturnType<typeof setTimeout> | undefined;
-    let activeSpreadsheet: Spreadsheet | null = null;
+
+    let activeHost: ReturnType<typeof mountExcelSpreadsheet> | null = null;
 
     const initSpreadsheet = async (buffer: ArrayBuffer, payload: any, seq: number) => {
       const fileReadOnly = payload.readOnly === true;
@@ -261,110 +253,45 @@ function ExcelViewer() {
       if (csvEncoding) {
         csvEncodingRef.current = csvEncoding;
       }
-      const viewRowLen = Math.max(maxLength ?? 0, MIN_VIEW_ROWS);
-      const viewColLen = Math.max(maxCols ?? 0, MIN_VIEW_COLS);
       container.innerHTML = "";
-      const spreadSheet = new Spreadsheet(container, {
-        mode: fileReadOnly ? "read" : "edit",
-        showToolbar: true,
-        extendToolbar: {
-          right: [
-            {
-              tip: `${t("viewer.autoFitColumns")} (${navigator.platform.includes("Mac") ? "Cmd+Alt+0" : "Ctrl+Alt+0"})`,
-              el: (() => {
-                const button = document.createElement("span");
-                button.textContent = "AF";
-                button.className = "excel-autofit-badge";
-                return button;
-              })(),
-              onClick: () => {
-                handleAutoFitColumns();
-              },
-            },
-          ],
+      const host = mountExcelSpreadsheet({
+        container,
+        sheets,
+        ext: payload.ext ?? "",
+        readOnly: fileReadOnly,
+        documentKey: documentCacheIdRef.current,
+        maxLength,
+        maxCols,
+        handlers: {
+          onAutoFit: handleAutoFitColumns,
+          onSave: () => void handleSave(),
+          onSaveAs: handleSaveAs,
+          onEditInVSCode: () => handler.emit("editInVSCode", true),
+          onFind: focusFindPanel,
+          onOpenExternal: (url) => handler.emit("openExternal", url),
+          onProtectedCell: () => {
+            message.info({
+              duration: 2,
+              content: t("viewer.protectedCell"),
+              className: "excel-protected-cell-message",
+            });
+          },
+          onValidationError: (errMessage) => {
+            message.warning({
+              duration: 2,
+              content: errMessage,
+              className: "excel-validation-error-message",
+            });
+          },
         },
-        showEditInVSCode: isCsvLikeExt(payload.ext ?? ""),
-        row: { len: viewRowLen, height: 30 },
-        col: { len: viewColLen },
-        view: { height: () => window.innerHeight - 2 },
       });
-      activeSpreadsheet = spreadSheet;
+      activeHost = host;
+      const spreadSheet = host.spreadSheet;
       spreadSheetRef.current = spreadSheet;
       gridReadyRef.current = true;
       setActiveSpreadsheet(spreadSheet);
       setLoadError(null);
       setLoading(false);
-      spreadSheet.loadData(sheets);
-
-      if (!fileReadOnly) {
-        spreadSheet.on("save", () => void handleSave());
-      }
-      spreadSheet.on("save-as", () => {
-        handleSaveAs();
-      });
-      spreadSheet.on("edit-in-vscode", () => {
-        handler.emit("editInVSCode", true);
-      });
-      spreadSheet.on("find", () => {
-        if (findPanelRef.current) {
-          if (findPanelRef.current !== "find") {
-            setFindPanel("find");
-          }
-          findReplacePanelRef.current?.focusFindInput(true);
-        } else {
-          setFindPanel("find");
-        }
-      });
-      const persistView = () => {
-        // Cell selection fires continuously while arrowing; one write per gesture is enough.
-        if (viewTimer) clearTimeout(viewTimer);
-        viewTimer = setTimeout(() => {
-          viewTimer = undefined;
-          saveViewState(documentCacheIdRef.current, spreadSheet.getSelection());
-        }, 200);
-      };
-      spreadSheet.on("cell-selected", () => {
-        persistView();
-      });
-      spreadSheet.onSheetChange(() => {
-        persistView();
-      });
-      spreadSheet.onOpenLink((linkPayload) => {
-        const parsed = parseSpreadsheetLink(linkPayload.link);
-        if (parsed.type === "internal") {
-          spreadSheet.followHyperlink(linkPayload);
-        } else {
-          handler.emit("openExternal", parsed.url);
-        }
-      });
-      spreadSheet.onProtectedCellDblClick(() => {
-        message.info({
-          duration: 2,
-          content: t("viewer.protectedCell"),
-          className: "excel-protected-cell-message",
-        });
-      });
-      spreadSheet.onValidationError((errMessage) => {
-        message.warning({
-          duration: 2,
-          content: errMessage,
-          className: "excel-validation-error-message",
-        });
-      });
-      spreadSheet.on("change", () => {
-        if (!fileReadOnly) {
-          spreadSheet.setSaveEnabled(true);
-          handler.emit("change");
-        }
-      });
-      const savedView = loadViewState(documentCacheIdRef.current);
-      if (savedView) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            restoreViewState(spreadSheet, savedView);
-          });
-        });
-      }
       initialFormattingRef.current = buildFormattingSnapshot(spreadSheet.getData());
     };
 
@@ -426,6 +353,9 @@ function ExcelViewer() {
 
     handler
       .on("open", (payload: ExcelOpenPayload) => {
+        // Flush the previous document's pending view write before the container is replaced.
+        activeHost?.dispose();
+        activeHost = null;
         const seq = ++openSeqRef.current;
         setLoading(true);
         setLoadError(null);
@@ -482,12 +412,7 @@ function ExcelViewer() {
     themeObserver.observe(document.head, { childList: true, subtree: true });
 
     return () => {
-      if (viewTimer) {
-        clearTimeout(viewTimer);
-        if (activeSpreadsheet) {
-          saveViewState(documentCacheIdRef.current, activeSpreadsheet.getSelection());
-        }
-      }
+      activeHost?.dispose();
       // An in-flight parse must not mount into a detached container after unmount.
       invalidateOpen(openSeqRef);
       gridReadyRef.current = false;
@@ -501,7 +426,7 @@ function ExcelViewer() {
     // and calls emit('init'), so re-running it when that callback's identity changes would
     // re-initialise the whole sheet. It is stable enough that the stale closure is safe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [message, handleSave, handleSaveAs]);
+  }, [focusFindPanel, message, handleSave, handleSaveAs]);
 
   return (
     <div className="excel-viewer">
