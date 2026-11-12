@@ -42,6 +42,7 @@ import { useParquetSiderResize } from "./useParquetSiderResize.ts";
 import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
 import { useParquetSearch } from "./useParquetSearch.ts";
 import { buildParquetColumns } from "./parquetColumns.tsx";
+import { resolveParquetKey } from "./parquetKeymap.ts";
 import "./Parquet.less";
 
 /**
@@ -431,126 +432,77 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
         return;
       }
-      if (event.key === "Escape") {
-        selectCell(null);
-        setInspected(null);
-        tableWrapRef.current?.focus();
-        return;
-      }
-      const column = cursor ? fileInfo.columns[cursor.col] : undefined;
-      const row = cursor ? pageRows[cursor.row] : undefined;
-      if (event.key === "Enter") {
-        if (cursor && row && column) {
-          setInspected({
-            row: loadedStart + cursor.row,
-            column: column.name,
-            value: row[column.name],
-          });
-        }
-        return;
-      }
-      const rows = Math.max(1, pageRows.length);
-      const cols = fileInfo.columns.length;
       const pageCount = Math.max(1, Math.ceil(fileInfo.rowCount / pageSize));
-      const base = cursorRef.current ?? { row: 0, col: 0 };
-
-      /**
-       * Turn the page and land the cursor on the edge of the new one. The column is kept: a
-       * comparison across pages should not have to be re-navigated. The row is applied once the
-       * new page's rows exist, because `goToPage` clears the cursor on purpose.
-       */
-      const turnPage = (nextPage: number, where: "first" | "last"): boolean => {
-        const targetPage = Math.max(0, Math.min(pageCount - 1, nextPage));
-        if (targetPage === page) return false;
-        pendingCursor.current = { where, col: base.col };
-        goToPage(targetPage);
-        return true;
-      };
-
-      if ((event.ctrlKey || event.metaKey) && (event.key === "Home" || event.key === "End")) {
-        event.preventDefault();
-        turnPage(event.key === "Home" ? 0 : pageCount - 1, event.key === "Home" ? "first" : "last");
-        return;
-      }
-      // Page-sized jumps take the rows you can actually see, not the page size: PAGE_SIZE is 50
-      // and the body shows about 22, so a page-sized step skipped a third of the data unseen.
       const visibleRows = Math.max(1, Math.floor(tableBodyHeight / ROW_HEIGHT));
-      if (event.key === "PageDown") {
-        event.preventDefault();
-        if (base.row + visibleRows <= rows - 1)
-          revealCursor({ row: base.row + visibleRows, col: base.col });
-        else turnPage(page + 1, "first");
-        return;
-      }
-      if (event.key === "PageUp") {
-        event.preventDefault();
-        if (base.row - visibleRows >= 0)
-          revealCursor({ row: base.row - visibleRows, col: base.col });
-        else turnPage(page - 1, "last");
-        return;
-      }
-      // Arrows walk off the end of a page into the next one instead of stopping dead: 50 rows is
-      // not a file, and a virtual table cannot be scrolled with the keyboard otherwise.
-      if (event.key === "ArrowDown" && cursor && cursor.row >= rows - 1) {
-        event.preventDefault();
-        turnPage(page + 1, "first");
-        return;
-      }
-      if (event.key === "ArrowUp" && cursor && cursor.row === 0) {
-        event.preventDefault();
-        turnPage(page - 1, "last");
-        return;
-      }
-
-      // Ctrl+C on the grid copies the inspected value. Without it the only copy target was the
-      // bottom bar button: the value on screen behaved like plain text and selected the page.
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
-        if (!inspectedCopyRef.current) return;
-        event.preventDefault();
-        copyValue(inspectedCopyRef.current);
-        return;
-      }
-      // The first arrow lands on the first cell: without this, Down starts at row 1 and Up at
-      // row -1 (clamped to 0), so the top-left cell could never be reached from a cold start.
-      if (!cursorRef.current) {
-        event.preventDefault();
-        revealCursor({ row: 0, col: 0 });
-        return;
-      }
-
-      const moves: Record<string, [number, number]> = {
-        ArrowDown: [1, 0],
-        ArrowUp: [-1, 0],
-        ArrowRight: [0, 1],
-        ArrowLeft: [0, -1],
-        Home: [0, -Infinity],
-        End: [0, Infinity],
-      };
-      const move = moves[event.key];
-      if (!move) return;
-      event.preventDefault();
-      const next = {
-        row: Math.max(0, Math.min(rows - 1, base.row + move[0])),
-        col:
-          move[1] === -Infinity
-            ? 0
-            : move[1] === Infinity
-              ? cols - 1
-              : Math.max(0, Math.min(cols - 1, base.col + move[1])),
-      };
-      selectCell(next);
-      const nextColumn = fileInfo.columns[next.col];
-      const nextRow = pageRows[next.row];
-      if (nextColumn && nextRow) {
-        setInspected({
-          row: loadedStart + next.row,
-          column: nextColumn.name,
-          value: nextRow[nextColumn.name],
-        });
+      const action = resolveParquetKey({
+        key: event.key,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        cursor: cursorRef.current,
+        rows: pageRows.length,
+        cols: fileInfo.columns.length,
+        page,
+        pageCount,
+        visibleRows,
+        hasCopy: Boolean(inspectedCopyRef.current),
+      });
+      switch (action.type) {
+        case "escape":
+          selectCell(null);
+          setInspected(null);
+          tableWrapRef.current?.focus();
+          return;
+        case "inspect": {
+          const current = cursorRef.current;
+          const column = current ? fileInfo.columns[current.col] : undefined;
+          const row = current ? pageRows[current.row] : undefined;
+          if (current && row && column) {
+            setInspected({
+              row: loadedStart + current.row,
+              column: column.name,
+              value: row[column.name],
+            });
+          }
+          return;
+        }
+        case "copy":
+          event.preventDefault();
+          copyValue(inspectedCopyRef.current);
+          return;
+        case "turn": {
+          event.preventDefault();
+          if (action.page === page) return;
+          pendingCursor.current = { where: action.where, col: cursorRef.current?.col ?? 0 };
+          goToPage(action.page);
+          return;
+        }
+        case "reveal": {
+          event.preventDefault();
+          revealCursor({ row: action.row, col: action.col });
+          const isMove = [
+            "ArrowDown",
+            "ArrowUp",
+            "ArrowLeft",
+            "ArrowRight",
+            "Home",
+            "End",
+          ].includes(event.key);
+          const nextColumn = fileInfo.columns[action.col];
+          const nextRow = pageRows[action.row];
+          if (isMove && nextColumn && nextRow) {
+            setInspected({
+              row: loadedStart + action.row,
+              column: nextColumn.name,
+              value: nextRow[nextColumn.name],
+            });
+          }
+          return;
+        }
+        case "none":
+          return;
       }
     },
     [
-      cursor,
       fileInfo,
       page,
       pageSize,
