@@ -54,6 +54,7 @@ web
 
 - **parquet、JSONL 与 JSON 预览只读，表格可编辑。** 只读不是「缺功能」，是另一种承诺（GLOSSARY: Editable surface）。
 - **格式集合已关闭**（interview 确认）：三种 Viewer 的格式与默认接管是上限，不会新增第四种 viewer。JSON 只作为命令式只读检查器存在：不写 `contributes.customEditors`、不注册 `.json`、不改 `.json` 的默认编辑器、不编辑、不校验 schema、不支持 JSONC；新增命令仍需过 Native preview 判据（原生能编辑，但不擅长 10–100 MB / minified 数组的阅读）。需要新增 **Viewer** 仍先写 ADR，默认答案是不。
+- **下一步方向**：先上收 parquet 的读路径、再做列画像（Column profile），两文件对比排在它之后且需另写 ADR；表格的可编辑面冻结，只修数据丢失/崩溃/安全。见 [ADR-0020](./docs/adr/0020-column-profile-direction.md)。**它尚未实现，不得写进上面的能力清单，也不得在 README/Release 里当作已有功能。**
 - **身份独立、可与上游共存**：`GaussAA.office-viewer-plus`，不覆盖 `cweijan.vscode-office`；上游是只读参考资料，不 merge、不 rebase（ADR-0002）。
 - **严格跟随 VS Code 主题**，包括 antd 组件；没有自带的明暗开关。
 - **零遥测**；上游的 telemetry 已被整体移除。
@@ -65,7 +66,7 @@ web
 
 - **名字**：Data File Viewer (Parquet, JSONL, Excel)（Marketplace 显示名，全仓库统一；曾用名 "Office Viewer Plus" 在 Marketplace 上被拒为已占用）；发布者 `GaussAA`；扩展 id `GaussAA.office-viewer-plus`。JSON 预览是命令式检查器，不进入显示名，也不把产品名扩成四项。
 - **署名与许可**：MIT，fork 自 `cweijan/vscode-office`（固定来源 `forkedFrom: cweijan.vscode-office@4.2.2`），`NOTICE.md` 记录来源。
-- **语气**：具体、机制优先、不自夸。README 先说清楚上游哪里坏、我们改了什么机制，并且**主动列出 Known limits**，而不是省略它们。
+- **语气**：具体、机制优先、不自夸。README 先说清楚上游哪里坏、我们改了什么机制，并且**主动列出 Non-goals 与 Known gaps**，而不是省略它们。
 - **证据形态**：`docs/screenshots/` 下的截图即对外证据，由 `pnpm verify:ui --docs` 从真实 webview 重新生成，不手工修图。
 
 ## Evidence on Hand
@@ -74,13 +75,13 @@ web
 - `scripts/ui-verify/` —— 无头浏览器场景与 fixture（含构造的 parquet/JSONL 文件）；断言 DOM，不止截图。
 - `scripts/perf/` —— 字节数与耗时预算；大文件缓存在本地。
 - `test/unit/`、`test/smoke/` —— 纯逻辑与真实宿主两层。
-- `docs/adr/0001`–`0018`、`GLOSSARY.md`、`CHANGELOG.md` —— 决策、术语与逐版说明。
-- **没有的**（未来工作不得编造）：用户评价、安装量、Marketplace 评分、外部基准对比、用户研究、付费/商业承诺。
+- `docs/adr/0001`–`0020`、`GLOSSARY.md`、`CHANGELOG.md` —— 决策、术语与逐版说明。
+- **没有的**（未来工作不得编造）：用户评价、安装量、Marketplace 评分、外部基准对比、用户研究、付费/商业承诺；以及 ADR-0020 里的列画像——它是已接受的方向，不是已有能力。
 
 ## Product Principles
 
 1. **体积是需求本身。** 一个只在示例文件上好看的预览不算做完；每个 viewer 都要在维护者真实打开的体量上验证过。
-2. **能力边界要明说。** 只读就说只读、没写就说没写——Known limits 与 ADR 里的「不做」，与做出来的功能同等重要。
+2. **能力边界要明说。** 只读就说只读、没写就说没写——Non-goals 与 ADR 里的「不做」、Known gaps 里的「还没做到」，与做出来的功能同等重要。
 3. **用机器判断，而不是用眼睛判断。** UI 改动靠 DOM 断言 + 字节/耗时预算决定去留，截图只是记录结果。
 4. **边界上收，内部放开。** 跨到宿主之外的东西（文件字节、外部链接、系统调用）都必须经过一个可测试的收口点；收口之后的内部实现可以大胆。
 5. **窄而完整 > 宽而将就。** 三种格式，每种做到底；多出来的格式不是能力，是维护债。命令式检查器可以存在，但它不扩大 Viewer 的格式集合，同样要窄而完整。

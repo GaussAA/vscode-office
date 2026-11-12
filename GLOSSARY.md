@@ -99,6 +99,12 @@ _Avoid_: 链接列、hyperlink column（列没有被重新类型化）
 点击 parquet schema 字段后，把表格水平滚动到该列并留下淡色列高亮。它不改变筛选、分页或行选择，只是导航。
 _Avoid_: 筛选、定位行（那是 jump-to-row）
 
+**Column profile（列画像）**:
+一份 parquet 文件里每一列的统计摘要：空值数与占比、取值范围、基数与 top-N。它先用 row-group
+statistics 回答，不为了显示一行摘要去解码整列；它不是筛选，也不改变当前页或行选择。
+口径见 [ADR-0020](./docs/adr/0020-column-profile-direction.md)。
+_Avoid_: 概览、统计报告、profiling（太泛，且暗示要整份扫）
+
 **Typecheck baseline（类型闸门基线）**:
 `scripts/typecheck-baseline.json` 里记录的已知类型错误，只许减不许增。它现在是空的，所以规则退化为：任何类型错误都会让 `pnpm check` 失败。
 _Avoid_: whitelist（它曾经是白名单；现在只是一个已清空的棘轮）
@@ -122,3 +128,13 @@ _Avoid_: 把「闸门存在」等同于「代码被看守」
 **Upstream（上游）**:
 我们 fork 的来源仓库 `cweijan/vscode-office`。它是**只读参考资料**，不是合并来源：需要上游的修复时读它的 diff 自己重写（见 [ADR-0002](./docs/adr/0002-independent-evolution.md)）。
 _Avoid_: 原版, 官方, 作者版；也别说「合并上游」
+
+**Non-goals（非目标）**:
+产品明确永不做的事：每条都带理由，并在 ADR 里留底。它与 Known gaps 的差别不是严重程度，
+而是「有没有改主意的一天」。
+_Avoid_: 已知限制、暂不支持（那会把两种东西混成一个词）
+
+**Known gaps（已知缺口）**:
+承认还没做到、且将来可能被认领的缺口。每条都要能被下一步认领，也要能被性能闸门或 ADR 的
+判据检验——写不出判据的，只是抱怨。
+_Avoid_: bug 列表、TODO（那些是执行层的东西，不是对外的承诺）
