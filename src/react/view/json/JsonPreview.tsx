@@ -1,10 +1,7 @@
-import { FileTextOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
-import { Button, ConfigProvider, Input, Splitter, theme as antdTheme } from "antd";
+import { ConfigProvider, Splitter, theme as antdTheme } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JsonlEntryDetail } from "../../../common/jsonlTypes.ts";
 import {
-  JSON_MAX_ARRAY_BYTES,
-  JSON_MAX_OBJECT_BYTES,
   JSON_RECORD_WINDOW,
   type JsonInfoPayload,
   type JsonRecordSummary,
@@ -19,8 +16,9 @@ import { handler } from "../../util/vscode.ts";
 import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { $t } from "../../i18n/i18nConfig.ts";
 import JsonlDetail, { type DetailMode } from "../jsonl/JsonlDetail.tsx";
-import { formatBytes } from "../jsonl/jsonlFormat.ts";
 import JsonRecordList from "./JsonRecordList.tsx";
+import JsonPreviewToolbar from "./JsonPreviewToolbar.tsx";
+import JsonPreviewState from "./JsonPreviewState.tsx";
 import JsonSearchRail, { type JsonSearchRow } from "./JsonSearchRail.tsx";
 import { collectMatchPaths, firstMatchKey } from "./jsonPreviewFormat.ts";
 import "../jsonl/Jsonl.less";
@@ -325,59 +323,6 @@ export default function JsonPreview() {
     </span>
   ) : null;
 
-  const toolbar = (
-    <div className="jsonl-toolbar">
-      <div className="jsonl-toolbar__left">
-        <span className="jsonl-file-name" title={info?.fileName}>
-          {info?.fileName ?? "JSON"}
-        </span>
-        {meta && <span className="jsonl-meta">{meta}</span>}
-        {info && (
-          <>
-            <span className="jsonl-dot">·</span>
-            <span className="jsonl-meta">{formatBytes(info.byteSize)}</span>
-          </>
-        )}
-        {info?.fromBuffer && <span className="json-buffer">{$t("json.fromBuffer")}</span>}
-      </div>
-      <div className="jsonl-toolbar__right">
-        <Input
-          size="small"
-          allowClear
-          prefix={<SearchOutlined />}
-          placeholder={$t("json.searchRecords")}
-          className="jsonl-search"
-          value={query}
-          disabled={!info || (info.rootKind !== "array" && info.rootKind !== "object")}
-          onChange={(event) => handleQueryChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              handleQueryChange("");
-            }
-          }}
-        />
-        {searchStatus}
-        <Button
-          type="text"
-          size="small"
-          icon={<ReloadOutlined />}
-          aria-label={$t("jsonl.reload")}
-          title={$t("jsonl.reload")}
-          onClick={reload}
-        />
-        <Button
-          type="text"
-          size="small"
-          icon={<FileTextOutlined />}
-          aria-label={$t("json.openText")}
-          title={$t("json.openText")}
-          onClick={openText}
-        />
-      </div>
-    </div>
-  );
-
   const wrap = (body: React.ReactNode) => (
     <ConfigProvider
       theme={{
@@ -386,57 +331,34 @@ export default function JsonPreview() {
       }}
     >
       <div className={`jsonl-viewer json-preview${dark ? "" : " jsonl-viewer--light"}`}>
-        {toolbar}
+        <JsonPreviewToolbar
+          info={info}
+          meta={meta}
+          query={query}
+          searchStatus={searchStatus}
+          onQueryChange={handleQueryChange}
+          onReload={reload}
+          onOpenText={openText}
+        />
         {body}
       </div>
     </ConfigProvider>
   );
 
   if (!info) {
-    return wrap(
-      <div className="json-preview__state">
-        <span>{$t("jsonl.loading")}</span>
-      </div>,
-    );
+    return wrap(<JsonPreviewState kind="loading" onOpenText={openText} />);
   }
 
   if (info.rootKind === "invalid") {
-    return wrap(
-      <div className="json-preview__state">
-        <div className="json-preview__state-title">{$t("jsonl.invalidJson")}</div>
-        <p>
-          {info.error?.message}
-          {info.error
-            ? ` · ${$t("json.lineColumn", { line: info.error.line, column: info.error.column })}`
-            : ""}
-        </p>
-        <Button onClick={openText}>{$t("json.openText")}</Button>
-      </div>,
-    );
+    return wrap(<JsonPreviewState kind="invalid" info={info} onOpenText={openText} />);
   }
 
   if (info.rootKind === "too-large") {
-    return wrap(
-      <div className="json-preview__state">
-        <div className="json-preview__state-title">{$t("json.tooLarge")}</div>
-        <p>
-          {$t("json.tooLargeHint", {
-            array: formatBytes(JSON_MAX_ARRAY_BYTES),
-            object: formatBytes(JSON_MAX_OBJECT_BYTES),
-          })}
-        </p>
-        <Button onClick={openText}>{$t("json.openText")}</Button>
-      </div>,
-    );
+    return wrap(<JsonPreviewState kind="too-large" onOpenText={openText} />);
   }
 
   if (arrayRoot && recordCount === 0) {
-    return wrap(
-      <div className="json-preview__state">
-        <div className="json-preview__state-title">{$t("json.noRecords")}</div>
-        <Button onClick={openText}>{$t("json.openText")}</Button>
-      </div>,
-    );
+    return wrap(<JsonPreviewState kind="empty" onOpenText={openText} />);
   }
 
   const detailElement = (
