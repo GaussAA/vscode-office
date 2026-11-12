@@ -19,10 +19,6 @@ import {
 } from "./parquetParser.ts";
 import { parquetAntdTheme } from "./parquetAntdTheme.ts";
 import {
-  COLUMN_MAX_WIDTH,
-  COLUMN_MIN_WIDTH,
-  COLUMN_STRETCH_MAX,
-  COLUMN_WIDTH_STORAGE_KEY,
   DATA_COLUMN_WIDTH,
   INDEX_COLUMN_WIDTH,
   MIN_ROWS_PER_PAGE,
@@ -31,7 +27,6 @@ import {
   SIDER_DEFAULT,
   SIDER_MAX,
   SIDER_MIN,
-  SIDER_STORAGE_KEY,
 } from "./parquetLayout.ts";
 import { loadPersistedRow, savePersistedRow } from "./parquetPersistence.ts";
 import { PresentationTable, ResizableHeaderCell } from "./parquetHeaders.tsx";
@@ -44,6 +39,8 @@ import ParquetInspector from "./ParquetInspector.tsx";
 import ParquetGuard from "./ParquetGuard.tsx";
 import ParquetErrorPane from "./ParquetErrorPane.tsx";
 import { useParquetInspection } from "./useParquetInspection.ts";
+import { useParquetColumnLayout } from "./useParquetColumnLayout.ts";
+import { useParquetSiderResize } from "./useParquetSiderResize.ts";
 import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
 import { useParquetSearch } from "./useParquetSearch.ts";
 import "./Parquet.less";
@@ -123,76 +120,18 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const lastPathRef = useRef<string | undefined>(undefined);
   /** Keyboard cursor into the grid; null until an arrow key (or a click) lands somewhere. */
   const [cursor, setCursor] = useState<CellCursor | null>(null);
-  const [siderWidth, setSiderWidth] = useState(() => {
-    try {
-      const saved = Number(localStorage.getItem(SIDER_STORAGE_KEY));
-      if (Number.isFinite(saved) && saved >= SIDER_MIN && saved <= SIDER_MAX) return saved;
-    } catch {}
-    return SIDER_DEFAULT;
-  });
+  const { siderWidth, setSiderWidth, beginResize, moveResize, endResize } = useParquetSiderResize();
   /** Rows per page. A page is one screenful, so this follows the body height. */
   const [pageSize, setPageSize] = useState(PARQUET_PAGE_SIZE);
   const pageSizeRef = useRef(PARQUET_PAGE_SIZE);
   const [tableBodyHeight, setTableBodyHeight] = useState(320);
-  /**
-   * Per-column widths, keyed by column name. Column widths are a reading decision, so they
-   * outlive the page view the same way the sidebar width does.
-   */
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
-    try {
-      const raw = localStorage.getItem(COLUMN_WIDTH_STORAGE_KEY);
-      const parsed = raw ? (JSON.parse(raw) as unknown) : null;
-      if (parsed && typeof parsed === "object") {
-        const clean: Record<string, number> = {};
-        for (const [name, width] of Object.entries(parsed as Record<string, unknown>)) {
-          if (typeof width === "number" && width >= COLUMN_MIN_WIDTH && width <= COLUMN_MAX_WIDTH) {
-            clean[name] = width;
-          }
-        }
-        return clean;
-      }
-    } catch {}
-    return {};
-  });
-  const columnWidthOf = useCallback(
-    (name: string) => columnWidths[name] ?? DATA_COLUMN_WIDTH,
-    [columnWidths],
-  );
-
   const [tableBodyWidth, setTableBodyWidth] = useState(0);
+  const {
+    layout: columnLayout,
+    setColumnWidth,
+    resetColumnWidth,
+  } = useParquetColumnLayout(fileInfo?.columns ?? [], tableBodyWidth);
 
-  /**
-   * The widths that actually render, and the resulting table extent.
-   *
-   * Columns grow to use spare room — a two-column file should not be 200px of table in a
-   * 1200px surface — but never past `COLUMN_STRETCH_MAX`, and the growth is uniform. When the
-   * cap is reached the table stops short and the surface's own background shows through, which
-   * is honest: there is no more data.
-   */
-  const columnLayout = useMemo(() => {
-    const base = (fileInfo?.columns ?? []).map((column) => columnWidthOf(column.name));
-    const baseSum = base.reduce((sum, width) => sum + width, 0);
-    const available = Math.max(0, tableBodyWidth - INDEX_COLUMN_WIDTH);
-    if (base.length === 0 || available <= baseSum) {
-      return { widths: base, filler: 0, extent: INDEX_COLUMN_WIDTH + baseSum };
-    }
-    const growth = base.map((width) => Math.max(0, COLUMN_STRETCH_MAX - width));
-    const capacity = growth.reduce((sum, room) => sum + room, 0);
-    if (capacity === 0) return { widths: base, filler: 0, extent: INDEX_COLUMN_WIDTH + baseSum };
-    const share = Math.min(1, (available - baseSum) / capacity);
-    const widths = base.map((width, index) => Math.round(width + growth[index] * share));
-    return {
-      widths,
-      // Whatever the cap refuses to absorb is handed to a filler column: rc-table forces the
-      // table to 100% of its container, so leaving the space unassigned is not an option —
-      // without the filler the leftover is redistributed onto the real columns.
-      filler: Math.max(
-        0,
-        tableBodyWidth - (INDEX_COLUMN_WIDTH + widths.reduce((sum, w) => sum + w, 0)),
-      ),
-      extent: INDEX_COLUMN_WIDTH + widths.reduce((sum, width) => sum + width, 0),
-    };
-  }, [fileInfo, columnWidthOf, tableBodyWidth]);
   /** The virtual table owns scrolling; cursor moves and row jumps go through its ref. */
   const tableRef = useRef<TableRef>(null);
   /** Pending focus retry while the virtual list renders the cursor's row. */
@@ -204,7 +143,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   /** Where the cursor should land once a page turned by keyboard has loaded. */
   const pendingCursor = useRef<{ where: "first" | "last"; col: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const siderDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   /** Absolute row the footer jump aimed at, highlighted until the next navigation. */
   const [targetRow, setTargetRow] = useState<number | null>(null);
   const fileInfoRef = useRef<ParquetFileInfo | null>(null);
@@ -410,18 +348,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   }, [loadedStart, fileInfo, pageRows.length]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(SIDER_STORAGE_KEY, String(siderWidth));
-    } catch {}
-  }, [siderWidth]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(columnWidths));
-    } catch {}
-  }, [columnWidths]);
-
-  useEffect(() => {
     const onFind = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "f") return;
       event.preventDefault();
@@ -431,32 +357,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     window.addEventListener("keydown", onFind);
     return () => window.removeEventListener("keydown", onFind);
   }, []);
-
-  const clampSiderWidth = (width: number) =>
-    Math.min(SIDER_MAX, Math.max(SIDER_MIN, Math.round(width)));
-
-  const handleSiderPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    siderDragRef.current = { startX: event.clientX, startWidth: siderWidth };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  };
-
-  const handleSiderPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = siderDragRef.current;
-    if (!drag) return;
-    setSiderWidth(clampSiderWidth(drag.startWidth + event.clientX - drag.startX));
-  };
-
-  const handleSiderPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
-    siderDragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    document.body.style.removeProperty("cursor");
-    document.body.style.removeProperty("user-select");
-  };
 
   const jumpToRow = useCallback(
     (warnWhenEmpty = true) => {
@@ -734,14 +634,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           role: "columnheader",
           "aria-colindex": position + 2,
           columnKey: column.name,
-          onResizeColumn: (width: number) =>
-            setColumnWidths((current) => ({ ...current, [column.name]: width })),
-          onResetColumn: () =>
-            setColumnWidths((current) => {
-              const next = { ...current };
-              delete next[column.name];
-              return next;
-            }),
+          onResizeColumn: (width: number) => setColumnWidth(column.name, width),
+          onResetColumn: () => resetColumnWidth(column.name),
         }),
         onCell: () => ({ role: "gridcell", "aria-colindex": position + 2 }),
         render: (value: unknown, _row, index) => {
@@ -779,7 +673,17 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       });
     }
     return cols;
-  }, [fileInfo, loadedStart, query, selectCell, activeColumn, columnLayout, setActiveColumn]);
+  }, [
+    fileInfo,
+    loadedStart,
+    query,
+    selectCell,
+    activeColumn,
+    columnLayout,
+    setActiveColumn,
+    setColumnWidth,
+    resetColumnWidth,
+  ]);
 
   useEffect(() => {
     handler
@@ -885,16 +789,17 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               aria-valuemax={SIDER_MAX}
               aria-valuenow={siderWidth}
               tabIndex={0}
-              onPointerDown={handleSiderPointerDown}
-              onPointerMove={handleSiderPointerMove}
-              onPointerUp={handleSiderPointerEnd}
-              onPointerCancel={handleSiderPointerEnd}
+              onPointerDown={beginResize}
+              onPointerMove={moveResize}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+              onLostPointerCapture={endResize}
               onDoubleClick={() => setSiderWidth(SIDER_DEFAULT)}
               onKeyDown={(event) => {
                 if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
                   event.preventDefault();
                   const delta = event.key === "ArrowRight" ? 16 : -16;
-                  setSiderWidth((width) => clampSiderWidth(width + delta));
+                  setSiderWidth((width) => width + delta);
                 } else if (event.key === "Home") {
                   event.preventDefault();
                   setSiderWidth(SIDER_MIN);
@@ -981,6 +886,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               copied={copied}
               onCopy={copyValue}
               onClear={() => {
+                inspection.collapse();
                 setInspected(null);
                 tableWrapRef.current?.focus();
               }}
