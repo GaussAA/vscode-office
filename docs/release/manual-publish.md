@@ -1,6 +1,9 @@
-# 手动发布（受信发布配置完成之前的过渡做法）
+# 手动发布（受信发布出问题时的兜底）
 
-适用场景：`docs/release/trusted-publishing.md` 里的 A2 / B1 / B2 还没做，但现在要发一个版本。
+> **状态（2026-11）**：A2 / B1 / B2 已完成，`PUBLISH_ENABLED=true`，6.8.0 起发布走 CI
+> （见 [release.md](../agents/release.md)）。本文只在受信发布本身坏掉时使用。
+
+适用场景：`docs/release/trusted-publishing.md` 的受信发布链路暂时不可用，但现在必须发一个版本。
 
 手动发布**不需要 PAT**（Marketplace 走浏览器会话），代价是每次都要人来做，而且发布前没有 CI
 替你跑闸门 —— 所以本地这两条别省：
@@ -33,8 +36,9 @@ gh release create v4.4.1 office-viewer-plus-4.4.1.vsix \
   --notes-file <notes.md>
 ```
 
-tag 会触发 `Release` 工作流。因为 `PUBLISH_ENABLED` 还没打开（见 trusted-publishing.md 的 B3），
-它只跑闸门、打包、上传 artifact，不会去碰 registry，所以不会红。
+tag 会触发 `Release` 工作流。若 `PUBLISH_ENABLED` 被关掉（见 trusted-publishing.md 的 B3），
+它只跑闸门、打包、上传 artifact，不会去碰 registry，所以不会红；打开时它就是正常发布路径，
+此时不要再用本文的手动步骤，否则会发布两次。
 
 ## 二、发到 VS Code Marketplace（浏览器）
 

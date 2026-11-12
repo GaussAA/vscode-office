@@ -210,8 +210,6 @@ Press `F5` in VS Code and choose **Extension** to run the local build.
   [hyparquet-compressors](https://github.com/hyparam/hyparquet-compressors)
 - Material Icon theme: [PKief/vscode-material-icon-theme](https://github.com/PKief/vscode-material-icon-theme)
 
-## Credits
-
 The original project was funded by [Database Client](https://database-client.com/) (Weijan Chen),
 which is why upstream ships a floating "Supported by Database Client" bar in every viewer. This
 fork removed that bar in 6.6.0 — it sat on top of the parquet pager — and keeps the credit here

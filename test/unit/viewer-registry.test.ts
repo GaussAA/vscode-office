@@ -57,19 +57,11 @@ function literalViewTypes(text: string): string[] {
   );
 }
 
-/** The desktop-only list the web entry re-registers as an "unsupported" screen. */
-function unsupportedViewTypes(text: string): string[] {
-  const block = /WEB_UNSUPPORTED_VIEW_TYPES\s*=\s*\[([\s\S]*?)\]/.exec(text);
-  if (!block) return [];
-  return [...block[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
-}
-
 const providerFiles = walk("src/provider", [".ts"]);
 const providerTypes = new Set<string>();
 for (const file of providerFiles) {
   const text = read(file);
   for (const type of literalViewTypes(text)) providerTypes.add(type);
-  for (const type of unsupportedViewTypes(text)) providerTypes.add(type);
 }
 
 /** viewTypes the given entry point registers, following `x.bindCustomEditors(...)` one hop. */
@@ -91,7 +83,6 @@ function registeredBy(entryFile: string): Set<string> {
     );
     const providerText = read(file);
     for (const type of literalViewTypes(providerText)) types.add(type);
-    for (const type of unsupportedViewTypes(providerText)) types.add(type);
   }
   return types;
 }

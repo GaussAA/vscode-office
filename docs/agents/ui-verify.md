@@ -66,8 +66,9 @@ Rules that keep this suite useful:
 
 ## Route smoke vs. real scenarios
 
-`remaining-routes-smoke` walks the two **React** routes without a behavioural scenario of
-their own — `excel` and `gitHistory` — with a minimal `open` payload and asserts that
+`remaining-routes-smoke` walks the **React** routes without a behavioural scenario of their
+own — `excel` since the Git History panel was removed in 6.8.0 — with a minimal `open`
+payload and asserts that
 something mounted and nothing threw. Its job is to catch fork-wide breakage (entry, provider,
 shared utilities), **not** rendering correctness. It polls for the mount (`page.waitFor`)
 rather than sleeping a fixed delay: the excel chunk is ~1.3 MB and mounts slower on a loaded

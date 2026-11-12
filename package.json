@@ -19,7 +19,6 @@
     "parquet",
     "jsonl",
     "ndjson",
-    "git",
     "spreadsheet"
   ],
   "categories": [

@@ -18,5 +18,6 @@ status: accepted
 
 - 基线的具体数字不写进词汇表也不写进 ADR 正文，只写进 `package.json`；它属于会变的事实，不属于决策。参见 [GLOSSARY](../../GLOSSARY.md) 的 **Platform baseline（平台基线）**。
 - **删除 `activationEvents` 不是删一行**：`activateGitHistory` 在激活时同时做三件事 —— 创建状态栏条目 `$(git-commit) Git`、注册 `WebviewPanelSerializer`、启动 `repoDiscovery.discover()` 扫仓库。不激活则状态栏不出现、Git History 面板在窗口重载后无法恢复。需要保留最小激活事件（`onWebviewPanel:`）并接受状态栏"首次激活后出现"的时序，不能简单删行。
+- **后续（6.8.0）**：Git 历史连同它的激活路径一起删除，现在的 `activationEvents` 只有 `onCommand:GaussAA.office.previewJson`；本条记录的是当时的时序约束。
 - 抬基线之后 `tsconfig` 的 `target: es2019` / `lib: [es6, es2017, es2019]` 不再有保护价值，可以提到 ES2022。
 - 因为闸门是 fail-closed 的（`scripts/typecheck.mjs`），基线变更会被类型错误直接暴露，这正是它可信的原因。
