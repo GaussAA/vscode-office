@@ -7,7 +7,6 @@ import { loadOfficeBuffer } from "../../util/loadOfficeContent.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
 import "./Excel.less";
 import { MIN_VIEW_COLS, MIN_VIEW_ROWS } from "./excel_meta.ts";
-import { detectCsvEncoding } from "./csvEncoding.ts";
 import { loadLegacyWorkbookRows, loadSheets, loadWorkbookRows } from "./excel_reader.ts";
 import {
   export_xlsx,
@@ -358,13 +357,16 @@ function ExcelViewer() {
 
     const initSpreadsheet = async (buffer: ArrayBuffer, payload: any, seq: number) => {
       const fileReadOnly = payload.readOnly === true;
-      if (/^\.?(csv|tsv)$/i.test(payload.ext ?? "")) {
-        csvEncodingRef.current = detectCsvEncoding(buffer);
-      }
-      const { sheets, maxLength, maxCols, csvDelimiter } = await loadSheets(buffer, payload.ext);
+      const { sheets, maxLength, maxCols, csvDelimiter, csvEncoding } = await loadSheets(
+        buffer,
+        payload.ext,
+      );
       if (seq !== openSeqRef.current) return;
       if (csvDelimiter) {
         csvDelimiterRef.current = csvDelimiter;
+      }
+      if (csvEncoding) {
+        csvEncodingRef.current = csvEncoding;
       }
       const viewRowLen = Math.max(maxLength ?? 0, MIN_VIEW_ROWS);
       const viewColLen = Math.max(maxCols ?? 0, MIN_VIEW_COLS);

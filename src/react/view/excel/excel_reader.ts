@@ -2,7 +2,7 @@ import * as ExcelJS from "@cweijan/exceljs";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import { parseCsv } from "./csvParser";
-import { decodeCsvBuffer } from "./csvEncoding";
+import { decodeCsvBufferWithEncoding, type CsvEncoding } from "./csvEncoding";
 import {
   DEFAULT_ROW_HEIGHT_PX,
   excelFreezeToExpr,
@@ -39,6 +39,8 @@ export interface ExcelData {
   maxLength?: number;
   /** Detected column delimiter when loading CSV/TSV */
   csvDelimiter?: string;
+  /** Encoding chosen while decoding CSV/TSV; the writer reuses it instead of guessing. */
+  csvEncoding?: CsvEncoding;
 }
 
 const MIN_COL_WIDTH = 70;
@@ -466,8 +468,13 @@ const loadWithSheetJs = (buffer: ArrayBuffer): ExcelData => {
 
 const loadCsv = (buffer: ArrayBuffer, delimiter?: string): ExcelData => {
   let maxCols = 26;
-  const emptySheet = { maxCols, sheets: [{ name: "Sheet1", rows: { len: 0 } }] };
-  const csvStr = decodeCsvBuffer(buffer);
+  const decoded = decodeCsvBufferWithEncoding(buffer);
+  const emptySheet = {
+    maxCols,
+    csvEncoding: decoded.encoding,
+    sheets: [{ name: "Sheet1", rows: { len: 0 } }],
+  };
+  const csvStr = decoded.text;
   if (!csvStr) return emptySheet;
 
   const { rows, delimiter: csvDelimiter } = parseCsv(csvStr, delimiter);
@@ -488,6 +495,7 @@ const loadCsv = (buffer: ArrayBuffer, delimiter?: string): ExcelData => {
     maxCols,
     maxLength: rows.length,
     csvDelimiter,
+    csvEncoding: decoded.encoding,
     sheets: [
       {
         name: "Sheet1",
