@@ -1,4 +1,4 @@
-import { App, ConfigProvider, InputNumber, Table } from "antd";
+import { App, ConfigProvider, Table } from "antd";
 import type { ColumnsType, TableRef } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@vscode/codicons/dist/codicon.css";
@@ -8,13 +8,9 @@ import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
-import { formatBytes, previewLimitBytes } from "@/common/previewLimit";
 import { ParquetSession } from "./parquetSession.ts";
-import { searchParquetValues } from "./parquetSearch.ts";
 import { describeParquetFailure } from "./parquetError.ts";
-import { jsonPreviewText } from "./parquetPreview.ts";
 import {
-  formatCellValue,
   PARQUET_CHUNK_SIZE,
   PARQUET_PAGE_SIZE,
   openParquetFile,
@@ -23,7 +19,6 @@ import {
 } from "./parquetParser.ts";
 import { parquetAntdTheme } from "./parquetAntdTheme.ts";
 import {
-  ANNOUNCE_DELAY_MS,
   COLUMN_MAX_WIDTH,
   COLUMN_MIN_WIDTH,
   COLUMN_STRETCH_MAX,
@@ -33,7 +28,6 @@ import {
   MIN_ROWS_PER_PAGE,
   PARQUET_MAX_PAGE_SIZE,
   ROW_HEIGHT,
-  SEARCH_MAX_ROWS,
   SIDER_DEFAULT,
   SIDER_MAX,
   SIDER_MIN,
@@ -41,22 +35,18 @@ import {
 } from "./parquetLayout.ts";
 import { loadPersistedRow, savePersistedRow } from "./parquetPersistence.ts";
 import { PresentationTable, ResizableHeaderCell } from "./parquetHeaders.tsx";
-import {
-  COLUMN_ICONS,
-  CursorContext,
-  ParquetCell,
-  type CellCursor,
-  type TableRow,
-} from "./parquetCell.tsx";
+import { CursorContext, ParquetCell, type CellCursor, type TableRow } from "./parquetCell.tsx";
 
-import { ParquetMetaBar } from "./ParquetMetaBar.tsx";
+import ParquetTopBar from "./ParquetTopBar.tsx";
+import ParquetPager from "./ParquetPager.tsx";
+import ParquetSchema from "./ParquetSchema.tsx";
+import ParquetInspector from "./ParquetInspector.tsx";
+import ParquetGuard from "./ParquetGuard.tsx";
+import ParquetErrorPane from "./ParquetErrorPane.tsx";
+import { useParquetInspection } from "./useParquetInspection.ts";
+import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
+import { useParquetSearch } from "./useParquetSearch.ts";
 import "./Parquet.less";
-
-/**
- * How much of a value the expanded panel renders. A LIST column can hold thousands of elements;
- * the panel is a reader, not a dump, and copy still receives the untruncated value.
- */
-const INSPECT_PREVIEW_LIMIT = 20_000;
 
 /**
  * Run background work when the page is idle.
@@ -117,18 +107,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    * `title` the cells used to carry — a tooltip cannot be selected, wrapped or copied, and
    * DESIGN.md forbids it as the only way to read a value.
    */
-  const [expandedInspectKey, setExpandedInspectKey] = useState<string | null>(null);
-  const [inspectedRaw, setInspectedRaw] = useState(false);
-  const [query, setQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [searchProgress, setSearchProgress] = useState<{
-    scanned: number;
-    total: number;
-    matches: number;
-  } | null>(null);
-  const [matchRows, setMatchRows] = useState<Set<number>>(() => new Set());
-  /** Position of the currently shown hit inside the sorted match list; null before any jump. */
-  const [activeMatch, setActiveMatch] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -219,12 +197,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const tableRef = useRef<TableRef>(null);
   /** Pending focus retry while the virtual list renders the cursor's row. */
   const focusTimer = useRef(0);
-  /** Field whose column the schema click last brought into view; tints it while browsing. */
-  const [activeColumn, setActiveColumn] = useState<number | null>(null);
-  /** Row → first matching column, for the rows the last scan kept. */
-  const matchColumnsRef = useRef<Map<number, number>>(new Map());
-  /** A finished scan that found nothing: that is an answer, and it has to look like one. */
-  const [searchedEmpty, setSearchedEmpty] = useState(false);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<CellCursor | null>(null);
   /** The full text of the current selection, for Ctrl+C on the grid. */
@@ -235,16 +207,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const siderDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   /** Absolute row the footer jump aimed at, highlighted until the next navigation. */
   const [targetRow, setTargetRow] = useState<number | null>(null);
-  /** True when the whole-file search stopped at SEARCH_MAX_ROWS instead of finishing. */
-  const [searchCapped, setSearchCapped] = useState(false);
   const fileInfoRef = useRef<ParquetFileInfo | null>(null);
   /** localStorage key of the open document; empty for inline (virtual) buffers. */
   const documentKeyRef = useRef<string | undefined>(undefined);
   /** Owns the page cache, cancellation and the page<->row arithmetic. */
   const sessionRef = useRef<ParquetSession | null>(null);
-  const searchSeq = useRef(0);
-  /** The needle the current results belong to; empty when there are none to trust. */
-  const searchedQuery = useRef("");
+
+  const { activeColumn, setActiveColumn, focusColumn } = useParquetColumnFocus({
+    fileInfoRef,
+    tableWrapRef,
+  });
 
   // Keep the cursor in a ref as well as state: several keydowns can arrive before React
   // re-renders, and each one must move from the position the previous one reached.
@@ -253,184 +225,27 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     setCursor(next);
   }, []);
 
-  /**
-   * Bring one field into view without changing the page or the row selection.
-   *
-   * The target is *measured*, not computed from the column width: when a file has fewer columns
-   * than fit the viewport, antd stretches them to fill it, so `64 + n × 120` only holds once the
-   * table actually overflows. The measured cell decides both whether scrolling is needed and how
-   * far to go.
-   */
-  const focusColumn = useCallback((position: number, mark = true) => {
-    if (mark) setActiveColumn(position);
-    const colIndex = position + 2;
+  // Every page change drops the inspector, the cursor and the jump highlight: they all
+  // point at rows on the old page. `jumpToRow` re-sets the highlight right after this.
+  const goToPage = useCallback(
+    (next: number | ((current: number) => number)) => {
+      setInspected(null);
+      selectCell(null);
+      setTargetRow(null);
+      setPage(next);
+    },
+    [selectCell],
+  );
 
-    const bodyOffset = (): number => {
-      const wrap = tableWrapRef.current;
-      if (!wrap) return 0;
-      const inner = wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner");
-      if (inner) return wrap.getBoundingClientRect().left - inner.getBoundingClientRect().left;
-      const body = wrap.querySelector<HTMLElement>(".ant-table-body, .ant-table-content");
-      return body?.scrollLeft ?? 0;
-    };
-
-    /**
-     * The header is a separate scroll surface. rc-virtual-list moves the body by transform, so
-     * nothing fires the scroll event that normally keeps the two in step.
-     */
-    const syncHeader = () => {
-      const header = tableWrapRef.current?.querySelector<HTMLElement>(".ant-table-header");
-      if (!header) return;
-      const offset = bodyOffset();
-      if (Math.abs(header.scrollLeft - offset) > 1) header.scrollLeft = offset;
-    };
-
-    const isSettled = (): boolean => {
-      const wrap = tableWrapRef.current;
-      const cell = wrap?.querySelector<HTMLElement>(
-        `[role="gridcell"][aria-colindex="${colIndex}"]`,
-      );
-      if (!wrap || !cell) return false;
-      const wrapRect = wrap.getBoundingClientRect();
-      const rect = cell.getBoundingClientRect();
-      const centred =
-        Math.abs(wrapRect.left + Math.max(0, (wrapRect.width - rect.width) / 2) - rect.left) < 2;
-      const header = wrap.querySelector<HTMLElement>(
-        `.ant-table-header th[aria-colindex="${colIndex}"]`,
-      );
-      const aligned = !header || Math.abs(header.getBoundingClientRect().left - rect.left) < 2;
-      return centred && aligned;
-    };
-
-    const scrollOnce = () => {
-      const wrap = tableWrapRef.current;
-      if (!wrap) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      // The header renders every column (it is not virtualised), so it is the reliable count.
-      const headerCols = wrap.querySelectorAll(".ant-table-header th[aria-colindex]").length;
-      const columnCount =
-        headerCols > 0 ? headerCols - 1 : (fileInfoRef.current?.columns.length ?? 0);
-      const contentWidth =
-        columnCount > 0
-          ? INDEX_COLUMN_WIDTH + (columnCount + 1) * DATA_COLUMN_WIDTH
-          : (wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner")
-              ?.scrollWidth ?? 0);
-      const maxScroll = Math.max(0, contentWidth - wrapRect.width);
-      if (maxScroll <= 0) {
-        syncHeader();
-        return;
-      }
-
-      // An off-screen column is not rendered at all, so there is nothing to measure: fall back to
-      // the layout arithmetic, then let the verification pass correct any drift now that the
-      // column exists in the DOM.
-      const cell = wrap.querySelector<HTMLElement>(
-        `[role="gridcell"][aria-colindex="${colIndex}"]`,
-      );
-      const desired = cell
-        ? (() => {
-            const rect = cell.getBoundingClientRect();
-            const centred = wrapRect.left + Math.max(0, (wrapRect.width - rect.width) / 2);
-            // Increasing the offset moves the content left, so the offset we want is the current
-            // one plus however far the cell still has to travel left.
-            return bodyOffset() + (rect.left - centred);
-          })()
-        : INDEX_COLUMN_WIDTH +
-          position * DATA_COLUMN_WIDTH -
-          Math.max(0, (wrapRect.width - DATA_COLUMN_WIDTH) / 2);
-      const target = Math.max(0, Math.min(maxScroll, desired));
-
-      // Drag the thumb rather than clicking the track: rc-virtual-list ignores a mousedown whose
-      // target is the thumb, and with a wide thumb the track position that would mean "the end"
-      // lands inside the thumb itself. A drag is relative, so it works at any thumb size.
-      const track = wrap.querySelector<HTMLElement>(
-        ".ant-table-tbody-virtual-scrollbar-horizontal",
-      );
-      const thumb = track?.querySelector<HTMLElement>(".ant-table-tbody-virtual-scrollbar-thumb");
-      if (track && thumb) {
-        const trackRect = track.getBoundingClientRect();
-        const thumbRect = thumb.getBoundingClientRect();
-        const offsetRange = trackRect.width - thumbRect.width;
-        if (offsetRange > 0 && thumbRect.width > 0) {
-          const px = ((target - bodyOffset()) / maxScroll) * offsetRange;
-          if (Math.abs(px) < 0.5) {
-            syncHeader();
-            return;
-          }
-          const startX = thumbRect.left + thumbRect.width / 2;
-          const startY = trackRect.top + trackRect.height / 2;
-          // The drag handler reads `pageX`, which a synthetic MouseEvent does not reliably carry
-          // (only `clientX` is part of MouseEventInit), so define it explicitly.
-          const fire = (node: EventTarget, type: string, x: number, init: MouseEventInit = {}) => {
-            const event = new MouseEvent(type, {
-              bubbles: true,
-              cancelable: true,
-              clientX: x,
-              clientY: startY,
-              ...init,
-            });
-            Object.defineProperty(event, "pageX", { value: x });
-            Object.defineProperty(event, "pageY", { value: startY });
-            node.dispatchEvent(event);
-          };
-          fire(thumb, "mousedown", startX, { button: 0, buttons: 1 });
-          // The window listeners only exist after React commits `dragging` (post-paint), and the
-          // scroll is applied on the frame after the move — releasing in the same tick cancels it,
-          // because the drag effect cleans up with `raf.cancel`.
-          window.setTimeout(() => {
-            fire(window, "mousemove", startX + px * 0.5, { buttons: 1 });
-            fire(window, "mousemove", startX + px, { buttons: 1 });
-            window.setTimeout(() => {
-              fire(window, "mouseup", startX + px, { buttons: 0 });
-              window.setTimeout(() => syncHeader(), 32);
-            }, 64);
-          }, 80);
-          return;
-        }
-      }
-
-      const body = wrap.querySelector<HTMLElement>(".ant-table-body, .ant-table-content");
-      if (body && Math.abs(target - body.scrollLeft) >= 1) {
-        const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-          ? "auto"
-          : "smooth";
-        body.scrollTo({ left: target, behavior });
-      }
-      syncHeader();
-    };
-
-    // Let the active column commit, then verify and retry: the virtual table rebuilds its
-    // scrollbar when a column class changes, so an attempt can land on a detached track or on one
-    // whose geometry is still zero. Both are silent.
-    requestAnimationFrame(() => {
-      let tries = 8;
-      const attempt = () => {
-        scrollOnce();
-        requestAnimationFrame(() => {
-          syncHeader();
-          if (isSettled() || --tries <= 0) return;
-          attempt();
-        });
-      };
-      attempt();
-    });
-  }, []);
-
-  const [fieldFilter, setFieldFilter] = useState("");
-  /** Index into `visibleColumns` of the field that holds the list's single tab stop. */
-  const [fieldCursor, setFieldCursor] = useState(0);
-
-  /**
-   * The schema list filters by name. 60 fields in a 260px column, each name truncated and most
-   * icons the same green, is not a way to find a field — and the filter is what makes the list
-   * usable without hunting with the horizontal scrollbar.
-   */
-  const visibleColumns = useMemo(() => {
-    const all = (fileInfo?.columns ?? []).map((column, position) => ({ column, position }));
-    const needle = fieldFilter.trim().toLowerCase();
-    if (!needle) return all;
-    return all.filter(({ column }) => column.name.toLowerCase().includes(needle));
-  }, [fileInfo, fieldFilter]);
+  const search = useParquetSearch({
+    fileInfoRef,
+    page,
+    pageSize,
+    goToPage,
+    focusColumn,
+    onError: setError,
+  });
+  const { query, matchRows, resetSearch } = search;
 
   /** Briefly true right after a copy, so the button can answer instead of staying silent. */
   const [copied, setCopied] = useState(false);
@@ -475,12 +290,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       selectCell(null);
       setActiveColumn(null);
       setTargetRow(null);
-      searchSeq.current++;
-      setSearching(false);
-      setSearchProgress(null);
-      setSearchCapped(false);
-      setMatchRows(new Set());
-      setQuery("");
+      resetSearch(true);
       // Clear the key before resetting the page, otherwise the reset would be persisted
       // against the document we are leaving.
       documentKeyRef.current = undefined;
@@ -516,7 +326,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         setLoading(false);
       }
     },
-    [selectCell],
+    [resetSearch, selectCell, setActiveColumn],
   );
 
   // The table body gets the height the flex column actually leaves it, instead of a
@@ -591,18 +401,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       cancelPrefetch?.();
     };
   }, [fileInfo, page, reloadToken]);
-
-  // Every page change drops the inspector, the cursor and the jump highlight: they all
-  // point at rows on the old page. `jumpToRow` re-sets the highlight right after this.
-  const goToPage = useCallback(
-    (next: number | ((current: number) => number)) => {
-      setInspected(null);
-      selectCell(null);
-      setTargetRow(null);
-      setPage(next);
-    },
-    [selectCell],
-  );
 
   useEffect(() => {
     // Nothing to remember before the first page has actually arrived — and while a restore is
@@ -701,75 +499,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     return `${start.toLocaleString()}–${end.toLocaleString()} of ${fileInfo.rowCount.toLocaleString()}`;
   }, [fileInfo, loadedStart, pageSize]);
 
-  const runSearch = useCallback(async () => {
-    const info = fileInfoRef.current;
-    const needle = query.trim().toLowerCase();
-    const seq = ++searchSeq.current;
-    setMatchRows(new Set());
-    setSearchCapped(false);
-    if (!info || !needle) {
-      setSearching(false);
-      setSearchProgress(null);
-      return;
-    }
-    // The results belong to this text. Remembering it is what lets Enter tell "walk the hits I
-    // already have" from "this is a new needle, search it".
-    searchedQuery.current = needle;
-    setSearching(true);
-    setSearchedEmpty(false);
-    setSearchProgress({ scanned: 0, total: info.rowCount, matches: 0 });
-    try {
-      // One page-aligned pass over the file, column by column, instead of a read per
-      // 5000-row batch: without an offset index every batch re-decoded the data page that
-      // contained it, which made a 1M-row file take ~28 s. See parquetSearch.ts.
-      const result = await searchParquetValues(info, needle, {
-        maxRows: SEARCH_MAX_ROWS,
-        isCancelled: () => seq !== searchSeq.current,
-        onProgress: (scanned, matches) => {
-          if (seq === searchSeq.current)
-            setSearchProgress({ scanned, total: info.rowCount, matches });
-        },
-      });
-      if (seq !== searchSeq.current || result.cancelled) return;
-      setMatchRows(new Set(result.rows));
-      setSearchCapped(result.capped);
-      setSearchedEmpty(result.rows.length === 0);
-      matchColumnsRef.current = new Map(
-        result.rows.map((row, at) => [row, result.columns[at] ?? 0] as const),
-      );
-      if (result.rows.length > 0) {
-        setActiveMatch(0);
-        const target = Math.floor(result.rows[0] / pageSizeRef.current);
-        goToPage((current) => (current === target ? current : target));
-        // A hit is a cell, not a row: bring its column into view too. `mark` stays false so
-        // the tint keeps meaning "you clicked a schema field", not "a search ran".
-        focusColumn(result.columns[0] ?? 0, false);
-      }
-    } catch (e) {
-      if (seq === searchSeq.current) setError(e instanceof Error ? e.message : "Search failed");
-    } finally {
-      if (seq === searchSeq.current) setSearching(false);
-    }
-  }, [query, goToPage, focusColumn]);
-
-  const jumpMatch = useCallback(
-    (direction: 1 | -1) => {
-      if (matchRows.size === 0) return;
-      const sorted = [...matchRows].sort((a, b) => a - b);
-      const pageStart = page * pageSize;
-      const pageEnd = pageStart + pageSize;
-      const target =
-        direction > 0
-          ? (sorted.find((row) => row >= pageEnd) ?? sorted[0])
-          : ([...sorted].reverse().find((row) => row < pageStart) ?? sorted[sorted.length - 1]);
-      goToPage(Math.floor(target / pageSize));
-      setActiveMatch(sorted.indexOf(target));
-      const column = matchColumnsRef.current.get(target);
-      if (column !== undefined) focusColumn(column, false);
-    },
-    [matchRows, page, pageSize, goToPage, focusColumn],
-  );
-
   /**
    * Move the cursor *and* show the cell in the bottom bar. A focus ring the inspector disagrees
    * with is worse than no ring at all, and two of the cursor's entry points (the first arrow of a
@@ -791,34 +520,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     [selectCell, fileInfo, loadedStart, pageRows],
   );
 
-  /** Abandon a running scan. The scan checks `searchSeq` between pages, so this stops it. */
-  const cancelSearch = useCallback(() => {
-    searchSeq.current++;
-    setSearching(false);
-    setSearchProgress(null);
-  }, []);
-
-  // Clearing the box drops the previous results — and so does editing it: a result set that no
-  // longer matches the text in the box is a lie that Enter would act on.
-  const resetSearch = useCallback(() => {
-    searchSeq.current++;
-    searchedQuery.current = "";
-    setSearching(false);
-    setSearchProgress(null);
-    setSearchCapped(false);
-    setMatchRows(new Set());
-    setSearchedEmpty(false);
-    setActiveMatch(null);
-    matchColumnsRef.current = new Map();
-  }, []);
-
-  const handleQueryChange = useCallback(
-    (next: string) => {
-      setQuery(next);
-      if (next.trim().toLowerCase() !== searchedQuery.current) resetSearch();
-    },
-    [resetSearch],
-  );
   /**
    * Grid keyboard cursor: arrows move, Home/End jump to first/last column, Enter inspects,
    * Escape dismisses. The cells themselves are spans, so without this the table is
@@ -1078,7 +779,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       });
     }
     return cols;
-  }, [fileInfo, loadedStart, query, selectCell, activeColumn, columnLayout]);
+  }, [fileInfo, loadedStart, query, selectCell, activeColumn, columnLayout, setActiveColumn]);
 
   useEffect(() => {
     handler
@@ -1106,84 +807,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       .emit("init");
   }, [loadParquet]);
 
-  const inspectedType = inspected
-    ? fileInfo?.columns.find((column) => column.name === inspected.column)?.type
-    : undefined;
-  const inspectedFull = inspected
-    ? inspected.value === null || inspected.value === undefined
-      ? $t("parquet.nullLabel")
-      : formatCellValue(inspected.value, inspectedType)
-    : "";
-  /**
-   * Containers are previewed, never dumped: `formatCellValue` has no length cap, so selecting a
-   * 5000-element LIST used to stringify the whole thing into state (and into the title) on every
-   * arrow key. Copy still gets the full value.
-   */
-  const inspectedText =
-    inspected && inspected.value !== null && typeof inspected.value === "object"
-      ? jsonPreviewText(inspected.value)
-      : inspectedFull;
-
-  /**
-   * What the expanded panel renders. Two forms, because the two questions differ: "is this the
-   * value I think it is" wants the compact one on one line, "what exactly is in there" wants the
-   * formatted one. Both are capped for rendering only — copy always takes `inspectedFull` — so a
-   * 5 000-element LIST cannot turn every arrow key into a megabyte of layout.
-   */
-  const inspectedBody = useMemo(() => {
-    if (!inspected) return "";
-    // `raw` means two different things, both of them "as the file stores it": a container becomes
-    // compact JSON instead of indented, and a string becomes escaped instead of literal (so a
-    // `\n` or a quote shows up as itself rather than breaking the line or the layout).
-    if (typeof inspected.value === "string") {
-      return inspectedRaw ? JSON.stringify(inspected.value) : inspected.value;
-    }
-    if (inspected.value === null || inspected.value === undefined) return inspectedFull;
-    if (typeof inspected.value === "object") {
-      try {
-        return JSON.stringify(inspected.value, null, inspectedRaw ? 0 : 2);
-      } catch {
-        return inspectedFull;
-      }
-    }
-    return inspectedFull;
-  }, [inspected, inspectedFull, inspectedRaw]);
-
-  const inspectedSize = useMemo(() => {
-    const capped = inspectedBody.slice(0, INSPECT_PREVIEW_LIMIT);
-    return {
-      chars: inspectedFull.length,
-      bytes: new TextEncoder().encode(inspectedFull).length,
-      shown: capped,
-      truncated: inspectedBody.length > capped.length,
-    };
-  }, [inspectedBody, inspectedFull]);
-
-  /**
-   * Expansion is derived from the selection's identity, not reset by an effect: a new cell is a
-   * new key, so it starts collapsed, and no setState-in-effect is needed (which React's lint rule
-   * forbids for exactly this reason — it renders twice for a state that was already implied).
-   */
-  const inspectKey = inspected ? `${inspected.row}:${inspected.column}` : "";
-  const inspectedExpanded = inspectKey !== "" && expandedInspectKey === inspectKey;
+  const inspection = useParquetInspection(inspected, fileInfo?.columns ?? []);
 
   useEffect(() => {
-    inspectedCopyRef.current = inspectedFull;
-  }, [inspectedFull]);
-
-  /**
-   * Assistive tech hears the selection once it settles. The visible bar updates on every arrow
-   * key, and an `aria-live` region on it queued one announcement per keystroke — ten moves,
-   * ten messages.
-   */
-  const [announcement, setAnnouncement] = useState("");
-  useEffect(() => {
-    if (!inspected) return;
-    const timer = window.setTimeout(() => {
-      setAnnouncement(`${inspected.column} · row ${inspected.row + 1} · ${inspectedText}`);
-    }, ANNOUNCE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [inspected, inspectedText]);
+    inspectedCopyRef.current = inspection.full;
+  }, [inspection.full]);
 
   /** The compression the file arrived in. This fork exists to open the ZSTD ones; the surface
    *  used to say nothing about the reason it worked at all. */
@@ -1212,36 +840,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   return (
     <div className={`parquet-viewer${dark ? "" : " parquet-viewer--light"}`}>
       {tooLarge && !loading && (
-        <div className="parquet-viewer__too-large">
-          <div className="parquet-viewer__too-large-panel">
-            <h2 className="parquet-viewer__too-large-title">{$t("previewGuard.title")}</h2>
-            <p className="parquet-viewer__too-large-body">
-              {$t("previewGuard.body", {
-                file: tooLarge.name,
-                size: formatBytes(tooLarge.size),
-                limit: formatBytes(previewLimitBytes(tooLarge.ext)),
-              })}
-            </p>
-            <div className="parquet-viewer__too-large-actions">
-              <button
-                type="button"
-                className="parquet-viewer__pager-btn parquet-viewer__too-large-open"
-                onClick={handleOpenAnyway}
-              >
-                {$t("previewGuard.open")}
-              </button>
-              {/* "Open anyway" is a memory bet. The file is on disk either way, so the second
-                  exit is the one that costs nothing: go look at it where it lives. */}
-              <button
-                type="button"
-                className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
-                onClick={() => handler.emit("revealFile")}
-              >
-                {$t("parquet.revealFile")}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ParquetGuard
+          tooLarge={tooLarge}
+          onOpenAnyway={handleOpenAnyway}
+          onRevealFile={() => handler.emit("revealFile")}
+        />
       )}
       {loading && (
         <div className="parquet-viewer__overlay">
@@ -1250,280 +853,29 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         </div>
       )}
       {failure ? (
-        <div className="parquet-viewer__error-pane">
-          {fileName && (
-            <div className="parquet-viewer__error-file">
-              <span className="codicon codicon-file" />
-              <span className="parquet-viewer__error-file-name">{fileName}</span>
-            </div>
-          )}
-          <div className="parquet-viewer__error" role="alert">
-            <span className="codicon codicon-error" />
-            <div className="parquet-viewer__error-body">
-              <p className="parquet-viewer__error-title">
-                {failure.kind === "other" ? failure.raw : $t("parquet.errorTitle")}
-              </p>
-              {failure.kind !== "other" && (
-                <p className="parquet-viewer__error-text">
-                  {failure.kind === "codec"
-                    ? $t("parquet.errorCodec", { codec: failure.codec })
-                    : $t("parquet.errorTruncated")}
-                </p>
-              )}
-              {failure.kind !== "other" && (
-                <details className="parquet-viewer__error-raw">
-                  <summary>{$t("parquet.errorDetail")}</summary>
-                  <pre>{failure.raw}</pre>
-                </details>
-              )}
-            </div>
-            <div className="parquet-viewer__error-actions">
-              <button
-                type="button"
-                className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
-                onClick={() => handler.emit("revealFile")}
-              >
-                {$t("parquet.revealFile")}
-              </button>
-              {/* Retry only where retrying can change the answer: an unsupported codec is a
-                  property of the file, so offering Retry there sends the reader in a circle. */}
-              {failure.kind !== "codec" && (
-                <button
-                  type="button"
-                  className="parquet-viewer__pager-btn"
-                  onClick={() => handler.emit("init")}
-                >
-                  {$t("common.retry")}
-                </button>
-              )}
-              <button
-                type="button"
-                className="parquet-viewer__pager-btn"
-                onClick={() => copyValue(failure.raw)}
-                title={copied ? $t("common.copied") : $t("parquet.copyError")}
-                aria-label={copied ? $t("common.copied") : $t("parquet.copyError")}
-              >
-                <span className={`codicon ${copied ? "codicon-check" : "codicon-copy"}`} />
-              </button>
-            </div>
-          </div>
-        </div>
+        <ParquetErrorPane
+          failure={failure}
+          fileName={fileName}
+          copied={copied}
+          onCopy={copyValue}
+          onRevealFile={() => handler.emit("revealFile")}
+          onRetry={() => handler.emit("init")}
+        />
       ) : fileInfo ? (
         <>
-          <header className="parquet-viewer__topbar">
-            <div className="parquet-viewer__search">
-              <span className="codicon codicon-search parquet-viewer__search-icon" />
-              <input
-                ref={searchInputRef}
-                className="parquet-viewer__find-input"
-                placeholder={$t("parquet.findInFile")}
-                aria-label={$t("parquet.findInFile")}
-                value={query}
-                onChange={(event) => handleQueryChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  event.preventDefault();
-                  // Enter follows VS Code's own find: move to the next hit. Re-running a
-                  // whole-file scan (1.3 s on a million rows) belongs on the button and on
-                  // Ctrl/Cmd+Enter, not on the key the user presses to walk the matches.
-                  if (event.ctrlKey || event.metaKey) void runSearch();
-                  else if (
-                    matchRows.size > 0 &&
-                    query.trim().toLowerCase() === searchedQuery.current
-                  )
-                    jumpMatch(event.shiftKey ? -1 : 1);
-                  else void runSearch();
-                }}
-              />
-              {query && (
-                <button
-                  type="button"
-                  className="parquet-viewer__find-clear"
-                  onClick={() => {
-                    handleQueryChange("");
-                    searchInputRef.current?.focus();
-                  }}
-                  title={$t("common.close")}
-                  aria-label={$t("common.close")}
-                >
-                  <span className="codicon codicon-close" />
-                </button>
-              )}
-              <button
-                type="button"
-                className="parquet-viewer__find-btn"
-                onClick={() => (searching ? cancelSearch() : void runSearch())}
-                title={searching ? $t("parquet.stopSearch") : $t("parquet.searchAllRows")}
-                aria-label={searching ? $t("parquet.stopSearch") : $t("parquet.searchAllRows")}
-              >
-                <span className={`codicon ${searching ? "codicon-stop-circle" : "codicon-run"}`} />
-              </button>
-            </div>
-            <div className="parquet-viewer__find-state">
-              {searching && searchProgress && (
-                <span className="parquet-viewer__find-count">
-                  {Math.round((searchProgress.scanned / Math.max(1, searchProgress.total)) * 100)}%
-                  {" · "}
-                  {searchProgress.matches}
-                </span>
-              )}
-              {!searching && query.trim() !== "" && matchRows.size === 0 && !searchedEmpty && (
-                <span className="parquet-viewer__find-count">{$t("parquet.searchHint")}</span>
-              )}
-              {!searching && matchRows.size > 0 && (
-                <>
-                  <span className="parquet-viewer__find-count">
-                    {$t("parquet.matchPosition", {
-                      index: (activeMatch ?? 0) + 1,
-                      count: matchRows.size.toLocaleString(),
-                    })}
-                    {searchCapped
-                      ? $t("parquet.cappedSuffix", {
-                          max: SEARCH_MAX_ROWS.toLocaleString(),
-                        })
-                      : ""}
-                  </span>
-                  <button
-                    type="button"
-                    className="parquet-viewer__find-btn"
-                    onClick={() => jumpMatch(-1)}
-                    title={$t("parquet.previousMatch")}
-                    aria-label={$t("parquet.previousMatch")}
-                  >
-                    <span className="codicon codicon-chevron-up" />
-                  </button>
-                  <button
-                    type="button"
-                    className="parquet-viewer__find-btn"
-                    onClick={() => jumpMatch(1)}
-                    title={$t("parquet.nextMatch")}
-                    aria-label={$t("parquet.nextMatch")}
-                  >
-                    <span className="codicon codicon-chevron-down" />
-                  </button>
-                </>
-              )}
-              {!searching && searchedEmpty && (
-                <span className="parquet-viewer__find-count">
-                  {$t("parquet.matchCountMany", { count: "0" })}
-                </span>
-              )}
-            </div>
-            <ParquetMetaBar
-              rowCount={fileInfo.rowCount}
-              columnCount={fileInfo.columns.length}
-              fileSize={fileInfo.file?.byteLength}
-              codecs={codecs}
-              createdBy={fileInfo.createdBy}
-            />
-          </header>
+          <ParquetTopBar
+            search={search}
+            searchInputRef={searchInputRef}
+            fileInfo={fileInfo}
+            codecs={codecs}
+          />
           <div className="parquet-viewer__body">
-            <aside className="parquet-viewer__sider" style={{ width: siderWidth }}>
-              <div className="parquet-viewer__sider-heading">
-                <span className="parquet-viewer__sider-title">
-                  <span className="codicon codicon-symbol-structure parquet-icon parquet-icon--schema" />
-                  {$t("parquet.schema")}
-                </span>
-                <span className="parquet-viewer__sider-count">
-                  {visibleColumns.length === fileInfo.columns.length
-                    ? fileInfo.columns.length
-                    : `${visibleColumns.length}/${fileInfo.columns.length}`}
-                </span>
-              </div>
-              <div className="parquet-viewer__field-filter-row">
-                <input
-                  type="text"
-                  className="parquet-viewer__field-filter"
-                  value={fieldFilter}
-                  placeholder={$t("parquet.filterFields")}
-                  aria-label={$t("parquet.filterFields")}
-                  spellCheck={false}
-                  onChange={(event) => {
-                    setFieldFilter(event.target.value);
-                    setFieldCursor(0);
-                  }}
-                />
-                {fieldFilter !== "" && (
-                  <button
-                    type="button"
-                    className="parquet-viewer__field-filter-clear"
-                    onClick={() => {
-                      setFieldFilter("");
-                      setFieldCursor(0);
-                    }}
-                    title={$t("common.close")}
-                    aria-label={$t("common.close")}
-                  >
-                    <span className="codicon codicon-close" />
-                  </button>
-                )}
-              </div>
-              <div
-                className="parquet-viewer__list"
-                role="listbox"
-                aria-label={$t("parquet.schema")}
-                onKeyDown={(event) => {
-                  // One tab stop for the whole list: 60 fields used to sit between the search
-                  // box and the grid, so reaching the table meant 60 presses of Tab.
-                  const keys: Record<string, number> = {
-                    ArrowDown: 1,
-                    ArrowUp: -1,
-                    Home: -Infinity,
-                    End: Infinity,
-                  };
-                  const move = keys[event.key];
-                  if (move === undefined) return;
-                  event.preventDefault();
-                  const last = Math.max(0, visibleColumns.length - 1);
-                  const next = Math.max(
-                    0,
-                    Math.min(
-                      last,
-                      fieldCursor + (move === -Infinity ? -last : move === Infinity ? last : move),
-                    ),
-                  );
-                  setFieldCursor(next);
-                  const target = visibleColumns[next];
-                  if (target) {
-                    focusColumn(target.position);
-                    const item = event.currentTarget.querySelectorAll<HTMLElement>(
-                      ".parquet-viewer__list-item",
-                    )[next];
-                    item?.focus();
-                  }
-                }}
-              >
-                {visibleColumns.map(({ column, position }, index) => {
-                  const icon = COLUMN_ICONS[column.category];
-                  const kind = column.category;
-                  const active = activeColumn === position;
-                  return (
-                    <button
-                      key={column.name}
-                      type="button"
-                      role="option"
-                      className={`parquet-viewer__list-item${active ? " parquet-viewer__list-item--active" : ""}`}
-                      aria-selected={active}
-                      aria-label={$t("parquet.jumpToColumn", { name: column.name })}
-                      title={`${column.name} · ${column.type}`}
-                      tabIndex={index === fieldCursor ? 0 : -1}
-                      onFocus={() => setFieldCursor(index)}
-                      onClick={() => focusColumn(position)}
-                    >
-                      <span
-                        className={`codicon parquet-viewer__list-icon parquet-viewer__list-icon--${kind} ${icon}`}
-                      />
-                      <span className="parquet-viewer__list-name" title={column.name}>
-                        {column.name}
-                      </span>
-                      <span className="parquet-viewer__list-type" title={column.type}>
-                        {column.type}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </aside>
+            <ParquetSchema
+              columns={fileInfo.columns}
+              activeColumn={activeColumn}
+              siderWidth={siderWidth}
+              onFocusColumn={focusColumn}
+            />
             <div
               className="parquet-viewer__resizer"
               role="separator"
@@ -1622,198 +974,29 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             </main>
           </div>
           <footer className="parquet-viewer__bottombar">
-            {inspected && inspectedExpanded && (
-              <section
-                className="parquet-viewer__inspector"
-                aria-label={inspected.column}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    setExpandedInspectKey(null);
-                    tableWrapRef.current?.focus();
-                  }
-                }}
-              >
-                <header className="parquet-viewer__inspector-head">
-                  <span className="parquet-viewer__inspector-name">{inspected.column}</span>
-                  {inspectedType ? (
-                    <span className="parquet-viewer__inspector-type">{inspectedType}</span>
-                  ) : null}
-                  <span className="parquet-viewer__inspector-meta">
-                    {$t("parquet.inspectMeta", {
-                      row: (inspected.row + 1).toLocaleString(),
-                      chars: inspectedSize.chars.toLocaleString(),
-                      bytes: inspectedSize.bytes.toLocaleString(),
-                    })}
-                  </span>
-                  <span className="parquet-viewer__inspector-actions">
-                    <button
-                      type="button"
-                      className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
-                      aria-pressed={inspectedRaw}
-                      onClick={() => setInspectedRaw((raw) => !raw)}
-                    >
-                      {inspectedRaw ? $t("parquet.inspectRaw") : $t("parquet.inspectFormatted")}
-                    </button>
-                    <button
-                      type="button"
-                      className="parquet-viewer__pager-btn"
-                      onClick={() => copyValue(inspectedFull)}
-                      aria-label={$t("parquet.copyValue")}
-                    >
-                      <span className="codicon codicon-copy" />
-                    </button>
-                    <button
-                      type="button"
-                      className="parquet-viewer__pager-btn"
-                      onClick={() => {
-                        setExpandedInspectKey(null);
-                        tableWrapRef.current?.focus();
-                      }}
-                      aria-label={$t("parquet.inspectCollapse")}
-                    >
-                      <span className="codicon codicon-chevron-down" />
-                    </button>
-                  </span>
-                </header>
-                <pre className="parquet-viewer__inspector-body">
-                  {inspectedSize.shown}
-                  {inspectedSize.truncated
-                    ? $t("parquet.cappedSuffix", { max: INSPECT_PREVIEW_LIMIT.toLocaleString() })
-                    : ""}
-                </pre>
-              </section>
-            )}
-
-            {/* One announcement per settled selection. The visible bar updates on every arrow
-                key, and aria-live on it queued a message per keystroke. */}
-            <span className="parquet-viewer__sr-only" role="status" aria-live="polite">
-              {inspected ? announcement : ""}
-            </span>
-            <div className="parquet-viewer__selection">
-              {fileInfo.rowCount === 0 ? null : inspected ? (
-                <>
-                  <span className="parquet-viewer__selection-label">
-                    {inspected.column} · row {inspected.row + 1}
-                  </span>
-                  <button
-                    type="button"
-                    className="parquet-viewer__selection-value"
-                    aria-expanded={inspectedExpanded}
-                    aria-label={$t("parquet.inspectExpand", { name: inspected.column })}
-                    onClick={() => setExpandedInspectKey(inspectedExpanded ? null : inspectKey)}
-                  >
-                    {inspectedText}
-                  </button>
-                  <button
-                    type="button"
-                    className="parquet-viewer__pager-btn"
-                    onClick={() => copyValue(inspectedFull)}
-                    title={copied ? $t("common.copied") : $t("parquet.copyValue")}
-                    aria-label={copied ? $t("common.copied") : $t("parquet.copyValue")}
-                  >
-                    <span className={`codicon ${copied ? "codicon-check" : "codicon-copy"}`} />
-                  </button>
-                  <button
-                    type="button"
-                    className="parquet-viewer__pager-btn"
-                    onClick={() => {
-                      setInspected(null);
-                      tableWrapRef.current?.focus();
-                    }}
-                    title={$t("common.close")}
-                    aria-label={$t("common.close")}
-                  >
-                    <span className="codicon codicon-close" />
-                  </button>
-                </>
-              ) : (
-                <span className="parquet-viewer__selection-hint">{$t("parquet.inspectHint")}</span>
-              )}
-            </div>
-            <div className="parquet-viewer__pager">
-              {pageLoading && (
-                <span
-                  className="codicon codicon-loading codicon-modifier-spin parquet-viewer__pager-loading"
-                  aria-label={$t("parquet.loading")}
-                />
-              )}
-              <button
-                type="button"
-                className="parquet-viewer__pager-btn"
-                disabled={page <= 0}
-                onClick={() => goToPage(0)}
-                title={$t("parquet.firstPage")}
-                aria-label={$t("parquet.firstPage")}
-              >
-                <span className="codicon codicon-arrow-left" />
-              </button>
-              <button
-                type="button"
-                className="parquet-viewer__pager-btn"
-                disabled={page <= 0}
-                onClick={() => goToPage((p) => Math.max(0, p - 1))}
-                title={$t("parquet.previousPage")}
-                aria-label={$t("parquet.previousPage")}
-              >
-                <span className="codicon codicon-chevron-left" />
-              </button>
-              <InputNumber
-                size="small"
-                className="parquet-viewer__row-jump"
-                min={1}
-                max={fileInfo.rowCount}
-                disabled={fileInfo.rowCount === 0}
-                precision={0}
-                value={rowJump}
-                placeholder={$t("parquet.rowLabel")}
-                aria-label={$t("parquet.rowLabel")}
-                onChange={(value) => setRowJump(typeof value === "number" ? value : null)}
-                onPressEnter={() => jumpToRow()}
-                // No jump on blur. Leaving a field is not a decision — retyping a number after
-                // looking at the table used to navigate away half-way through. The typed value
-                // stays in the box; only Enter (or Go) acts on it.
-              />
-              <button
-                type="button"
-                className="parquet-viewer__pager-btn parquet-viewer__pager-btn--text"
-                data-row-jump-go
-                disabled={fileInfo.rowCount === 0}
-                onClick={() => jumpToRow()}
-                title={$t("parquet.goToRow")}
-              >
-                {$t("parquet.go")}
-              </button>
-              <span className="parquet-viewer__pager-info">{rowRange}</span>
-              {fileInfo.rowCount > 0 && (
-                <span className="parquet-viewer__pager-page">
-                  {$t("parquet.pagePosition", {
-                    page: (page + 1).toLocaleString(),
-                    total: totalPages.toLocaleString(),
-                  })}
-                </span>
-              )}
-              <button
-                type="button"
-                className="parquet-viewer__pager-btn"
-                disabled={page >= totalPages - 1}
-                onClick={() => goToPage((p) => Math.min(totalPages - 1, p + 1))}
-                title={$t("parquet.nextPage")}
-                aria-label={$t("parquet.nextPage")}
-              >
-                <span className="codicon codicon-chevron-right" />
-              </button>
-              <button
-                type="button"
-                className="parquet-viewer__pager-btn"
-                disabled={page >= totalPages - 1}
-                onClick={() => goToPage(totalPages - 1)}
-                title={$t("parquet.lastPage")}
-                aria-label={$t("parquet.lastPage")}
-              >
-                <span className="codicon codicon-arrow-right" />
-              </button>
-            </div>
+            <ParquetInspector
+              inspected={inspected}
+              inspection={inspection}
+              hasRows={fileInfo.rowCount > 0}
+              copied={copied}
+              onCopy={copyValue}
+              onClear={() => {
+                setInspected(null);
+                tableWrapRef.current?.focus();
+              }}
+              onFocusTable={() => tableWrapRef.current?.focus()}
+            />
+            <ParquetPager
+              fileInfo={fileInfo}
+              page={page}
+              totalPages={totalPages}
+              rowRange={rowRange}
+              pageLoading={pageLoading}
+              rowJump={rowJump}
+              onRowJump={setRowJump}
+              onJump={() => jumpToRow()}
+              onGoToPage={goToPage}
+            />
           </footer>
         </>
       ) : null}
