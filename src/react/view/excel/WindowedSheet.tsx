@@ -276,6 +276,12 @@ export default function WindowedSheet({
   const liveStatus = selected
     ? `${columnName(selected.col)}${bodyRowToFileRow(selected.row)}: ${selectedValue}`
     : find.countLabel;
+  // The selected row may have scrolled out of the rendered window; an activedescendant that
+  // points at a missing id is an accessibility error, so omit it until the cell is mounted.
+  const selectedCellId =
+    selected && range && selected.row >= range.start && selected.row < range.end
+      ? cellId(selected.row, selected.col)
+      : undefined;
 
   return (
     <div className="windowed-sheet" data-rows={source.rowCount} data-columns={columnCount}>
@@ -301,7 +307,7 @@ export default function WindowedSheet({
         aria-readonly="true"
         aria-rowcount={source.rowCount}
         aria-colcount={columnCount + 1}
-        aria-activedescendant={selected ? cellId(selected.row, selected.col) : undefined}
+        aria-activedescendant={selectedCellId}
       >
         <div className="windowed-sheet__inner" style={{ width: "max-content", minWidth: "100%" }}>
           <div

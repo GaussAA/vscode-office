@@ -65,7 +65,7 @@ export default function WindowedFindBar({
         >
           ↓
         </button>
-        <span className="windowed-sheet__count" aria-hidden="true">
+        <span className="windowed-sheet__count" role="status" aria-live="polite">
           {countLabel}
         </span>
       </div>

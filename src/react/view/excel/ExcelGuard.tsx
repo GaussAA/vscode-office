@@ -52,6 +52,23 @@ export default function ExcelGuard({ file, onOpenAnyway, onOpenInVSCode }: Excel
         if (event.key === "Escape" && armed) {
           event.stopPropagation();
           cancel();
+          return;
+        }
+        if (event.key !== "Tab") return;
+        // The dialog is modal; keep focus inside it instead of letting Tab reach the grid
+        // underneath (which is still mounted while the guard is up).
+        const buttons = Array.from(
+          event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not([disabled])"),
+        );
+        if (buttons.length === 0) return;
+        const active = document.activeElement as HTMLButtonElement | null;
+        const index = buttons.indexOf(active as HTMLButtonElement);
+        if (event.shiftKey && index <= 0) {
+          event.preventDefault();
+          buttons[buttons.length - 1]?.focus();
+        } else if (!event.shiftKey && (index < 0 || index === buttons.length - 1)) {
+          event.preventDefault();
+          buttons[0]?.focus();
         }
       }}
     >
