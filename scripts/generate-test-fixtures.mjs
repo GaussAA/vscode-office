@@ -11,7 +11,54 @@
 import { writeFileSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { brotliCompressSync, gzipSync, zstdCompressSync } from "node:zlib";
 import { parquetWriteBuffer } from "hyparquet-writer";
+
+/**
+ * Compressors for `hyparquet-writer`, one per codec the fixtures claim.
+ *
+ * `codec` is the option the writer actually reads. The old `compression:` key was silently
+ * ignored — every "codec" fixture came out SNAPPY while its name promised otherwise, which is
+ * why `fixtures.test.ts` now also asserts the codec in the file.
+ *
+ * LZ4 has no Node compressor, so this fixture uses **literal-only blocks**: valid LZ4 whose
+ * decoder path is the literal copy. It proves the framing and the codec name, not the
+ * match-copy path — the test name says so.
+ */
+function literalOnlyLz4(input) {
+  const length = input.byteLength;
+  const header = [length >= 15 ? 0xf0 : length << 4];
+  if (length >= 15) {
+    let remaining = length - 15;
+    while (remaining >= 255) {
+      header.push(255);
+      remaining -= 255;
+    }
+    header.push(remaining);
+  }
+  const block = new Uint8Array(header.length + length);
+  block.set(header, 0);
+  block.set(input, header.length);
+  return block;
+}
+
+/** Hadoop's legacy framing: [uncompressed length][compressed length][block], big-endian. */
+function hadoopLz4(input, block) {
+  const framed = new Uint8Array(8 + block.byteLength);
+  const view = new DataView(framed.buffer);
+  view.setUint32(0, input.byteLength);
+  view.setUint32(4, block.byteLength);
+  framed.set(block, 8);
+  return framed;
+}
+
+const COMPRESSORS = {
+  GZIP: (input) => new Uint8Array(gzipSync(input)),
+  BROTLI: (input) => new Uint8Array(brotliCompressSync(input)),
+  ZSTD: (input) => new Uint8Array(zstdCompressSync(input)),
+  LZ4: (input) => hadoopLz4(input, literalOnlyLz4(input)),
+  LZ4_RAW: literalOnlyLz4,
+};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..");
@@ -52,7 +99,7 @@ function generateParquetFixtures() {
         { name: "name", data: names, type: "STRING" },
         { name: "score", data: scores, type: "DOUBLE" },
       ],
-      compression: "SNAPPY",
+      codec: "SNAPPY",
     });
     writeFileSync(snappyPath, new Uint8Array(buffer));
     console.log(`   ✅ snappy.parquet (${rows} 行, SNAPPY 压缩)`);
@@ -75,7 +122,8 @@ function generateParquetFixtures() {
         { name: "id", data: ids, type: "INT32" },
         { name: "value", data: values, type: "DOUBLE" },
       ],
-      compression: "GZIP",
+      codec: "GZIP",
+      compressors: COMPRESSORS,
     });
     writeFileSync(gzipPath, new Uint8Array(buffer));
     console.log(`   ✅ gzip.parquet (${rows} 行, GZIP 压缩)`);
@@ -98,7 +146,7 @@ function generateParquetFixtures() {
         { name: "id", data: ids, type: "INT32" },
         { name: "flag", data: flags, type: "BOOLEAN" },
       ],
-      compression: "UNCOMPRESSED",
+      codec: "UNCOMPRESSED",
     });
     writeFileSync(uncompressedPath, new Uint8Array(buffer));
     console.log(`   ✅ uncompressed.parquet (${rows} 行, 无压缩)`);
@@ -121,7 +169,8 @@ function generateParquetFixtures() {
         { name: "id", data: ids, type: "INT32" },
         { name: "text", data: texts, type: "STRING" },
       ],
-      compression: "LZ4",
+      codec: "LZ4",
+      compressors: COMPRESSORS,
     });
     writeFileSync(lz4Path, new Uint8Array(buffer));
     console.log(`   ✅ lz4.parquet (${rows} 行, LZ4 压缩)`);
@@ -144,7 +193,8 @@ function generateParquetFixtures() {
         { name: "id", data: ids, type: "INT32" },
         { name: "message", data: messages, type: "STRING" },
       ],
-      compression: "BROTLI",
+      codec: "BROTLI",
+      compressors: COMPRESSORS,
     });
     writeFileSync(brotliPath, new Uint8Array(buffer));
     console.log(`   ✅ brotli.parquet (${rows} 行, BROTLI 压缩)`);
@@ -152,7 +202,55 @@ function generateParquetFixtures() {
     console.log(`   ⏭️  brotli.parquet 已存在`);
   }
 
-  // 6. 空文件
+  // 6. ZSTD 压缩：上游打不开的那种，fork 的头号卖点必须有 fixture 看守
+  const zstdPath = join(parquetDir, "zstd.parquet");
+  if (!existsSync(zstdPath)) {
+    const rows = 700;
+    const ids = new Int32Array(rows);
+    const notes = new Array(rows);
+    for (let i = 0; i < rows; i++) {
+      ids[i] = i + 1;
+      notes[i] = `zstd note ${i}`;
+    }
+    const buffer = parquetWriteBuffer({
+      columnData: [
+        { name: "id", data: ids, type: "INT32" },
+        { name: "note", data: notes, type: "STRING" },
+      ],
+      codec: "ZSTD",
+      compressors: COMPRESSORS,
+    });
+    writeFileSync(zstdPath, new Uint8Array(buffer));
+    console.log(`   ✅ zstd.parquet (${rows} 行, ZSTD 压缩)`);
+  } else {
+    console.log(`   ⏭️  zstd.parquet 已存在`);
+  }
+
+  // 7. LZ4_RAW：与上面的 LZ4 是两种封装，decoder 走的是不同的解压函数
+  const lz4RawPath = join(parquetDir, "lz4-raw.parquet");
+  if (!existsSync(lz4RawPath)) {
+    const rows = 400;
+    const ids = new Int32Array(rows);
+    const values = new Float64Array(rows);
+    for (let i = 0; i < rows; i++) {
+      ids[i] = i + 1;
+      values[i] = i / 8;
+    }
+    const buffer = parquetWriteBuffer({
+      columnData: [
+        { name: "id", data: ids, type: "INT32" },
+        { name: "value", data: values, type: "DOUBLE" },
+      ],
+      codec: "LZ4_RAW",
+      compressors: COMPRESSORS,
+    });
+    writeFileSync(lz4RawPath, new Uint8Array(buffer));
+    console.log(`   ✅ lz4-raw.parquet (${rows} 行, LZ4_RAW 压缩)`);
+  } else {
+    console.log(`   ⏭️  lz4-raw.parquet 已存在`);
+  }
+
+  // 8. 空文件
   const emptyPath = join(parquetDir, "empty.parquet");
   if (!existsSync(emptyPath)) {
     const buffer = parquetWriteBuffer({

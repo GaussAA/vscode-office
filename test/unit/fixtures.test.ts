@@ -20,17 +20,33 @@ async function bytesOf(path: string): Promise<ArrayBuffer> {
 
 // ---------------------------------------------------------------- parquet
 
-const CODECS: Array<[file: string, rows: number, lastId: number]> = [
-  ["snappy", 1000, 1000],
-  ["gzip", 500, 500],
-  ["uncompressed", 300, 300],
-  ["lz4", 800, 800],
-  ["brotli", 600, 600],
+/**
+ * One row per codec fixture. The codec is asserted from the file's own metadata, not trusted
+ * from the fixture name: these five files were once all SNAPPY because the generator passed
+ * `compression:` instead of `codec:`, so "gzip opens" proved nothing about gzip.
+ *
+ * LZ4 has no Node compressor, so both LZ4 fixtures store literals only. They prove the codec
+ * name and the framing; the match-copy path is not fixture-backed.
+ */
+const CODECS: Array<[file: string, codec: string, rows: number, lastId: number]> = [
+  ["snappy", "SNAPPY", 1000, 1000],
+  ["gzip", "GZIP", 500, 500],
+  ["brotli", "BROTLI", 600, 600],
+  ["zstd", "ZSTD", 700, 700],
+  ["lz4", "LZ4", 800, 800],
+  ["lz4-raw", "LZ4_RAW", 400, 400],
+  ["uncompressed", "UNCOMPRESSED", 300, 300],
 ];
 
-for (const [name, rows, lastId] of CODECS) {
-  test(`parquet codec: ${name} opens, and its first and last rows decode`, async () => {
+for (const [name, codec, rows, lastId] of CODECS) {
+  test(`parquet codec: ${name} declares ${codec}, and its first and last rows decode`, async () => {
     const info = await openParquetFile(await bytesOf(`parquet/${name}.parquet`));
+    const declared = new Set(
+      info.metadata.row_groups.flatMap((group) =>
+        group.columns.map((column) => column.meta_data?.codec),
+      ),
+    );
+    assert.deepEqual([...declared], [codec], `${name}.parquet declares ${[...declared].join()}`);
     assert.equal(info.rowCount, rows);
 
     const first = await readParquetRows(info.file, info.metadata, 0, 1);
