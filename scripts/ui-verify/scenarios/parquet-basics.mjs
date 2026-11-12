@@ -14,7 +14,7 @@ import {
   unexpected,
 } from "../helpers.mjs";
 
-/** 10 scenario(s); the runner concatenates these lists. */
+/** 12 scenario(s); the runner concatenates these lists. */
 export default [
   {
     name: "parquet-empty",
@@ -517,7 +517,6 @@ export default [
   },
   {
     name: "parquet-profile-badges",
-    docs: "parquet-profile.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1&profile=1");
       const ready = await page.waitFor(
@@ -573,6 +572,93 @@ export default [
         `a silent host still claimed something about nulls: ${state.firstLabel}`,
       );
       return "no host answer, no number";
+    },
+  },
+  {
+    name: "parquet-profile-panel",
+    docs: "parquet-profile.png",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1&profile=1");
+      // Keyboard path: focus the first field row and press `i`.
+      const opened = await page.evaluate(`(() => {
+        const row = document.querySelector('.parquet-viewer__list-item');
+        row.focus();
+        row.dispatchEvent(new KeyboardEvent('keydown', { key: 'i', bubbles: true }));
+        return true;
+      })()`);
+      expect(opened, "could not focus the first field row");
+      const ready = await page.waitFor(`!!document.querySelector('.parquet-viewer__profile')`);
+      expect(ready, "the profile panel never opened");
+      // The automatic scan is a round trip; wait for its result, not only for the shell.
+      const scanned = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__profile-row').length === 2`,
+      );
+      expect(scanned, "the automatic scan produced no top-N");
+      const panel = json(
+        await page.evaluate(`JSON.stringify((() => {
+          const root = document.querySelector('.parquet-viewer__profile');
+          return {
+            name: root.querySelector('.parquet-viewer__profile-name')?.textContent ?? null,
+            values: [...root.querySelectorAll('.parquet-viewer__profile-value')].map(n => n.textContent),
+            counts: [...root.querySelectorAll('.parquet-viewer__profile-count')].map(n => n.textContent),
+            note: root.querySelector('.parquet-viewer__profile-note')?.textContent ?? null,
+            scanButton: [...root.querySelectorAll('button')].some(b => b.textContent.includes('Scan this column')),
+          };
+        })())`),
+      );
+      expect(panel.name === "id", `panel header is ${panel.name}`);
+      expect(panel.values.length === 2, `panel shows ${panel.values.length} values`);
+      expect(panel.values[0] === "service-a-0", `top value is ${panel.values[0]}`);
+      // The note has to admit how much of the file the scan covered.
+      expect(panel.note.includes("Scanned"), `note is ${panel.note}`);
+      expect(panel.note.includes("98 distinct"), `note is ${panel.note}`);
+      // Esc closes and puts focus back on the row that opened it.
+      await page.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+      const closed = await page.waitFor(`!document.querySelector('.parquet-viewer__profile')`);
+      expect(closed, "Escape did not close the panel");
+      const focus = json(
+        await page.evaluate(
+          `JSON.stringify({ column: document.activeElement?.dataset?.column ?? null })`,
+        ),
+      );
+      expect(focus.column === "id", `focus returned to ${focus.column}`);
+      // Reopen and leave it open: this scenario supplies the documentation screenshot, and a
+      // screenshot of a closed panel documents nothing.
+      await page.evaluate(
+        `document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'i', bubbles: true }))`,
+      );
+      await page.waitFor(`document.querySelectorAll('.parquet-viewer__profile-row').length === 2`);
+      return `top-N ${panel.values[0]} ×${panel.counts[0]}, note admits coverage, Esc returns focus`;
+    },
+  },
+  {
+    name: "parquet-profile-missing-column",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1&profile=1");
+      // Mouse path on the `active` badge: no statistics, so the scan must be asked for, not assumed.
+      await page.evaluate(`(() => {
+        const badges = document.querySelectorAll('.parquet-viewer__list-null');
+        badges[2].click();
+      })()`);
+      const ready = await page.waitFor(`!!document.querySelector('.parquet-viewer__profile')`);
+      expect(ready, "clicking a badge did not open the panel");
+      const before = json(
+        await page.evaluate(`JSON.stringify({
+          name: document.querySelector('.parquet-viewer__profile-name')?.textContent ?? null,
+          scanButton: [...document.querySelectorAll('.parquet-viewer__profile button')].some(b => b.textContent === 'Scan this column'),
+          rows: document.querySelectorAll('.parquet-viewer__profile-row').length,
+        })`),
+      );
+      expect(before.name === "active", `panel header is ${before.name}`);
+      expect(before.scanButton === true, "a column without statistics started scanning on its own");
+      expect(before.rows === 0, `a scan happened before it was asked for: ${before.rows} rows`);
+      await page.evaluate(`[...document.querySelectorAll('.parquet-viewer__profile button')]
+        .find(b => b.textContent === 'Scan this column')?.click()`);
+      const scanned = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__profile-row').length === 2`,
+      );
+      expect(scanned, "the explicit scan never produced a top-N");
+      return "no statistics: explicit scan, then top-N";
     },
   },
 ];

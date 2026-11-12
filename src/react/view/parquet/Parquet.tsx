@@ -8,13 +8,19 @@ import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
-import type { ParquetProfile, ParquetProfilePayload } from "@/common/parquetProfileTypes";
+import type {
+  ParquetColumnScan,
+  ParquetColumnScanPayload,
+  ParquetProfile,
+  ParquetProfilePayload,
+} from "@/common/parquetProfileTypes";
 import { ParquetSession } from "./parquetSession.ts";
 import { describeParquetFailure } from "./parquetError.ts";
 import {
   PARQUET_CHUNK_SIZE,
   openParquetFile,
   readParquetRows,
+  type ParquetColumnInfo,
   type ParquetFileInfo,
 } from "./parquetParser.ts";
 import { parquetAntdTheme } from "./parquetAntdTheme.ts";
@@ -25,6 +31,7 @@ import { type CellCursor, type TableRow } from "./parquetCell.tsx";
 import ParquetTopBar from "./ParquetTopBar.tsx";
 import ParquetPager from "./ParquetPager.tsx";
 import ParquetSchema from "./ParquetSchema.tsx";
+import ParquetColumnPanel from "./ParquetColumnPanel.tsx";
 import ParquetInspector from "./ParquetInspector.tsx";
 import ParquetGuard from "./ParquetGuard.tsx";
 import ParquetErrorPane from "./ParquetErrorPane.tsx";
@@ -59,6 +66,17 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    */
   const [profile, setProfile] = useState<ParquetProfile | null>(null);
   const profileRequest = useRef(0);
+  /**
+   * The column whose profile panel is docked above the bottom bar.
+   *
+   * One panel at a time; it closes when a cell is inspected, because both panels occupy the
+   * same slot and two of them would overlap.
+   */
+  const [profilePanel, setProfilePanel] = useState<{ column: ParquetColumnInfo } | null>(null);
+  const [columnScan, setColumnScan] = useState<ParquetColumnScan | null>(null);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const scanRequest = useRef(0);
   /** Row to return to once the page size is known; consumed by the measuring effect. */
   const restoreRowRef = useRef(0);
   /** True until the restored page has actually loaded; nothing may be persisted before that. */
@@ -139,6 +157,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const selectCell = useCallback((next: CellCursor | null) => {
     cursorRef.current = next;
     setCursor(next);
+    // Selecting a cell opens the value panel in the same dock the profile panel uses; close
+    // the profile here rather than in an effect, so the update has an event behind it.
+    setProfilePanel(null);
   }, []);
 
   // Every page change drops the inspector, the cursor and the jump highlight: they all
@@ -282,6 +303,73 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setProfile(payload.profile);
     });
   }, []);
+
+  useEffect(() => {
+    handler.on("parquetColumnScanData", (payload: ParquetColumnScanPayload | undefined) => {
+      if (!payload || payload.requestId !== scanRequest.current) return;
+      setScanLoading(false);
+      if (payload.scan) setColumnScan(payload.scan);
+      else setScanError(payload.error ?? "The scan failed.");
+    });
+  }, []);
+
+  /**
+   * Esc closes the panel and puts focus back on the field row that opened it.
+   *
+   * The row is found by `data-column` rather than through a ref map: the schema list owns its
+   * own roving focus, and handing it a map of 60 refs to save one query is not a trade worth
+   * making.
+   */
+  const closeProfilePanel = useCallback(() => {
+    const name = profilePanel?.column.name;
+    setProfilePanel(null);
+    setColumnScan(null);
+    setScanError(null);
+    setScanLoading(false);
+    if (!name) return;
+    const row = Array.from(
+      document.querySelectorAll<HTMLElement>(".parquet-viewer__list-item"),
+    ).find((element) => element.dataset.column === name);
+    row?.focus();
+  }, [profilePanel]);
+
+  const startScan = useCallback((column: ParquetColumnInfo) => {
+    scanRequest.current += 1;
+    setScanLoading(true);
+    setScanError(null);
+    setColumnScan(null);
+    handler.emit("parquetColumnScan", { requestId: scanRequest.current, name: column.name });
+  }, []);
+
+  const openProfilePanel = useCallback(
+    (column: ParquetColumnInfo) => {
+      // The value panel docks in the same slot; one of them at a time.
+      setInspected(null);
+      setProfilePanel({ column });
+      setColumnScan(null);
+      setScanError(null);
+      const stats = profile?.columns.find((candidate) => candidate.name === column.name);
+      // The scan decodes, so it stays opt-in where there is nothing to lose by asking first:
+      // a file whose writer omitted statistics gets an explicit "Scan this column".
+      if (stats === undefined || stats.state === "missing") {
+        setScanLoading(false);
+        return;
+      }
+      startScan(column);
+    },
+    [profile, startScan],
+  );
+
+  useEffect(() => {
+    if (!profilePanel) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeProfilePanel();
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [profilePanel, closeProfilePanel]);
 
   const jumpToRow = useCallback(
     (warnWhenEmpty = true) => {
@@ -599,6 +687,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               siderWidth={siderWidth}
               profile={profile}
               onFocusColumn={focusColumn}
+              onInspectColumn={openProfilePanel}
             />
             <div
               className="parquet-viewer__resizer"
@@ -647,6 +736,19 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             />
           </div>
           <footer className="parquet-viewer__bottombar">
+            {profilePanel && (
+              <ParquetColumnPanel
+                column={profilePanel.column}
+                stats={profile?.columns.find(
+                  (candidate) => candidate.name === profilePanel.column.name,
+                )}
+                scan={columnScan}
+                loading={scanLoading}
+                error={scanError}
+                onScan={() => startScan(profilePanel.column)}
+                onClose={closeProfilePanel}
+              />
+            )}
             <ParquetInspector
               inspected={inspected}
               inspection={inspection}

@@ -11,6 +11,8 @@ interface ParquetSchemaProps {
   /** Null while the host has not answered; every row then simply has no badge. */
   profile?: ParquetProfile | null;
   onFocusColumn: (position: number) => void;
+  /** Open the profile panel for this column (mouse on the badge, or `i` on the focused row). */
+  onInspectColumn: (column: ParquetColumnInfo) => void;
 }
 
 /**
@@ -34,6 +36,7 @@ export default function ParquetSchema({
   siderWidth,
   profile,
   onFocusColumn,
+  onInspectColumn,
 }: ParquetSchemaProps) {
   const [fieldFilter, setFieldFilter] = useState("");
   const [fieldCursor, setFieldCursor] = useState(0);
@@ -108,8 +111,16 @@ export default function ParquetSchema({
             Home: -Infinity,
             End: Infinity,
           };
+          const target = visibleColumns[fieldCursor];
           const move = keys[event.key];
-          if (move === undefined) return;
+          if (move === undefined) {
+            // `i` inspects the focused field; the row's own activation is still the jump.
+            if ((event.key === "i" || event.key === "I") && target) {
+              event.preventDefault();
+              onInspectColumn(target.column);
+            }
+            return;
+          }
           event.preventDefault();
           const last = Math.max(0, visibleColumns.length - 1);
           const next = Math.max(
@@ -120,9 +131,9 @@ export default function ParquetSchema({
             ),
           );
           setFieldCursor(next);
-          const target = visibleColumns[next];
-          if (target) {
-            onFocusColumn(target.position);
+          const moved = visibleColumns[next];
+          if (moved) {
+            onFocusColumn(moved.position);
             const item = event.currentTarget.querySelectorAll<HTMLElement>(
               ".parquet-viewer__list-item",
             )[next];
@@ -161,6 +172,7 @@ export default function ParquetSchema({
               aria-selected={active}
               aria-label={summary ? `${label} — ${summary}` : label}
               title={`${column.name} · ${column.type}`}
+              data-column={column.name}
               tabIndex={index === fieldCursor ? 0 : -1}
               onFocus={() => setFieldCursor(index)}
               onClick={() => onFocusColumn(position)}
@@ -172,7 +184,16 @@ export default function ParquetSchema({
                 {column.name}
               </span>
               {badge && (
-                <span className="parquet-viewer__list-null" aria-hidden="true">
+                <span
+                  className="parquet-viewer__list-null"
+                  aria-hidden="true"
+                  onClick={(event) => {
+                    // Mouse convenience only: an interactive element inside the row button
+                    // would be invalid HTML, so the keyboard path is `i` on the focused row.
+                    event.stopPropagation();
+                    onInspectColumn(column);
+                  }}
+                >
                   {badge}
                 </span>
               )}

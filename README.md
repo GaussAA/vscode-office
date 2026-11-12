@@ -60,7 +60,9 @@ Reading is lazy and stays usable on big files:
 - **A column profile in the sidebar.** Each field reports its share of null rows, read from the
   file's row-group statistics — footer metadata, never a column decode. A file written without
   statistics says so instead of showing `0%`, a partial answer is labelled partial, and a nested
-  column is left unprofiled because leaf statistics do not describe a row.
+  column is left unprofiled because leaf statistics do not describe a row. Click the badge (or
+  press `i` on the focused field) for that column's top values and counts: the scan decodes only
+  that column, stops after 200,000 rows, and the panel says how much it covered.
 
 ![Parquet types](docs/screenshots/parquet-types.png)
 

@@ -512,6 +512,10 @@ function parquetStub(fixtures) {
    * `?profile=1` turns it on; without the flag the fake host stays silent, which is the
    * control case — a viewer must not invent null rates when the host never answers.
    */
+  /**
+   * The fake host answers a column scan when `?profile=1` is set. The payload matches
+   * `/mixed.parquet`: 300 rows, two values in the top-N.
+   */
   const profile = {
     rowCount: 3000,
     rowGroupCount: 2,
@@ -548,6 +552,26 @@ function parquetStub(fixtures) {
         return;
       }
       const params = new URLSearchParams(location.search);
+      if (msg.type === 'parquetColumnScan') {
+        if (params.get('profile') !== '1') return;
+        const requestId = msg.content && msg.content.requestId;
+        const name = String(msg.content && msg.content.name);
+        setTimeout(function () {
+          window.postMessage({ type: 'parquetColumnScanData', content: { requestId: requestId, scan: {
+            name: name,
+            scanned: 300,
+            rowCount: 300,
+            complete: true,
+            distinct: 98,
+            nulls: 12,
+            top: [
+              { value: 'service-a-0', count: 40 },
+              { value: 'service-b-1', count: 31 },
+            ],
+          } } }, '*');
+        }, 40);
+        return;
+      }
       if (msg.type === 'parquetProfile') {
         if (params.get('profile') !== '1') return;
         const requestId = msg.content && msg.content.requestId;
