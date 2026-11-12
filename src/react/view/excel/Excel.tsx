@@ -127,6 +127,8 @@ function ExcelViewer() {
     /** The limit this file missed; local text and virtual text have different ones. */
     limit: number;
   } | null>(null);
+  /** The guard's second step: "Open anyway" arms a confirmation instead of loading at once. */
+  const [openAnywayArmed, setOpenAnywayArmed] = useState(false);
   /**
    * Set when a large text file is shown as a read-only window instead of the editable grid.
    * `null` means the grid path is in charge.
@@ -154,10 +156,34 @@ function ExcelViewer() {
   const pendingPayloadRef = useRef<ExcelOpenPayload | null>(null);
   /** Wired inside the boot effect; the guard panel lives outside it. */
   const loadPayloadRef = useRef<((payload: ExcelOpenPayload) => void) | null>(null);
+  /** Ctrl+F in the windowed view focuses this input, not the dead grid Find panel. */
+  const windowedFindInputRef = useRef<HTMLInputElement>(null);
+  /** The guard's safe action owns initial focus. */
+  const tooLargeSafeRef = useRef<HTMLButtonElement>(null);
+  /** Arming the retry moves focus to Cancel, so Enter cannot load by accident. */
+  const tooLargeCancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     findPanelRef.current = findPanel;
   }, [findPanel]);
+
+  useEffect(() => {
+    if (!tooLarge) return;
+    setOpenAnywayArmed(false);
+    const frame = requestAnimationFrame(() => tooLargeSafeRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [tooLarge]);
+
+  useEffect(() => {
+    if (!tooLarge || !openAnywayArmed) return;
+    const frame = requestAnimationFrame(() => tooLargeCancelRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [openAnywayArmed, tooLarge]);
+
+  const cancelOpenAnyway = useCallback(() => {
+    setOpenAnywayArmed(false);
+    requestAnimationFrame(() => tooLargeSafeRef.current?.focus());
+  }, []);
 
   const adaptiveColorMode = colorMode === "adaptive";
   const themedDark = adaptiveColorMode && vscodeDark;
@@ -232,6 +258,7 @@ function ExcelViewer() {
     const payload = pendingPayloadRef.current;
     if (!payload) return;
     forcedRef.current = true;
+    setOpenAnywayArmed(false);
     setTooLarge(null);
     setLoading(true);
     if (payload.scheme === "file" || payload.bufferBase64 || payload.buffer?.length) {
@@ -370,6 +397,11 @@ function ExcelViewer() {
       }
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyF") {
         e.preventDefault();
+        if (windowSource) {
+          windowedFindInputRef.current?.focus();
+          windowedFindInputRef.current?.select();
+          return;
+        }
         if (findPanelRef.current) {
           if (findPanelRef.current !== "find") {
             setFindPanel("find");
@@ -382,6 +414,10 @@ function ExcelViewer() {
       }
       if ((e.ctrlKey || e.metaKey) && e.code === "KeyH") {
         e.preventDefault();
+        if (windowSource) {
+          windowedFindInputRef.current?.focus();
+          return;
+        }
         setFindPanel(readOnlyRef.current ? "find" : "replace");
         return;
       }
@@ -392,7 +428,7 @@ function ExcelViewer() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleAutoFitColumns, handleSave, handleSaveAs]);
+  }, [handleAutoFitColumns, handleSave, handleSaveAs, windowSource]);
 
   useEffect(() => {
     const container = document.getElementById("container");
@@ -635,28 +671,47 @@ function ExcelViewer() {
         </div>
       )}
       {tooLarge && !loading && (
-        <div className="excel-too-large">
+        <div
+          className="excel-too-large"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="excel-too-large-title"
+          aria-describedby="excel-too-large-body"
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && openAnywayArmed) {
+              event.stopPropagation();
+              cancelOpenAnyway();
+            }
+          }}
+        >
           <div className="excel-too-large-panel">
             <svg
               className="excel-too-large-icon"
-              width="44"
-              height="44"
-              viewBox="0 0 44 44"
+              width="28"
+              height="28"
+              viewBox="0 0 28 28"
               fill="none"
               aria-hidden
             >
-              <circle cx="22" cy="22" r="20" stroke="currentColor" strokeWidth="1.8" />
               <path
-                d="M15 27l6-12 6 12"
+                d="M7 3.5h9l5 5v16H7z"
                 stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
+                strokeWidth="1.5"
                 strokeLinejoin="round"
               />
-              <path d="M18.5 23h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path
+                d="M16 3.5v5h5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              <path d="M14 12v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <circle cx="14" cy="21" r="1" fill="currentColor" />
             </svg>
-            <h2 className="excel-too-large-title">{t("viewer.tooLargeTitle")}</h2>
-            <p className="excel-too-large-body">
+            <h2 className="excel-too-large-title" id="excel-too-large-title">
+              {t("viewer.tooLargeTitle")}
+            </h2>
+            <p className="excel-too-large-body" id="excel-too-large-body">
               {t(
                 "viewer.tooLargeBody",
                 tooLarge.name,
@@ -664,14 +719,44 @@ function ExcelViewer() {
                 formatBytes(tooLarge.limit),
               )}
             </p>
+            {openAnywayArmed && (
+              <p className="excel-too-large-confirm">{t("viewer.tooLargeConfirm")}</p>
+            )}
             <div className="excel-too-large-actions">
-              <Button type="primary" onClick={handleOpenAnyway}>
-                {t("viewer.tooLargeOpen")}
-              </Button>
-              {isCsvLikeExt(tooLarge.ext) && (
-                <Button onClick={() => handler.emit("editInVSCode", true)}>
-                  {t("viewer.tooLargeOpenInVSCode")}
-                </Button>
+              <button
+                ref={tooLargeSafeRef}
+                type="button"
+                className="excel-too-large-action excel-too-large-action--primary"
+                onClick={() => handler.emit("editInVSCode", true)}
+              >
+                {t("viewer.tooLargeOpenInVSCode")}
+              </button>
+              {!openAnywayArmed ? (
+                <button
+                  type="button"
+                  className="excel-too-large-action excel-too-large-action--secondary"
+                  onClick={() => setOpenAnywayArmed(true)}
+                >
+                  {t("viewer.tooLargeOpen")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="excel-too-large-action excel-too-large-action--danger"
+                  onClick={handleOpenAnyway}
+                >
+                  {t("viewer.tooLargeConfirmOpen")}
+                </button>
+              )}
+              {openAnywayArmed && (
+                <button
+                  ref={tooLargeCancelRef}
+                  type="button"
+                  className="excel-too-large-action excel-too-large-action--ghost"
+                  onClick={cancelOpenAnyway}
+                >
+                  {t("button.cancel")}
+                </button>
               )}
             </div>
           </div>
@@ -680,7 +765,7 @@ function ExcelViewer() {
       {readOnly && !loading && !loadError && !tooLarge && !windowSource && (
         <div className="excel-readonly-banner">{t("viewer.readonlyBanner")}</div>
       )}
-      {findPanel && !loading && !loadError && !tooLarge && (
+      {findPanel && !loading && !loadError && !tooLarge && !windowSource && (
         <FindReplacePanel
           ref={findReplacePanelRef}
           spreadSheet={activeSpreadsheet}
@@ -758,9 +843,10 @@ function ExcelViewer() {
           onSelectSheet={handleSelectSheet}
           fileName={pendingPayloadRef.current?.fileName ?? ""}
           onOpenInVSCode={() => handler.emit("editInVSCode", true)}
+          findInputRef={windowedFindInputRef}
         />
       )}
-      {!loading && !loadError && (
+      {!loading && !loadError && !windowSource && !tooLarge && (
         <button
           type="button"
           className="dark-mode-toggle"

@@ -25,6 +25,8 @@ body:has(.excel-app) {
   width: 100vw;
   height: 100vh;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background-color: white;
   font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
@@ -513,69 +515,140 @@ body:has(.excel-app) {
     color: var(--vscode-foreground, #333);
 
     &-panel {
-      width: min(580px, 100%);
+      width: min(560px, 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: clamp(12px, 2vw, 18px);
-      padding: clamp(28px, 4vw, 44px);
+      gap: 12px;
+      padding: 32px;
       text-align: center;
-      border: 1px solid var(--vscode-editorWidget-border, rgba(0, 0, 0, 0.12));
-      border-radius: 10px;
+      border: 0;
+      border-radius: 8px;
       background: var(--vscode-editorWidget-background, #f8f9fa);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+      box-shadow: 0 8px 32px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.16));
     }
 
     &-icon {
       color: var(--vscode-editorWarning-foreground, #bf8803);
-      opacity: 0.9;
       flex-shrink: 0;
     }
 
     &-title {
       margin: 0;
-      font-size: clamp(16px, 2vw, 20px);
+      font-size: 18px;
       font-weight: 600;
       line-height: 1.35;
       color: var(--vscode-foreground, #1a1a1a);
     }
 
-    &-body {
+    &-body,
+    &-confirm {
       margin: 0;
       max-width: 46em;
-      font-size: clamp(12px, 1.3vw, 14px);
+      font-size: 13px;
       line-height: 1.6;
       color: var(--vscode-descriptionForeground, #666);
     }
 
+    &-confirm {
+      color: var(--vscode-editorWarning-foreground, #bf8803);
+      font-weight: 500;
+    }
+
     &-actions {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
       justify-content: center;
       margin-top: 4px;
     }
+
+    &-action {
+      height: 30px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+
+      &:focus-visible {
+        outline: 1px solid var(--vscode-focusBorder, #0078d4);
+        outline-offset: 2px;
+      }
+
+      &--primary {
+        background: var(--vscode-button-background, #0e639c);
+        color: var(--vscode-button-foreground, #ffffff);
+
+        &:hover {
+          background: var(--vscode-button-hoverBackground, #1177bb);
+        }
+      }
+
+      &--secondary {
+        background: var(
+          --vscode-button-secondaryBackground,
+          color-mix(
+            in srgb,
+            var(--vscode-editorWidget-background, #f8f9fa) 88%,
+            var(--vscode-foreground, #333333)
+          )
+        );
+        color: var(--vscode-button-secondaryForeground, var(--vscode-foreground, #333333));
+
+        &:hover {
+          background: var(
+            --vscode-button-secondaryHoverBackground,
+            color-mix(
+              in srgb,
+              var(--vscode-editorWidget-background, #f8f9fa) 82%,
+              var(--vscode-foreground, #333333)
+            )
+          );
+        }
+      }
+
+      &--danger {
+        background: transparent;
+        color: var(--vscode-errorForeground, #f14c4c);
+        box-shadow: inset 0 0 0 1px
+          color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 55%, transparent);
+
+        &:hover {
+          background: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 12%, transparent);
+        }
+      }
+
+      &--ghost {
+        background: transparent;
+        color: var(--vscode-descriptionForeground, #9d9d9d);
+
+        &:hover {
+          background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
+        }
+      }
+    }
   }
 
   .excel-readonly-banner {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 999;
+    position: relative;
+    flex: 0 0 auto;
+    z-index: 1;
     padding: 4px 12px;
-    font-size: 12px;
+    font-size: 11px;
     text-align: center;
-    color: #5c4b00;
-    background: #fff8e1;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    color: var(--vscode-descriptionForeground, #666);
+    background: var(--vscode-editorWidget-background, #f8f9fa);
+    border-bottom: 0;
     pointer-events: none;
   }
 
-  body.office-dark & .excel-readonly-banner {
-    color: #e8d48b;
-    background: rgba(92, 75, 0, 0.35);
-    border-bottom-color: rgba(255, 255, 255, 0.08);
+  > #container {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
   }
 
   --excel-selection: rgb(33, 186, 69);

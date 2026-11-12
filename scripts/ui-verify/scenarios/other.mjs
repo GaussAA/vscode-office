@@ -98,6 +98,64 @@ export default [
       await page.navigate(`${base}/harness-route?route=excel&guard=1`);
       const panel = await page.waitFor(`!!document.querySelector('.excel-too-large')`, 15000);
       expect(panel, "the size guard did not render for an oversized file");
+      await page.sleep(100);
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                text: document.querySelector('.excel-too-large')?.innerText ?? '',
+                grid: !!document.querySelector('#container .x-spreadsheet'),
+                role: document.querySelector('.excel-too-large')?.getAttribute('role') ?? '',
+                modal: document.querySelector('.excel-too-large')?.getAttribute('aria-modal') ?? '',
+                active: document.activeElement?.textContent?.trim() ?? '',
+                toggle: !!document.querySelector('.dark-mode-toggle'),
+                buttons: [...document.querySelectorAll('.excel-too-large button')].map(b => b.textContent.trim()),
+            })`),
+      );
+      expect(/huge\.csv/.test(state.text), `panel does not name the file: ${state.text}`);
+      expect(/900\.0 MB/.test(state.text), `panel does not show the file size: ${state.text}`);
+      expect(/200\.0 MB/.test(state.text), `panel does not show the limit: ${state.text}`);
+      expect(state.role === "dialog", `guard is not a dialog: ${state.role}`);
+      expect(state.modal === "true", "guard is not modal");
+      expect(state.active === "Open in VS Code", `safe action does not own focus: ${state.active}`);
+      expect(!state.toggle, "the floating theme toggle still overlaps the guard");
+      expect(!state.grid, "the grid rendered anyway — the guard must not parse the file");
+      expect(
+        state.buttons.includes("Open anyway") && state.buttons.includes("Open in VS Code"),
+        `guard actions: ${state.buttons.join(" / ")}`,
+      );
+
+      // Arming the retry must not leave Enter pointed at the memory bet.
+      await page.evaluate(`[...document.querySelectorAll('.excel-too-large button')]
+                .find(b => b.textContent.trim() === 'Open anyway')?.click()`);
+      await page.sleep(120);
+      const armed = json(
+        await page.evaluate(`JSON.stringify({
+                active: document.activeElement?.textContent?.trim() ?? '',
+                confirm: document.querySelector('.excel-too-large-confirm')?.innerText ?? '',
+            })`),
+      );
+      expect(armed.active === "Cancel", `arming the retry focused ${armed.active}`);
+      expect(/9×/.test(armed.confirm), `confirmation does not name the cost: ${armed.confirm}`);
+      await page.evaluate(`[...document.querySelectorAll('.excel-too-large button')]
+                .find(b => b.textContent.trim() === 'Cancel')?.click()`);
+      await page.sleep(120);
+      expect(
+        await page.evaluate(`document.activeElement?.textContent?.trim() === 'Open in VS Code'`),
+        "cancelling the retry did not return focus to the safe action",
+      );
+      expect(
+        await page.evaluate(`!document.querySelector('.excel-too-large-confirm')`),
+        "the retry confirmation survived cancellation",
+      );
+      return "guard is a focused dialog with a safe primary and a second-step retry";
+    },
+  },
+  {
+    name: "excel-large-file-force",
+    async run({ page, base }) {
+      // The stub claims 900 MB; the guard has to refuse before fetching anything.
+      await page.navigate(`${base}/harness-route?route=excel&guard=1`);
+      const panel = await page.waitFor(`!!document.querySelector('.excel-too-large')`, 15000);
+      expect(panel, "the size guard did not render for an oversized file");
       const state = json(
         await page.evaluate(`JSON.stringify({
                 text: document.querySelector('.excel-too-large')?.innerText ?? '',
@@ -113,10 +171,22 @@ export default [
         state.buttons.includes("Open anyway"),
         `missing the retry button: ${state.buttons.join(" / ")}`,
       );
+      expect(
+        state.buttons.includes("Open in VS Code"),
+        `missing the safe escape: ${state.buttons.join(" / ")}`,
+      );
 
-      // Answering "open anyway" really does load it.
+      // Answering "open anyway" arms a confirmation; only the second click may parse the file.
       await page.evaluate(`[...document.querySelectorAll('.excel-too-large button')]
                 .find(b => b.textContent.trim() === 'Open anyway')?.click()`);
+      const confirmed = await page.waitFor(
+        `[...document.querySelectorAll('.excel-too-large button')]
+                .some(b => b.textContent.trim() === 'Load full grid anyway')`,
+        5000,
+      );
+      expect(confirmed, "the retry did not ask for a second confirmation");
+      await page.evaluate(`[...document.querySelectorAll('.excel-too-large button')]
+                .find(b => b.textContent.trim() === 'Load full grid anyway')?.click()`);
       const grid = await page.waitFor(
         `!!document.querySelector('#container .x-spreadsheet')`,
         15000,
@@ -128,6 +198,16 @@ export default [
       expect(
         await page.evaluate(`!document.querySelector('.excel-too-large')`),
         "the guard stayed up",
+      );
+      const layout = json(
+        await page.evaluate(`JSON.stringify({
+                banner: document.querySelector('.excel-readonly-banner')?.getBoundingClientRect().toJSON() ?? null,
+                toolbar: document.querySelector('.x-spreadsheet-toolbar')?.getBoundingClientRect().toJSON() ?? null,
+            })`),
+      );
+      expect(
+        !layout.banner || !layout.toolbar || layout.banner.bottom <= layout.toolbar.top + 1,
+        "the read-only banner overlaps the spreadsheet toolbar",
       );
       return `refused 900 MB, loaded after confirm (${cells} grid)`;
     },
@@ -195,15 +275,74 @@ export default [
                 total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
                 banner: document.querySelector('.windowed-sheet__banner')?.innerText ?? '',
                 first: document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText ?? '',
+                header: document.querySelector('.windowed-sheet__head-label')?.innerText ?? '',
+                role: document.querySelector('.windowed-sheet__scroller')?.getAttribute('role') ?? '',
+                rowcount: document.querySelector('.windowed-sheet__scroller')?.getAttribute('aria-rowcount') ?? '',
+                toggle: !!document.querySelector('.dark-mode-toggle'),
             })`),
       );
       expect(!state.grid, "the editable grid mounted for a large file");
-      // The served file is a header row plus 5000 data rows; the window shows every record,
-      // like the grid does, so the header is row 1.
+      // The served file is a header row plus 5000 data rows; row 1 is the frozen header, so
+      // the body starts at row 2 while the total stays 5001.
       expect(state.total === 5001, `unexpected row count: ${state.total}`);
       expect(state.rows > 0 && state.rows < 80, `rendered ${state.rows} rows, expected a viewport`);
       expect(/Read-only/.test(state.banner), `missing the read-only banner: ${state.banner}`);
-      expect(state.first === "id", `unexpected first cell: ${state.first}`);
+      expect(state.header === "id", `unexpected frozen header: ${state.header}`);
+      expect(state.first === "r0", `unexpected first body cell: ${state.first}`);
+      expect(state.role === "grid", `missing grid semantics: ${state.role}`);
+      expect(state.rowcount === "5001", `unexpected aria-rowcount: ${state.rowcount}`);
+      expect(!state.toggle, "the floating theme toggle still overlaps the windowed chrome");
+
+      await page.evaluate(`(() => {
+                const scroller = document.querySelector('.windowed-sheet__scroller');
+                scroller.focus();
+                scroller.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: 'ArrowDown', bubbles: true, cancelable: true,
+                }));
+            })()`);
+      await page.sleep(120);
+      const keyboard = json(
+        await page.evaluate(`JSON.stringify({
+                active: document.querySelector('.windowed-sheet__scroller')?.getAttribute('aria-activedescendant') ?? '',
+                selected: document.querySelector('.windowed-sheet__cell--selected')?.innerText ?? '',
+                value: document.querySelector('.windowed-sheet__selection')?.innerText ?? '',
+            })`),
+      );
+      expect(keyboard.active === "windowed-sheet-cell-1-0", `active cell: ${keyboard.active}`);
+      expect(keyboard.selected === "r1", `keyboard-selected cell: ${keyboard.selected}`);
+      expect(/A3/.test(keyboard.value), `full-value channel: ${keyboard.value}`);
+
+      const resizeBefore = json(
+        await page.evaluate(`JSON.stringify({
+                count: document.querySelectorAll('.windowed-sheet__resizer').length,
+                width: document.querySelector('.windowed-sheet__resizer')?.parentElement
+                    ?.getBoundingClientRect().width ?? 0,
+            })`),
+      );
+      expect(resizeBefore.count === 8, `expected 8 column resizers, got ${resizeBefore.count}`);
+      await page.evaluate(`(() => {
+                const handle = document.querySelector('.windowed-sheet__resizer');
+                handle?.focus();
+                handle?.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: 'ArrowRight', bubbles: true, cancelable: true,
+                }));
+            })()`);
+      await page.sleep(100);
+      const resizeAfter = await page.evaluate(
+        `document.querySelector('.windowed-sheet__resizer')?.parentElement
+                ?.getBoundingClientRect().width ?? 0`,
+      );
+      expect(
+        resizeAfter > resizeBefore.width + 4,
+        `column resize did not widen the track: ${resizeBefore.width} -> ${resizeAfter}`,
+      );
+      await page.evaluate(`(() => {
+                const handle = document.querySelector('.windowed-sheet__resizer');
+                handle?.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: 'Home', bubbles: true, cancelable: true,
+                }));
+            })()`);
+      await page.sleep(100);
 
       await page.evaluate(`(() => {
                 const scroller = document.querySelector('.windowed-sheet__scroller');
@@ -227,6 +366,21 @@ export default [
       await page.navigate(`${base}/harness-route?route=excel&window=1`);
       const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 15000);
       expect(ready, "the windowed view did not render");
+
+      // Ctrl+F must focus the inline Find, never mount the grid's dead FindReplacePanel.
+      await page.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'f', code: 'KeyF', ctrlKey: true, bubbles: true, cancelable: true,
+            }))`);
+      const shortcut = await page.waitFor(
+        `document.activeElement?.classList.contains('windowed-sheet__input')
+                    && document.activeElement?.getAttribute('aria-label') === 'Find'`,
+        5000,
+      );
+      expect(shortcut, "Ctrl+F did not focus the inline Find");
+      expect(
+        await page.evaluate(`!document.querySelector('.frp-panel')`),
+        "Ctrl+F mounted the legacy FindReplacePanel in the windowed view",
+      );
 
       await page.evaluate(`(() => {
                 const input = document.querySelectorAll('.windowed-sheet__input')[0];
@@ -271,6 +425,15 @@ export default [
         15000,
       );
       expect(jumped, "go-to-row never scrolled to row 3000");
+
+      // End the documented run on the match itself, not on the later jump.
+      await page.evaluate(`[...document.querySelectorAll('.windowed-sheet__btn')]
+                .find(b => b.textContent.trim() === 'Find')?.click()`);
+      const returned = await page.waitFor(
+        `[...document.querySelectorAll('.windowed-sheet__cell')].some(cell => cell.textContent === 'r4999')`,
+        15000,
+      );
+      expect(returned, "find did not return to the match");
       return `find: ${state.count}, ${state.marks} mark(s); jump: row 3000 visible`;
     },
   },
@@ -290,12 +453,14 @@ export default [
                 total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
                 sheets: [...document.querySelectorAll('.windowed-sheet__select option')].map(o => o.textContent),
                 first: document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText ?? '',
+                header: document.querySelector('.windowed-sheet__head-label')?.innerText ?? '',
             })`),
       );
       expect(!state.grid, "the editable grid mounted for a workbook");
       expect(state.total === 201, `unexpected row count: ${state.total}`);
       expect(state.rows > 0 && state.rows < 80, `rendered ${state.rows} rows`);
-      expect(state.first === "id", `unexpected first cell: ${state.first}`);
+      expect(state.header === "id", `unexpected frozen header: ${state.header}`);
+      expect(state.first === "0", `unexpected first body cell: ${state.first}`);
       expect(state.sheets.join(",") === "Data,Extra", `sheet picker: ${state.sheets.join(",")}`);
 
       await page.evaluate(`(() => {
@@ -305,7 +470,8 @@ export default [
                 select.dispatchEvent(new Event('change', { bubbles: true }));
             })()`);
       const switched = await page.waitFor(
-        `document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText === 'a'`,
+        `document.querySelector('.windowed-sheet__head-label')?.innerText === 'a'
+                    && document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText === 'b'`,
         15000,
       );
       expect(switched, "switching sheets did not show the second sheet");
@@ -313,6 +479,19 @@ export default [
         `Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0)`,
       );
       expect(total === 3, `second sheet has ${total} rows`);
+
+      // Leave the documented screenshot on the real Data sheet, not the tiny Extra sheet.
+      await page.evaluate(`(() => {
+                const select = document.querySelector('.windowed-sheet__select');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+                setter.call(select, '0');
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            })()`);
+      const restored = await page.waitFor(
+        `document.querySelector('.windowed-sheet__head-label')?.innerText === 'id'`,
+        15000,
+      );
+      expect(restored, "the workbook did not return to the Data sheet");
       return "201-row workbook windowed, sheet switch works";
     },
   },
@@ -329,15 +508,16 @@ export default [
                 total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
                 rows: document.querySelectorAll('.windowed-sheet__row').length,
                 first: document.querySelector('.windowed-sheet__row .windowed-sheet__cell')?.innerText ?? '',
-                second: [...document.querySelectorAll('.windowed-sheet__row')][1]
-                    ?.querySelectorAll('.windowed-sheet__cell')[1]?.innerText ?? '',
+                header: document.querySelector('.windowed-sheet__head-label')?.innerText ?? '',
+                second: document.querySelectorAll('.windowed-sheet__row .windowed-sheet__cell')[1]?.innerText ?? '',
             })`),
       );
       expect(!state.grid, "the editable grid mounted for a legacy workbook");
       expect(state.total === 51, `unexpected row count: ${state.total}`);
       expect(state.rows > 0 && state.rows < 80, `rendered ${state.rows} rows`);
-      expect(state.first === "id", `unexpected first cell: ${state.first}`);
-      expect(state.second === "legacy-0", `unexpected second row: ${state.second}`);
+      expect(state.header === "id", `unexpected frozen header: ${state.header}`);
+      expect(state.first === "0", `unexpected first body cell: ${state.first}`);
+      expect(state.second === "legacy-0", `unexpected second body cell: ${state.second}`);
       return `51-row .xls windowed through SheetJS`;
     },
   },

@@ -28,6 +28,7 @@ function OptionChip({
     <button
       type="button"
       className={`frp-chip${checked ? " frp-chip-active" : ""}`}
+      aria-pressed={checked}
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => onChange(!checked)}
       title={label}

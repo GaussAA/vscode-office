@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Excel: the windowed preview now freezes the file's first row as a column header, fills the
+  viewport width, and adds a selectable cell value bar, grid semantics with keyboard navigation
+  and copy, a live match count and a compact instrument-scale toolbar. The large-file guard
+  makes **Open in VS Code** the safe primary action, requires a second confirmation for
+  **Open anyway** and names the full-grid / ≈9× memory cost. The floating theme toggle is hidden
+  in the windowed and guard views, and Ctrl+F now focuses the inline Find.
+- Excel: the editable read-only banner is now in flow instead of covering the spreadsheet
+  toolbar; the documented guard, workbook and find screenshots show the state they name.
+
 ## [6.7.0] - 2026-11-11
 
 ### Added

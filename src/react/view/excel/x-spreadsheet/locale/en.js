@@ -156,14 +156,23 @@ export default {
     protectedCell: "Protected cells do not support this function",
     readonlyBanner: "Read-only — browse and find; use Save As to save changes",
     windowedBanner: "Read-only preview — large files open without editing",
+    windowedMode: "Read-only preview",
+    windowedHint: "— large files open without editing",
     matchesOne: "{} match",
     matchesMany: "{} matches",
     goToRow: "Go to row",
     go: "Go",
+    sheet: "Sheet",
+    resizeColumn: "Resize column",
+    copied: "Copied",
+    copyFailed: "Could not copy the cell value",
     tooLargeTitle: "This file is too large to preview automatically",
     tooLargeBody:
       "{} is {}. Previews above {} are not loaded until you ask: parsing a file this size can take many seconds and more than a gigabyte of memory.",
     tooLargeOpen: "Open anyway",
+    tooLargeConfirm:
+      "Loading it into the full grid can use about 9× its size in memory and may exhaust the renderer. Continue?",
+    tooLargeConfirmOpen: "Load full grid anyway",
     tooLargeOpenInVSCode: "Open in VS Code",
     formatCannotPreserveTitle: "Formatting cannot be preserved",
     formatCannotPreserveContent:

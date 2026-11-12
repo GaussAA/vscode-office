@@ -156,14 +156,23 @@ export default {
     protectedCell: "受保護的儲存格不支援此功能",
     readonlyBanner: "唯讀模式 — 可瀏覽與尋找，請使用「另存新檔」儲存變更",
     windowedBanner: "唯讀預覽 — 大檔案不提供編輯",
+    windowedMode: "唯讀預覽",
+    windowedHint: "— 大檔案不提供編輯",
     matchesOne: "{} 個符合",
     matchesMany: "{} 個符合",
+    sheet: "工作表",
+    resizeColumn: "調整欄寬",
+    copied: "已複製",
+    copyFailed: "無法複製儲存格內容",
     goToRow: "跳轉到列",
     go: "跳轉",
     tooLargeTitle: "檔案較大，未自動預覽",
     tooLargeBody:
       "{} 有 {}，超過預覽上限 {}。解析這種體積的檔案可能要數十秒並佔用上千兆記憶體，所以暫不自動載入。",
     tooLargeOpen: "仍然開啟",
+    tooLargeConfirm:
+      "載入完整網格可能佔用約 9 倍檔案大小的記憶體，並可能導致渲染器崩潰。仍要繼續？",
+    tooLargeConfirmOpen: "仍要載入完整網格",
     tooLargeOpenInVSCode: "在 VS Code 中開啟",
     formatCannotPreserveTitle: "格式將無法保留",
     formatCannotPreserveContent:
