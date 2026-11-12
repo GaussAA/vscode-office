@@ -18,6 +18,13 @@ import JsonlDetail, { type DetailMode } from "./JsonlDetail.tsx";
 import JsonlIndex from "./JsonlIndex.tsx";
 import { DEFAULT_LEFT_WIDTH, LEFT_MAX, LEFT_MIN } from "./jsonlLayout";
 import { loadJsonlPersisted, saveJsonlPersisted } from "./jsonlPersistence";
+import {
+  applyWindowReply,
+  emptyDirectoryWindow,
+  recenterWindow,
+  windowNeedsMore,
+  type DirectoryWindow,
+} from "./directoryWindow";
 import { formatBytes } from "./jsonlFormat.ts";
 import "./Jsonl.less";
 
@@ -38,15 +45,9 @@ export default function JsonlViewer() {
    * pair of a `Map` plus a `{start,end}` could disagree — a late reply extended the range
    * without filling the middle, and nothing ever asked for the hole.
    */
-  const [directory, setDirectory] = useState<{
-    start: number;
-    end: number;
-    items: JsonlEntrySummary[];
-  }>({
-    start: 0,
-    end: 0,
-    items: [],
-  });
+  const [directory, setDirectory] = useState<DirectoryWindow<JsonlEntrySummary>>(() =>
+    emptyDirectoryWindow(),
+  );
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState<JsonlEntryDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -114,8 +115,8 @@ export default function JsonlViewer() {
   /** Load a window of entries around `target`, keeping `target` in it. */
   const recenter = useCallback(
     (target: number, lineCount: number) => {
-      const begin = Math.max(0, Math.min(target - 100, Math.max(0, lineCount - JSONL_CHUNK_SIZE)));
-      requestRange(begin, Math.min(lineCount, begin + JSONL_CHUNK_SIZE), "replace", target);
+      const range = recenterWindow(target, lineCount, JSONL_CHUNK_SIZE);
+      requestRange(range.start, range.end, "replace", target);
     },
     [requestRange],
   );
@@ -158,7 +159,7 @@ export default function JsonlViewer() {
       }
       target = Math.max(0, Math.min(payload.lineCount - 1, target));
 
-      setDirectory({ start: 0, end: 0, items: [] });
+      setDirectory(emptyDirectoryWindow());
       setSelected(target);
       if (payload.lineCount === 0) {
         setDetail(null);
@@ -179,20 +180,16 @@ export default function JsonlViewer() {
       const mode = rangeMode.current.get(payload.requestId);
       if (!mode) return; // a reply nobody is waiting for any more
       rangeMode.current.delete(payload.requestId);
-      if (payload.requestId === rangeSeq.current) setChunkLoading(false);
-      // A replace that a newer replace has already superseded must not repaint the pane: the
-      // newer request owns the anchor guarantee for the row the user jumped to.
-      if (mode === "replace" && payload.requestId !== rangeSeq.current) return;
-      if (!payload.entries.length) return;
-
-      const end = payload.start + payload.entries.length;
-      setDirectory((prev) => {
-        if (mode === "replace") return { start: payload.start, end, items: payload.entries };
-        // An append is only valid when it continues the window; anything else is
-        // stale, and moving `end` would claim rows we never received.
-        if (payload.start !== prev.end) return prev;
-        return { start: prev.start, end, items: [...prev.items, ...payload.entries] };
-      });
+      const isNewest = payload.requestId === rangeSeq.current;
+      if (isNewest) setChunkLoading(false);
+      setDirectory((previous) =>
+        applyWindowReply(
+          previous,
+          { start: payload.start, items: payload.entries },
+          mode,
+          isNewest,
+        ),
+      );
     });
 
     handler.on("jsonlEntryData", (payload: JsonlEntryPayload) => {
@@ -277,7 +274,7 @@ export default function JsonlViewer() {
 
   const searchActive = query.trim().length > 0;
   const items = searchActive ? searchEntries : directory.items;
-  const hasMore = !searchActive && info !== null && directory.end < info.lineCount;
+  const hasMore = !searchActive && info !== null && windowNeedsMore(directory, info.lineCount);
 
   const jump = useCallback(() => {
     if (!info || info.lineCount === 0 || jumpValue == null) return;
