@@ -71,6 +71,8 @@ export default function JsonlViewer() {
   const rangeMode = useRef(new Map<number, "replace" | "append">());
   const entrySeq = useRef(0);
   const searchSeq = useRef(0);
+  /** A scan is running on the host; cancel it even if the render state has not caught up. */
+  const searchInFlight = useRef(false);
   const searchTimer = useRef<number | undefined>(undefined);
   const searchAutoSelected = useRef(false);
   const pendingJump = useRef<number | null>(null);
@@ -126,11 +128,15 @@ export default function JsonlViewer() {
     const previous = searchSeq.current;
     const requestId = ++searchSeq.current;
     // Tell the host to stop the old scan; ignoring its output would leave it running.
-    if (previous) handler.emit("jsonlSearchCancel", { requestId: previous });
+    if (previous && searchInFlight.current) {
+      handler.emit("jsonlSearchCancel", { requestId: previous });
+    }
+    searchInFlight.current = false;
     searchAutoSelected.current = false;
     setSearchEntries([]);
     setSearchMeta(null);
     if (!trimmed) return;
+    searchInFlight.current = true;
     setSearching(true);
     handler.emit("jsonlSearch", { requestId, query: trimmed });
   }, []);
@@ -155,6 +161,10 @@ export default function JsonlViewer() {
         setSearching(false);
         setSearchEntries([]);
         setSearchMeta(null);
+        if (searchInFlight.current) {
+          handler.emit("jsonlSearchCancel", { requestId: searchSeq.current });
+        }
+        searchInFlight.current = false;
         searchSeq.current++;
       }
       target = Math.max(0, Math.min(payload.lineCount - 1, target));
@@ -216,7 +226,10 @@ export default function JsonlViewer() {
         done: batch.done,
         capped: batch.capped,
       });
-      if (batch.done) setSearching(false);
+      if (batch.done) {
+        searchInFlight.current = false;
+        setSearching(false);
+      }
     });
 
     handler.emit("init");
@@ -225,7 +238,10 @@ export default function JsonlViewer() {
   const clearSearch = useCallback(() => {
     // Stop the host-side scan instead of letting it run to completion unread.
     const previous = searchSeq.current;
-    if (searching) handler.emit("jsonlSearchCancel", { requestId: previous });
+    if (searchInFlight.current) {
+      handler.emit("jsonlSearchCancel", { requestId: previous });
+    }
+    searchInFlight.current = false;
     // Reject batches already in flight. Without the bump a late batch can append results and
     // auto-select an entry after the user has left search mode.
     searchSeq.current++;
@@ -238,7 +254,7 @@ export default function JsonlViewer() {
       pendingJump.current = null;
       recenter(Math.max(0, Math.min(info.lineCount - 1, target)), info.lineCount);
     }
-  }, [info, recenter, searching]);
+  }, [info, recenter]);
 
   const handleQueryChange = useCallback(
     (next: string) => {

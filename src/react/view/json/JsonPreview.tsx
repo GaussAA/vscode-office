@@ -1,5 +1,5 @@
 import { ConfigProvider, Splitter, theme as antdTheme } from "antd";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { JsonlEntryDetail } from "../../../common/jsonlTypes.ts";
 import {
   JSON_RECORD_WINDOW,
@@ -235,12 +235,13 @@ export default function JsonPreview() {
   }, [query, searchEpoch]);
 
   const searchActive = query.trim().length > 0;
+  const deferredQuery = useDeferredValue(query);
   const arrayRoot = info?.rootKind === "array";
   const recordCount = info?.recordCount ?? 0;
   const pathResults = useMemo(() => {
     if (!searchActive || arrayRoot || !root || root.kind !== "value") return [];
-    return collectMatchPaths(root.value, query.trim());
-  }, [arrayRoot, query, root, searchActive]);
+    return collectMatchPaths(root.value, deferredQuery.trim());
+  }, [arrayRoot, deferredQuery, root, searchActive]);
 
   const handleQueryChange = useCallback((value: string) => {
     const term = value.trim();
