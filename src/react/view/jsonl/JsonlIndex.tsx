@@ -3,7 +3,7 @@ import type { DataNode } from "antd/es/tree";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { JsonlEntrySummary } from "../../../common/jsonlTypes.ts";
-import { ROW_HEIGHT, formatBytes } from "./jsonlFormat.ts";
+import { ROW_HEIGHT, formatBytes } from "../entry/entryFormat.ts";
 import { highlightRuns } from "../../common/highlight.ts";
 import { $t } from "../../i18n/i18nConfig.ts";
 

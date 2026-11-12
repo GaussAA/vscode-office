@@ -1,4 +1,4 @@
-import { makePathKey, pathToText, type PathSeg } from "../jsonl/jsonlFormat.ts";
+import { makePathKey, pathToText, type PathSeg } from "../entry/entryFormat.ts";
 
 export interface JsonPathMatch {
   key: string;

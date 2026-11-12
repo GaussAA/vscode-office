@@ -9,7 +9,7 @@ import {
   WRAP_NODE_LIMIT,
   fullValueText,
   makePathKey,
-} from "@/react/view/jsonl/jsonlFormat";
+} from "@/react/view/entry/entryFormat";
 import { highlightRuns } from "@/react/common/highlight";
 
 const objectOfSize = (size: number): Record<string, number> =>

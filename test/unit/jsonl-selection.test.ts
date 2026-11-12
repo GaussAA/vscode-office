@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { JSONL_VALUE_TEXT_LIMIT, type JsonlEntryDetail } from "@/common/jsonlTypes";
-import { makePathKey } from "@/react/view/jsonl/jsonlFormat";
+import { makePathKey } from "@/react/view/entry/entryFormat";
 import {
   collapsedChars,
   readActiveValue,
   readCopyPath,
   readPanel,
   readSelection,
-} from "@/react/view/jsonl/jsonlSelection";
+} from "@/react/view/entry/entrySelection";
 
 const base = {
   index: 0,

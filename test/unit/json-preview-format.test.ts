@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { collectMatchPaths, firstMatchKey } from "@/react/view/json/jsonPreviewFormat";
-import { readCopyPath, readSelection } from "@/react/view/jsonl/jsonlSelection";
+import { readCopyPath, readSelection } from "@/react/view/entry/entrySelection";
 import type { JsonlEntryDetail } from "@/common/jsonlTypes";
 
 test("firstMatchKey: key, string value, nested object and array", () => {

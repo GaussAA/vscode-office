@@ -3,7 +3,7 @@
  *
  * This module used to build antd `DataNode`s with JSX titles, which meant the interesting
  * part — how deep, how wide, when to truncate, whether to wrap — could only be exercised by
- * bundling React. It now returns plain data; rendering is one adapter in `JsonlDetail`.
+ * bundling React. It now returns plain data; rendering is one adapter in `EntryDetail`.
  */
 
 import { JSONL_VALUE_TEXT_LIMIT } from "@/common/jsonlTypes";
@@ -112,7 +112,7 @@ export function countNodes(value: unknown, limit = WRAP_NODE_LIMIT, maxDepth = M
   return capped ? limit + 1 : count;
 }
 
-/** One row of the detail tree, as data. Rendering lives in `JsonlDetail`. */
+/** One row of the detail tree, as data. Rendering lives in `EntryDetail`. */
 export interface NodeModel {
   key: string;
   path: PathSeg[];

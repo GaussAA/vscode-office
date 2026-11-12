@@ -8,12 +8,12 @@ import {
   readPathKey,
   typeLabel,
   valueAtPath,
-} from "./jsonlFormat.ts";
+} from "./entryFormat.ts";
 
 /**
  * The read model behind the detail's bottom bar.
  *
- * Selection used to be four `useMemo`s inside `JsonlDetail`: which value is selected, how it
+ * Selection used to be four `useMemo`s inside `EntryDetail`: which value is selected, how it
  * is addressed, how it previews, and whether a scalar root counts as selected without a tree
  * row. Those rules are pure, and the component is a poor place to test them; this module is
  * the seam.

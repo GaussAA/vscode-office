@@ -50,4 +50,4 @@ JSON 预览以**显式命令**打开，**不注册为 Viewer**：
 
 - 100 MB 数组 fixture（91.6 MB、50,000 条记录）在宿主侧测得：索引 0.49–1.37 s、100 条记录窗口 1–3 ms、单条详情 <1 ms、全文件搜索 63–114 ms；闸门预算分别为 6 s / 2 s / 8 s。
 - UI 场景覆盖记录列表虚拟化（500 条记录时 DOM <100 行）、记录搜索高亮、对象根路径搜索、buffer 标签、invalid / too-large / 空数组；真实 VS Code smoke 覆盖命令打开 webview 面板，并断言 `.json` 没有 custom editor 声明。
-- JSON 的 tree/value panel/keyboard 复用 `JsonlDetail`，只给它加了可选的 `entryLabel`、`highlight`、`revealKey`；JSONL 的既有场景保持通过。
+- JSON 的 tree/value panel/keyboard 复用 `EntryDetail`，只给它加了可选的 `entryLabel`、`highlight`、`revealKey`；JSONL 的既有场景保持通过。

@@ -40,7 +40,7 @@ row paints) keeps DevTools round-trip time out of the duration.
 
 The JSONL checks are host-side on purpose: indexing, window parsing and the whole-file scan
 happen in the extension host, so the browser harness cannot see them. The JSONL module bundles
-`jsonlFile.ts`, `jsonlSession.ts` and `jsonlFormat.ts` with esbuild into a temp directory and
+`jsonlFile.ts`, `jsonlSession.ts` and `entryFormat.ts` with esbuild into a temp directory and
 imports the ESM output. The window check asserts the **returned row count** (≤3 for 2 MB
 lines), not only time: that is the deterministic proof that the 4 MB budget is applied.
 

@@ -24,7 +24,7 @@ const JSONL_SEARCH_BUDGET_MS = 5_000;
 
 /**
  * Bundle the host-side JSONL services for Node. The entry points preserve their relative
- * output paths (`service/jsonlFile.mjs`, `react/view/jsonl/jsonlFormat.mjs`).
+ * output paths (`service/jsonlFile.mjs`, `react/view/entry/entryFormat.mjs`).
  */
 export async function loadJsonlHost() {
   const outdir = mkdtempSync(join(tmpdir(), "perf-jsonl-"));
@@ -32,7 +32,7 @@ export async function loadJsonlHost() {
     entryPoints: [
       join(repoRoot, "src/service/jsonlFile.ts"),
       join(repoRoot, "src/service/jsonlSession.ts"),
-      join(repoRoot, "src/react/view/jsonl/jsonlFormat.ts"),
+      join(repoRoot, "src/react/view/entry/entryFormat.ts"),
     ],
     outdir,
     outExtension: { ".js": ".mjs" },
@@ -47,7 +47,7 @@ export async function loadJsonlHost() {
     pathToFileURL(join(outdir, "service", "jsonlSession.mjs")).href
   );
   const formatModule = await import(
-    pathToFileURL(join(outdir, "react", "view", "jsonl", "jsonlFormat.mjs")).href
+    pathToFileURL(join(outdir, "react", "view", "entry", "entryFormat.mjs")).href
   );
   return {
     ...fileModule,

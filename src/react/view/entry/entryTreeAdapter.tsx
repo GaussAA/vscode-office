@@ -2,7 +2,7 @@ import type { DataNode } from "antd/es/tree";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { highlightRuns } from "../../common/highlight.ts";
 import type { JsonlEntryDetail } from "../../../common/jsonlTypes.ts";
-import { typeLabel, type NodeModel } from "./jsonlFormat";
+import { typeLabel, type NodeModel } from "./entryFormat";
 
 export function chipClass(entry: JsonlEntryDetail): string {
   switch (entry.kind) {

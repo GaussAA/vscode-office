@@ -18,17 +18,17 @@ import {
   preview,
   readPathKey,
   typeLabel,
-} from "./jsonlFormat.ts";
-import JsonlValuePanel from "./JsonlValuePanel.tsx";
-import { chipClass, chipLabel, toAntdNodes } from "./jsonlTreeAdapter.tsx";
-import { detailKeyAction } from "./jsonlKeys.ts";
+} from "./entryFormat.ts";
+import EntryValuePanel from "./EntryValuePanel.tsx";
+import { chipClass, chipLabel, toAntdNodes } from "./entryTreeAdapter.tsx";
+import { detailKeyAction } from "./entryKeys.ts";
 import {
   collapsedChars,
   readActiveValue,
   readCopyPath,
   readPanel,
   readSelection,
-} from "./jsonlSelection.ts";
+} from "./entrySelection.ts";
 
 export type DetailMode = "tree" | "raw";
 
@@ -51,7 +51,7 @@ interface Props {
 }
 
 /** Right pane: the full tree (or raw text) of exactly one entry. */
-export default function JsonlDetail({
+export default function EntryDetail({
   index,
   entry,
   loading,
@@ -396,7 +396,7 @@ export default function JsonlDetail({
   }
 
   const valuePanel = selection ? (
-    <JsonlValuePanel
+    <EntryValuePanel
       path={selection.panelPath}
       preview={selection.preview}
       typeLabel={selection.typeLabel}

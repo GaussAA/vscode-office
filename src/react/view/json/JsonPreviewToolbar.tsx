@@ -3,7 +3,7 @@ import { Button, Input } from "antd";
 import type { ReactNode } from "react";
 import type { JsonInfoPayload } from "../../../common/jsonPreviewTypes.ts";
 import { $t } from "../../i18n/i18nConfig.ts";
-import { formatBytes } from "../jsonl/jsonlFormat";
+import { formatBytes } from "../entry/entryFormat";
 
 interface JsonPreviewToolbarProps {
   info: JsonInfoPayload | null;

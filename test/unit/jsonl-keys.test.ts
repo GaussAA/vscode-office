@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { detailKeyAction, type DetailKeyInput } from "@/react/view/jsonl/jsonlKeys";
+import { detailKeyAction, type DetailKeyInput } from "@/react/view/entry/entryKeys";
 
 const base: DetailKeyInput = {
   key: "",

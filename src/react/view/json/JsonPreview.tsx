@@ -15,7 +15,7 @@ import { jsonViewerThemeTokens } from "../../common/jsonViewerTheme.ts";
 import { handler } from "../../util/vscode.ts";
 import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { $t } from "../../i18n/i18nConfig.ts";
-import JsonlDetail, { type DetailMode } from "../jsonl/JsonlDetail.tsx";
+import EntryDetail, { type DetailMode } from "../entry/EntryDetail.tsx";
 import JsonRecordList from "./JsonRecordList.tsx";
 import JsonPreviewToolbar from "./JsonPreviewToolbar.tsx";
 import JsonPreviewState from "./JsonPreviewState.tsx";
@@ -363,7 +363,7 @@ export default function JsonPreview() {
   }
 
   const detailElement = (
-    <JsonlDetail
+    <EntryDetail
       key={arrayRoot ? `record-${selected}` : `root-${info.cacheId}`}
       index={arrayRoot ? selected : 0}
       entry={arrayRoot ? detail : root}

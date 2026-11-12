@@ -14,7 +14,7 @@ import { jsonViewerThemeTokens } from "../../common/jsonViewerTheme.ts";
 import { handler } from "../../util/vscode.ts";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
-import JsonlDetail, { type DetailMode } from "./JsonlDetail.tsx";
+import EntryDetail, { type DetailMode } from "../entry/EntryDetail.tsx";
 import JsonlIndex from "./JsonlIndex.tsx";
 import { DEFAULT_LEFT_WIDTH, LEFT_MAX, LEFT_MIN } from "./jsonlLayout";
 import { loadJsonlPersisted, saveJsonlPersisted } from "./jsonlPersistence";
@@ -25,7 +25,7 @@ import {
   windowNeedsMore,
   type DirectoryWindow,
 } from "./directoryWindow";
-import { formatBytes } from "./jsonlFormat.ts";
+import { formatBytes } from "../entry/entryFormat.ts";
 import "./Jsonl.less";
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -436,7 +436,7 @@ export default function JsonlViewer() {
                 />
               </Splitter.Panel>
               <Splitter.Panel className="jsonl-splitter__panel">
-                <JsonlDetail
+                <EntryDetail
                   // Include the document: reopening a file on the same entry number must not
                   // inherit the previous tree's explicit expansion or selected key.
                   key={`${info?.cacheId ?? "pending"}:${selected}`}

@@ -1,7 +1,7 @@
 import { $t } from "../../i18n/i18nConfig.ts";
 import type { RefObject } from "react";
 import { JSONL_VALUE_TEXT_LIMIT } from "../../../common/jsonlTypes.ts";
-import type { ValueText } from "./jsonlFormat.ts";
+import type { ValueText } from "./entryFormat.ts";
 
 interface Props {
   path: string;
@@ -17,9 +17,9 @@ interface Props {
 
 /**
  * The docked selection bar under the tree. Presentational: the selection read model owns the
- * labels, and `JsonlDetail` owns the keyboard and the open state.
+ * labels, and `EntryDetail` owns the keyboard and the open state.
  */
-export default function JsonlValuePanel({
+export default function EntryValuePanel({
   path,
   preview,
   typeLabel,

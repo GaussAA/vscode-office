@@ -2,7 +2,7 @@ import { Button } from "antd";
 import type { JsonInfoPayload } from "../../../common/jsonPreviewTypes.ts";
 import { JSON_MAX_ARRAY_BYTES, JSON_MAX_OBJECT_BYTES } from "../../../common/jsonPreviewTypes.ts";
 import { $t } from "../../i18n/i18nConfig.ts";
-import { formatBytes } from "../jsonl/jsonlFormat";
+import { formatBytes } from "../entry/entryFormat";
 
 type StateKind = "loading" | "invalid" | "too-large" | "empty";
 
