@@ -353,6 +353,8 @@ function ExcelViewer() {
   useEffect(() => {
     const container = document.getElementById("container");
     if (!container) return;
+    let viewTimer: ReturnType<typeof setTimeout> | undefined;
+    let activeSpreadsheet: Spreadsheet | null = null;
 
     const initSpreadsheet = async (buffer: ArrayBuffer, payload: any, seq: number) => {
       const fileReadOnly = payload.readOnly === true;
@@ -391,6 +393,7 @@ function ExcelViewer() {
         col: { len: viewColLen },
         view: { height: () => window.innerHeight - 2 },
       });
+      activeSpreadsheet = spreadSheet;
       spreadSheetRef.current = spreadSheet;
       gridReadyRef.current = true;
       setActiveSpreadsheet(spreadSheet);
@@ -418,7 +421,12 @@ function ExcelViewer() {
         }
       });
       const persistView = () => {
-        saveViewState(documentCacheIdRef.current, spreadSheet.getSelection());
+        // Cell selection fires continuously while arrowing; one write per gesture is enough.
+        if (viewTimer) clearTimeout(viewTimer);
+        viewTimer = setTimeout(() => {
+          viewTimer = undefined;
+          saveViewState(documentCacheIdRef.current, spreadSheet.getSelection());
+        }, 200);
       };
       spreadSheet.on("cell-selected", () => {
         persistView();
@@ -579,6 +587,12 @@ function ExcelViewer() {
     themeObserver.observe(document.head, { childList: true, subtree: true });
 
     return () => {
+      if (viewTimer) {
+        clearTimeout(viewTimer);
+        if (activeSpreadsheet) {
+          saveViewState(documentCacheIdRef.current, activeSpreadsheet.getSelection());
+        }
+      }
       // An in-flight parse must not mount into a detached container after unmount.
       invalidateOpen(openSeqRef);
       gridReadyRef.current = false;
