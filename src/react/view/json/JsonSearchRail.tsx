@@ -35,18 +35,18 @@ function marked(text: string, query: string) {
 /** Search results replace the record rail; one row per matching record (or path). */
 export default function JsonSearchRail({ rows, selectedKey, query, loading, onSelect }: Props) {
   const { ref, onScroll, start, end, totalHeight } = useVirtualWindow(rows.length);
+  const selectedIndex = rows.findIndex((row) => row.key === selectedKey);
 
   useEffect(() => {
     const element = ref.current;
     if (!element || !selectedKey) return;
-    const selectedIndex = rows.findIndex((row) => row.key === selectedKey);
     if (selectedIndex < 0) return;
     const top = selectedIndex * JSON_ROW_HEIGHT;
     if (top < element.scrollTop) element.scrollTop = top;
     else if (top + JSON_ROW_HEIGHT > element.scrollTop + element.clientHeight) {
       element.scrollTop = top + JSON_ROW_HEIGHT - element.clientHeight;
     }
-  }, [ref, rows, selectedKey]);
+  }, [ref, rows, selectedIndex, selectedKey]);
 
   if (rows.length === 0) {
     return (
@@ -56,6 +56,36 @@ export default function JsonSearchRail({ rows, selectedKey, query, loading, onSe
     );
   }
 
+  const select = (next: number) => {
+    if (next < 0 || next >= rows.length) return;
+    onSelect(rows[next]);
+    ref.current?.focus();
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (rows.length === 0) return;
+    const page = Math.max(1, Math.floor((ref.current?.clientHeight ?? 0) / JSON_ROW_HEIGHT) - 1);
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      select(Math.min(rows.length - 1, Math.max(0, selectedIndex) + 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      select(Math.max(0, (selectedIndex < 0 ? rows.length : selectedIndex) - 1));
+    } else if (event.key === "PageDown") {
+      event.preventDefault();
+      select(Math.min(rows.length - 1, Math.max(0, selectedIndex) + page));
+    } else if (event.key === "PageUp") {
+      event.preventDefault();
+      select(Math.max(0, (selectedIndex < 0 ? rows.length : selectedIndex) - page));
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      select(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      select(rows.length - 1);
+    }
+  };
+
   const rendered = [];
   for (let index = start; index < end; index++) {
     const row = rows[index];
@@ -63,6 +93,7 @@ export default function JsonSearchRail({ rows, selectedKey, query, loading, onSe
     rendered.push(
       <div
         key={row.key}
+        id={`json-search-${index}`}
         role="option"
         aria-selected={active}
         aria-posinset={index + 1}
@@ -95,8 +126,11 @@ export default function JsonSearchRail({ rows, selectedKey, query, loading, onSe
       ref={ref}
       className="json-search-list"
       role="listbox"
+      tabIndex={0}
       aria-label={$t("json.results")}
+      aria-activedescendant={selectedIndex >= 0 ? `json-search-${selectedIndex}` : undefined}
       onScroll={onScroll}
+      onKeyDown={onKeyDown}
     >
       <div style={{ height: totalHeight, position: "relative" }}>{rendered}</div>
     </div>

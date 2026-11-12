@@ -43,12 +43,19 @@ export default function JsonRecordList({ count, labels, selected, onSelect, onNe
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (count === 0) return;
+    const page = Math.max(1, Math.floor((ref.current?.clientHeight ?? 0) / JSON_ROW_HEIGHT) - 1);
     if (event.key === "ArrowDown") {
       event.preventDefault();
       select(Math.min(count - 1, selected + 1));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       select(Math.max(0, selected - 1));
+    } else if (event.key === "PageDown") {
+      event.preventDefault();
+      select(Math.min(count - 1, selected + page));
+    } else if (event.key === "PageUp") {
+      event.preventDefault();
+      select(Math.max(0, selected - page));
     } else if (event.key === "Home") {
       event.preventDefault();
       select(0);

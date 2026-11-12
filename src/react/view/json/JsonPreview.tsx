@@ -8,16 +8,15 @@ import {
   JSON_RECORD_WINDOW,
   type JsonInfoPayload,
   type JsonRecordSummary,
+  type JsonRecordsPayload,
   type JsonRootPayload,
   type JsonSearchBatch,
   type JsonSearchRecord,
 } from "../../../common/jsonPreviewTypes.ts";
+import { savePersistedState } from "../../common/persistedState.ts";
+import { jsonViewerThemeTokens } from "../../common/jsonViewerTheme.ts";
 import { handler } from "../../util/vscode.ts";
-import {
-  getVscodeThemeColor,
-  isVscodeDarkTheme,
-  observeVscodeThemeChange,
-} from "../../util/vscodeTheme.ts";
+import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { $t } from "../../i18n/i18nConfig.ts";
 import JsonlDetail, { type DetailMode } from "../jsonl/JsonlDetail.tsx";
 import { formatBytes } from "../jsonl/jsonlFormat.ts";
@@ -32,25 +31,31 @@ const LEFT_PREFIX = "json-preview:left:";
 const SEARCH_DEBOUNCE_MS = 250;
 
 interface SearchMeta {
-  done: boolean;
   capped: boolean;
+}
+
+function clampLeft(value: number): number {
+  return value >= 220 && value <= 560 ? value : DEFAULT_LEFT_WIDTH;
 }
 
 function loadLeft(cacheId: string): number {
   try {
-    const value = Number(localStorage.getItem(LEFT_PREFIX + cacheId));
-    return value >= 220 && value <= 560 ? value : DEFAULT_LEFT_WIDTH;
-  } catch {
-    return DEFAULT_LEFT_WIDTH;
-  }
+    const raw = localStorage.getItem(LEFT_PREFIX + cacheId);
+    if (!raw) return DEFAULT_LEFT_WIDTH;
+    try {
+      const parsed = JSON.parse(raw) as { left?: unknown };
+      if (parsed && typeof parsed.left === "number") return clampLeft(parsed.left);
+    } catch {
+      // Legacy entries were a bare number.
+      return clampLeft(Number(raw));
+    }
+  } catch {}
+  return DEFAULT_LEFT_WIDTH;
 }
 
 function saveLeft(cacheId: string, value: number): void {
-  try {
-    localStorage.setItem(LEFT_PREFIX + cacheId, String(value));
-  } catch {
-    // persistence is a convenience; never break the preview
-  }
+  // Bounded storage: one key per document, evicted by the shared helper.
+  savePersistedState(LEFT_PREFIX, cacheId, { left: clampLeft(value) });
 }
 
 /** A command-opened, read-only JSON inspection surface. It is not a custom editor. */
@@ -60,26 +65,35 @@ export default function JsonPreview() {
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState<JsonlEntryDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [labels, setLabels] = useState<Map<number, JsonRecordSummary>>(new Map());
+  const [labels] = useState<Map<number, JsonRecordSummary>>(() => new Map());
+  const [, setLabelsVersion] = useState(0);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<JsonSearchRecord[]>([]);
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
-  const [revealKey, setRevealKey] = useState<string | null>(null);
+  /** Bumped when a refresh must re-run the same query against the new bytes. */
+  const [searchEpoch, setSearchEpoch] = useState(0);
+  const [reveal, setReveal] = useState<{ key: string; nonce: number } | null>(null);
+  const revealSeq = useRef(0);
+  const revealAt = useCallback((key: string) => {
+    revealSeq.current++;
+    setReveal({ key, nonce: revealSeq.current });
+  }, []);
   const [mode, setMode] = useState<DetailMode>("tree");
   const [actionsHost, setActionsHost] = useState<HTMLDivElement | null>(null);
-  const [dark, setDark] = useState(isVscodeDarkTheme);
+  const dark = useVscodeDarkTheme();
 
   const infoRef = useRef<JsonInfoPayload | null>(null);
   const selectedRef = useRef(0);
   const queryRef = useRef("");
   const entrySeq = useRef(0);
   const recordsSeq = useRef(0);
+  /** Which document a record-window request belongs to; replies for an old one are ignored. */
+  const recordsEpoch = useRef(0);
+  const requestEpoch = useRef(new Map<number, number>());
   const searchSeq = useRef(0);
   const searchRequestId = useRef(0);
   const requestedWindows = useRef(new Set<number>());
-
-  useEffect(() => observeVscodeThemeChange(() => setDark(isVscodeDarkTheme())), []);
 
   useEffect(() => {
     selectedRef.current = selected;
@@ -100,6 +114,7 @@ export default function JsonPreview() {
       if (requestedWindows.current.has(windowStart)) continue;
       requestedWindows.current.add(windowStart);
       const requestId = ++recordsSeq.current;
+      requestEpoch.current.set(requestId, recordsEpoch.current);
       handler.emit("jsonRecords", {
         requestId,
         start: windowStart,
@@ -118,21 +133,47 @@ export default function JsonPreview() {
 
   useEffect(() => {
     const onInfo = (payload: JsonInfoPayload) => {
+      const previous = infoRef.current;
+      const sameFile = previous?.cacheId === payload.cacheId;
+      const sameShape = sameFile && previous?.rootKind === payload.rootKind;
       infoRef.current = payload;
       requestedWindows.current = new Set();
+      recordsEpoch.current++;
+      requestEpoch.current.clear();
+      if (searchRequestId.current) {
+        handler.emit("jsonSearchCancel", { requestId: searchRequestId.current });
+        searchRequestId.current = 0;
+      }
+      searchSeq.current++;
       setInfo(payload);
-      setLabels(new Map());
-      setSelected(0);
-      selectedRef.current = 0;
+      labels.clear();
+      setLabelsVersion((version) => version + 1);
       setDetail(null);
       setRoot(null);
       setDetailLoading(payload.rootKind === "array");
-      setRevealKey(null);
-      setQuery("");
-      queryRef.current = "";
-      setResults([]);
-      setSearching(false);
-      setSearchMeta(null);
+      setReveal(null);
+      if (sameShape) {
+        const next =
+          payload.rootKind === "array"
+            ? Math.min(Math.max(0, selectedRef.current), Math.max(0, payload.recordCount - 1))
+            : 0;
+        setSelected(next);
+        selectedRef.current = next;
+        // A reload of the same document keeps the query; the effect below re-runs it against
+        // the new bytes. Results themselves belong to the old bytes and are dropped.
+        setResults([]);
+        setSearchMeta(null);
+        setSearching(payload.rootKind === "array" && queryRef.current.trim() !== "");
+        setSearchEpoch((epoch) => epoch + 1);
+      } else {
+        setSelected(0);
+        selectedRef.current = 0;
+        setQuery("");
+        queryRef.current = "";
+        setResults([]);
+        setSearching(false);
+        setSearchMeta(null);
+      }
       if (payload.rootKind === "array") requestWindows(0, JSON_RECORD_WINDOW);
     };
 
@@ -143,13 +184,12 @@ export default function JsonPreview() {
         setDetail(payload.entry);
         setDetailLoading(false);
       })
-      .on("jsonRecordsData", (payload: { records?: JsonRecordSummary[] }) => {
-        if (!payload.records?.length) return;
-        setLabels((previous) => {
-          const next = new Map(previous);
-          for (const record of payload.records ?? []) next.set(record.index, record);
-          return next;
-        });
+      .on("jsonRecordsData", (payload: JsonRecordsPayload) => {
+        if (requestEpoch.current.get(payload.requestId) !== recordsEpoch.current) return;
+        requestEpoch.current.delete(payload.requestId);
+        if (!payload.records.length) return;
+        for (const record of payload.records) labels.set(record.index, record);
+        setLabelsVersion((version) => version + 1);
       })
       .on(
         "jsonRecordData",
@@ -159,11 +199,12 @@ export default function JsonPreview() {
           setDetail(payload.entry);
           setDetailLoading(false);
           const term = queryRef.current;
-          setRevealKey(
+          const key =
             term && payload.entry?.kind === "value"
               ? firstMatchKey(payload.entry.value, term)
-              : null,
-          );
+              : null;
+          if (key) revealAt(key);
+          else setReveal(null);
         },
       )
       .on("jsonSearchBatch", (batch: JsonSearchBatch) => {
@@ -171,12 +212,12 @@ export default function JsonPreview() {
         if (batch.records.length) {
           setResults((previous) => [...previous, ...batch.records]);
         }
-        setSearchMeta({ done: batch.done, capped: batch.capped });
+        setSearchMeta({ capped: batch.capped });
         if (batch.done) setSearching(false);
       });
 
     handler.emit("init");
-  }, [requestWindows]);
+  }, [labels, requestWindows, revealAt]);
 
   useEffect(() => {
     if (info?.rootKind !== "array") return;
@@ -186,13 +227,14 @@ export default function JsonPreview() {
   useEffect(() => {
     const term = query.trim();
     if (!term || infoRef.current?.rootKind !== "array") return;
+    setSearching(true);
     const timer = window.setTimeout(() => {
       const requestId = ++searchSeq.current;
       searchRequestId.current = requestId;
       handler.emit("jsonSearch", { requestId, query: term });
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [query]);
+  }, [query, searchEpoch]);
 
   const searchActive = query.trim().length > 0;
   const arrayRoot = info?.rootKind === "array";
@@ -213,7 +255,7 @@ export default function JsonPreview() {
     }
     setResults([]);
     setSearchMeta(null);
-    setRevealKey(null);
+    setReveal(null);
     setSearching(term.length > 0 && infoRef.current?.rootKind === "array");
   }, []);
 
@@ -233,11 +275,11 @@ export default function JsonPreview() {
     ? searchRows.some((row) => row.index === selected)
       ? `record-${selected}`
       : undefined
-    : (revealKey ?? undefined);
+    : reveal?.key;
 
   const onSelectRecord = useCallback((index: number) => {
     setSelected(index);
-    setRevealKey(null);
+    setReveal(null);
   }, []);
 
   const onSelectSearchRow = useCallback(
@@ -246,42 +288,23 @@ export default function JsonPreview() {
         const same = row.index === selectedRef.current;
         const term = queryRef.current;
         setSelected(row.index);
-        setRevealKey(
-          same && term && detail?.kind === "value" ? firstMatchKey(detail.value, term) : null,
-        );
+        if (same && term && detail?.kind === "value") {
+          const key = firstMatchKey(detail.value, term);
+          if (key) revealAt(key);
+        } else {
+          setReveal(null);
+        }
       } else {
-        setRevealKey(row.key);
+        revealAt(row.key);
       }
     },
-    [detail],
+    [detail, revealAt],
   );
 
   const openText = () => handler.emit("jsonOpenText");
   const reload = () => handler.emit("jsonReload");
 
-  const themeTokens = {
-    colorBgContainer: "transparent",
-    colorBgElevated: getVscodeThemeColor(
-      "--vscode-editorWidget-background",
-      dark ? "#202020" : "#ffffff",
-    ),
-    colorBorder: getVscodeThemeColor("--vscode-panel-border", dark ? "#2b2b2b" : "#e5e5e5"),
-    colorText: getVscodeThemeColor("--vscode-foreground", dark ? "#cccccc" : "#3b3b3b"),
-    colorTextSecondary: getVscodeThemeColor(
-      "--vscode-descriptionForeground",
-      dark ? "#9d9d9d" : "#717171",
-    ),
-    colorPrimary: getVscodeThemeColor("--vscode-button-background", "#0078d4"),
-    colorError: getVscodeThemeColor("--vscode-errorForeground", "#f14c4c"),
-    colorWarning: getVscodeThemeColor("--vscode-editorWarning-foreground", "#cca700"),
-    fontFamily: getVscodeThemeColor(
-      "--vscode-font-family",
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    ),
-    fontSize: Number.parseInt(getVscodeThemeColor("--vscode-font-size", "13px"), 10) || 13,
-    controlHeightSM: 22,
-    borderRadius: 4,
-  };
+  const themeTokens = useMemo(() => jsonViewerThemeTokens(dark), [dark]);
 
   const meta = info
     ? arrayRoot
@@ -418,7 +441,7 @@ export default function JsonPreview() {
 
   const detailElement = (
     <JsonlDetail
-      key={arrayRoot ? `record-${selected}` : "root"}
+      key={arrayRoot ? `record-${selected}` : `root-${info.cacheId}`}
       index={arrayRoot ? selected : 0}
       entry={arrayRoot ? detail : root}
       loading={arrayRoot ? detailLoading : !root}
@@ -427,7 +450,8 @@ export default function JsonPreview() {
       actionsHost={actionsHost}
       entryLabel={arrayRoot ? `[${selected}]` : "root"}
       highlight={searchActive ? query.trim() : undefined}
-      revealKey={revealKey}
+      revealKey={reveal?.key}
+      revealNonce={reveal?.nonce}
     />
   );
 
@@ -461,7 +485,7 @@ export default function JsonPreview() {
 
   const body = rail ? (
     <Splitter
-      key={`${info.cacheId}:${searchActive ? "search" : "records"}`}
+      key={info.cacheId}
       className="jsonl-splitter"
       onResize={(sizes) => saveLeft(info.cacheId, sizes[0] ?? DEFAULT_LEFT_WIDTH)}
     >
