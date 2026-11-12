@@ -14,7 +14,7 @@ import {
   unexpected,
 } from "../helpers.mjs";
 
-/** 8 scenario(s); the runner concatenates these lists. */
+/** 10 scenario(s); the runner concatenates these lists. */
 export default [
   {
     name: "parquet-empty",
@@ -513,6 +513,66 @@ export default [
         `the teal icons do not share one token: ${JSON.stringify(tokens)}`,
       );
       return `icon tokens alias 6 chart colours (blue ${tokens.blue})`;
+    },
+  },
+  {
+    name: "parquet-profile-badges",
+    docs: "parquet-profile.png",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1&profile=1");
+      const ready = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-null').length === 4`,
+      );
+      expect(ready, "the profile badges never rendered");
+      const state = json(
+        await page.evaluate(`JSON.stringify((() => {
+                const rows = [...document.querySelectorAll('.parquet-viewer__list-item')];
+                return {
+                    badges: rows.map(row => row.querySelector('.parquet-viewer__list-null')?.textContent ?? null),
+                    labels: rows.map(row => row.getAttribute('aria-label')),
+                };
+            })())`),
+      );
+      // id 0%, name 12% (360 of 3000), active missing, score partial — four distinct answers.
+      expect(state.badges[0] === "null 0%", `id badge is ${state.badges[0]}`);
+      expect(state.badges[1] === "null 12%", `name badge is ${state.badges[1]}`);
+      expect(state.badges[2] === "—", `missing statistics badge is ${state.badges[2]}`);
+      expect(state.badges[3] === "—", `partial statistics badge is ${state.badges[3]}`);
+      // The badge is aria-hidden; the sentence has to reach the row's accessible name.
+      expect(
+        state.labels[1].includes("12% of rows are null"),
+        `the field row never says what 12% means: ${state.labels[1]}`,
+      );
+      expect(
+        state.labels[2].includes("No row-group statistics"),
+        `a missing-statistics row appears to have statistics: ${state.labels[2]}`,
+      );
+      expect(
+        state.labels[3].includes("Partial statistics"),
+        `a partial answer reads as a complete one: ${state.labels[3]}`,
+      );
+      return "null share + missing + partial, each spoken in aria-label";
+    },
+  },
+  {
+    name: "parquet-profile-silent-host",
+    async run({ page, base }) {
+      // No `profile=1`: the fake host never answers, so the rail must stay bare. A viewer that
+      // paints `0%` from an absent answer would fail here.
+      await openParquet(page, base, "?mixed=1");
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                badges: document.querySelectorAll('.parquet-viewer__list-null').length,
+                firstLabel: document.querySelector('.parquet-viewer__list-item')?.getAttribute('aria-label') ?? null,
+            })`),
+      );
+      expect(state.badges === 0, `a silent host still produced ${state.badges} badge(s)`);
+      expect(
+        state.firstLabel && !state.firstLabel.includes("null"),
+        `a silent host still claimed something about nulls: ${state.firstLabel}`,
+      );
+      return "no host answer, no number";
     },
   },
 ];

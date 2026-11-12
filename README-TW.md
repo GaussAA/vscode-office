@@ -49,6 +49,9 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解碼。
 - **URL 可直接點擊**：整個值都是 `http(s)` URL 的儲存格會透過擴充功能宿主在瀏覽器開啟；
   其他協定、帶帳號密碼的 URL 不會被開啟。
 - **點擊左側欄位跳到對應欄**：表格水平捲動到該欄並留下淡色高亮，不改變列、分頁或篩選。
+- **側欄給每一欄一個畫像**：每個欄位顯示空值佔比，讀的是 row-group statistics（footer 中繼資料，
+  不解碼任何一欄）。writer 沒寫統計時明說而不是顯示 `0%`，只有部分資料列群組帶統計時標為
+  partial，巢狀欄位不做畫像——葉節點統計不是一列的值。
 
 ![Parquet 型別著色](docs/screenshots/parquet-types.png)
 
@@ -58,6 +61,8 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解碼。
 檢視器跟隨 VS Code 主題——包括以前在深色檢視下仍是淺色的 antd 控件。沒有獨立的明暗切換開關。
 
 ![淺色主題下的 parquet](docs/screenshots/parquet-light.png)
+
+![欄位畫像](docs/screenshots/parquet-profile.png)
 
 ### JSONL / NDJSON：目錄 + 樹狀，而不是表格
 

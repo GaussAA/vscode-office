@@ -506,6 +506,37 @@ function parquetStub(fixtures) {
   // A virtual document arrives inline; the host sends it base64-encoded because a `number[]`
   // costs 5-8x the file on the JSON bridge. `?inline=1` exercises that decode path.
   const inlineBase64 = readFileSync(fixtures.mixed).toString("base64");
+  /**
+   * The canned answer to a profile request, matching `/mixed.parquet` column for column.
+   *
+   * `?profile=1` turns it on; without the flag the fake host stays silent, which is the
+   * control case — a viewer must not invent null rates when the host never answers.
+   */
+  const profile = {
+    rowCount: 3000,
+    rowGroupCount: 2,
+    hasAnyStatistics: true,
+    columns: [
+      {
+        name: "id",
+        type: "INT32",
+        state: "available",
+        groupsWithStatistics: 2,
+        nullCount: 0,
+        nullRatio: 0,
+      },
+      {
+        name: "name",
+        type: "STRING",
+        state: "available",
+        groupsWithStatistics: 2,
+        nullCount: 360,
+        nullRatio: 0.12,
+      },
+      { name: "active", type: "BOOLEAN", state: "missing", groupsWithStatistics: 0 },
+      { name: "score", type: "DOUBLE", state: "partial", groupsWithStatistics: 1 },
+    ],
+  };
   return `<script>
 (function () {
   window.__openExternalCalls = [];
@@ -517,6 +548,14 @@ function parquetStub(fixtures) {
         return;
       }
       const params = new URLSearchParams(location.search);
+      if (msg.type === 'parquetProfile') {
+        if (params.get('profile') !== '1') return;
+        const requestId = msg.content && msg.content.requestId;
+        setTimeout(function () {
+          window.postMessage({ type: 'parquetProfileData', content: { requestId: requestId, profile: ${JSON.stringify(profile)} } }, '*');
+        }, 40);
+        return;
+      }
       const guard = params.get('guard') === '1';
       // "Open anyway" for a gated virtual document: the host reads it and sends it inline.
       if (guard && msg.type === 'openForce') {

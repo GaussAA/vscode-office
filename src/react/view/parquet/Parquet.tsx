@@ -8,6 +8,7 @@ import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
+import type { ParquetProfile, ParquetProfilePayload } from "@/common/parquetProfileTypes";
 import { ParquetSession } from "./parquetSession.ts";
 import { describeParquetFailure } from "./parquetError.ts";
 import {
@@ -49,6 +50,15 @@ type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBas
 function ParquetViewer({ dark }: { dark: boolean }) {
   const { message } = App.useApp();
   const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);
+  /**
+   * The column profile, or null while it is unknown.
+   *
+   * It arrives from the host after the file opens (ADR-0020): the webview never reads the
+   * footer itself, and a failed profile simply leaves every row without a badge rather than
+   * showing a zero.
+   */
+  const [profile, setProfile] = useState<ParquetProfile | null>(null);
+  const profileRequest = useRef(0);
   /** Row to return to once the page size is known; consumed by the measuring effect. */
   const restoreRowRef = useRef(0);
   /** True until the restored page has actually loaded; nothing may be persisted before that. */
@@ -200,6 +210,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setLoading(true);
       setError(null);
       setFileInfo(null);
+      setProfile(null);
       fileInfoRef.current = null;
       sessionRef.current?.reset();
       sessionRef.current = null;
@@ -223,6 +234,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
         fileInfoRef.current = info;
         setFileInfo(info);
+        // Ask the host for the profile in the same turn the file opens. Request ids are
+        // monotonic, so a reply that belongs to the previous document is ignored instead of
+        // painting another file's null rates.
+        profileRequest.current += 1;
+        handler.emit("parquetProfile", { requestId: profileRequest.current });
         // Come back to where this document was left. The page cannot be computed yet — a page
         // is a screenful, and this document has not been measured — so remember the row and let
         // the measuring effect turn it into a page.
@@ -256,6 +272,15 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     };
     window.addEventListener("keydown", onFind);
     return () => window.removeEventListener("keydown", onFind);
+  }, []);
+
+  // Registered once: the webview bridge keeps one listener per event, so re-registering on
+  // every document would be a no-op at best.
+  useEffect(() => {
+    handler.on("parquetProfileData", (payload: ParquetProfilePayload | undefined) => {
+      if (!payload || payload.requestId !== profileRequest.current) return;
+      setProfile(payload.profile);
+    });
   }, []);
 
   const jumpToRow = useCallback(
@@ -572,6 +597,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               columns={fileInfo.columns}
               activeColumn={activeColumn}
               siderWidth={siderWidth}
+              profile={profile}
               onFocusColumn={focusColumn}
             />
             <div

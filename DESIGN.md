@@ -288,7 +288,8 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 侧栏的 schema 字段行是一个 `<button>`，整行可点，`aria-pressed` 表示当前列。
 
 - **Shape:** 6px 圆角、`6px 8px` 内距、最小高度 32px、行间 1px 空隙。
-- **Contents:** 类型图标（14px，按类型取色）+ 字段名（12px/500，单行省略）+ 类型徽标（右对齐）。
+- **Contents:** 类型图标（14px，按类型取色）+ 字段名（12px/500，单行省略）+ 空值率徽标（有统计时）+ 类型徽标（右对齐）。
+- **Null share:** `null 12%`（9.5px 等宽、muted、无底色、`tabular-nums`）。它是视觉徽标，无统计时退成 `—`；整句走字段行的 `aria-label`（"Jump to column name — 12% of rows are null"），所以读者不需要猜这个百分数是什么。低于 1% 且非零显示 `null <1%`，不四舍五入成 0。
 - **States:** hover 用 `list-hoverBackground`；激活行用 Signal Blue 12% 混入底色、字段名转 Signal Blue；`focus-visible` 用 `outline-offset: -1px`（贴内边，避免与相邻行粘连）。
 
 ### Type badges

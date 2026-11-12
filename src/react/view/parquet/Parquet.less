@@ -517,6 +517,20 @@ body:has(.parquet-app) {
   font-weight: 500;
 }
 
+/* The null share answers the question the schema rail is opened for. Visual only: the field
+   row's aria-label carries the same sentence, so it stays quiet — mono, muted, no background,
+   and it never takes width from the column name (`flex-shrink: 0` is on the badge, the name
+   owns the ellipsis). */
+.parquet-viewer__list-null {
+  flex-shrink: 0;
+  color: var(--pv-muted);
+  font-family: var(--pv-mono);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 /* Two lines instead of one clipped one: `TIMESTAMP_MILLIS` and `TIMESTAMP_MICROS` were becoming
    the same `TIMESTAMP_MIL…`, and the badge is the thing that makes the legend unnecessary. */
 .parquet-viewer__list-type {

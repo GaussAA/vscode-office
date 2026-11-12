@@ -57,6 +57,10 @@ Reading is lazy and stays usable on big files:
   extension host; other schemes and URLs with credentials are never opened.
 - **Click a schema field to jump to its column.** The table scrolls horizontally to that
   column and leaves a quiet tint behind, without changing rows or filters.
+- **A column profile in the sidebar.** Each field reports its share of null rows, read from the
+  file's row-group statistics — footer metadata, never a column decode. A file written without
+  statistics says so instead of showing `0%`, a partial answer is labelled partial, and a nested
+  column is left unprofiled because leaf statistics do not describe a row.
 
 ![Parquet types](docs/screenshots/parquet-types.png)
 
@@ -67,6 +71,8 @@ The viewer follows the VS Code theme — including the antd widgets, which used 
 under a dark view. There is no separate light/dark switch.
 
 ![Parquet in a light theme](docs/screenshots/parquet-light.png)
+
+![Column profile](docs/screenshots/parquet-profile.png)
 
 ### JSONL / NDJSON: a directory, not a grid
 

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Parquet: the schema sidebar reports each column's null share, read from row-group statistics —
+  footer metadata, never a column decode. A file whose writer omitted statistics says so instead
+  of showing `0%`; an answer that covers only some row groups is labelled partial; nested columns
+  are not profiled, because leaf statistics do not describe a row. The field row's accessible
+  name carries the same sentence, so the percentage is never a bare number.
+
 ## [6.8.0] - 2026-11-12
 
 ### Added
