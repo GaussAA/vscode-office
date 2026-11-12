@@ -663,6 +663,63 @@ function excelGuardStub() {
 }
 
 /**
+ * Bridge for the save branches: a small editable grid whose postMessage traffic is recorded.
+ * `saveDone` is sent back by the stub, so dirty state can be observed without a real host.
+ */
+function excelEditStub(mode = "direct") {
+  const file =
+    mode === "format"
+      ? { ext: ".xls", fileName: "edit.xls", path: "/edit.xls", size: 4096 }
+      : {
+          ext: ".csv",
+          fileName: mode === "readonly" ? "readonly.csv" : "edit.csv",
+          path: "/edit.csv",
+          size: 128,
+        };
+  return `<script>
+(function () {
+  window.__excelMessages = [];
+  window.__saveDone = false;
+  const api = {
+    postMessage(msg) {
+      if (!msg) return;
+      if (msg.type === 'init') {
+        setTimeout(function () {
+          window.postMessage({ type: 'open', content: {
+            ext: '${file.ext}',
+            fileName: '${file.fileName}',
+            path: '${file.path}',
+            scheme: 'file',
+            size: ${file.size},
+            readOnly: ${mode === "readonly" ? "true" : "false"},
+            documentCacheId: 'demo:edit-${mode}',
+          } }, '*');
+        }, 60);
+        return;
+      }
+      const content = msg.content || {};
+      window.__excelMessages.push({
+        type: msg.type,
+        ext: content.ext || '',
+        base64Length: (content.contentBase64 || '').length,
+        byteLength: Array.isArray(content.content) ? content.content.length : 0,
+      });
+      if (msg.type === 'save') {
+        setTimeout(function () {
+          window.__saveDone = true;
+          window.postMessage({ type: 'saveDone' }, '*');
+        }, 30);
+      }
+    },
+    getState() { return undefined; },
+    setState() {},
+  };
+  window.acquireVsCodeApi = function () { return api; };
+})();
+</script>`;
+}
+
+/**
  * Bridge for the large-file windowed view: a `file:` payload just under the size guard, so the
  * viewer picks the read-only window instead of the editable grid.
  */
@@ -720,6 +777,20 @@ function windowXls() {
 }
 
 const WINDOW_XLS = windowXls();
+
+/** A small editable legacy workbook: formatted save must ask before writing. */
+function editXls() {
+  const data = [
+    ["id", "name"],
+    ["1", "alpha"],
+    ["2", "beta"],
+  ];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Data");
+  return XLSX.write(workbook, { type: "buffer", bookType: "biff8" });
+}
+
+const EDIT_XLS = editXls();
 
 /**
  * Bridge for a workbook that must open in the windowed view: 12 MB claimed, just under the
@@ -812,6 +883,8 @@ export function startHarness(fixtures, port = 0) {
               : "jsonl";
       const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
       const guard = path === "/harness-route" && url.searchParams.get("guard") === "1";
+      const editParam = path === "/harness-route" ? (url.searchParams.get("edit") ?? "") : "";
+      const edit = ["direct", "format", "readonly"].includes(editParam) ? editParam : "";
       const windowed = path === "/harness-route" && url.searchParams.get("window") === "1";
       const windowRows = Math.min(
         Math.max(Number(url.searchParams.get("windowRows") ?? 5000) || 5000, 1),
@@ -822,25 +895,30 @@ export function startHarness(fixtures, port = 0) {
       const many = Math.min(Math.max(Number(url.searchParams.get("many") ?? 0) || 0, 0), 5000);
       const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 0) || 0, 0), 500);
       const jsonl = many > 0 ? manyFixtures(many) : entries;
-      const stub = guard
-        ? excelGuardStub()
-        : legacyView
-          ? excelLegacyStub()
-          : workbookView
-            ? excelWorkbookStub()
-            : windowed
-              ? excelWindowStub(windowRows)
-              : path === "/harness-json"
-                ? jsonStub(
-                    url.searchParams.get("mode") ?? "array",
-                    Math.min(Math.max(Number(url.searchParams.get("records") ?? 5) || 5, 1), 5000),
-                    url.searchParams.get("buffer") === "1",
-                  )
-                : path === "/harness-route"
-                  ? smokeStub(url.searchParams.get("route") ?? "html")
-                  : route === "parquet"
-                    ? parquetStub(fixtures)
-                    : jsonlStub(url.searchParams.get("empty") === "1" ? [] : jsonl, limit);
+      const stub = edit
+        ? excelEditStub(edit)
+        : guard
+          ? excelGuardStub()
+          : legacyView
+            ? excelLegacyStub()
+            : workbookView
+              ? excelWorkbookStub()
+              : windowed
+                ? excelWindowStub(windowRows)
+                : path === "/harness-json"
+                  ? jsonStub(
+                      url.searchParams.get("mode") ?? "array",
+                      Math.min(
+                        Math.max(Number(url.searchParams.get("records") ?? 5) || 5, 1),
+                        5000,
+                      ),
+                      url.searchParams.get("buffer") === "1",
+                    )
+                  : path === "/harness-route"
+                    ? smokeStub(url.searchParams.get("route") ?? "html")
+                    : route === "parquet"
+                      ? parquetStub(fixtures)
+                      : jsonlStub(url.searchParams.get("empty") === "1" ? [] : jsonl, limit);
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;
@@ -889,6 +967,18 @@ export function startHarness(fixtures, port = 0) {
 
     // What the size guard's "Open anyway" loads: small enough that the grid proves the
     // retry happened, real enough that the CSV parser runs.
+    if (path === "/edit.csv") {
+      res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+      res.end("id,name\n1,alpha\n2,beta\n");
+      return;
+    }
+
+    if (path === "/edit.xls") {
+      res.writeHead(200, { "content-type": "application/vnd.ms-excel" });
+      res.end(EDIT_XLS);
+      return;
+    }
+
     if (path === "/huge.csv") {
       res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
       res.end("a,b,c\n1,2,3\n4,5,6\n");

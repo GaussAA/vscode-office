@@ -396,6 +396,122 @@ export default [
     },
   },
   {
+    name: "excel-save-direct",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness-route?route=excel&edit=direct`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the editable grid did not render");
+
+      await page.evaluate(
+        `window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', code: 'KeyS', ctrlKey: true, bubbles: true, cancelable: true }))`,
+      );
+      const saved = await page.waitFor(
+        `window.__excelMessages?.some(message => message.type === 'save')`,
+        15000,
+      );
+      expect(saved, "Ctrl+S did not post a save");
+      const done = await page.waitFor(`window.__saveDone === true`, 5000);
+      expect(done, "saveDone did not arrive");
+
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                messages: window.__excelMessages.filter(message => message.type === 'save'),
+                modal: !!document.querySelector('.ant-modal'),
+                saveDisabled: document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+                    ?.classList.contains('disabled') ?? null,
+            })`),
+      );
+      expect(state.messages.length === 1, `save messages: ${JSON.stringify(state.messages)}`);
+      const message = state.messages[0];
+      expect(
+        message.base64Length > 0 || message.byteLength > 0,
+        `save carried no bytes: ${JSON.stringify(message)}`,
+      );
+      expect(!state.modal, "the direct save opened a modal");
+      expect(state.saveDisabled !== false, "saveDone did not disable the save button");
+      return `direct save posted ${message.base64Length || message.byteLength} bytes, saveDone cleared dirty`;
+    },
+  },
+  {
+    name: "excel-save-format-confirm",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness-route?route=excel&edit=format`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the editable legacy grid did not render");
+
+      // Make the workbook formatted; a format that cannot keep it must ask before writing.
+      await page.evaluate(`(() => {
+                const bold = [...document.querySelectorAll('.x-spreadsheet-toolbar-btn')]
+                    .find(button => (button.getAttribute('data-tooltip') || '').toLowerCase().includes('bold'));
+                bold?.click();
+            })()`);
+      await page.sleep(120);
+      await page.evaluate(
+        `window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', code: 'KeyS', ctrlKey: true, bubbles: true, cancelable: true }))`,
+      );
+      const asked = await page.waitFor(
+        `/Formatting cannot be preserved/i.test(document.querySelector('.ant-modal')?.innerText ?? '')`,
+        10000,
+      );
+      expect(asked, "Ctrl+S did not ask before losing formatting");
+      const beforeChoice = json(
+        await page.evaluate(`JSON.stringify({
+                saves: window.__excelMessages.filter(message => message.type === 'save').length,
+                buttons: [...document.querySelectorAll('.ant-modal button')].map(button => button.textContent.trim()),
+            })`),
+      );
+      expect(beforeChoice.saves === 0, "the format-loss branch wrote before the user chose");
+      expect(
+        beforeChoice.buttons.some((label) => /original/i.test(label)),
+        `missing the original-format choice: ${beforeChoice.buttons.join(" / ")}`,
+      );
+
+      await page.evaluate(`[...document.querySelectorAll('.ant-modal button')]
+                .find(button => /original/i.test(button.textContent))?.click()`);
+      const saved = await page.waitFor(
+        `window.__excelMessages?.some(message => message.type === 'save')`,
+        15000,
+      );
+      expect(saved, "choosing the original format did not save");
+      return `format-loss dialog blocked the write, then saved the original`;
+    },
+  },
+  {
+    name: "excel-save-readonly-saveas",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness-route?route=excel&edit=readonly`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the read-only grid did not render");
+      expect(
+        await page.evaluate(`!!document.querySelector('.excel-readonly-banner')`),
+        "the read-only banner is missing",
+      );
+
+      await page.evaluate(
+        `window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', code: 'KeyS', ctrlKey: true, bubbles: true, cancelable: true }))`,
+      );
+      const dialog = await page.waitFor(
+        `/Save As/i.test(document.querySelector('.ant-modal')?.innerText ?? '')`,
+        5000,
+      );
+      expect(dialog, "Ctrl+S in a read-only document did not open Save As");
+      const sends = await page.evaluate(
+        `window.__excelMessages.filter(message => message.type === 'save' || message.type === 'saveAs').length`,
+      );
+      expect(sends === 0, `a read-only document wrote before choosing a target: ${sends}`);
+      return "read-only Ctrl+S opened Save As without writing";
+    },
+  },
+  {
     name: "excel-windowed-find",
     docs: "excel-windowed-find.png",
     async run({ page, base }) {
