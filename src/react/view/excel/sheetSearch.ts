@@ -108,3 +108,21 @@ export function nextMatch(
   }
   return matches[matches.length - 1];
 }
+
+/**
+ * Step from the match the find bar last visited, not from the viewport's top row. Centering a
+ * hit makes the viewport start above it, so viewport-relative stepping returned the same hit
+ * forever. `fallbackRow` is only for a fresh search or a manually scrolled viewport.
+ */
+export function stepMatch(
+  matches: readonly number[],
+  activeRow: number | null,
+  direction: 1 | -1,
+  fallbackRow: number,
+): number | undefined {
+  if (matches.length === 0) return undefined;
+  if (activeRow === null) return nextMatch(matches, fallbackRow, direction);
+  const index = matches.indexOf(activeRow);
+  if (index < 0) return nextMatch(matches, activeRow, direction);
+  return matches[(index + direction + matches.length) % matches.length];
+}

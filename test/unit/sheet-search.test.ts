@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { SheetSource } from "@/react/view/excel/sheetSource";
-import { nextMatch, searchSheetRows } from "@/react/view/excel/sheetSearch";
+import { nextMatch, searchSheetRows, stepMatch } from "@/react/view/excel/sheetSearch";
 
 /**
  * Phase 3 of ADR-0017: the windowed view has no cell model to walk, so find scans row blocks
@@ -110,4 +110,15 @@ test("nextMatch: forward wraps to the first, backward to the last", () => {
   assert.equal(nextMatch(matches, 40, -1), 10);
   assert.equal(nextMatch(matches, 2, -1), 40, "backward wraps");
   assert.equal(nextMatch([], 5, 1), undefined);
+});
+
+test("stepMatch: a centered hit advances instead of returning itself", () => {
+  const matches = [43, 63];
+  // After jumping to 43 the viewport's top row is above it; stepping from the tracked
+  // active row must still move to 63.
+  assert.equal(stepMatch(matches, 43, 1, 32), 63);
+  assert.equal(stepMatch(matches, 63, 1, 32), 43);
+  assert.equal(stepMatch(matches, 43, -1, 32), 63);
+  assert.equal(stepMatch(matches, null, 1, 32), 43);
+  assert.equal(stepMatch([], 43, 1, 32), undefined);
 });

@@ -152,6 +152,7 @@ export default {
     tooltip: "提示",
   },
   viewer: {
+    loadErrorTitle: "無法開啟檔案",
     saveSuccess: "儲存成功",
     protectedCell: "受保護的儲存格不支援此功能",
     readonlyBanner: "唯讀模式 — 可瀏覽與尋找，請使用「另存新檔」儲存變更",

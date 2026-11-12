@@ -81,6 +81,7 @@ export default {
     concat: "Concat",
   },
   viewer: {
+    loadErrorTitle: "Datei konnte nicht geöffnet werden",
     saveSuccess: "Gespeichert",
     protectedCell: "Geschützte Zellen unterstützen diese Funktion nicht",
     readonlyBanner:

@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from "react";
-import { nextMatch, searchSheetRows } from "./sheetSearch";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { searchSheetRows, stepMatch } from "./sheetSearch";
 import type { SheetSource } from "./sheetSource";
 import { t } from "./excel_i18n";
 import { ROW_HEIGHT } from "./windowedSheetModel";
@@ -38,6 +38,8 @@ export function useWindowedFind({
   onError,
 }: UseWindowedFindArgs): WindowedFind {
   const searchSeq = useRef(0);
+  /** Body row the find bar last jumped to; stepping is relative to this, not the viewport. */
+  const activeMatch = useRef<number | null>(null);
   const [query, setQuery] = useState("");
   const [searchedQuery, setSearchedQuery] = useState("");
   const [matches, setMatches] = useState<number[]>([]);
@@ -53,6 +55,7 @@ export function useWindowedFind({
     setQuery(needle);
     setCapped(false);
     if (!needle) {
+      activeMatch.current = null;
       setSearchedQuery("");
       setMatches([]);
       setProgress(null);
@@ -72,7 +75,10 @@ export function useWindowedFind({
       setMatches(result.rows);
       setCapped(result.capped);
       setSearchedQuery(needle);
-      if (result.rows.length > 0) jumpToRow(result.rows[0]);
+      if (result.rows.length > 0) {
+        activeMatch.current = result.rows[0];
+        jumpToRow(result.rows[0]);
+      }
     } catch (cause) {
       if (ticket === searchSeq.current) {
         onError(cause instanceof Error ? cause.message : String(cause));
@@ -87,17 +93,27 @@ export function useWindowedFind({
 
   const step = useCallback(
     (direction: 1 | -1) => {
-      const current = Math.floor(Math.max(0, bodyScrollTop) / ROW_HEIGHT);
-      const target = nextMatch(matches, current, direction);
-      if (target !== undefined) jumpToRow(target);
+      const fallback = Math.floor(Math.max(0, bodyScrollTop) / ROW_HEIGHT);
+      const target = stepMatch(matches, activeMatch.current, direction, fallback);
+      if (target !== undefined) {
+        activeMatch.current = target;
+        jumpToRow(target);
+      }
     },
     [bodyScrollTop, jumpToRow, matches],
   );
+
+  /** Invalidate a scan that outlives the component; its result must not touch a new sheet. */
+  const cancelSearch = useCallback(() => {
+    searchSeq.current++;
+  }, []);
+  useEffect(() => cancelSearch, [cancelSearch]);
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
     // A new query invalidates the old hit list; stale highlights are worse than an empty state.
     searchSeq.current++;
+    activeMatch.current = null;
     setSearchedQuery("");
     setMatches([]);
     setCapped(false);

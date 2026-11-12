@@ -1,3 +1,5 @@
+import { t } from "./excel_i18n";
+
 interface ExcelLoadErrorProps {
   message: string;
 }
@@ -18,7 +20,7 @@ export default function ExcelLoadError({ message }: ExcelLoadErrorProps) {
           <path d="M22 13v12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
           <circle cx="22" cy="31" r="1.8" fill="currentColor" />
         </svg>
-        <h2 className="excel-load-error-title">Failed to open file</h2>
+        <h2 className="excel-load-error-title">{t("viewer.loadErrorTitle")}</h2>
         <span className="excel-load-error-message">{message}</span>
       </div>
     </div>

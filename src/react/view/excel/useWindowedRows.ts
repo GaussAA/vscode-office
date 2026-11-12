@@ -114,6 +114,12 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
       });
   }, [reader, bodyScrollTop, viewport, viewportHeight]);
 
+  /** Invalidate an in-flight read when the sheet unmounts or its source changes. */
+  const cancelLoad = useCallback(() => {
+    loadSeq.current++;
+  }, []);
+  useEffect(() => cancelLoad, [cancelLoad]);
+
   // One state update per frame: a trackpad emits far more scroll events than there are paints,
   // and every update would otherwise queue another window read.
   const handleScroll = useCallback((event: UIEvent<HTMLDivElement>) => {

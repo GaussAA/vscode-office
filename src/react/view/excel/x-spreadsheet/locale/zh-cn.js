@@ -152,6 +152,7 @@ export default {
     tooltip: "提示",
   },
   viewer: {
+    loadErrorTitle: "无法打开文件",
     saveSuccess: "保存成功",
     protectedCell: "被保护单元格不支持此功能",
     readonlyBanner: "只读模式 — 可浏览与查找，请使用「另存为」保存更改",

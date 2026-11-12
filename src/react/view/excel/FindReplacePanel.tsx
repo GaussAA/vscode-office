@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import type Spreadsheet from "./x-spreadsheet/index";
 import type { FindMatch, FindOptions } from "./x-spreadsheet/index";
 import { t } from "./excel_i18n";
+import { columnName } from "./windowedSheetModel";
 
 export interface FindReplacePanelProps {
   spreadSheet: Spreadsheet | null;
@@ -48,7 +49,6 @@ const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProp
     const [status, setStatus] = useState<{ text: string; error?: boolean } | null>(null);
     const lastMatchRef = useRef<FindMatch | null>(null);
     const findInputRef = useRef<HTMLInputElement>(null);
-    const panelRef = useRef<HTMLDivElement>(null);
 
     const focusFindInput = useCallback((select = false) => {
       requestAnimationFrame(() => {
@@ -87,9 +87,13 @@ const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProp
         }
         spreadSheet.gotoMatch(match);
         lastMatchRef.current = match;
-        const col = String.fromCharCode(65 + (match.ci % 26));
         setStatus({
-          text: t("findReplace.matchLocation", match.sheetIndex + 1, col, match.ri + 1),
+          text: t(
+            "findReplace.matchLocation",
+            match.sheetIndex + 1,
+            columnName(match.ci),
+            match.ri + 1,
+          ),
         });
         focusFindInput();
       },
@@ -122,7 +126,11 @@ const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProp
           return;
         }
       }
-      spreadSheet.replaceAt(match, findText, replaceText, options);
+      if (!spreadSheet.replaceAt(match, findText, replaceText, options)) {
+        setStatus({ text: t("findReplace.notFound"), error: true });
+        focusFindInput();
+        return;
+      }
       onChanged?.();
       const next = spreadSheet.findNext(findText, match, options);
       gotoMatch(next ?? spreadSheet.findFirst(findText, options));
@@ -131,7 +139,7 @@ const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProp
     const handleReplaceAll = useCallback(() => {
       if (!spreadSheet || !findText) return;
       const count = spreadSheet.replaceAll(findText, replaceText, buildOptions());
-      onChanged?.();
+      if (count > 0) onChanged?.();
       setStatus({ text: t("findReplace.replacedCount", count) });
       lastMatchRef.current = null;
       focusFindInput();
@@ -140,7 +148,7 @@ const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProp
     const showReplace = mode === "replace" && !readOnly;
 
     return (
-      <div className="frp-panel" ref={panelRef}>
+      <div className="frp-panel">
         {/* Header */}
         <div className="frp-header">
           <span className="frp-title">
@@ -179,6 +187,7 @@ const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProp
               ref={findInputRef}
               className="frp-input"
               placeholder={t("findReplace.placeholder")}
+              aria-label={t("findReplace.placeholder")}
               value={findText}
               onChange={(e) => {
                 setFindText(e.target.value);
@@ -255,6 +264,7 @@ const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProp
               <input
                 className="frp-input"
                 placeholder={t("findReplace.replacePlaceholder")}
+                aria-label={t("findReplace.replacePlaceholder")}
                 value={replaceText}
                 onChange={(e) => setReplaceText(e.target.value)}
                 onKeyDown={(e) => {
@@ -299,7 +309,11 @@ const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProp
             label={t("findReplace.allSheets")}
           />
           {status && (
-            <span className={`frp-status${status.error ? " frp-status-error" : ""}`}>
+            <span
+              className={`frp-status${status.error ? " frp-status-error" : ""}`}
+              role="status"
+              aria-live="polite"
+            >
               {status.text}
             </span>
           )}

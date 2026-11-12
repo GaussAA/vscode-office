@@ -152,6 +152,7 @@ export default {
     tooltip: "Tooltip",
   },
   viewer: {
+    loadErrorTitle: "Failed to open file",
     saveSuccess: "Save done",
     protectedCell: "Protected cells do not support this function",
     readonlyBanner: "Read-only — browse and find; use Save As to save changes",
