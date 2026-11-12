@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createTextSheetSource, indexRecordStarts } from "@/react/view/excel/sheetSource";
+import {
+  createTextSheetSource,
+  indexRecordStarts,
+  indexRecordStartsAndFields,
+} from "@/react/view/excel/sheetSource";
 import { encodeCsvText } from "@/react/view/excel/csvEncoding";
 
 /**
@@ -96,4 +100,19 @@ test("source: delimiter and encoding are detected once", () => {
 
   assert.equal(source.encoding, "gbk");
   assert.equal(source.rowCount, 2);
+});
+
+test("text source: a wide row after the old 200-row sample still sets the column count", () => {
+  const rows = Array.from({ length: 201 }, (_, index) => (index === 200 ? "a,b,c,d" : "a,b"));
+  const source = createTextSheetSource(toBuffer(`${rows.join("\n")}\n`));
+  assert.equal(source.columnCount, 4);
+});
+
+test("record index: quoted delimiters and newlines do not inflate the field count", () => {
+  const indexed = indexRecordStartsAndFields(
+    new Uint8Array(toBuffer('a,b\n1,"x,y"\n2,"line\nbreak"\n')),
+    0x2c,
+  );
+  assert.equal(indexed.maxFields, 2);
+  assert.equal(indexed.starts.length, 3);
 });

@@ -356,7 +356,7 @@ function ExcelViewer() {
 
     const initSpreadsheet = async (buffer: ArrayBuffer, payload: any, seq: number) => {
       const fileReadOnly = payload.readOnly === true;
-      if (payload.ext?.match(/csv/i)) {
+      if (/^\.?(csv|tsv)$/i.test(payload.ext ?? "")) {
         csvEncodingRef.current = detectCsvEncoding(buffer);
       }
       const { sheets, maxLength, maxCols, csvDelimiter } = await loadSheets(buffer, payload.ext);

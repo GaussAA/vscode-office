@@ -95,8 +95,3 @@ export function headerCells(rows: string[][], columnCount: number): string[] {
   }
   return labels;
 }
-
-/** The size the guard compares against, for the refusal panel. */
-export function limitFor(ext: string): number {
-  return previewLimitBytes(ext);
-}

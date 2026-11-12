@@ -40,10 +40,23 @@ const DETECT_BYTES = 256 * 1024;
  * state machine instead of `indexOf("\n")`. Quote handling mirrors the parser: a quote only
  * opens a field at its start, and `""` inside a quoted field is an escaped quote.
  */
-export function indexRecordStarts(bytes: Uint8Array, delimiter: number): number[] {
+export interface RecordIndex {
+  starts: number[];
+  /** Widest record, counted from the bytes. This is the real column count, not a sample. */
+  maxFields: number;
+}
+
+/**
+ * Byte-level record index. Counting delimiters during the same pass fixes the old 200-row
+ * column sample: a narrow prefix is not a bound on the file, and the window renderer uses this
+ * count for its fixed columns.
+ */
+export function indexRecordStartsAndFields(bytes: Uint8Array, delimiter: number): RecordIndex {
   const starts: number[] = [0];
   let inQuotes = false;
   let atFieldStart = true;
+  let fields = 1;
+  let maxFields = 0;
   for (let index = 0; index < bytes.length; index++) {
     const byte = bytes[index];
     if (inQuotes) {
@@ -63,20 +76,30 @@ export function indexRecordStarts(bytes: Uint8Array, delimiter: number): number[
       continue;
     }
     if (byte === delimiter) {
+      fields++;
       atFieldStart = true;
       continue;
     }
     if (byte === LF) {
+      maxFields = Math.max(maxFields, fields);
       starts.push(index + 1);
+      fields = 1;
       atFieldStart = true;
       continue;
     }
     if (byte !== CR) atFieldStart = false;
   }
+  if (starts.length > 0 && starts[starts.length - 1] < bytes.length) {
+    maxFields = Math.max(maxFields, fields);
+  }
   // A trailing newline closes the last record; it does not start an empty one.
   if (starts.length > 1 && starts[starts.length - 1] >= bytes.length) starts.pop();
-  if (starts.length === 1 && starts[0] >= bytes.length) return [];
-  return starts;
+  if (starts.length === 1 && starts[0] >= bytes.length) return { starts: [], maxFields: 0 };
+  return { starts, maxFields };
+}
+
+export function indexRecordStarts(bytes: Uint8Array, delimiter: number): number[] {
+  return indexRecordStartsAndFields(bytes, delimiter).starts;
 }
 
 /**
@@ -97,23 +120,12 @@ export function createTextSheetSource(buffer: ArrayBuffer): TextSheetSource {
   } catch {
     delimiter = ",";
   }
-  const starts = indexRecordStarts(bytes, delimiter.charCodeAt(0));
+  const { starts, maxFields } = indexRecordStartsAndFields(bytes, delimiter.charCodeAt(0));
 
   const decode = (slice: Uint8Array): string =>
     decodeCsvBufferWithEncoding(slice.slice().buffer as ArrayBuffer).text;
 
-  // Sampled once: the grid needs a column count before the first window is read. A later
-  // window with more columns still renders — the count is a header hint, not a bound.
-  let columnCount = 1;
-  if (starts.length > 0) {
-    const sampleEnd = Math.min(starts.length, 200);
-    const sample = decode(
-      bytes.subarray(starts[0], sampleEnd < starts.length ? starts[sampleEnd] : bytes.length),
-    );
-    for (const row of parseCsvRecords(sample, delimiter)) {
-      if (row.length > columnCount) columnCount = row.length;
-    }
-  }
+  const columnCount = Math.max(1, maxFields);
 
   return {
     kind: "text",
