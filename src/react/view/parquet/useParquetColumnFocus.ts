@@ -61,6 +61,9 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
         return centred && aligned;
       };
 
+      /** True while a synthetic drag is in flight; a second mousedown would cancel the first. */
+      let dragging = false;
+
       const scrollOnce = () => {
         const wrap = tableWrapRef.current;
         if (!wrap) return;
@@ -137,6 +140,7 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
               node.dispatchEvent(event);
             };
             fire(thumb, "mousedown", startX, { button: 0, buttons: 1 });
+            dragging = true;
             // The window listeners only exist after React commits `dragging` (post-paint), and
             // the scroll is applied on the frame after the move — releasing in the same tick
             // cancels it, because the drag effect cleans up with `raf.cancel`.
@@ -145,7 +149,10 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
               fire(window, "mousemove", startX + px, { buttons: 1 });
               window.setTimeout(() => {
                 fire(window, "mouseup", startX + px, { buttons: 0 });
-                window.setTimeout(() => syncHeader(), 32);
+                window.setTimeout(() => {
+                  dragging = false;
+                  syncHeader();
+                }, 32);
               }, 64);
             }, 80);
             return;
@@ -165,18 +172,25 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
       // Let the active column commit, then verify and retry: the virtual table rebuilds its
       // scrollbar when a column class changes, so an attempt can land on a detached track or
       // one whose geometry is still zero. Both are silent.
-      requestAnimationFrame(() => {
-        let tries = 8;
-        const attempt = () => {
+      //
+      // The budget is wall time, not frames: on a loaded machine a frame is what is slow, so a
+      // frame count shrinks exactly when the retries are needed. And attempts are serialised —
+      // a drag takes ~176 ms of timers, so starting the next one two frames later (33 ms) would
+      // overlap it, and only one of two overlapping drags can win.
+      const deadline = Date.now() + 800;
+      const attempt = () => {
+        if (!dragging) {
           scrollOnce();
-          requestAnimationFrame(() => {
-            syncHeader();
-            if (isSettled() || --tries <= 0) return;
-            attempt();
-          });
-        };
-        attempt();
-      });
+          // `scrollOnce` leaves `dragging` set only when it started a drag chain.
+          if (dragging) return;
+        }
+        requestAnimationFrame(() => {
+          syncHeader();
+          if (isSettled() || Date.now() > deadline) return;
+          attempt();
+        });
+      };
+      requestAnimationFrame(attempt);
     },
     [fileInfoRef, tableWrapRef],
   );

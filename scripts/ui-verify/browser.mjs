@@ -81,6 +81,13 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
   });
   const session = await page.createCDPSession();
   await session.send("Log.enable");
+  // A slower machine is the usual reason a scenario passes locally and fails in CI, and it is
+  // not reproducible by running the suite again. `UI_VERIFY_CPU=8` throttles this browser the
+  // way a loaded runner slows one down, so the flake can be made to happen on purpose.
+  const cpuRate = Number(process.env.UI_VERIFY_CPU ?? 0);
+  if (cpuRate > 1) {
+    await session.send("Emulation.setCPUThrottlingRate", { rate: cpuRate });
+  }
   session.on("Log.entryAdded", ({ entry }) => {
     const text = entry?.text ?? "";
     if (entry?.source === "security" || /Content Security Policy/i.test(text)) {
