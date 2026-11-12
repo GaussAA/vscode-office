@@ -1,0 +1,200 @@
+/*
+ * The comparison panel: one table, grouped by finding.
+ *
+ * Same instrument rules as the other views — no dividers, no shadows, colour only for signal —
+ * and one addition the other views do not need: a group heading, because a long schema has to
+ * announce where the findings stop and the unchanged columns begin.
+ */
+.compare-view {
+  --cmp-fg: var(--vscode-foreground, #cccccc);
+  --cmp-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.72));
+  --cmp-panel: color-mix(in srgb, var(--vscode-foreground, #cccccc) 8%, transparent);
+  --cmp-line: color-mix(in srgb, var(--vscode-foreground, #cccccc) 12%, transparent);
+  --cmp-link: var(--vscode-textLink-foreground, #3794ff);
+  --cmp-error: var(--vscode-errorForeground, #f48771);
+  --cmp-added: var(--vscode-charts-green, #89d185);
+  --cmp-removed: var(--vscode-charts-red, #f48771);
+  --cmp-changed: var(--vscode-charts-orange, #d18616);
+  --cmp-mono: var(--vscode-editor-font-family, ui-monospace, Consolas, monospace);
+
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100vh;
+  overflow: auto;
+  padding: 16px;
+  gap: 12px;
+  color: var(--cmp-fg);
+  font-family: var(--vscode-font-family, "Segoe UI", sans-serif);
+  font-size: 13px;
+}
+
+.compare-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compare-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.compare-file {
+  font-family: var(--cmp-mono);
+  font-size: 13px;
+}
+
+.compare-arrow {
+  color: var(--cmp-muted);
+}
+
+.compare-counts {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+  color: var(--cmp-muted);
+  font-family: var(--cmp-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A row-count move is a finding, so it gets the changed colour rather than the muted default. */
+.compare-delta {
+  color: var(--cmp-changed);
+}
+
+.compare-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cmp-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.compare-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compare-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  color: var(--cmp-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.compare-group-count {
+  color: var(--cmp-fg);
+  font-family: var(--cmp-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.compare-table th {
+  padding: 4px 8px;
+  border: 0;
+  color: var(--cmp-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.compare-table td {
+  padding: 4px 8px;
+  border: 0;
+  overflow: hidden;
+  font-family: var(--cmp-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-table th:nth-child(1) {
+  width: 24%;
+}
+
+.compare-table th:nth-child(2) {
+  width: 16%;
+}
+
+.compare-table th:nth-child(3) {
+  width: 22%;
+}
+
+.compare-table th:nth-child(4) {
+  width: 26%;
+}
+
+.compare-table th:nth-child(5) {
+  width: 12%;
+}
+
+.compare-table tbody tr:nth-child(odd) {
+  background: color-mix(in srgb, var(--cmp-fg) 3.5%, transparent);
+}
+
+.compare-name {
+  color: var(--cmp-fg);
+  font-weight: 500;
+}
+
+.compare-type,
+.compare-null,
+.compare-range {
+  color: var(--cmp-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--cmp-panel);
+  color: var(--cmp-muted);
+  font-size: 9.5px;
+  text-transform: lowercase;
+}
+
+.compare-row--added .compare-badge {
+  color: var(--cmp-added);
+}
+
+.compare-row--removed .compare-badge {
+  color: var(--cmp-removed);
+}
+
+.compare-row--changed .compare-badge,
+.compare-row--type-changed .compare-badge {
+  color: var(--cmp-changed);
+}
+
+.compare-note {
+  margin: 0;
+  color: var(--cmp-muted);
+}
+
+.compare-error {
+  margin: 0;
+  color: var(--cmp-error);
+}

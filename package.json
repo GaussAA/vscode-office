@@ -34,7 +34,8 @@
     "url": "https://github.com/GaussAA/vscode-office.git"
   },
   "activationEvents": [
-    "onCommand:GaussAA.office.previewJson"
+    "onCommand:GaussAA.office.previewJson",
+    "onCommand:GaussAA.office.compareParquet"
   ],
   "main": "./out/extension.js",
   "type": "module",
@@ -57,6 +58,11 @@
       {
         "command": "GaussAA.office.previewJson",
         "title": "Preview JSON",
+        "category": "Data File Viewer"
+      },
+      {
+        "command": "GaussAA.office.compareParquet",
+        "title": "Compare Parquet Files",
         "category": "Data File Viewer"
       }
     ],
