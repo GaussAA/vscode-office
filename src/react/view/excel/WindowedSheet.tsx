@@ -21,6 +21,7 @@ import {
   COPY_FEEDBACK_MS,
   MAX_COLUMN_WIDTH,
   MIN_COLUMN_WIDTH,
+  HEADER_HEIGHT,
   ROW_HEIGHT,
   bodyRowToFileRow,
   cellId,
@@ -83,6 +84,7 @@ export default function WindowedSheet({
     bodyScrollTop,
     bodyViewportHeight,
     totalHeight,
+    compressed,
     handleScroll,
     scrollToRow,
     ensureRowVisible,
@@ -283,6 +285,48 @@ export default function WindowedSheet({
       ? cellId(selected.row, selected.col)
       : undefined;
 
+  const renderedRows = rows.map((row, offset) => {
+    const index = (range?.start ?? 0) + offset;
+    const classes = ["windowed-sheet__row"];
+    if (index % 2 === 1) classes.push("windowed-sheet__row--alt");
+    if (matchSet.has(index)) classes.push("windowed-sheet__row--match");
+    if (index === targetRow) classes.push("windowed-sheet__row--target");
+    return (
+      <div
+        key={index}
+        className={classes.join(" ")}
+        role="row"
+        aria-rowindex={bodyRowToFileRow(index)}
+        style={{ gridTemplateColumns: resize.gridTemplate, height: ROW_HEIGHT }}
+      >
+        <span className="windowed-sheet__index" role="rowheader" aria-colindex={1}>
+          {bodyRowToFileRow(index)}
+        </span>
+        {columns.map((column) => {
+          const raw = row[column] ?? "";
+          const text = cellText(raw);
+          const isSelected = selected?.row === index && selected.col === column;
+          return (
+            <span
+              key={column}
+              id={cellId(index, column)}
+              className={`windowed-sheet__cell${isSelected ? " windowed-sheet__cell--selected" : ""}`}
+              role="gridcell"
+              aria-colindex={column + 2}
+              aria-selected={isSelected}
+              onClick={() => {
+                scrollerRef.current?.focus();
+                selectCell(index, column);
+              }}
+            >
+              {needle && find.isSearchResult ? highlight(text, needle) : text}
+            </span>
+          );
+        })}
+      </div>
+    );
+  });
+
   return (
     <div className="windowed-sheet" data-rows={source.rowCount} data-columns={columnCount}>
       <WindowedSheetBanner
@@ -355,49 +399,20 @@ export default function WindowedSheet({
             ))}
           </div>
           <div className="windowed-sheet__body" role="rowgroup" style={{ height: totalHeight }}>
-            <div style={{ height: offsetTop }} />
-            {rows.map((row, offset) => {
-              const index = (range?.start ?? 0) + offset;
-              const classes = ["windowed-sheet__row"];
-              if (index % 2 === 1) classes.push("windowed-sheet__row--alt");
-              if (matchSet.has(index)) classes.push("windowed-sheet__row--match");
-              if (index === targetRow) classes.push("windowed-sheet__row--target");
-              return (
-                <div
-                  key={index}
-                  className={classes.join(" ")}
-                  role="row"
-                  aria-rowindex={bodyRowToFileRow(index)}
-                  style={{ gridTemplateColumns: resize.gridTemplate, height: ROW_HEIGHT }}
-                >
-                  <span className="windowed-sheet__index" role="rowheader" aria-colindex={1}>
-                    {bodyRowToFileRow(index)}
-                  </span>
-                  {columns.map((column) => {
-                    const raw = row[column] ?? "";
-                    const text = cellText(raw);
-                    const isSelected = selected?.row === index && selected.col === column;
-                    return (
-                      <span
-                        key={column}
-                        id={cellId(index, column)}
-                        className={`windowed-sheet__cell${isSelected ? " windowed-sheet__cell--selected" : ""}`}
-                        role="gridcell"
-                        aria-colindex={column + 2}
-                        aria-selected={isSelected}
-                        onClick={() => {
-                          scrollerRef.current?.focus();
-                          selectCell(index, column);
-                        }}
-                      >
-                        {needle && find.isSearchResult ? highlight(text, needle) : text}
-                      </span>
-                    );
-                  })}
-                </div>
-              );
-            })}
-            <div style={{ height: offsetBottom }} />
+            {compressed ? (
+              <div
+                className="windowed-sheet__seek"
+                style={{ position: "sticky", top: HEADER_HEIGHT, zIndex: 1 }}
+              >
+                {renderedRows}
+              </div>
+            ) : (
+              <>
+                <div style={{ height: offsetTop }} />
+                {renderedRows}
+                <div style={{ height: offsetBottom }} />
+              </>
+            )}
           </div>
         </div>
       </div>

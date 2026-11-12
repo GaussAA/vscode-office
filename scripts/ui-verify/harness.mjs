@@ -666,7 +666,7 @@ function excelGuardStub() {
  * Bridge for the large-file windowed view: a `file:` payload just under the size guard, so the
  * viewer picks the read-only window instead of the editable grid.
  */
-function excelWindowStub() {
+function excelWindowStub(rows = 5000) {
   return `<script>
 (function () {
   const api = {
@@ -676,7 +676,7 @@ function excelWindowStub() {
         window.postMessage({ type: 'open', content: {
           ext: '.csv',
           fileName: 'window.csv',
-          path: '/window.csv',
+          path: '/window.csv?rows=${rows}',
           scheme: 'file',
           size: 12 * 1024 * 1024,
           readOnly: true,
@@ -813,6 +813,10 @@ export function startHarness(fixtures, port = 0) {
       const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
       const guard = path === "/harness-route" && url.searchParams.get("guard") === "1";
       const windowed = path === "/harness-route" && url.searchParams.get("window") === "1";
+      const windowRows = Math.min(
+        Math.max(Number(url.searchParams.get("windowRows") ?? 5000) || 5000, 1),
+        2_000_000,
+      );
       const workbookView = path === "/harness-route" && url.searchParams.get("workbook") === "1";
       const legacyView = path === "/harness-route" && url.searchParams.get("legacy") === "1";
       const many = Math.min(Math.max(Number(url.searchParams.get("many") ?? 0) || 0, 0), 5000);
@@ -825,7 +829,7 @@ export function startHarness(fixtures, port = 0) {
           : workbookView
             ? excelWorkbookStub()
             : windowed
-              ? excelWindowStub()
+              ? excelWindowStub(windowRows)
               : path === "/harness-json"
                 ? jsonStub(
                     url.searchParams.get("mode") ?? "array",
@@ -908,8 +912,12 @@ export function startHarness(fixtures, port = 0) {
     // The windowed view's document: 5000 rows, so "only the viewport is in the DOM" and
     // "scrolling reaches the last row" are both observable.
     if (path === "/window.csv") {
+      const rows = Math.min(
+        Math.max(Number(url.searchParams.get("rows") ?? 5000) || 5000, 1),
+        2_000_000,
+      );
       const lines = ["id,a,b,c,d,e,f,g"];
-      for (let row = 0; row < 5000; row++) {
+      for (let row = 0; row < rows; row++) {
         lines.push(`r${row},1,2,3,4,5,6,7`);
       }
       res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });

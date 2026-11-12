@@ -358,6 +358,44 @@ export default [
     },
   },
   {
+    name: "excel-windowed-seek-limit",
+    async run({ page, base }) {
+      // 1.6M rows × 22px is 35.2M px, above Chromium's scroll-container limit. The view must
+      // keep the DOM height capped and still make the final row reachable through the seek bar.
+      await page.navigate(`${base}/harness-route?route=excel&window=1&windowRows=1600000`);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 20000);
+      expect(ready, "the compressed windowed view did not render");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
+                domRows: document.querySelectorAll('.windowed-sheet__row').length,
+                scrollHeight: document.querySelector('.windowed-sheet__scroller')?.scrollHeight ?? 0,
+                seek: !!document.querySelector('.windowed-sheet__seek'),
+            })`),
+      );
+      expect(state.total === 1_600_001, `unexpected row count: ${state.total}`);
+      expect(state.seek, "the compressed view did not switch to the seek window");
+      expect(state.domRows > 0 && state.domRows < 80, `rendered ${state.domRows} rows`);
+      expect(
+        state.scrollHeight < 31_000_000,
+        `scroll height is still above the browser cap: ${state.scrollHeight}`,
+      );
+      expect(state.scrollHeight > 29_000_000, `unexpected capped height: ${state.scrollHeight}`);
+
+      await page.evaluate(`(() => {
+                const scroller = document.querySelector('.windowed-sheet__scroller');
+                scroller.scrollTop = scroller.scrollHeight;
+                scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+            })()`);
+      const reachedEnd = await page.waitFor(
+        `[...document.querySelectorAll('.windowed-sheet__cell')].some(cell => cell.textContent === 'r1599999')`,
+        15000,
+      );
+      expect(reachedEnd, "the last row is unreachable through the capped seek bar");
+      return `1,600,001 records, height ${state.scrollHeight}px, last row reachable`;
+    },
+  },
+  {
     name: "excel-windowed-find",
     docs: "excel-windowed-find.png",
     async run({ page, base }) {

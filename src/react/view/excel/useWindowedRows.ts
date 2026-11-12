@@ -9,7 +9,7 @@ import {
 } from "react";
 import { headerCells } from "./sheetView";
 import { createSheetWindowReader } from "./sheetWindowReader";
-import { scrollTopForRow, type VisibleRange } from "./sheetWindow";
+import { scrollHeightFor, scrollTopForRow, type VisibleRange } from "./sheetWindow";
 import type { SheetSource } from "./sheetSource";
 import { HEADER_HEIGHT, OVERSCAN, ROW_HEIGHT, toBodySource } from "./windowedSheetModel";
 
@@ -33,6 +33,7 @@ export interface WindowedRows {
     overscan: number;
   };
   totalHeight: number;
+  compressed: boolean;
   handleScroll: (event: UIEvent<HTMLDivElement>) => void;
   scrollToRow: (row: number) => void;
   ensureRowVisible: (row: number) => void;
@@ -68,7 +69,13 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
     }),
     [bodyViewportHeight, dataRowCount],
   );
-  const bodyScrollTop = Math.max(0, scrollTop - HEADER_HEIGHT);
+  const totalHeight = scrollHeightFor(viewport);
+  const compressed = dataRowCount * ROW_HEIGHT > totalHeight;
+  // In compressed mode the seek bar spans header + capped body, so the raw scrollTop is the
+  // coordinate the range model expects. Normal mode scrolls only the body inside the sticky header.
+  const bodyScrollTop = compressed
+    ? Math.max(0, scrollTop)
+    : Math.max(0, scrollTop - HEADER_HEIGHT);
 
   // Read the file's first row once. It becomes the frozen column header; the body never sees it.
   useEffect(() => {
@@ -149,6 +156,11 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
 
   const ensureRowVisible = useCallback(
     (row: number) => {
+      if (compressed) {
+        if (range && row >= range.start && row < range.end) return;
+        scrollToRow(row);
+        return;
+      }
       const top = Math.max(0, scrollTop - HEADER_HEIGHT);
       const rowTop = row * ROW_HEIGHT;
       if (rowTop >= top && rowTop + ROW_HEIGHT <= top + bodyViewportHeight) return;
@@ -159,7 +171,7 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
       latestTopRef.current = next;
       setScrollTop(next);
     },
-    [bodyViewportHeight, dataRowCount, scrollTop],
+    [bodyViewportHeight, compressed, dataRowCount, range, scrollToRow, scrollTop],
   );
 
   return {
@@ -176,7 +188,8 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
     bodyViewportHeight,
     viewportHeight,
     viewport,
-    totalHeight: dataRowCount * ROW_HEIGHT,
+    totalHeight,
+    compressed,
     handleScroll,
     scrollToRow,
     ensureRowVisible,
