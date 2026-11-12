@@ -31,7 +31,10 @@ const PROFILE_BUDGET_MS = 300;
 export async function loadProfileHost() {
   const outdir = mkdtempSync(join(tmpdir(), "perf-parquet-profile-"));
   await build({
-    entryPoints: [join(repoRoot, "src/service/parquetProfile.ts")],
+    entryPoints: [
+      join(repoRoot, "src/service/parquetProfile.ts"),
+      join(repoRoot, "src/service/parquetCompare.ts"),
+    ],
     outdir,
     outExtension: { ".js": ".mjs" },
     bundle: true,
@@ -41,9 +44,11 @@ export async function loadProfileHost() {
     logLevel: "silent",
   });
   const module = await import(pathToFileURL(join(outdir, "parquetProfile.mjs")).href);
+  const compare = await import(pathToFileURL(join(outdir, "parquetCompare.mjs")).href);
   return {
     readParquetProfile: module.readParquetProfile,
     scanParquetColumn: module.scanParquetColumn,
+    compareParquetProfiles: compare.compareParquetProfiles,
     cleanup: () => rmSync(outdir, { recursive: true, force: true }),
   };
 }
@@ -170,6 +175,60 @@ export const profileScenarios = [
       return (
         `${elapsed} ms / ${counter.bytesRead} bytes for ${scan.scanned.toLocaleString()} rows ` +
         `of \`name\` (${scan.distinct} distinct, ${scan.nulls} nulls, top "${scan.top[0]?.value}")`
+      );
+    },
+  },
+  {
+    name: "compare-two-profiles",
+    async run({ fixtures, profileHost }) {
+      const left = countingSource(new Uint8Array(readFileSync(fixtures.profile)));
+      const right = countingSource(new Uint8Array(readFileSync(fixtures.profileNoStats)));
+
+      const started = performance.now();
+      const [leftProfile, rightProfile] = [
+        await profileHost.readParquetProfile(left.source),
+        await profileHost.readParquetProfile(right.source),
+      ];
+      const compare = profileHost.compareParquetProfiles(
+        { fileName: "this-period.parquet", profile: leftProfile },
+        { fileName: "yesterday.parquet", profile: rightProfile },
+      );
+      const elapsed = Math.round(performance.now() - started);
+
+      // Shape: the right file is written without statistics, so the two shared columns cannot
+      // be compared and the five extra columns on the left are gone. A comparison that called
+      // those `same` would be the bug this scenario exists for.
+      expect(
+        compare.left.rowCount === fixtures.profileRows,
+        `left side has ${compare.left.rowCount} rows, fixture has ${fixtures.profileRows}`,
+      );
+      expect(
+        compare.right.rowCount === fixtures.profileNoStatsRows,
+        `right side has ${compare.right.rowCount} rows, fixture has ${fixtures.profileNoStatsRows}`,
+      );
+      expect(compare.summary.uncomparable === 2, `uncomparable is ${compare.summary.uncomparable}`);
+      expect(compare.summary.removed === 5, `removed is ${compare.summary.removed}`);
+      expect(compare.summary.added === 0, `added is ${compare.summary.added}`);
+      expect(compare.summary.same === 0, `same is ${compare.summary.same}`);
+      expect(
+        compare.rowCountDelta === fixtures.profileNoStatsRows - fixtures.profileRows,
+        `row delta is ${compare.rowCountDelta}`,
+      );
+
+      const bytesRead = left.bytesRead + right.bytesRead;
+      expect(
+        bytesRead <= 256 * 1024,
+        `comparing read ${bytesRead} bytes; two footers are kilobytes, not megabytes`,
+      );
+      expect(
+        elapsed <= 300,
+        `comparing took ${elapsed} ms (budget 300 ms); it should parse two footers, nothing else`,
+      );
+
+      return (
+        `${elapsed} ms / ${bytesRead} bytes for ` +
+        `${fixtures.profileRows.toLocaleString()} vs ${fixtures.profileNoStatsRows.toLocaleString()} rows ` +
+        `(${compare.summary.uncomparable} uncomparable, ${compare.summary.removed} removed)`
       );
     },
   },

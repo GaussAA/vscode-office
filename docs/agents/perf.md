@@ -1,7 +1,7 @@
 # Performance gate
 
 `pnpm verify:perf` runs the built viewers in headless Chrome **and the JSONL / JSON / parquet
-profile host services in Node** and asserts nine numbers that used to be catastrophic and
+profile host services in Node** and asserts ten numbers that used to be catastrophic and
 invisible:
 
 | invariant                                       | budget                                    | why it exists                                                                                                                                                                                                                               |
@@ -15,6 +15,7 @@ invisible:
 | a 100 MB JSON array is indexed, not parsed      | index < 6 s, window < 2 s, search < 8 s   | a `JSON.parse` of the whole file would allocate hundreds of MB and block the host; the scanner must only record boundaries and parse the 100 records in the requested window. Measured 1.37 s / 3 ms / 114 ms on 91.6 MB and 50,000 records |
 | a column profile reads the footer, not the file | ≤ 256 KB read, < 300 ms                   | the 4.3 MB fixture decodes whole in ~1.5 s, so a wall-clock budget alone accepts a full decode; hyparquet's default tail fetch is 512 KB, so dropping the explicit 8-byte probe also fails here. Measured 5 ms / 5.7 KB of 4.3 MB           |
 | scanning one column reads one column            | 200k rows < 2 s, read < ½ the file        | the scan is the half that decodes, so the invariant is one column's chunks rather than the whole row. Measured 287 ms / 178 KB of 4.3 MB, 500 distinct values, 15,385 nulls skipped                                                         |
+| comparing two files reads two footers           | < 300 ms, read < 256 KB                   | a comparison is two profiles plus a pure diff; decoding either file would show up in the byte count long before the clock. Measured 5 ms / 5,988 bytes for a 1M-row file against a 100k-row file                                            |
 
 It is separate from `pnpm verify:ui` on purpose: that suite answers "does the DOM look
 right" with small fixtures; this one answers "what did it cost" with large files, and byte
@@ -27,7 +28,7 @@ scripts/perf/
 ├── runner.mjs         scenarios + budgets + CLI (exit code is the gate)
 ├── jsonl.mjs          the two JSONL Node-only checks; bundles the host services with esbuild
 ├── json.mjs           the JSON array index/window/search check; bundles jsonPreview.ts
-├── parquet-profile.mjs the column-profile check; bundles parquetProfile.ts and counts bytes read
+├── parquet-profile.mjs profile, column scan and two-file compare; bundles the host services
 ├── expect.mjs         the assertion primitive shared by the scenario modules
 ├── harness.mjs        HTTP server: built HTML from out/webview, fake bridge, Range + byte counting
 └── fixtures.mjs       generates the two ONE-ROW-GROUP parquet files, the TEN-ROW-GROUP profile
