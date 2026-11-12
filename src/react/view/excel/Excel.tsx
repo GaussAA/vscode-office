@@ -1,11 +1,10 @@
 import { MoonOutlined, SunOutlined } from "@ant-design/icons";
-import { App, Button, Modal, Radio, Spin } from "antd";
+import { App, Button, Spin } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { handler, vscodeApi } from "../../util/vscode.ts";
 import { isVscodeEditorDark, observeVscodeThemeChange } from "../../util/vscodeTheme.ts";
 import { loadOfficeBuffer } from "../../util/loadOfficeContent.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
-import { formatBytes } from "@/common/previewLimit";
 import "./Excel.less";
 import { MIN_VIEW_COLS, MIN_VIEW_ROWS } from "./excel_meta.ts";
 import { detectCsvEncoding } from "./csvEncoding.ts";
@@ -24,6 +23,9 @@ import WindowedSheet from "./WindowedSheet";
 import { createTextSheetSource, type SheetSource } from "./sheetSource";
 import { createWorkbookSheetSource, type WorkbookSheetSource } from "./workbookSource";
 import { limitForView, sheetViewFor } from "./sheetView";
+import ExcelGuard, { type ExcelTooLarge } from "./ExcelGuard";
+import ExcelLoadError from "./ExcelLoadError";
+import ExcelSaveAsDialog from "./ExcelSaveAsDialog";
 
 initExcelLocale();
 
@@ -120,15 +122,7 @@ function ExcelViewer() {
    * instead of parsing; nothing is fetched, because the fetch is already half the cost of a
    * large CSV on a remote workspace.
    */
-  const [tooLarge, setTooLarge] = useState<{
-    size: number;
-    name: string;
-    ext: string;
-    /** The limit this file missed; local text and virtual text have different ones. */
-    limit: number;
-  } | null>(null);
-  /** The guard's second step: "Open anyway" arms a confirmation instead of loading at once. */
-  const [openAnywayArmed, setOpenAnywayArmed] = useState(false);
+  const [tooLarge, setTooLarge] = useState<ExcelTooLarge | null>(null);
   /**
    * Set when a large text file is shown as a read-only window instead of the editable grid.
    * `null` means the grid path is in charge.
@@ -141,7 +135,6 @@ function ExcelViewer() {
   /** Bumped per document; the windowed view keys on it so a new file starts at the top. */
   const [windowLoad, setWindowLoad] = useState(0);
   const [saveAsVisible, setSaveAsVisible] = useState(false);
-  const [saveAsFormat, setSaveAsFormat] = useState("xlsx");
   const [activeSpreadsheet, setActiveSpreadsheet] = useState<Spreadsheet | null>(null);
   const extRef = useRef("");
   const documentCacheIdRef = useRef("");
@@ -158,32 +151,10 @@ function ExcelViewer() {
   const loadPayloadRef = useRef<((payload: ExcelOpenPayload) => void) | null>(null);
   /** Ctrl+F in the windowed view focuses this input, not the dead grid Find panel. */
   const windowedFindInputRef = useRef<HTMLInputElement>(null);
-  /** The guard's safe action owns initial focus. */
-  const tooLargeSafeRef = useRef<HTMLButtonElement>(null);
-  /** Arming the retry moves focus to Cancel, so Enter cannot load by accident. */
-  const tooLargeCancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     findPanelRef.current = findPanel;
   }, [findPanel]);
-
-  useEffect(() => {
-    if (!tooLarge) return;
-    setOpenAnywayArmed(false);
-    const frame = requestAnimationFrame(() => tooLargeSafeRef.current?.focus());
-    return () => cancelAnimationFrame(frame);
-  }, [tooLarge]);
-
-  useEffect(() => {
-    if (!tooLarge || !openAnywayArmed) return;
-    const frame = requestAnimationFrame(() => tooLargeCancelRef.current?.focus());
-    return () => cancelAnimationFrame(frame);
-  }, [openAnywayArmed, tooLarge]);
-
-  const cancelOpenAnyway = useCallback(() => {
-    setOpenAnywayArmed(false);
-    requestAnimationFrame(() => tooLargeSafeRef.current?.focus());
-  }, []);
 
   const adaptiveColorMode = colorMode === "adaptive";
   const themedDark = adaptiveColorMode && vscodeDark;
@@ -241,10 +212,7 @@ function ExcelViewer() {
     setSaveAsVisible(true);
   }, []);
 
-  /**
-   * The user answered the size guard. A local file is fetched by this webview, so the retry
-   * is immediate; a virtual document was never read by the host, so ask for it.
-   */ const handleSelectSheet = useCallback((index: number) => {
+  const handleSelectSheet = useCallback((index: number) => {
     const source = workbookRef.current;
     if (!source) return;
     const next = source.selectSheet(index);
@@ -254,11 +222,14 @@ function ExcelViewer() {
     setWindowLoad((load) => load + 1);
   }, []);
 
+  /**
+   * The user answered the size guard. A local file is fetched by this webview, so the retry
+   * is immediate; a virtual document was never read by the host, so ask for it.
+   */
   const handleOpenAnyway = useCallback(() => {
     const payload = pendingPayloadRef.current;
     if (!payload) return;
     forcedRef.current = true;
-    setOpenAnywayArmed(false);
     setTooLarge(null);
     setLoading(true);
     if (payload.scheme === "file" || payload.bufferBase64 || payload.buffer?.length) {
@@ -373,7 +344,6 @@ function ExcelViewer() {
   const confirmSaveAs = useCallback(async (fmt: string) => {
     const spreadSheet = spreadSheetRef.current;
     if (!spreadSheet) return;
-    setSaveAsVisible(false);
     try {
       await exportSaveAs(spreadSheet, fmt, csvEncodingRef.current, csvDelimiterRef.current);
       if (!readOnlyRef.current) {
@@ -650,117 +620,14 @@ function ExcelViewer() {
   return (
     <div className="excel-viewer">
       <Spin spinning={loading} fullscreen={true} />
-      {loadError && !loading && (
-        <div className="excel-load-error">
-          <div className="excel-load-error-panel">
-            <svg
-              className="excel-load-error-icon"
-              width="44"
-              height="44"
-              viewBox="0 0 44 44"
-              fill="none"
-              aria-hidden
-            >
-              <circle cx="22" cy="22" r="20" stroke="currentColor" strokeWidth="1.8" />
-              <path d="M22 13v12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-              <circle cx="22" cy="31" r="1.8" fill="currentColor" />
-            </svg>
-            <h2 className="excel-load-error-title">Failed to open file</h2>
-            <span className="excel-load-error-message">{loadError}</span>
-          </div>
-        </div>
-      )}
+      {loadError && !loading && <ExcelLoadError message={loadError} />}
       {tooLarge && !loading && (
-        <div
-          className="excel-too-large"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="excel-too-large-title"
-          aria-describedby="excel-too-large-body"
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && openAnywayArmed) {
-              event.stopPropagation();
-              cancelOpenAnyway();
-            }
-          }}
-        >
-          <div className="excel-too-large-panel">
-            <svg
-              className="excel-too-large-icon"
-              width="28"
-              height="28"
-              viewBox="0 0 28 28"
-              fill="none"
-              aria-hidden
-            >
-              <path
-                d="M7 3.5h9l5 5v16H7z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M16 3.5v5h5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-              <path d="M14 12v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <circle cx="14" cy="21" r="1" fill="currentColor" />
-            </svg>
-            <h2 className="excel-too-large-title" id="excel-too-large-title">
-              {t("viewer.tooLargeTitle")}
-            </h2>
-            <p className="excel-too-large-body" id="excel-too-large-body">
-              {t(
-                "viewer.tooLargeBody",
-                tooLarge.name,
-                formatBytes(tooLarge.size),
-                formatBytes(tooLarge.limit),
-              )}
-            </p>
-            {openAnywayArmed && (
-              <p className="excel-too-large-confirm">{t("viewer.tooLargeConfirm")}</p>
-            )}
-            <div className="excel-too-large-actions">
-              <button
-                ref={tooLargeSafeRef}
-                type="button"
-                className="excel-too-large-action excel-too-large-action--primary"
-                onClick={() => handler.emit("editInVSCode", true)}
-              >
-                {t("viewer.tooLargeOpenInVSCode")}
-              </button>
-              {!openAnywayArmed ? (
-                <button
-                  type="button"
-                  className="excel-too-large-action excel-too-large-action--secondary"
-                  onClick={() => setOpenAnywayArmed(true)}
-                >
-                  {t("viewer.tooLargeOpen")}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="excel-too-large-action excel-too-large-action--danger"
-                  onClick={handleOpenAnyway}
-                >
-                  {t("viewer.tooLargeConfirmOpen")}
-                </button>
-              )}
-              {openAnywayArmed && (
-                <button
-                  ref={tooLargeCancelRef}
-                  type="button"
-                  className="excel-too-large-action excel-too-large-action--ghost"
-                  onClick={cancelOpenAnyway}
-                >
-                  {t("button.cancel")}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <ExcelGuard
+          key={`${tooLarge.name}-${tooLarge.size}`}
+          file={tooLarge}
+          onOpenAnyway={handleOpenAnyway}
+          onOpenInVSCode={() => handler.emit("editInVSCode", true)}
+        />
       )}
       {readOnly && !loading && !loadError && !tooLarge && !windowSource && (
         <div className="excel-readonly-banner">{t("viewer.readonlyBanner")}</div>
@@ -779,60 +646,14 @@ function ExcelViewer() {
           }}
         />
       )}
-      <Modal
+      <ExcelSaveAsDialog
         open={saveAsVisible}
-        title={t("button.saveAs")}
         onCancel={() => setSaveAsVisible(false)}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => setSaveAsVisible(false)}
-            style={{ padding: "3px 12px", height: "auto" }}
-          >
-            {t("button.cancel")}
-          </Button>,
-          <Button
-            key="ok"
-            type="primary"
-            onClick={() => void confirmSaveAs(saveAsFormat)}
-            style={{ padding: "3px 12px", height: "auto" }}
-          >
-            {t("button.save")}
-          </Button>,
-        ]}
-        getContainer={() => document.body}
-        centered
-        width={360}
-      >
-        <div style={{ padding: "8px 0 16px" }}>
-          <div style={{ marginBottom: 12, opacity: 0.65, fontSize: 12 }}>
-            {t("viewer.chooseExportFormat")}
-          </div>
-          <Radio.Group
-            value={saveAsFormat}
-            onChange={(e) => setSaveAsFormat(e.target.value as string)}
-            style={{ display: "flex", flexDirection: "column", gap: 10 }}
-          >
-            {[
-              {
-                value: "xlsx",
-                label: t("viewer.exportXlsxLabel"),
-                desc: t("viewer.exportXlsxDesc"),
-              },
-              { value: "csv", label: t("viewer.exportCsvLabel"), desc: t("viewer.exportCsvDesc") },
-              { value: "xls", label: t("viewer.exportXlsLabel"), desc: t("viewer.exportXlsDesc") },
-              { value: "ods", label: t("viewer.exportOdsLabel"), desc: t("viewer.exportOdsDesc") },
-            ].map((f) => (
-              <Radio key={f.value} value={f.value} style={{ alignItems: "flex-start" }}>
-                <span style={{ fontWeight: 500 }}>{f.label}</span>
-                <span style={{ display: "block", fontSize: 11, opacity: 0.55, marginTop: 1 }}>
-                  {f.desc}
-                </span>
-              </Radio>
-            ))}
-          </Radio.Group>
-        </div>
-      </Modal>
+        onSave={(format) => {
+          setSaveAsVisible(false);
+          void confirmSaveAs(format);
+        }}
+      />
       <div id="container"></div>
       {windowSource && (
         <WindowedSheet
