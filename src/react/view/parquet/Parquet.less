@@ -1,4 +1,5 @@
 @import "../../common/highlight.less";
+@import "../../common/motion.less";
 
 body:has(.parquet-app) {
   width: 100vw;
@@ -181,9 +182,7 @@ body:has(.parquet-app) {
   padding: 0 4px 0 10px;
   border-radius: var(--pv-radius);
   background: var(--vscode-input-background, var(--pv-control));
-  transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: background var(--motion-base) var(--motion-ease);
 
   &:focus-within {
     background: var(--vscode-input-background, var(--pv-control));
@@ -229,8 +228,8 @@ body:has(.parquet-app) {
   background: transparent;
   cursor: pointer;
   transition:
-    color 0.12s ease,
-    background 0.12s ease;
+    color var(--motion-fast) var(--motion-ease),
+    background var(--motion-fast) var(--motion-ease);
 
   .codicon {
     font-size: 14px;
@@ -456,7 +455,7 @@ body:has(.parquet-app) {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background var(--motion-fast) var(--motion-ease);
 
   &:hover {
     background: var(--pv-hover);
@@ -563,7 +562,7 @@ body:has(.parquet-app) {
     inset: 10px 2.5px;
     border-radius: 999px;
     background: transparent;
-    transition: background 0.15s ease;
+    transition: background var(--motion-base) var(--motion-ease);
   }
 
   &:hover::after,
@@ -661,7 +660,7 @@ body:has(.parquet-app) {
     background: var(--pv-canvas) !important;
     font-family: var(--pv-mono);
     font-size: 12px;
-    transition: background 0.1s ease;
+    transition: background var(--motion-fast) var(--motion-ease);
   }
 
   .ant-table-tbody > tr.parquet-viewer__row--alt > td,
@@ -908,9 +907,9 @@ body:has(.parquet-app) {
   font-weight: 500;
   cursor: pointer;
   transition:
-    color 0.12s ease,
-    background 0.12s ease,
-    opacity 0.12s ease;
+    color var(--motion-fast) var(--motion-ease),
+    background var(--motion-fast) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
 
   .codicon {
     font-size: 13px;
@@ -1018,7 +1017,7 @@ body:has(.parquet-app) {
     left: 2px;
     width: 1px;
     background: transparent;
-    transition: background 0.12s ease;
+    transition: background var(--motion-fast) var(--motion-ease);
   }
 
   &:hover::after,
@@ -1304,9 +1303,10 @@ body:has(.parquet-app) {
   gap: 6px;
   max-height: 40vh;
   padding: 8px 16px 10px;
-  border-top: 1px solid color-mix(in srgb, var(--pv-fg) 12%, transparent);
+  /* No top divider and no shadow: the raised tint is the separation (DESIGN.md). A line here
+     was a divider in disguise, and the shadow was ours, not antd's. */
   background: var(--pv-raised);
-  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.22);
+  animation: pv-panel-in var(--motion-base) var(--motion-ease);
 }
 
 .parquet-viewer__profile-head {
@@ -1395,9 +1395,10 @@ body:has(.parquet-app) {
   gap: 6px;
   max-height: 40vh;
   padding: 8px 16px 10px;
-  border-top: 1px solid color-mix(in srgb, var(--pv-fg) 12%, transparent);
+  /* No top divider and no shadow: the raised tint is the separation (DESIGN.md). A line here
+     was a divider in disguise, and the shadow was ours, not antd's. */
   background: var(--pv-raised);
-  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.22);
+  animation: pv-panel-in var(--motion-base) var(--motion-ease);
 }
 
 .parquet-viewer__inspector-head {

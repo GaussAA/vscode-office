@@ -277,6 +277,31 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 
 **The Inset Focus Rule.** 输入类焦点的表现是 `inset 0 0 0 1px var(--focus)` 的环；可聚焦的按钮/行是 `outline: 1px solid var(--focus)` 加 1px 或 -1px 偏移。两者都不加 blur、chevron、位移或颜色渐变。
 
+## Motion
+
+**动效只表达状态变化，不表达入场。** 没有淡入的页面、没有骨架屏、没有滚动联动、没有视差。
+一张要看几小时的表格不该自己动。
+
+| 令牌            | 值                           | 用在哪                       |
+| --------------- | ---------------------------- | ---------------------------- |
+| `--motion-fast` | 120ms                        | hover / press / 选中反馈     |
+| `--motion-base` | 160ms                        | 停靠面板出现、较大的表面变化 |
+| `--motion-slow` | 180ms                        | 预留，目前没有使用者         |
+| `--motion-ease` | `cubic-bezier(0.2, 0, 0, 1)` | 全部                         |
+
+规则：
+
+- **不写字面时长。** 所有 `transition` / `animation` 必须引用令牌，否则 `prefers-reduced-motion`
+  关不掉它——这个仓库此前 34 处过渡里只有 2 处尊重该偏好，就是字面量的代价。
+- **`prefers-reduced-motion: reduce` 是把时长归零，不是删声明。** 删掉 `transition` 会让元素留在
+  起始状态；归零让它直接落到终态，这才是"减少运动"而不是"减少功能"。
+- **停靠面板只淡入、不滑动。** `transform` 会让面板在测量中移动，而好几个场景在面板出现的瞬间
+  就量它的尺寸。
+- **antd 的动效也归这个偏好管**：`antThemeConfig` 把 `token.motion` 设为 `motionEnabled()`，
+  否则波浪、下拉的动画会绕过这条规则。
+- **断言在 `verify:ui`**：`parquet-motion-budget`（时长落在 120–180 ms）、`parquet-motion-reduced`
+  （偏好下全部 `0s` 且面板仍在终态）、`parquet-motion-no-reflow`（面板进出不改变行数与列宽）。
+
 ## Shapes
 
 形态语言是**方块 + 小圆角**，没有斜角、没有裁切、没有装饰性轮廓。

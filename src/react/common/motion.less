@@ -1,0 +1,52 @@
+/*
+ * Motion tokens (ADR-0022).
+ *
+ * State feedback only: 120–180 ms, one easing. There is no entrance animation, no skeleton and
+ * no scroll-linked motion — a table you read for hours should not move under its own steam.
+ *
+ * `prefers-reduced-motion: reduce` zeroes the durations rather than deleting the declarations,
+ * so an element still lands in its final state and only the travel is gone. That matters for
+ * anything positioned with `transitions`: removing the property would also remove the end state.
+ */
+
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
+  --motion-slow: 180ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0s;
+    --motion-base: 0s;
+    --motion-slow: 0s;
+  }
+}
+
+/*
+ * A docked panel appears by fading in where it already belongs. It deliberately does not slide:
+ * a transform would move the panel under a measurement, and several scenarios measure the panel
+ * the moment it exists.
+ */
+@keyframes pv-panel-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes pv-panel-in {
+    from {
+      opacity: 1;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+}
