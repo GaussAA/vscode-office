@@ -1,6 +1,7 @@
 @import "./EntryShell.less";
 
 @import "../../common/highlight.less";
+@import "../../common/motion.less";
 
 /* ---------- shared tree resets ---------- */
 
@@ -39,7 +40,7 @@
     line-height: var(--jl-row-height);
     padding: 0 6px 0 2px;
     border-radius: var(--jl-radius-sm);
-    transition: background 0.1s ease;
+    transition: background var(--motion-fast) var(--motion-ease);
     overflow: hidden;
   }
 
@@ -190,7 +191,7 @@
   font-size: 12px;
   text-align: start;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background var(--motion-fast) var(--motion-ease);
 }
 
 .jsonl-valuebar__toggle:hover {
