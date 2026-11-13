@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ParquetFileInfo } from "./parquetParser";
 import { savePersistedRow } from "./parquetPersistence";
 import type { ParquetSession } from "./parquetSession";
@@ -26,6 +26,12 @@ interface UseParquetPageArgs {
   restorePendingRef: RefObject<boolean>;
   loadedStartRef: RefObject<number>;
   onError: (message: string) => void;
+  /**
+   * Fires once per loaded page with the row the page starts at. Announcements hang off this
+   * rather than off `loadedStart` in an effect: the callback has an event behind it, and it says
+   * "rows actually arrived", which is the moment worth speaking.
+   */
+  onPageLoaded?: (start: number, loaded: number) => void;
 }
 
 /**
@@ -43,7 +49,13 @@ export function useParquetPage({
   restorePendingRef,
   loadedStartRef,
   onError,
+  onPageLoaded,
 }: UseParquetPageArgs) {
+  const onLoadedRef = useRef(onPageLoaded);
+
+  useEffect(() => {
+    onLoadedRef.current = onPageLoaded;
+  }, [onPageLoaded]);
   const [loadedPage, setLoadedPage] = useState(0);
   const [loadedStart, setLoadedStart] = useState(0);
   const [pageRows, setPageRows] = useState<Record<string, unknown>[]>([]);
@@ -73,6 +85,7 @@ export function useParquetPage({
         setLoadedPage(page);
         setLoadedStart(snapshot.start);
         loadedStartRef.current = snapshot.start;
+        onLoadedRef.current?.(snapshot.start, snapshot.rows.length);
         if (snapshot.start === restoreRowRef.current) restorePendingRef.current = false;
         setPageLoading(false);
         // Prefetch only once this page is on screen. Idle time keeps a cache hit fast.
