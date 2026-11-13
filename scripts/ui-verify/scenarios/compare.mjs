@@ -7,8 +7,18 @@ import { expect, json } from "../helpers.mjs";
  */
 async function openCompare(page, base, mode) {
   await page.navigate(`${base}/harness-route?route=compare&case=${mode}`);
-  const ready = await page.waitFor(`!!document.querySelector('.compare-view')`);
-  expect(ready, "the compare view did not mount");
+  // `.compare-view` exists while the panel is still loading, so waiting for it waits for the
+  // shell, not the answer. A group heading or the error line only appear once the payload has
+  // been rendered — waiting for either is what keeps these scenarios from asserting on "Loading…".
+  const ready = await page.waitFor(
+    `!!document.querySelector('.compare-group-title, .compare-error')`,
+  );
+  if (!ready) {
+    const state = await page.evaluate(
+      `document.querySelector('.compare-view')?.innerText?.slice(0, 120) ?? '(no compare view)'`,
+    );
+    throw new Error(`the comparison never arrived; the panel still shows: ${state}`);
+  }
 }
 
 /** Group titles, in the order they render. */

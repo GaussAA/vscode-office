@@ -53,6 +53,24 @@ in CI. Read the message — `table did not render` and `did not bring the column
 different bugs. Prefer making the scenario wait for the _precondition_ its assertion needs
 ("the table can scroll sideways") over adding a retry: a retry hides the next real regression.
 
+### Preconditions: wait for the answer, not the shell
+
+Every flake this suite has had was the same shape — the fake host answers asynchronously, the
+scenario acts on whatever exists before that answer lands. Three real cases, all fixed the same
+way:
+
+| Symptom                                                 | What existed too early                                  | What the scenario waits for now                             |
+| ------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------- |
+| `the automatic scan produced no top-N`                  | the docked panel (it opens before the profile answer)   | the null-share badge — only rendered once statistics arrive |
+| `Cannot read properties of undefined (reading 'click')` | the schema list without its badges                      | `list-null` count ≥ 1 before clicking badge #3              |
+| `compare-*` asserting on "Loading…"                     | `.compare-view`, which renders in the loading state too | a group heading or the error line                           |
+
+The rule: **wait for a node that can only exist after the answer**, never for a container that
+renders empty first. If the scenario is asserting an _absence_ (a silent host must produce no
+number), the honest construct is "the page is otherwise ready, then a bounded grace period" —
+`parquet-profile-silent-host` waits for the table and then 250 ms, because an absence needs a
+window rather than a signal.
+
 ## Adding a scenario
 
 Append to `scenarios` in `runner.mjs`:
