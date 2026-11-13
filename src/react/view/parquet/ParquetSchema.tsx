@@ -171,7 +171,7 @@ export default function ParquetSchema({
               className={`parquet-viewer__list-item${active ? " parquet-viewer__list-item--active" : ""}`}
               aria-selected={active}
               aria-label={summary ? `${label} — ${summary}` : label}
-              title={`${column.name} · ${column.type}`}
+              title={`${column.name} · ${column.displayType ?? column.type}`}
               data-column={column.name}
               tabIndex={index === fieldCursor ? 0 : -1}
               onFocus={() => setFieldCursor(index)}
@@ -198,7 +198,7 @@ export default function ParquetSchema({
                 </span>
               )}
               <span className="parquet-viewer__list-type" title={column.type}>
-                {column.type}
+                {column.displayType ?? column.type}
               </span>
             </button>
           );

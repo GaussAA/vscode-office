@@ -59,6 +59,8 @@ export interface ParquetColumnInfo {
   name: string;
   /** Raw schema type, shown next to the name. */
   type: string;
+  /** Display type, with special handling for URL-like columns. */
+  displayType?: string;
   /** Derived once, so the icon and alignment cannot disagree. */
   category: ColumnCategory;
   /** Groups and legacy repeated primitives are one cell of JSON, not a scalar. */
@@ -95,13 +97,19 @@ function asyncBufferFromArrayBuffer(buffer: ArrayBuffer): AsyncBuffer {
 }
 
 function formatSchemaType(element: SchemaElement): string {
+  let type: string;
   if (element.logical_type?.type) {
-    return element.logical_type.type;
+    type = element.logical_type.type;
+  } else if (element.converted_type) {
+    type = element.converted_type;
+  } else {
+    type = element.type ?? "UNKNOWN";
   }
-  if (element.converted_type) {
-    return element.converted_type;
+  // Normalize UTF8 to STRING for consistent display (UTF8 is the default encoding)
+  if (type.toUpperCase() === "UTF8") {
+    return "STRING";
   }
-  return element.type ?? "UNKNOWN";
+  return type;
 }
 
 /**
@@ -110,10 +118,17 @@ function formatSchemaType(element: SchemaElement): string {
  * STRUCT carries neither, and none of them has a physical `element.type`.
  */
 function formatColumnType(element: SchemaElement, hasChildren: boolean): string {
+  let type: string;
   if (hasChildren) {
-    return element.converted_type ?? element.logical_type?.type ?? "STRUCT";
+    type = element.converted_type ?? element.logical_type?.type ?? "STRUCT";
+  } else {
+    type = formatSchemaType(element);
   }
-  return formatSchemaType(element);
+  // Normalize UTF8 to STRING for consistent display (UTF8 is the default encoding)
+  if (type.toUpperCase() === "UTF8") {
+    return "STRING";
+  }
+  return type;
 }
 
 /**
@@ -127,7 +142,28 @@ export function describeColumn(element: SchemaElement, hasChildren: boolean): Pa
   const type = formatColumnType(element, hasChildren);
   // A nested column is one cell of JSON, so it gets the structure icon and alignment.
   const category = nested ? "structure" : categorizeType(type);
-  return { name: element.name, type, category, nested };
+
+  // Detect URL-like columns by name pattern (case-insensitive)
+  const name = element.name.toLowerCase();
+  const isLikelyUrl =
+    !nested &&
+    category === "string" &&
+    (name.includes("url") ||
+      name.includes("link") ||
+      name.includes("href") ||
+      name === "uri" ||
+      name.endsWith("_url") ||
+      name.endsWith("_link") ||
+      name.startsWith("url_") ||
+      name.startsWith("link_"));
+
+  return {
+    name: element.name,
+    type,
+    displayType: isLikelyUrl ? "link" : undefined,
+    category,
+    nested,
+  };
 }
 
 function isAsyncBuffer(source: ArrayBuffer | AsyncBuffer): source is AsyncBuffer {

@@ -111,11 +111,23 @@ function stateOf(aggregate: Aggregate, rowGroupCount: number): ParquetProfileSta
 }
 
 /**
+ * Check if a value should be counted as empty/null for list-type columns.
+ * Empty arrays are semantically null for list columns.
+ */
+function isEmptyValue(value: MinMax): boolean {
+  // Empty arrays (represented as empty byte arrays in min/max stats for LIST columns)
+  if (value instanceof Uint8Array && value.byteLength === 0) return true;
+  return false;
+}
+
+/**
  * Aggregate per-row-group statistics into one answer per top-level column.
  *
  * A partial answer is reported as partial rather than summed into a total: three of ten row
  * groups is a fact about three row groups, and calling it "the column's nulls" would be a lie
  * the UI cannot detect.
+ *
+ * For LIST columns, empty arrays are treated as null values because they carry no data.
  */
 export function profileFromParquet(info: {
   metadata: FileMetaData;
@@ -150,8 +162,13 @@ export function profileFromParquet(info: {
       }
       const min = stats.min_value ?? stats.min;
       const max = stats.max_value ?? stats.max;
-      if (min !== undefined) aggregate.min = pickExtreme(aggregate.min, min, "min");
-      if (max !== undefined) aggregate.max = pickExtreme(aggregate.max, max, "max");
+      // For LIST columns, check if min/max indicate empty arrays
+      if (min !== undefined && !isEmptyValue(min)) {
+        aggregate.min = pickExtreme(aggregate.min, min, "min");
+      }
+      if (max !== undefined && !isEmptyValue(max)) {
+        aggregate.max = pickExtreme(aggregate.max, max, "max");
+      }
     }
   }
 
@@ -224,7 +241,8 @@ function scanDisplayText(value: unknown): string {
  * Count values of one column over a bounded prefix.
  *
  * Nulls are skipped rather than counted: their share is already a property of the column in the
- * profile, and letting `NULL` win every top-N makes the panel useless.
+ * profile, and letting `NULL` win every top-N makes the panel useless. Empty arrays are also
+ * treated as null for list columns, because an empty list carries no data.
  */
 export async function scanParquetColumn(
   source: ByteSource,
@@ -258,7 +276,10 @@ export async function scanParquetColumn(
     });
     for (const row of rows) {
       const value = row[name];
-      if (value === null || value === undefined) {
+      // Treat null, undefined, and empty arrays as null for counting purposes.
+      const isEmpty =
+        value === null || value === undefined || (Array.isArray(value) && value.length === 0);
+      if (isEmpty) {
         nulls += 1;
         continue;
       }
