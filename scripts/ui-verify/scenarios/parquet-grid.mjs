@@ -201,6 +201,15 @@ export default [
                     thumbW: thumb?.getBoundingClientRect().width,
                     thumbLeft: thumb?.getBoundingClientRect().left,
                     headerLeft: document.querySelector('.parquet-table th:last-child')?.getBoundingClientRect().left,
+                    // Distinguishes the two ways this can fail: the click never reached the
+                    // handler (no active column anywhere) or it did and the scroll did not
+                    // follow (active column tinted, viewport still at offset 0).
+                    activeHeaders: document.querySelectorAll('.parquet-table th.parquet-viewer__column--active').length,
+                    activeCells: document.querySelectorAll('.ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--active').length,
+                    selectedFields: document.querySelectorAll('.parquet-viewer__list-item--active').length,
+                    clickedField: document.querySelector('.parquet-viewer__list-item--active')?.getAttribute('data-column') ?? null,
+                    headerColumns: document.querySelectorAll('.ant-table-header th[aria-colindex]').length,
+                    bodyColumns: document.querySelectorAll('.ant-table-tbody-virtual [role="gridcell"][aria-colindex]').length,
                 };
             })())`);
         throw new Error(`schema click did not bring the URL column into view: ${diag}`);

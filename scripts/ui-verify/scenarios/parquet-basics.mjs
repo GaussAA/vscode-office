@@ -640,6 +640,12 @@ export default [
     name: "parquet-profile-missing-column",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1&profile=1");
+      // The badges only exist once the host's profile answer has landed; clicking before that
+      // reads as "no statistics" and would test a different screen than the one intended.
+      const profiled = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-null').length >= 3`,
+      );
+      expect(profiled, "the profile answer never rendered the null-share badges");
       // Mouse path on the `active` badge: no statistics, so the scan must be asked for, not assumed.
       await page.evaluate(`(() => {
         const badges = document.querySelectorAll('.parquet-viewer__list-null');
