@@ -65,6 +65,7 @@ import parquetA11y from "./scenarios/parquet-a11y.mjs";
 import parquetFrames from "./scenarios/parquet-frames.mjs";
 import parquetMotion from "./scenarios/parquet-motion.mjs";
 import parquetSurfaces from "./scenarios/parquet-surfaces.mjs";
+import parquetTabOrder from "./scenarios/parquet-tab-order.mjs";
 import parquetBasics from "./scenarios/parquet-basics.mjs";
 import parquetGrid from "./scenarios/parquet-grid.mjs";
 import other from "./scenarios/other.mjs";
@@ -78,6 +79,7 @@ const scenarios = [
   ...parquetMotion,
   ...excelMotion,
   ...parquetA11y,
+  ...parquetTabOrder,
   ...parquetFrames,
   ...compare,
   ...other,
@@ -101,6 +103,7 @@ async function main() {
         page: browser,
         base: harness.url,
         setReducedMotion: browser.setReducedMotion,
+        press: browser.press,
         frames: browser.frames,
         clearFrames: browser.clearFrames,
         stats: async () => (await fetch(`${harness.url}/stats`)).json(),
