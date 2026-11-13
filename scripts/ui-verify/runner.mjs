@@ -60,6 +60,7 @@ import { expect, unexpected } from "./helpers.mjs";
 import json from "./scenarios/json.mjs";
 import jsonl from "./scenarios/jsonl.mjs";
 import compare from "./scenarios/compare.mjs";
+import parquetFrames from "./scenarios/parquet-frames.mjs";
 import parquetMotion from "./scenarios/parquet-motion.mjs";
 import parquetSurfaces from "./scenarios/parquet-surfaces.mjs";
 import parquetBasics from "./scenarios/parquet-basics.mjs";
@@ -73,6 +74,7 @@ const scenarios = [
   ...parquetGrid,
   ...parquetSurfaces,
   ...parquetMotion,
+  ...parquetFrames,
   ...compare,
   ...other,
 ];
@@ -95,6 +97,8 @@ async function main() {
         page: browser,
         base: harness.url,
         setReducedMotion: browser.setReducedMotion,
+        frames: browser.frames,
+        clearFrames: browser.clearFrames,
         stats: async () => (await fetch(`${harness.url}/stats`)).json(),
       };
       browser.clearViolations();

@@ -100,6 +100,32 @@ run to run — because the regression being guarded is an order of magnitude, no
 percent. If a change makes a scan legitimately slower (more columns decoded per row, say),
 raise the budget in the same commit and say why.
 
+## Interaction frames (baseline, not yet gated)
+
+ADR-0022 defines "smooth" as something measured, so `verify:ui` now records **frame gaps** during
+paging, scrolling and selecting on the 250k-row fixture:
+
+| scenario                | fixture                         | local baseline |
+| ----------------------- | ------------------------------- | -------------- |
+| `parquet-frames-paging` | 5 page turns                    | 0 gaps ≥ 50 ms |
+| `parquet-frames-scroll` | horizontal travel + PageDown ×5 | 0 gaps ≥ 50 ms |
+| `parquet-frames-select` | 20 cell selections              | 0 gaps ≥ 50 ms |
+
+Measured as `requestAnimationFrame` deltas over 50 ms, **not** as `longtask` entries:
+`PerformanceObserver` advertises `longtask` in this Chromium and then never delivers one — a
+deliberate 120 ms stall produced zero entries while `supportedEntryTypes` listed the type. A
+collector that reports nothing is indistinguishable from a viewer with no jank, so
+`parquet-frames-observer` blocks the main thread on purpose and fails unless the gap is recorded.
+That scenario is the reason the other three mean anything.
+
+Three preconditions keep the numbers honest, and each one has already caught a real mistake while
+this was being built: the right fixture (pager says 250,000), the collector alive (the self-check),
+and the interaction actually moving the view.
+
+Thresholds are deliberately absent for now: the plan (ADR-0022 decision 4) is to watch the CI
+numbers for two rounds and then set a ceiling that only ever tightens. A ceiling invented on the
+first local run would be fitted to one machine.
+
 ## What is not gated
 
 - **Page turns on wide tables (~0.5 s after the fix).** Prefetching the next page used to
