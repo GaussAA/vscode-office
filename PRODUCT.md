@@ -56,7 +56,7 @@ web
 
 - **parquet、JSONL 与 JSON 预览只读，表格可编辑。** 只读不是「缺功能」，是另一种承诺（GLOSSARY: Editable surface）。
 - **格式集合已关闭**（interview 确认）：三种 Viewer 的格式与默认接管是上限，不会新增第四种 viewer。JSON 只作为命令式只读检查器存在：不写 `contributes.customEditors`、不注册 `.json`、不改 `.json` 的默认编辑器、不编辑、不校验 schema、不支持 JSONC；新增命令仍需过 Native preview 判据（原生能编辑，但不擅长 10–100 MB / minified 数组的阅读）。需要新增 **Viewer** 仍先写 ADR，默认答案是不。
-- **下一步方向**：视觉与交互（ADR-0022）——在仪器语言内加层次、动效只做 120–180 ms 状态反馈、把「流畅」定义成可测量的长任务预算。它**尚未实现**，不得写进上面的能力清单。表格的可编辑面冻结，只修数据丢失/崩溃/安全。
+- **下一步方向**：交互与无障碍（ADR-0023）——先给 parquet 加可听反馈（翻页/搜索/选中的 live region），再把动效令牌扩到 excel，键盘验收改为 Tab 序列遍历。它**尚未实现**，不得写进上面的能力清单。表格的可编辑面冻结，只修数据丢失/崩溃/安全。
 - **身份独立、可与上游共存**：`GaussAA.office-viewer-plus`，不覆盖 `cweijan.vscode-office`；上游是只读参考资料，不 merge、不 rebase（ADR-0002）。
 - **严格跟随 VS Code 主题**，包括 antd 组件；没有自带的明暗开关。
 - **零遥测**；上游的 telemetry 已被整体移除。
@@ -77,7 +77,7 @@ web
 - `scripts/ui-verify/` —— 无头浏览器场景与 fixture（含构造的 parquet/JSONL 文件）；断言 DOM，不止截图。
 - `scripts/perf/` —— 字节数与耗时预算；大文件缓存在本地。
 - `test/unit/`、`test/smoke/` —— 纯逻辑与真实宿主两层。
-- `docs/adr/0001`–`0022`、`GLOSSARY.md`、`CHANGELOG.md` —— 决策、术语与逐版说明。
+- `docs/adr/0001`–`0023`、`GLOSSARY.md`、`CHANGELOG.md` —— 决策、术语与逐版说明。
 - **没有的**（未来工作不得编造）：用户评价、安装量、Marketplace 评分、外部基准对比、用户研究、付费/商业承诺；以及未经闸门与截图验证的能力（本文件只记录证据在手的东西）。
 
 ## Product Principles
