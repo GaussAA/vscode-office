@@ -60,11 +60,20 @@ import { expect, unexpected } from "./helpers.mjs";
 import json from "./scenarios/json.mjs";
 import jsonl from "./scenarios/jsonl.mjs";
 import compare from "./scenarios/compare.mjs";
+import parquetSurfaces from "./scenarios/parquet-surfaces.mjs";
 import parquetBasics from "./scenarios/parquet-basics.mjs";
 import parquetGrid from "./scenarios/parquet-grid.mjs";
 import other from "./scenarios/other.mjs";
 
-const scenarios = [...json, ...jsonl, ...parquetBasics, ...parquetGrid, ...compare, ...other];
+const scenarios = [
+  ...json,
+  ...jsonl,
+  ...parquetBasics,
+  ...parquetGrid,
+  ...parquetSurfaces,
+  ...compare,
+  ...other,
+];
 
 async function main() {
   const fixtures = createFixtures(join(repoRoot, ".ui-verify"));
