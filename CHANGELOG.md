@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.10.0] - 2026-11-13
+
 ### Changed
 
 - Parquet: the viewer's chrome and its docked panels now sit on three named surface levels
@@ -18,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `prefers-reduced-motion` (which zeroes the durations rather than removing them, so every
   element still lands in its final state). antd's own widget animations follow the same
   preference. Before this, 32 of 34 transitions in the webview ignored it.
+
+### Fixed
+
+- Parquet: clicking a field in the schema sidebar now reliably scrolls its column into view.
+  The jump retried only while a synthetic scrollbar drag was in flight, so a drag that did
+  nothing (the virtual table rebuilds its scrollbar when the active column changes) ended the
+  retry chain and left the viewport where it was. Reproduced on a Linux CI runner, fixed, and
+  verified with 20 consecutive runs in the environment that failed.
 
 ## [6.9.0] - 2026-11-12
 
