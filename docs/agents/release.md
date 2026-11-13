@@ -77,8 +77,12 @@ workflow 自动完成：`check:full` → `check:release --tag=` → 打包 → *
 
 ## 校验两个注册表（两个都要，且要等）
 
-传播延迟实测：**Open VSX 约 1 分钟**（其间直接 404）、**Marketplace 约 6 分钟**。发布步骤返回
-success 之后立刻查询会误判成失败。
+传播延迟实测（v6.9.0 与 v6.10.0 两次刷新）：**Open VSX 约 5–6 分钟**（其间直接 404 或旧版本号）、
+**Marketplace 约 9–10 分钟**。发布步骤返回 success 之后立刻查询会误判成失败——2026-11-12/13
+那两次都是第 4–7 次轮询才看到新版本，而旧数字（1 与 6 分钟）会让人在第 3 分钟就以为发挂了。
+
+轮询脚本的两个坑：Open VSX 的 `allVersions` 会先出现新版本、`version` 字段稍后才更新；Marketplace
+要带 `flags=914` 才返回版本列表。
 
 ```bash
 # Open VSX：期望 "version":"<version>"
