@@ -10,10 +10,8 @@ interface UseParquetColumnFocusArgs {
 /**
  * Bring one field into view without changing the page or the row selection.
  *
- * This lives outside the viewer because the behaviour is a small, testable horizontal-scroll
- * model built on the virtual table's DOM: measure the target instead of computing it from a
- * column width (antd stretches few-column files), keep the separately-scrolled header aligned,
- * and retry for a few frames because the virtual list rebuilds its scrollbar.
+ * Uses native smooth scrolling with retry logic to handle the virtual list's scrollbar rebuild.
+ * The synthetic drag approach was removed in favor of simpler, more reliable smooth scrolling.
  */
 export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetColumnFocusArgs) {
   /** Field whose column the schema click last brought into view; tints it while browsing. */
@@ -61,15 +59,9 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
         return centred && aligned;
       };
 
-      /** True while a synthetic drag is in flight; a second mousedown would cancel the first. */
-      let dragging = false;
-
-      // Wall-clock budget, not a frame count: on a loaded machine a frame is what is slow, so a
-      // frame budget shrinks exactly when the retries are needed. Declared before `scrollOnce`
-      // because the drag chain schedules the next attempt itself.
-      const deadline = Date.now() + 1200;
-      // Assigned below; the drag chain only reaches it after this function has been called.
-      let attempt: () => void;
+      // Wall-clock budget for retries: the virtual list may rebuild its scrollbar when the
+      // active column changes, so we retry until settled or timeout.
+      const deadline = Date.now() + 800;
 
       const scrollOnce = () => {
         const wrap = tableWrapRef.current;
@@ -108,70 +100,6 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
             Math.max(0, (wrapRect.width - DATA_COLUMN_WIDTH) / 2);
         const target = Math.max(0, Math.min(maxScroll, desired));
 
-        // Drag the thumb rather than clicking the track: rc-virtual-list ignores a mousedown
-        // whose target is the thumb, and a wide thumb can cover the position that means "the
-        // end". A drag is relative, so it works at any thumb size.
-        const track = wrap.querySelector<HTMLElement>(
-          ".ant-table-tbody-virtual-scrollbar-horizontal",
-        );
-        const thumb = track?.querySelector<HTMLElement>(".ant-table-tbody-virtual-scrollbar-thumb");
-        if (track && thumb) {
-          const trackRect = track.getBoundingClientRect();
-          const thumbRect = thumb.getBoundingClientRect();
-          const offsetRange = trackRect.width - thumbRect.width;
-          if (offsetRange > 0 && thumbRect.width > 0) {
-            const px = ((target - bodyOffset()) / maxScroll) * offsetRange;
-            if (Math.abs(px) < 0.5) {
-              syncHeader();
-              return;
-            }
-            const startX = thumbRect.left + thumbRect.width / 2;
-            const startY = trackRect.top + trackRect.height / 2;
-            // The drag handler reads `pageX`, which a synthetic MouseEvent does not reliably
-            // carry (only `clientX` is part of MouseEventInit), so define it explicitly.
-            const fire = (
-              node: EventTarget,
-              type: string,
-              x: number,
-              init: MouseEventInit = {},
-            ) => {
-              const event = new MouseEvent(type, {
-                bubbles: true,
-                cancelable: true,
-                clientX: x,
-                clientY: startY,
-                ...init,
-              });
-              Object.defineProperty(event, "pageX", { value: x });
-              Object.defineProperty(event, "pageY", { value: startY });
-              node.dispatchEvent(event);
-            };
-            fire(thumb, "mousedown", startX, { button: 0, buttons: 1 });
-            dragging = true;
-            // The window listeners only exist after React commits `dragging` (post-paint), and
-            // the scroll is applied on the frame after the move — releasing in the same tick
-            // cancels it, because the drag effect cleans up with `raf.cancel`.
-            window.setTimeout(() => {
-              fire(window, "mousemove", startX + px * 0.5, { buttons: 1 });
-              fire(window, "mousemove", startX + px, { buttons: 1 });
-              window.setTimeout(() => {
-                fire(window, "mouseup", startX + px, { buttons: 0 });
-                window.setTimeout(() => {
-                  dragging = false;
-                  syncHeader();
-                  // A drag can silently do nothing — the virtual table rebuilds its scrollbar
-                  // when the active-column class changes, and on a loaded machine the drag
-                  // listeners may not be attached yet. This used to end the retry loop (the
-                  // caller saw `dragging` and returned), which is exactly the flake: one dead
-                  // drag left the viewport at offset 0 for the rest of the scenario.
-                  if (!isSettled() && Date.now() <= deadline) requestAnimationFrame(attempt);
-                }, 32);
-              }, 64);
-            }, 80);
-            return;
-          }
-        }
-
         const body = wrap.querySelector<HTMLElement>(".ant-table-body, .ant-table-content");
         if (body && Math.abs(target - body.scrollLeft) >= 1) {
           const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
@@ -183,22 +111,14 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
       };
 
       // Let the active column commit, then verify and retry: the virtual table rebuilds its
-      // scrollbar when a column class changes, so an attempt can land on a detached track or
-      // one whose geometry is still zero. Both are silent.
-      //
-      // Attempts are serialised — a drag takes ~176 ms of timers, so starting the next one two
-      // frames later (33 ms) would overlap it, and only one of two overlapping drags can win.
-      attempt = () => {
-        if (!dragging) {
-          scrollOnce();
-          // `scrollOnce` leaves `dragging` set only when it started a drag chain, and that chain
-          // schedules the next attempt when it finishes.
-          if (dragging) return;
-        }
+      // scrollbar when a column class changes, so an attempt can land on a detached track.
+      const attempt = () => {
+        scrollOnce();
         requestAnimationFrame(() => {
           syncHeader();
           if (isSettled() || Date.now() > deadline) return;
-          attempt();
+          // Retry after a short delay to allow smooth scroll to progress
+          setTimeout(attempt, 50);
         });
       };
       requestAnimationFrame(attempt);
