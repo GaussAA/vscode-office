@@ -100,16 +100,20 @@ run to run — because the regression being guarded is an order of magnitude, no
 percent. If a change makes a scan legitimately slower (more columns decoded per row, say),
 raise the budget in the same commit and say why.
 
-## Interaction frames (baseline, not yet gated)
+## Interaction frames
 
-ADR-0022 defines "smooth" as something measured, so `verify:ui` now records **frame gaps** during
-paging, scrolling and selecting on the 250k-row fixture:
+ADR-0022 defines "smooth" as something measured, so `verify:ui` records **frame gaps** during
+paging, scrolling and selecting on the 250k-row fixture, and fails above a ceiling:
 
-| scenario                | fixture                         | local baseline |
-| ----------------------- | ------------------------------- | -------------- |
-| `parquet-frames-paging` | 5 page turns                    | 0 gaps ≥ 50 ms |
-| `parquet-frames-scroll` | horizontal travel + PageDown ×5 | 0 gaps ≥ 50 ms |
-| `parquet-frames-select` | 20 cell selections              | 0 gaps ≥ 50 ms |
+| scenario                | fixture                         | baseline (3 local + 2 CI rounds) | ceiling       |
+| ----------------------- | ------------------------------- | -------------------------------- | ------------- |
+| `parquet-frames-paging` | 5 page turns                    | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+| `parquet-frames-scroll` | horizontal travel + PageDown ×5 | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+| `parquet-frames-select` | 20 cell selections              | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+
+The ceiling was set **after** five runs agreed on zero: one gap under 150 ms is tolerated for a
+GC pause, anything beyond is an order-of-magnitude regression. ADR-0022 decision 4 says the only
+direction from here is down — when the numbers stay at zero for another few rounds, tighten.
 
 Measured as `requestAnimationFrame` deltas over 50 ms, **not** as `longtask` entries:
 `PerformanceObserver` advertises `longtask` in this Chromium and then never delivers one — a
@@ -122,9 +126,9 @@ Three preconditions keep the numbers honest, and each one has already caught a r
 this was being built: the right fixture (pager says 250,000), the collector alive (the self-check),
 and the interaction actually moving the view.
 
-Thresholds are deliberately absent for now: the plan (ADR-0022 decision 4) is to watch the CI
-numbers for two rounds and then set a ceiling that only ever tightens. A ceiling invented on the
-first local run would be fitted to one machine.
+**Verified by mutation:** adding a 200 ms stall to the paging scenario fails with
+`1 frame gap(s), longest 183 ms (ceiling 1 gap / 150 ms)` — the gate reports the measured gap, not
+just a verdict.
 
 ## What is not gated
 

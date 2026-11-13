@@ -26,6 +26,15 @@ async function expectBigFixture(page) {
   }
 }
 
+/**
+ * The ceiling, set from the numbers two CI rounds and three local runs agreed on: **zero** frame
+ * gaps ≥ 50 ms in every interaction, on the 250k-row fixture. One gap under 150 ms is tolerated
+ * for a GC pause; anything beyond is the order-of-magnitude regression this guards
+ * (ADR-0022 decision 4). The only direction from here is down.
+ */
+const MAX_GAP_MS = 150;
+const MAX_GAPS = 1;
+
 function summarize(raw, label) {
   const longFrames = raw.longFrames ?? [];
   const loafs = raw.loafs ?? [];
@@ -41,6 +50,14 @@ function summarize(raw, label) {
 }
 
 function describe(sample) {
+  if (sample.longest > MAX_GAP_MS || sample.longFrames > MAX_GAPS) {
+    throw new Error(
+      `${sample.label} produced ${sample.longFrames} frame gap(s), longest ${sample.longest} ms ` +
+        `(ceiling ${MAX_GAPS} gap / ${MAX_GAP_MS} ms). Paging means a heavier page decode or row ` +
+        `render; scrolling means the virtual table's scrollbar work grew; selecting means the ` +
+        `value panel re-renders more than it used to.`,
+    );
+  }
   return (
     `${sample.label}: ${sample.longFrames} long frame(s), longest ${sample.longest} ms, ` +
     `${sample.loafs} long frame(s), ${sample.blocked} ms blocked`
