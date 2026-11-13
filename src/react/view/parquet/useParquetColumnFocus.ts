@@ -64,6 +64,13 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
       /** True while a synthetic drag is in flight; a second mousedown would cancel the first. */
       let dragging = false;
 
+      // Wall-clock budget, not a frame count: on a loaded machine a frame is what is slow, so a
+      // frame budget shrinks exactly when the retries are needed. Declared before `scrollOnce`
+      // because the drag chain schedules the next attempt itself.
+      const deadline = Date.now() + 1200;
+      // Assigned below; the drag chain only reaches it after this function has been called.
+      let attempt: () => void;
+
       const scrollOnce = () => {
         const wrap = tableWrapRef.current;
         if (!wrap) return;
@@ -152,6 +159,12 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
                 window.setTimeout(() => {
                   dragging = false;
                   syncHeader();
+                  // A drag can silently do nothing — the virtual table rebuilds its scrollbar
+                  // when the active-column class changes, and on a loaded machine the drag
+                  // listeners may not be attached yet. This used to end the retry loop (the
+                  // caller saw `dragging` and returned), which is exactly the flake: one dead
+                  // drag left the viewport at offset 0 for the rest of the scenario.
+                  if (!isSettled() && Date.now() <= deadline) requestAnimationFrame(attempt);
                 }, 32);
               }, 64);
             }, 80);
@@ -173,15 +186,13 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
       // scrollbar when a column class changes, so an attempt can land on a detached track or
       // one whose geometry is still zero. Both are silent.
       //
-      // The budget is wall time, not frames: on a loaded machine a frame is what is slow, so a
-      // frame count shrinks exactly when the retries are needed. And attempts are serialised —
-      // a drag takes ~176 ms of timers, so starting the next one two frames later (33 ms) would
-      // overlap it, and only one of two overlapping drags can win.
-      const deadline = Date.now() + 800;
-      const attempt = () => {
+      // Attempts are serialised — a drag takes ~176 ms of timers, so starting the next one two
+      // frames later (33 ms) would overlap it, and only one of two overlapping drags can win.
+      attempt = () => {
         if (!dragging) {
           scrollOnce();
-          // `scrollOnce` leaves `dragging` set only when it started a drag chain.
+          // `scrollOnce` leaves `dragging` set only when it started a drag chain, and that chain
+          // schedules the next attempt when it finishes.
           if (dragging) return;
         }
         requestAnimationFrame(() => {
