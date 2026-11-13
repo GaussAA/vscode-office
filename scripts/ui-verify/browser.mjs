@@ -144,6 +144,14 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
         { name: "prefers-reduced-motion", value: reduce ? "reduce" : "no-preference" },
       ]);
     },
+    /**
+     * A real key press, not a dispatched event.
+     *
+     * `dispatchEvent(new KeyboardEvent("Tab"))` does not move focus — the browser moves focus
+     * from `keydown` handled by the compositor. A keyboard-reachability scenario built on
+     * synthetic events would pass while a real user is stuck, which is the worst kind of green.
+     */
+    press: (key) => page.keyboard.press(key),
     /** Long frames (rAF gaps ≥ 50 ms) and long animation frames since the page started. */
     frames: () =>
       page.evaluate(
