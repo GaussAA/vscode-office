@@ -1,4 +1,5 @@
 @css-prefix: x-spreadsheet;
+@import "../../../common/motion.less";
 // color
 @red-color: #db2828;
 @red-hover-color: #d01919;
@@ -101,7 +102,7 @@ body {
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;
-  animation: x-spreadsheet-tooltip-in 0.12s ease-out;
+  animation: x-spreadsheet-tooltip-in var(--motion-fast) var(--motion-ease);
   z-index: 201;
 
   &:before {
@@ -1035,7 +1036,9 @@ body {
   color: rgba(0, 0, 0, 0.88);
   white-space: nowrap;
   cursor: pointer;
-  transition: all 0.3s;
+  transition:
+    color var(--motion-base) var(--motion-ease),
+    background-color var(--motion-base) var(--motion-ease);
   text-shadow: 0 0 0.5px currentcolor;
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
@@ -1285,7 +1288,9 @@ body {
   vertical-align: baseline;
   zoom: 1;
   user-select: none;
-  transition: all 0.1s linear;
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease);
 
   &.active,
   &:hover {
@@ -1402,9 +1407,9 @@ body {
   opacity: 0;
   -webkit-animation-fill-mode: both;
   animation-fill-mode: both;
-  -webkit-animation-duration: 0.5s;
-  animation-duration: 0.5s;
-  transition: background-color 0.5s linear;
+  -webkit-animation-duration: var(--motion-slow);
+  animation-duration: var(--motion-slow);
+  transition: background-color var(--motion-slow) var(--motion-ease);
   user-select: none;
   z-index: 1000;
 
