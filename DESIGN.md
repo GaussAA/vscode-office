@@ -249,9 +249,31 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 
 本仓库自己的样式不再声明浮层阴影。唯一保留的 `box-shadow` 是 antd 自带的弹层/下拉菜单；表格铺满视口后底部那条 1px 内阴影（`inset 0 -1px 0`）只是收边，不是层级。输入类控件的「描边」用 `inset 0 0 0 1px` 模拟，不是阴影。
 
+### Surface levels (signature)
+
+三段底色，用同一个混合函数从前景往画布里推 —— 深浅主题都成立，不新增色值：
+
+| 层        | 放什么                             | 值                                         |
+| --------- | ---------------------------------- | ------------------------------------------ |
+| `canvas`  | 表格主体：读者真正在读的地方       | `--vscode-editor-background`               |
+| `surface` | 命令栏、schema 侧栏、底栏、表头    | `color-mix(in srgb, var(--fg) 4%, canvas)` |
+| `raised`  | 停靠面板：列画像、值面板、对比面板 | `color-mix(in srgb, var(--fg) 8%, canvas)` |
+
+四条规则：
+
+- **只有三段，不许有第四段。** 还想分得更细，用内距与字阶，不要调出新的百分比——第四段出现时，
+  「层次」就变成了「另一个界面」。
+- **表头属于 `surface`，不属于 `canvas`。** 它是栏，不是内容；内容区只有一种底色。
+- **`raised` 必须比 `surface` 更靠近前景**，由 `verify:ui` 的 `getComputedStyle` 断言守着。反了的话
+  停靠面板会沉进底栏，而且深浅主题里会以不同方式沉。
+- **令牌集中定义在 `Parquet.less` 顶部**（`--pv-canvas` / `--pv-surface` / `--pv-raised`），组件里只引用，
+  不在局部再算一遍混合。
+
 ### Named Rules
 
 **The No-Divider Rule.** 区域之间不加 1px 线。觉得两块区域糊在一起，就调混合比例或加内距，不要画线。
+
+**The Three-Level Rule.** 底色只有 `canvas` / `surface` / `raised` 三种。新增一块区域时先回答「它在哪一层」，回答不了说明它和别的区域没有结构差别，那就不要给它新底色。
 
 **The Inset Focus Rule.** 输入类焦点的表现是 `inset 0 0 0 1px var(--focus)` 的环；可聚焦的按钮/行是 `outline: 1px solid var(--focus)` 加 1px 或 -1px 偏移。两者都不加 blur、chevron、位移或颜色渐变。
 

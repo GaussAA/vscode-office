@@ -7,13 +7,11 @@ body:has(.parquet-app) {
 }
 
 .parquet-viewer {
-  --pv-bg: var(--vscode-editor-background, #1e1e1e);
-  --pv-panel: color-mix(in srgb, var(--vscode-sideBar-background, #252526) 92%, var(--pv-fg) 8%);
-  --pv-panel-strong: color-mix(
-    in srgb,
-    var(--vscode-editorGroupHeader-tabsBackground, #2d2d2d) 92%,
-    var(--pv-fg) 8%
-  );
+  /* Three surface levels (DESIGN.md). The mix moves toward the foreground, so `raised` reads
+     closer to the text than `surface` in both light and dark themes without a new colour. */
+  --pv-canvas: var(--vscode-editor-background, #1e1e1e);
+  --pv-surface: color-mix(in srgb, var(--vscode-foreground, #cccccc) 4%, var(--pv-canvas));
+  --pv-raised: color-mix(in srgb, var(--vscode-foreground, #cccccc) 8%, var(--pv-canvas));
   --pv-fg: var(--vscode-foreground, #cccccc);
   --pv-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.72));
   --pv-hover: var(--vscode-list-hoverBackground, rgba(90, 93, 94, 0.3));
@@ -25,10 +23,10 @@ body:has(.parquet-app) {
   --pv-error: var(--vscode-errorForeground, #f48771);
   --pv-link: var(--vscode-textLink-foreground, #3794ff);
   --pv-json-key: var(--vscode-charts-purple, #b180d7);
-  --pv-control: color-mix(in srgb, var(--pv-fg) 8%, var(--pv-panel));
-  --pv-control-hover: color-mix(in srgb, var(--pv-fg) 13%, var(--pv-panel));
-  --pv-control-active: color-mix(in srgb, var(--pv-fg) 18%, var(--pv-panel));
-  --pv-row-alt: color-mix(in srgb, var(--pv-fg) 3.5%, var(--pv-bg));
+  --pv-control: color-mix(in srgb, var(--pv-fg) 8%, var(--pv-surface));
+  --pv-control-hover: color-mix(in srgb, var(--pv-fg) 13%, var(--pv-surface));
+  --pv-control-active: color-mix(in srgb, var(--pv-fg) 18%, var(--pv-surface));
+  --pv-row-alt: color-mix(in srgb, var(--pv-fg) 3.5%, var(--pv-canvas));
   /* findMatchHighlightBackground is semi-transparent on purpose — VS Code paints it *over*
      text. Mixing it again at 18% left roughly 6% effective opacity, so a matched row read as a
      slightly luckier stripe instead of a hit. The opaque token is the right source; the fallback
@@ -36,9 +34,9 @@ body:has(.parquet-app) {
   --pv-row-match: color-mix(
     in srgb,
     var(--vscode-editor-findMatchBackground, #ea5c00) 22%,
-    var(--pv-bg)
+    var(--pv-canvas)
   );
-  --pv-row-target: color-mix(in srgb, var(--pv-accent) 18%, var(--pv-bg));
+  --pv-row-target: color-mix(in srgb, var(--pv-accent) 18%, var(--pv-canvas));
   --pv-scroll-thumb: color-mix(in srgb, var(--pv-fg) 22%, transparent);
   --pv-scroll-thumb-hover: color-mix(in srgb, var(--pv-fg) 38%, transparent);
   --pv-type-bg: color-mix(in srgb, var(--pv-fg) 8%, transparent);
@@ -82,7 +80,7 @@ body:has(.parquet-app) {
   height: 100vh;
   min-height: 100vh;
   color: var(--pv-fg);
-  background: var(--pv-bg);
+  background: var(--pv-canvas);
   font-family: var(--pv-font);
   font-size: var(--vscode-font-size, 13px);
   overflow: hidden;
@@ -170,7 +168,7 @@ body:has(.parquet-app) {
   flex-shrink: 0;
   min-height: 52px;
   padding: 8px 16px;
-  background: var(--pv-panel-strong);
+  background: var(--pv-surface);
 }
 
 .parquet-viewer__search {
@@ -336,7 +334,7 @@ body:has(.parquet-app) {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--pv-panel);
+  background: var(--pv-surface);
 }
 
 .parquet-viewer__sider-heading {
@@ -584,7 +582,7 @@ body:has(.parquet-app) {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--pv-bg);
+  background: var(--pv-canvas);
 }
 
 .parquet-viewer__table-wrap {
@@ -623,7 +621,7 @@ body:has(.parquet-app) {
     background: transparent;
     font-size: 12px;
     /* The grid now fills the viewport, so the data can stop short of the bottom (a short page, the
-       last page, or the remainder of a whole-row page). That tail is the same `--pv-bg` as the
+       last page, or the remainder of a whole-row page). That tail is the same `--pv-canvas` as the
        cells, which left it reading as one more empty row; a hairline at the grid's bottom edge
        says where the table ends instead. `box-shadow` rather than `border`: a border would change
        the measured height that decides how many rows fit. */
@@ -631,7 +629,7 @@ body:has(.parquet-app) {
   }
 
   .ant-table-header {
-    background: var(--pv-panel);
+    background: var(--pv-surface);
   }
 
   .ant-table-thead > tr > th {
@@ -640,7 +638,7 @@ body:has(.parquet-app) {
     padding: 8px 12px !important;
     border: 0 !important;
     color: var(--pv-muted) !important;
-    background: var(--pv-panel) !important;
+    background: var(--pv-surface) !important;
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: 0.045em;
@@ -660,7 +658,7 @@ body:has(.parquet-app) {
     padding: 6px 12px !important;
     border: 0 !important;
     color: var(--pv-fg);
-    background: var(--pv-bg) !important;
+    background: var(--pv-canvas) !important;
     font-family: var(--pv-mono);
     font-size: 12px;
     transition: background 0.1s ease;
@@ -691,23 +689,23 @@ body:has(.parquet-app) {
   /* The schema click leaves a quiet column tint behind, not a second selection state. */
   .ant-table-thead > tr > th.parquet-viewer__column--active {
     color: var(--pv-fg) !important;
-    background: color-mix(in srgb, var(--pv-link) 10%, var(--pv-panel)) !important;
+    background: color-mix(in srgb, var(--pv-link) 10%, var(--pv-surface)) !important;
   }
 
   .ant-table-tbody > tr > td.parquet-viewer__column--active,
   .ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--active {
-    background: color-mix(in srgb, var(--pv-link) 7%, var(--pv-bg)) !important;
+    background: color-mix(in srgb, var(--pv-link) 7%, var(--pv-canvas)) !important;
   }
 
   .ant-table-tbody > tr:hover > td.parquet-viewer__column--active,
   .ant-table-tbody > tr.ant-table-row-hover > td.parquet-viewer__column--active,
   .ant-table-tbody-virtual .ant-table-row:hover .ant-table-cell.parquet-viewer__column--active {
-    background: color-mix(in srgb, var(--pv-link) 11%, var(--pv-bg)) !important;
+    background: color-mix(in srgb, var(--pv-link) 11%, var(--pv-canvas)) !important;
   }
 
   .ant-table-cell-fix-left,
   .ant-table-cell-fix-right {
-    background: var(--pv-bg) !important;
+    background: var(--pv-canvas) !important;
   }
 
   .ant-table-tbody > tr.parquet-viewer__row--alt > td.ant-table-cell-fix-left,
@@ -717,7 +715,7 @@ body:has(.parquet-app) {
 
   .ant-table-placeholder > td,
   .ant-table-placeholder:hover > td {
-    background: var(--pv-bg) !important;
+    background: var(--pv-canvas) !important;
     border: 0 !important;
   }
 
@@ -832,8 +830,9 @@ body:has(.parquet-app) {
   gap: 16px;
   flex-shrink: 0;
   min-height: 44px;
-  padding: 6px 16px;
-  background: var(--pv-panel-strong);
+  /* On the 8px grid like the top bar: 6px made the two bars read as different thicknesses. */
+  padding: 8px 16px;
+  background: var(--pv-surface);
 }
 
 /* The selection is one group — label, value, copy, close — that must stay together. It used
@@ -1151,7 +1150,7 @@ body:has(.parquet-app) {
   gap: 10px;
   min-height: 200px;
   color: var(--pv-muted);
-  background: var(--pv-bg);
+  background: var(--pv-canvas);
   font-size: 13px;
 
   .codicon {
@@ -1170,7 +1169,7 @@ body:has(.parquet-app) {
   justify-content: center;
   gap: 12px;
   color: var(--pv-muted);
-  background: color-mix(in srgb, var(--pv-bg) 78%, transparent);
+  background: color-mix(in srgb, var(--pv-canvas) 78%, transparent);
   backdrop-filter: blur(2px);
   font-size: 13px;
 
@@ -1245,7 +1244,7 @@ body:has(.parquet-app) {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: var(--pv-bg);
+  background: var(--pv-canvas);
 }
 
 .parquet-viewer__too-large-panel {
@@ -1255,7 +1254,7 @@ body:has(.parquet-app) {
   width: min(560px, 100%);
   padding: 24px;
   border-radius: var(--pv-radius);
-  background: var(--pv-panel-strong);
+  background: var(--pv-raised);
 }
 
 .parquet-viewer__too-large-title {
@@ -1306,7 +1305,7 @@ body:has(.parquet-app) {
   max-height: 40vh;
   padding: 8px 16px 10px;
   border-top: 1px solid color-mix(in srgb, var(--pv-fg) 12%, transparent);
-  background: var(--pv-panel-strong);
+  background: var(--pv-raised);
   box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.22);
 }
 
@@ -1397,7 +1396,7 @@ body:has(.parquet-app) {
   max-height: 40vh;
   padding: 8px 16px 10px;
   border-top: 1px solid color-mix(in srgb, var(--pv-fg) 12%, transparent);
-  background: var(--pv-panel-strong);
+  background: var(--pv-raised);
   box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.22);
 }
 
@@ -1452,7 +1451,7 @@ body:has(.parquet-app) {
   padding: 8px 10px;
   overflow: auto;
   border-radius: var(--pv-radius-sm);
-  background: var(--pv-bg);
+  background: var(--pv-canvas);
   color: var(--pv-fg);
   font-family: var(--pv-mono);
   font-size: 11.5px;
