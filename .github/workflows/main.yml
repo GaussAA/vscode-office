@@ -33,6 +33,16 @@ jobs:
         run: xvfb-run -a pnpm test:smoke:min
       - name: UI verification (headless DOM assertions)
         run: xvfb-run -a pnpm verify:ui
+      # Diagnostic branch only: repeat the scenario that never fails on Windows, so the runner
+      # environment gets 20 chances to fail it and the diagnostic lands in this log.
+      - name: Repro column-jump flake (diagnostic, temporary)
+        run: |
+          for i in $(seq 1 20); do
+            echo "=== attempt $i ==="
+            xvfb-run -a node scripts/ui-verify/runner.mjs --filter=parquet-json-links-column-jump 2>&1 | tee "/tmp/jump-$i.log"
+            if grep -q "FAIL" "/tmp/jump-$i.log"; then exit 0; fi
+          done
+          echo "no failure in 20 attempts"
       # The only layer that sees cost rather than appearance: bytes served, search passes,
       # window sizes. Its large fixtures are generated into .perf/, so the cache keeps a cold
       # run from regenerating 200 MB on every push; the key is the generator's own hash.
