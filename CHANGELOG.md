@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.11.0] - 2026-11-13
+
+### Added
+
+- Parquet: turning a page and running a search are now **spoken** as well as drawn. A screen
+  reader hears `22–42 of 300` after a page turn and `3 matches` when a search finishes, through
+  one polite live region. Results are announced, not progress: the scan updates a visible
+  progress bar without queueing a message per batch.
+
+### Changed
+
+- Excel: its animations now follow `prefers-reduced-motion` like the other two viewers do. The
+  last eleven hard-coded durations are gone, and a unit test fails the build if one comes back —
+  a literal duration is one the preference cannot zero.
+
 ## [6.10.0] - 2026-11-13
 
 ### Changed
