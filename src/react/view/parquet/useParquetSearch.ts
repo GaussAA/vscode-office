@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ParquetFileInfo } from "./parquetParser";
 import { searchParquetValues } from "./parquetSearch";
 import { SEARCH_MAX_ROWS } from "./parquetLayout";
@@ -10,6 +10,11 @@ interface UseParquetSearchArgs {
   goToPage: (next: number | ((current: number) => number)) => void;
   focusColumn: (position: number, mark?: boolean) => void;
   onError: (message: string) => void;
+  /**
+   * Fires once per finished search with the number of matching rows. Announcing progress would
+   * queue a message per scanned batch; the result is the thing worth saying out loud.
+   */
+  onSearched?: (matches: number) => void;
 }
 
 export interface ParquetSearch {
@@ -39,7 +44,13 @@ export function useParquetSearch({
   goToPage,
   focusColumn,
   onError,
+  onSearched,
 }: UseParquetSearchArgs): ParquetSearch {
+  const onSearchedRef = useRef(onSearched);
+
+  useEffect(() => {
+    onSearchedRef.current = onSearched;
+  }, [onSearched]);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [progress, setProgress] = useState<{
@@ -102,6 +113,7 @@ export function useParquetSearch({
       setMatchRows(new Set(result.rows));
       setCapped(result.capped);
       setSearchedEmpty(result.rows.length === 0);
+      onSearchedRef.current?.(result.rows.length);
       matchColumnsRef.current = new Map(
         result.rows.map((row, at) => [row, result.columns[at] ?? 0] as const),
       );

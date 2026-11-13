@@ -5,6 +5,7 @@ import "@vscode/codicons/dist/codicon.css";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { handler } from "../../util/vscode.ts";
 import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
+import { formatRowRange } from "./parquetAnnounce.ts";
 import { arrayBufferFromPayload } from "../../util/loadOfficeContent.ts";
 import { openParquetSource } from "../../util/parquetSource.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
@@ -164,6 +165,31 @@ function ParquetViewer({ dark }: { dark: boolean }) {
 
   // Every page change drops the inspector, the cursor and the jump highlight: they all
   // point at rows on the old page. `jumpToRow` re-sets the highlight right after this.
+  /**
+   * What a screen reader hears about navigation and search.
+   *
+   * One region, latest event wins: selection is announced by the inspector (it owns the
+   * debounced per-cell message), and this one carries the two answers the reader cannot
+   * otherwise get — which page arrived, and whether a search found anything.
+   */
+  const [announcement, setAnnouncement] = useState("");
+
+  const announcePage = useCallback(
+    (start: number, loaded: number) => {
+      const total = fileInfoRef.current?.rowCount ?? 0;
+      setAnnouncement(formatRowRange(start, loaded, total));
+    },
+    [fileInfoRef],
+  );
+
+  const announceSearch = useCallback((matches: number) => {
+    setAnnouncement(
+      matches === 1
+        ? $t("parquet.matchCountOne", { count: 1 })
+        : $t("parquet.matchCountMany", { count: matches }),
+    );
+  }, []);
+
   const goToPage = useCallback(
     (next: number | ((current: number) => number)) => {
       setInspected(null);
@@ -175,6 +201,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   );
 
   const search = useParquetSearch({
+    onSearched: announceSearch,
     fileInfoRef,
     page,
     pageSize,
@@ -194,6 +221,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     restorePendingRef,
     loadedStartRef,
     onError: setError,
+    onPageLoaded: announcePage,
   });
 
   /** Briefly true right after a copy, so the button can answer instead of staying silent. */
@@ -407,9 +435,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     // look like a failure message.
     if (fileInfo.rowCount === 0) return "";
     // What is on screen, which during a page load is still the previous page.
-    const start = loadedStart + 1;
-    const end = Math.min(fileInfo.rowCount, loadedStart + pageSize);
-    return `${start.toLocaleString()}–${end.toLocaleString()} of ${fileInfo.rowCount.toLocaleString()}`;
+    return formatRowRange(loadedStart, pageSize, fileInfo.rowCount);
   }, [fileInfo, loadedStart, pageSize]);
 
   /**
@@ -650,6 +676,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
 
   return (
     <div className={`parquet-viewer${dark ? "" : " parquet-viewer--light"}`}>
+      {/* Navigation and search have no other way out for a screen reader: the pager updates a
+          label that nothing speaks, and a finished search only changes a number in the bar.
+          Latest event wins in one region — a region per surface would interrupt itself. */}
+      <span
+        className="parquet-viewer__sr-only parquet-viewer__announce"
+        role="status"
+        aria-live="polite"
+      >
+        {announcement}
+      </span>
       {tooLarge && !loading && (
         <ParquetGuard
           tooLarge={tooLarge}
