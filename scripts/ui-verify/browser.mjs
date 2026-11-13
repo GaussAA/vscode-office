@@ -68,6 +68,41 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
 
   const page = await browser.newPage();
 
+  // Interaction smoothness has to be measurable or "it feels fast" is the only evidence
+  // (ADR-0022). Measured as **frame gaps**, not as `longtask` entries: `PerformanceObserver`
+  // advertises `longtask` here but never delivers one — a deliberate 120 ms stall produced zero
+  // entries while `supportedEntryTypes` listed the type. A rAF loop that records deltas over
+  // 50 ms catches the same jank (including layout and paint) and is what actually fires.
+  await page.evaluateOnNewDocument(() => {
+    window.__dshFrames = { longFrames: [], loafs: [], started: Date.now() };
+    let last = performance.now();
+    const tick = (now) => {
+      const delta = now - last;
+      if (delta >= 50) {
+        window.__dshFrames.longFrames.push({
+          start: Math.round(now - delta),
+          duration: Math.round(delta),
+        });
+      }
+      last = now;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          window.__dshFrames.loafs.push({
+            start: Math.round(entry.startTime),
+            duration: Math.round(entry.duration),
+            blocking: Math.round(entry.blockingDuration ?? 0),
+          });
+        }
+      }).observe({ type: "long-animation-frame", buffered: true });
+    } catch {
+      // Older Chromium: the frame-gap loop above is the primary signal anyway.
+    }
+  });
+
   // Uncaught page errors are evidence too: a view that throws while mounting is broken
   // even if the DOM looks present.
   const exceptions = [];
@@ -109,6 +144,18 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
         { name: "prefers-reduced-motion", value: reduce ? "reduce" : "no-preference" },
       ]);
     },
+    /** Long frames (rAF gaps ≥ 50 ms) and long animation frames since the page started. */
+    frames: () =>
+      page.evaluate(
+        `JSON.stringify(window.__dshFrames ?? { longFrames: [], loafs: [], started: null })`,
+      ),
+    clearFrames: () =>
+      page.evaluate(`(() => {
+        window.__dshFrames.longFrames.length = 0;
+        window.__dshFrames.loafs.length = 0;
+        window.__dshFrames.started = Date.now();
+        return true;
+      })()`),
     evaluate: (expression) => page.evaluate(expression),
     screenshot: async (file) => {
       await page.screenshot({ path: file });
