@@ -579,6 +579,11 @@ export default [
     docs: "parquet-profile.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1&profile=1");
+      // The badge only exists once the host's profile answer has landed. Pressing `i` before that
+      // reads as "no statistics" and shows the explicit scan button instead — a different screen,
+      // and the top-N wait below then has nothing to wait for.
+      const profiled = await page.waitFor(`!!document.querySelector('.parquet-viewer__list-null')`);
+      expect(profiled, "the profile answer never rendered a null-share badge");
       // Keyboard path: focus the first field row and press `i`.
       const opened = await page.evaluate(`(() => {
         const row = document.querySelector('.parquet-viewer__list-item');

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Parquet: the viewer's chrome and its docked panels now sit on three named surface levels
+  (`canvas` / `surface` / `raised`) instead of a mix of ad-hoc tokens, so the command bar, the
+  schema sidebar, the header, the bottom bar and the panels that cover the table read as one
+  hierarchy in both themes. The docked panels lost their 1px top divider and their shadow — both
+  were against `DESIGN.md`, and the raised tint is what separates them now.
+- Parquet: motion is state feedback only — 120–180 ms, one easing, all of it behind
+  `prefers-reduced-motion` (which zeroes the durations rather than removing them, so every
+  element still lands in its final state). antd's own widget animations follow the same
+  preference. Before this, 32 of 34 transitions in the webview ignored it.
+
 ## [6.9.0] - 2026-11-12
 
 ### Added

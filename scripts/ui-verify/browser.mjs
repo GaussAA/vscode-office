@@ -99,6 +99,16 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
     navigate: async (url) => {
       await page.goto(url, { waitUntil: "domcontentloaded" });
     },
+    /**
+     * Emulate the `prefers-reduced-motion` user preference before navigating. The media query is
+     * read at module scope in two places (CSS custom properties and antd's `motion` token), so
+     * this has to be set before `goto`, not after.
+     */
+    setReducedMotion: async (reduce) => {
+      await page.emulateMediaFeatures([
+        { name: "prefers-reduced-motion", value: reduce ? "reduce" : "no-preference" },
+      ]);
+    },
     evaluate: (expression) => page.evaluate(expression),
     screenshot: async (file) => {
       await page.screenshot({ path: file });
