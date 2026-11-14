@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { $t } from "../../i18n/i18nConfig";
 import { formatBytes } from "@/common/previewLimit";
 
@@ -9,7 +10,11 @@ interface ParquetMetaBarProps {
   createdBy?: string;
 }
 
-export function ParquetMetaBar({
+/**
+ * Metadata bar showing file statistics.
+ * Memoized since it rarely changes after initial load.
+ */
+export const ParquetMetaBar = memo(function ParquetMetaBar({
   rowCount,
   columnCount,
   fileSize,
@@ -58,4 +63,4 @@ export function ParquetMetaBar({
       )}
     </div>
   );
-}
+});
