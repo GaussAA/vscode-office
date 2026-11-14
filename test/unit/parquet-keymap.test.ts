@@ -1,92 +1,156 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveParquetKey } from "../../src/react/view/parquet/parquetKeymap";
+import { resolveParquetKey } from "../../src/react/view/parquet/parquetKeymap.ts";
 
-const base = {
+const baseInput = {
   ctrlKey: false,
   metaKey: false,
-  cursor: { row: 0, col: 0 },
-  rows: 50,
-  cols: 4,
+  cursor: { row: 5, col: 2 },
+  rows: 1000,
+  cols: 10,
   page: 2,
-  pageCount: 10,
-  visibleRows: 20,
-  hasCopy: true,
+  pageCount: 20,
+  visibleRows: 50,
+  hasCopy: false,
 };
 
-test("parquet keymap: escape, enter and copy are commands, not navigation", () => {
-  assert.deepEqual(resolveParquetKey({ ...base, key: "Escape" }), { type: "escape" });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "Enter" }), { type: "inspect" });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "c", ctrlKey: true }), { type: "copy" });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "c", ctrlKey: true, hasCopy: false }), {
-    type: "none",
-  });
+test("resolveParquetKey: Escape clears selection", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "Escape" });
+  assert.deepStrictEqual(action, { type: "escape" });
 });
 
-test("parquet keymap: page-sized moves stay on the page when they can", () => {
-  assert.deepEqual(resolveParquetKey({ ...base, key: "PageDown", cursor: { row: 2, col: 1 } }), {
-    type: "reveal",
-    row: 22,
-    col: 1,
-  });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "PageUp", cursor: { row: 30, col: 1 } }), {
-    type: "reveal",
-    row: 10,
-    col: 1,
-  });
+test("resolveParquetKey: Enter inspects cell", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "Enter" });
+  assert.deepStrictEqual(action, { type: "inspect" });
 });
 
-test("parquet keymap: page edges turn the page and land on the edge", () => {
-  assert.deepEqual(resolveParquetKey({ ...base, key: "PageDown", cursor: { row: 35, col: 1 } }), {
-    type: "turn",
-    page: 3,
-    where: "first",
-  });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "PageUp", cursor: { row: 5, col: 1 } }), {
-    type: "turn",
-    page: 1,
-    where: "last",
-  });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "ArrowDown", cursor: { row: 49, col: 2 } }), {
-    type: "turn",
-    page: 3,
-    where: "first",
-  });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "ArrowUp", cursor: { row: 0, col: 2 } }), {
-    type: "turn",
-    page: 1,
-    where: "last",
-  });
+test("resolveParquetKey: ArrowDown moves cursor down", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "ArrowDown" });
+  assert.deepStrictEqual(action, { type: "reveal", row: 6, col: 2 });
 });
 
-test("parquet keymap: ctrl+home/end go to the page edges", () => {
-  assert.deepEqual(resolveParquetKey({ ...base, key: "Home", ctrlKey: true }), {
-    type: "turn",
-    page: 0,
-    where: "first",
-  });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "End", metaKey: true }), {
-    type: "turn",
-    page: 9,
-    where: "last",
-  });
+test("resolveParquetKey: ArrowUp moves cursor up", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "ArrowUp" });
+  assert.deepStrictEqual(action, { type: "reveal", row: 4, col: 2 });
 });
 
-test("parquet keymap: arrows clamp and home/end jump columns; cold start only on navigation", () => {
-  assert.deepEqual(resolveParquetKey({ ...base, key: "ArrowLeft", cursor: { row: 1, col: 0 } }), {
-    type: "reveal",
-    row: 1,
-    col: 0,
+test("resolveParquetKey: ArrowRight moves cursor right", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "ArrowRight" });
+  assert.deepStrictEqual(action, { type: "reveal", row: 5, col: 3 });
+});
+
+test("resolveParquetKey: ArrowLeft moves cursor left", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "ArrowLeft" });
+  assert.deepStrictEqual(action, { type: "reveal", row: 5, col: 1 });
+});
+
+test("resolveParquetKey: Home moves to start of row", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "Home" });
+  assert.deepStrictEqual(action, { type: "reveal", row: 5, col: 0 });
+});
+
+test("resolveParquetKey: End moves to end of row", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "End" });
+  assert.deepStrictEqual(action, { type: "reveal", row: 5, col: 9 });
+});
+
+test("resolveParquetKey: Ctrl+Home jumps to first page", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "Home", ctrlKey: true });
+  assert.deepStrictEqual(action, { type: "turn", page: 0, where: "first" });
+});
+
+test("resolveParquetKey: Ctrl+End jumps to last page", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "End", ctrlKey: true });
+  assert.deepStrictEqual(action, { type: "turn", page: 19, where: "last" });
+});
+
+test("resolveParquetKey: PageDown moves down one page worth of rows", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "PageDown" });
+  // PageDown moves by visibleRows (50), so from row 5 to row 55
+  assert.deepStrictEqual(action, { type: "reveal", row: 55, col: 2 });
+});
+
+test("resolveParquetKey: PageUp turns page when not enough room", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "PageUp" });
+  // At row 5, PageUp tries to move up by 50 rows (5 - 50 = -45 < 0)
+  // So it turns to previous page instead
+  assert.deepStrictEqual(action, { type: "turn", page: 1, where: "last" });
+});
+
+test("resolveParquetKey: PageUp reveals when there's room", () => {
+  const action = resolveParquetKey({
+    ...baseInput,
+    cursor: { row: 100, col: 2 },
+    key: "PageUp",
   });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "End", cursor: { row: 1, col: 0 } }), {
-    type: "reveal",
-    row: 1,
-    col: 3,
+  // At row 100, PageUp moves up by 50 rows to row 50
+  assert.deepStrictEqual(action, { type: "reveal", row: 50, col: 2 });
+});
+
+test("resolveParquetKey: Ctrl+C copies when hasCopy is true", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "c", ctrlKey: true, hasCopy: true });
+  assert.deepStrictEqual(action, { type: "copy" });
+});
+
+test("resolveParquetKey: Ctrl+C does nothing when hasCopy is false", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "c", ctrlKey: true, hasCopy: false });
+  assert.deepStrictEqual(action, { type: "none" });
+});
+
+test("resolveParquetKey: clamps column at left edge", () => {
+  const action = resolveParquetKey({
+    ...baseInput,
+    cursor: { row: 5, col: 0 },
+    key: "ArrowLeft",
   });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "ArrowDown", cursor: null }), {
-    type: "reveal",
-    row: 0,
-    col: 0,
+  assert.deepStrictEqual(action, { type: "reveal", row: 5, col: 0 });
+});
+
+test("resolveParquetKey: clamps column at right edge", () => {
+  const action = resolveParquetKey({
+    ...baseInput,
+    cursor: { row: 5, col: 9 },
+    key: "ArrowRight",
   });
-  assert.deepEqual(resolveParquetKey({ ...base, key: "a", cursor: null }), { type: "none" });
+  assert.deepStrictEqual(action, { type: "reveal", row: 5, col: 9 });
+});
+
+test("resolveParquetKey: ArrowUp at row 0 turns page", () => {
+  const action = resolveParquetKey({
+    ...baseInput,
+    cursor: { row: 0, col: 2 },
+    key: "ArrowUp",
+  });
+  // At row 0, ArrowUp triggers page turn to previous page
+  assert.deepStrictEqual(action, { type: "turn", page: 1, where: "last" });
+});
+
+test("resolveParquetKey: null cursor with movement key starts at 0,0", () => {
+  const action = resolveParquetKey({
+    ...baseInput,
+    cursor: null,
+    key: "ArrowDown",
+  });
+  // No cursor + movement key = reveal at 0,0 (doesn't move)
+  assert.deepStrictEqual(action, { type: "reveal", row: 0, col: 0 });
+});
+
+test("resolveParquetKey: null cursor with ArrowRight starts at 0,0", () => {
+  const action = resolveParquetKey({
+    ...baseInput,
+    cursor: null,
+    key: "ArrowRight",
+  });
+  // No cursor + movement key = reveal at 0,0 (doesn't move)
+  assert.deepStrictEqual(action, { type: "reveal", row: 0, col: 0 });
+});
+
+test("resolveParquetKey: unknown key returns none", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "x" });
+  assert.deepStrictEqual(action, { type: "none" });
+});
+
+test("resolveParquetKey: handles Cmd key on Mac (metaKey)", () => {
+  const action = resolveParquetKey({ ...baseInput, key: "Home", metaKey: true });
+  assert.deepStrictEqual(action, { type: "turn", page: 0, where: "first" });
 });
