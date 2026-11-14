@@ -1,3 +1,19 @@
+/**
+ * Parquet File Parsing and Schema Analysis
+ *
+ * Core parser for Apache Parquet files using the hyparquet library.
+ * Handles metadata extraction, schema parsing, column categorization,
+ * and data reading with support for various compression codecs.
+ *
+ * Key features:
+ * - Schema tree flattening for display
+ * - Column type categorization (bool, numeric, string, datetime, structure)
+ * - Compression codec support (ZSTD, GZIP, BROTLI, LZ4, SNAPPY)
+ * - Nested structure handling
+ *
+ * @module parquetParser
+ */
+
 import {
   parquetMetadataAsync,
   parquetReadObjects,
@@ -13,12 +29,28 @@ import { toDisplayText } from "@/common/displayText";
 export type ColumnCategory = "bool" | "numeric" | "string" | "datetime" | "structure" | "field";
 
 /**
- * The only place a parquet type string is decoded.
+ * Categorize a Parquet column type for display purposes.
  *
- * The viewer asks one question about a column: which icon and alignment it gets. Each caller
- * used to do its own `type.includes(...)` scan, in a different order, so a new logical type had
- * to be taught to several functions and the answers could disagree (a `LIST<STRING>` looked
- * like a string).
+ * This is the single source of truth for type classification.
+ * Each column gets an icon and alignment based on its category.
+ *
+ * Categories:
+ * - bool: Boolean values
+ * - numeric: Integers, floats, decimals
+ * - string: Text, UUIDs, enums, bytes
+ * - datetime: Timestamps, dates, times
+ * - structure: JSON, structs, maps, lists
+ * - field: Unknown/fallback types
+ *
+ * @param type - Raw Parquet type string (e.g., "INT64", "UTF8", "TIMESTAMP_MILLIS")
+ * @returns The display category
+ * @example
+ * ```ts
+ * categorizeType("INT64") // "numeric"
+ * categorizeType("UTF8") // "string"
+ * categorizeType("TIMESTAMP_MILLIS") // "datetime"
+ * categorizeType("LIST<STRING>") // "structure"
+ * ```
  */
 export function categorizeType(type: string): ColumnCategory {
   const upper = `${type}`.toUpperCase();
@@ -87,6 +119,15 @@ export const PARQUET_PAGE_SIZE = 50;
  */
 export const PARQUET_CHUNK_SIZE = 5_000;
 
+/**
+ * Convert an ArrayBuffer to AsyncBuffer for hyparquet.
+ *
+ * AsyncBuffer is hyparquet's abstraction for file access that works
+ * with both local buffers and remote files.
+ *
+ * @param buffer - The array buffer to wrap
+ * @returns AsyncBuffer interface for hyparquet
+ */
 function asyncBufferFromArrayBuffer(buffer: ArrayBuffer): AsyncBuffer {
   return {
     byteLength: buffer.byteLength,
@@ -96,6 +137,15 @@ function asyncBufferFromArrayBuffer(buffer: ArrayBuffer): AsyncBuffer {
   };
 }
 
+/**
+ * Format a schema element's type for display.
+ *
+ * Prefers logical_type over deprecated converted_type, with fallback to physical type.
+ * Normalizes UTF8 to STRING for consistency.
+ *
+ * @param element - Parquet schema element
+ * @returns Formatted type string (e.g., "STRING", "INT64", "TIMESTAMP_MILLIS")
+ */
 function formatSchemaType(element: SchemaElement): string {
   let type: string;
   if (element.logical_type?.type) {
@@ -113,9 +163,14 @@ function formatSchemaType(element: SchemaElement): string {
 }
 
 /**
- * Display type for a top-level column. `hasChildren` is authoritative for groups: a LIST
- * or MAP group may carry only `logical_type` (converted_type is deprecated), a plain
- * STRUCT carries neither, and none of them has a physical `element.type`.
+ * Format a top-level column's type for display.
+ *
+ * Handles both leaf columns and nested structures (LIST, MAP, STRUCT).
+ * For groups, uses logical_type or converted_type; for leaves, uses formatSchemaType.
+ *
+ * @param element - Schema element
+ * @param hasChildren - True if this is a group with nested elements
+ * @returns Formatted type string (e.g., "LIST", "MAP", "STRUCT", "INT64")
  */
 function formatColumnType(element: SchemaElement, hasChildren: boolean): string {
   let type: string;

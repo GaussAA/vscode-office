@@ -1,3 +1,21 @@
+/**
+ * Keyboard Navigation for Parquet Viewer
+ *
+ * Pure functional keymap that translates keyboard events into semantic actions.
+ * Handles complex navigation including:
+ * - Arrow key cell movement
+ * - Page up/down navigation
+ * - Home/End key shortcuts
+ * - Ctrl/Cmd modifiers for document-level jumps
+ * - Edge case handling (page boundaries, wrapping)
+ *
+ * This is a pure function that returns actions without side effects,
+ * making it easy to test and maintain. The caller (React component)
+ * performs the actual state updates.
+ *
+ * @module parquetKeymap
+ */
+
 export type ParquetKeyAction =
   | { type: "escape" }
   | { type: "inspect" }
@@ -19,6 +37,7 @@ interface ParquetKeyInput {
   hasCopy: boolean;
 }
 
+/** Arrow key movement deltas: [rowDelta, colDelta] */
 const MOVES: Record<string, [number, number]> = {
   ArrowDown: [1, 0],
   ArrowUp: [-1, 0],
@@ -29,9 +48,32 @@ const MOVES: Record<string, [number, number]> = {
 };
 
 /**
- * Pure keymap for the parquet grid. It decides what a key means (page turn, reveal, inspect,
- * copy) without touching DOM or React state; the caller performs the action. This is the part
- * that used to hide page-edge bugs in a 120-line event handler.
+ * Resolve a keyboard event to a semantic action.
+ *
+ * Pure function that decides what a keypress means without side effects.
+ * Handles navigation, inspection, copy, and page turns.
+ *
+ * Key behaviors:
+ * - Arrow keys: Move cursor within page
+ * - Page Up/Down: Navigate pages
+ * - Home/End: Move to start/end of row
+ * - Ctrl+Home/End: Jump to first/last page
+ * - Enter: Inspect selected cell
+ * - Ctrl+C: Copy cell value
+ * - Escape: Close inspector/clear selection
+ *
+ * @param input - Current state and key event
+ * @returns The action to perform
+ * @example
+ * ```ts
+ * const action = resolveParquetKey({
+ *   key: "ArrowDown",
+ *   cursor: { row: 5, col: 2 },
+ *   rows: 1000,
+ *   // ... other state
+ * });
+ * // action = { type: "reveal", row: 6, col: 2 }
+ * ```
  */
 export function resolveParquetKey({
   key,
