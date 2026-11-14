@@ -468,7 +468,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const handleTableKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       if (!fileInfo) return;
-      const target = event.target as HTMLElement;
+      // React.KeyboardEvent.target is EventTarget; in DOM it's always an Element
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
         return;
       }
