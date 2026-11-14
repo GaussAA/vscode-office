@@ -16,6 +16,11 @@ export function useParquetCursor(options: UseParquetCursorOptions = {}) {
   const [cursor, setCursor] = useState<CellCursor | null>(null);
   const cursorRef = useRef<CellCursor | null>(null);
 
+  /**
+   * Select a cell and update both state and ref.
+   *
+   * @param next - The cell cursor to select, or null to clear selection
+   */
   const selectCell = useCallback(
     (next: CellCursor | null) => {
       cursorRef.current = next;
@@ -25,10 +30,23 @@ export function useParquetCursor(options: UseParquetCursorOptions = {}) {
     [options],
   );
 
+  /**
+   * Clear the current cell selection.
+   */
   const clearCursor = useCallback(() => {
     selectCell(null);
   }, [selectCell]);
 
+  /**
+   * Move the cursor relative to its current position.
+   *
+   * @param delta - Row and column offsets to apply
+   * @example
+   * ```ts
+   * moveCursor({ row: 1, col: 0 }); // Move down one row
+   * moveCursor({ row: 0, col: -1 }); // Move left one column
+   * ```
+   */
   const moveCursor = useCallback(
     (delta: { row?: number; col?: number }) => {
       const current = cursorRef.current;

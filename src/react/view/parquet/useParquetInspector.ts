@@ -1,8 +1,23 @@
+/**
+ * Cell Inspector Management for Parquet Viewer
+ *
+ * Manages the inspector panel that shows detailed cell content.
+ * Useful for large values, JSON structures, and nested data.
+ *
+ * @module useParquetInspector
+ */
+
 import { useCallback, useRef, useState } from "react";
 
+/**
+ * Represents a cell selected for detailed inspection.
+ */
 export interface InspectedCell {
+  /** Zero-based row index */
   row: number;
+  /** Column name */
   column: string;
+  /** Cell value (can be any Parquet type) */
   value: unknown;
 }
 
@@ -13,6 +28,8 @@ export interface InspectedCell {
  * - Full cell value (for large values)
  * - JSON structure (for nested data)
  * - Copy functionality
+ *
+ * @returns Inspector state and control functions
  */
 export function useParquetInspector() {
   const [inspected, setInspected] = useState<InspectedCell | null>(null);
@@ -29,6 +46,13 @@ export function useParquetInspector() {
     setCopied(false);
   }, []);
 
+  /**
+   * Copy cell value to clipboard.
+   *
+   * Shows a temporary "copied" indicator for 2 seconds.
+   *
+   * @param text - The text to copy
+   */
   const copyValue = useCallback(async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);

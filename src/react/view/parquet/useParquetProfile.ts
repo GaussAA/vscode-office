@@ -1,3 +1,12 @@
+/**
+ * Column Profiling Management for Parquet Viewer
+ *
+ * Manages the column profiling panel that shows statistical analysis
+ * of column data, including value distributions, top values, and histograms.
+ *
+ * @module useParquetProfile
+ */
+
 import { useCallback, useRef, useState } from "react";
 import type { ParquetColumnScan } from "@/common/parquetProfileTypes";
 import type { ParquetColumnInfo } from "./parquetParser.ts";
@@ -13,6 +22,8 @@ interface ProfilePanel {
  * - Column statistics (min, max, distinct count, etc.)
  * - Top values histogram
  * - Value distribution
+ *
+ * @returns Profile panel state and control functions
  */
 export function useParquetProfile() {
   const [profilePanel, setProfilePanel] = useState<ProfilePanel | null>(null);
@@ -33,6 +44,14 @@ export function useParquetProfile() {
     setScanError(null);
   }, []);
 
+  /**
+   * Start a column scan operation.
+   *
+   * Initiates a request to scan column values for statistical analysis.
+   *
+   * @param column - The column to scan
+   * @param onRequest - Callback to send the scan request to the host
+   */
   const startScan = useCallback(
     (column: ParquetColumnInfo, onRequest: (seq: number, column: ParquetColumnInfo) => void) => {
       const seq = ++profileRequest.current;
@@ -43,6 +62,15 @@ export function useParquetProfile() {
     [],
   );
 
+  /**
+   * Handle scan response from host.
+   *
+   * Updates scan state only if the sequence number matches the current request.
+   *
+   * @param seq - Sequence number of the scan request
+   * @param scan - Scan results (null on error)
+   * @param error - Error message (null on success)
+   */
   const handleScanReply = useCallback(
     (seq: number, scan: ParquetColumnScan | null, error: string | null) => {
       if (seq !== profileRequest.current) return;

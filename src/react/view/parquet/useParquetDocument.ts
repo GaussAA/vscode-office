@@ -1,3 +1,15 @@
+/**
+ * Document Loading Management for Parquet Viewer
+ *
+ * Manages the lifecycle of Parquet file loading, including:
+ * - File opening and reopening
+ * - Loading and error states
+ * - File metadata and column profiling data
+ * - Sequence tracking to handle concurrent requests
+ *
+ * @module useParquetDocument
+ */
+
 import { useCallback, useRef, useState } from "react";
 import type { ParquetFileInfo } from "./parquetParser.ts";
 import type { ParquetProfile } from "@/common/parquetProfileTypes";
@@ -11,6 +23,8 @@ import type { ParquetProfile } from "@/common/parquetProfileTypes";
  * - Error states
  * - File metadata (row count, columns, codecs)
  * - Column profiling data
+ *
+ * @returns Document state and control functions
  */
 export function useParquetDocument() {
   const [fileInfo, setFileInfo] = useState<ParquetFileInfo | null>(null);

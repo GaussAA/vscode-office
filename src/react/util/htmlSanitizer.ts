@@ -1,7 +1,23 @@
+/**
+ * HTML Sanitization utilities for preventing XSS attacks.
+ *
+ * Uses DOMPurify to safely parse and clean HTML from untrusted sources,
+ * particularly clipboard content during spreadsheet paste operations.
+ *
+ * @module htmlSanitizer
+ */
+
 import DOMPurify from "dompurify";
 import { JSDOM } from "jsdom";
 
-// Create a DOMPurify instance for Node.js environment
+/**
+ * Create a DOMPurify instance that works in both browser and Node.js environments.
+ *
+ * In the browser, uses the window object directly.
+ * In Node.js (for testing), creates a JSDOM window.
+ *
+ * @returns DOMPurify instance configured for the current environment
+ */
 const createDOMPurify = () => {
   if (typeof window !== "undefined") {
     // Browser environment

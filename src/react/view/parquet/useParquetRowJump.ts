@@ -1,3 +1,12 @@
+/**
+ * Row Jump Navigation for Parquet Viewer
+ *
+ * Manages the footer's "jump to row" functionality, allowing users
+ * to navigate directly to a specific row number.
+ *
+ * @module useParquetRowJump
+ */
+
 import { useCallback, useState } from "react";
 
 /**
@@ -8,6 +17,8 @@ import { useCallback, useState } from "react";
  * 2. Navigate to the page containing that row
  * 3. Highlight the target row
  * 4. Clear highlight on next navigation
+ *
+ * @returns Row jump state and control functions
  */
 export function useParquetRowJump() {
   /** The row number user entered, displayed as highlighted until next navigation */
@@ -15,6 +26,20 @@ export function useParquetRowJump() {
   /** Pending input value in the jump textbox */
   const [rowJump, setRowJump] = useState("");
 
+  /**
+   * Jump to a specific row number.
+   *
+   * Validates the input and calculates which page contains the target row.
+   *
+   * @param pageSize - Number of rows per page
+   * @param totalRows - Total number of rows in the file
+   * @param onPageChange - Callback to navigate to the calculated page
+   * @returns true if jump was successful, false if input was invalid
+   * @example
+   * ```ts
+   * jumpToRow(100, 1000, setPage); // Jump to row 42 (page 0)
+   * ```
+   */
   const jumpToRow = useCallback(
     (pageSize: number, totalRows: number, onPageChange: (page: number) => void): boolean => {
       const target = Number.parseInt(rowJump, 10);
