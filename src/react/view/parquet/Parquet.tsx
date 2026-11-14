@@ -46,6 +46,7 @@ import ParquetTable from "./ParquetTable.tsx";
 import { useParquetTableSize } from "./useParquetTableSize.ts";
 import { buildParquetColumns } from "./parquetColumns.tsx";
 import { resolveParquetKey } from "./parquetKeymap.ts";
+import { ErrorBoundary } from "../../components/ErrorBoundary.tsx";
 import "./Parquet.less";
 
 /** A virtual document arrives as inline base64; a local one as a fetchable path. */
@@ -820,10 +821,12 @@ export default function Parquet() {
   const dark = useVscodeDarkTheme();
   const antTheme = useMemo(() => parquetAntdTheme(dark), [dark]);
   return (
-    <ConfigProvider theme={antTheme}>
-      <App className="parquet-app">
-        <ParquetViewer dark={dark} />
-      </App>
-    </ConfigProvider>
+    <ErrorBoundary>
+      <ConfigProvider theme={antTheme}>
+        <App className="parquet-app">
+          <ParquetViewer dark={dark} />
+        </App>
+      </ConfigProvider>
+    </ErrorBoundary>
   );
 }

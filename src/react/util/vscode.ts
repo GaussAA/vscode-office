@@ -42,17 +42,45 @@ function receive({ data }: MessageEvent) {
     events[data.type](data.content);
   }
 }
-window.addEventListener("message", receive);
+
 const isMac = navigator.userAgent.includes("Mac OS");
-window.addEventListener(
-  "keydown",
-  (e) => {
-    if (isMac && isCompose(e) && (e.altKey || e.code == "KeyW")) {
-      e.preventDefault();
-    }
-  },
-  isMac ? true : undefined,
-);
+
+// Keyboard handler for Mac compose key prevention
+function preventMacComposeConflict(e: KeyboardEvent) {
+  if (isMac && isCompose(e) && (e.altKey || e.code == "KeyW")) {
+    e.preventDefault();
+  }
+}
+
+// Keyboard handler for F12 developer tools and Hebrew paste bug
+function handleGlobalKeyboard(e: KeyboardEvent) {
+  if (e.code == "F12") handler.emit("developerTool");
+  else if (isCompose(e) && e.code == "KeyV") e.preventDefault(); // vscode的bug, hebrew(希伯来语)键盘会粘贴两次
+}
+
+// Install global event listeners (called once at module load)
+let listenersInstalled = false;
+function installGlobalListeners() {
+  if (listenersInstalled) return;
+  listenersInstalled = true;
+
+  window.addEventListener("message", receive);
+  window.addEventListener("keydown", preventMacComposeConflict, isMac ? true : undefined);
+  window.addEventListener("keydown", handleGlobalKeyboard);
+}
+
+// Cleanup function for testing or hot-reload scenarios
+export function cleanupGlobalListeners() {
+  if (!listenersInstalled) return;
+  listenersInstalled = false;
+
+  window.removeEventListener("message", receive);
+  window.removeEventListener("keydown", preventMacComposeConflict);
+  window.removeEventListener("keydown", handleGlobalKeyboard);
+}
+
+// Install listeners immediately at module load
+installGlobalListeners();
 
 const getVscodeEvent = () => {
   return {
@@ -70,8 +98,3 @@ export const handler = getVscodeEvent();
 export function isCompose(e: KeyboardEvent) {
   return e.metaKey || e.ctrlKey;
 }
-
-window.addEventListener("keydown", (e) => {
-  if (e.code == "F12") handler.emit("developerTool");
-  else if (isCompose(e) && e.code == "KeyV") e.preventDefault(); // vscode的bug, hebrew(希伯来语)键盘会粘贴两次
-});

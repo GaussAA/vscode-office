@@ -26,6 +26,7 @@ import {
   type DirectoryWindow,
 } from "./directoryWindow";
 import { formatBytes } from "../entry/entryFormat.ts";
+import { ErrorBoundary } from "../../components/ErrorBoundary.tsx";
 import "./Jsonl.less";
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -38,7 +39,7 @@ interface SearchMeta {
   capped: boolean;
 }
 
-export default function JsonlViewer() {
+function JsonlViewerContent() {
   const [info, setInfo] = useState<JsonlInfoPayload | null>(null);
   /**
    * The directory window: one contiguous range and its rows, in a single value. The old
@@ -456,5 +457,13 @@ export default function JsonlViewer() {
         )}
       </div>
     </ConfigProvider>
+  );
+}
+
+export default function JsonlViewer() {
+  return (
+    <ErrorBoundary>
+      <JsonlViewerContent />
+    </ErrorBoundary>
   );
 }

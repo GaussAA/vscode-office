@@ -12,6 +12,7 @@ import ExcelLoadError from "./ExcelLoadError";
 import ExcelSaveAsDialog from "./ExcelSaveAsDialog";
 import { useExcelDocumentSession } from "./useExcelDocumentSession";
 import { loadExcelColorMode, saveExcelColorMode, type ExcelColorMode } from "./excelViewState";
+import { ErrorBoundary } from "../../components/ErrorBoundary.tsx";
 
 initExcelLocale();
 
@@ -214,8 +215,10 @@ function ExcelViewer() {
 
 export default function Excel() {
   return (
-    <App className="excel-app" message={{ top: 16 }}>
-      <ExcelViewer />
-    </App>
+    <ErrorBoundary>
+      <App className="excel-app" message={{ top: 16 }}>
+        <ExcelViewer />
+      </App>
+    </ErrorBoundary>
   );
 }
