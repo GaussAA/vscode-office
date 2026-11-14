@@ -105,10 +105,10 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
         // Scroll if target changed (cell appeared) or if this is the first scroll
         if (body && Math.abs(target - body.scrollLeft) >= 1) {
           if (lastTarget === null || Math.abs(target - lastTarget) > 5) {
-            const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-              ? "auto"
-              : "smooth";
-            body.scrollTo({ left: target, behavior });
+            // Use instant scroll: smooth scrolling is unreliable in headless browsers and can
+            // timeout in CI. Users who want animation can rely on the browser's own smooth scroll
+            // for small adjustments, while large jumps benefit from instant arrival.
+            body.scrollTo({ left: target, behavior: "auto" });
             lastTarget = target;
           }
         }
