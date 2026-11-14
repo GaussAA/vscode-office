@@ -11,6 +11,7 @@
  */
 import type * as ExcelJS from "@cweijan/exceljs";
 import * as XLSX from "xlsx";
+import { hasProperty, isObject } from "@/common/typeGuards";
 
 export interface WorkbookSheetRows {
   name: string;
@@ -22,12 +23,13 @@ export interface WorkbookSheetRows {
 export function workbookCellText(cell: ExcelJS.Cell): string {
   const value = cell.value;
   if (value == null) return "";
-  if (typeof value === "object") {
-    if ("formula" in value || "sharedFormula" in value) {
-      const formula = (value as { formula?: string }).formula;
-      return formula ? `=${formula}` : (cell.text ?? "");
+  if (isObject(value)) {
+    if (hasProperty(value, "formula") || hasProperty(value, "sharedFormula")) {
+      const formula = value.formula;
+      return typeof formula === "string" ? `=${formula}` : (cell.text ?? "");
     }
-    if ("hyperlink" in value) {
+    if (hasProperty(value, "hyperlink")) {
+      // Type guard ensures value has hyperlink property
       const link = value as ExcelJS.CellHyperlinkValue;
       return link.text || link.hyperlink || "";
     }
