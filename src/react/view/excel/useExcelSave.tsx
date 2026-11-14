@@ -7,6 +7,13 @@ import { t } from "./excel_i18n";
 import { chooseExcelSaveRoute } from "./excelSave";
 import { exportSaveAs, export_xlsx, hasFormattingChanged } from "./excel_writer";
 
+// Helper to safely extract error message
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return String(error);
+};
+
 type SaveModal = ReturnType<typeof App.useApp>["modal"];
 
 interface UseExcelSaveArgs {
@@ -69,7 +76,7 @@ export function useExcelSave({
             try {
               await export_xlsx(spreadSheet, "xlsx", csvEncoding, { saveAs: true }, csvDelimiter);
             } catch (error) {
-              console.error(`Failed to save Excel file: ${(error as Error).message}`);
+              console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
               throw error;
             }
           },
@@ -96,7 +103,7 @@ export function useExcelSave({
                         csvDelimiter,
                       );
                     } catch (error) {
-                      console.error(`Failed to save Excel file: ${(error as Error).message}`);
+                      console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
                     }
                   })();
                 }}
@@ -118,7 +125,7 @@ export function useExcelSave({
                         csvDelimiter,
                       );
                     } catch (error) {
-                      console.error(`Failed to save Excel file: ${(error as Error).message}`);
+                      console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
                     }
                   })();
                 }}
@@ -139,7 +146,7 @@ export function useExcelSave({
       pendingSaveRef.current = true;
     } catch (error) {
       pendingSaveRef.current = false;
-      console.error(`Failed to save Excel file: ${(error as Error).message}`);
+      console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
     }
   }, [
     csvDelimiterRef,
@@ -161,7 +168,7 @@ export function useExcelSave({
         await exportSaveAs(spreadSheet, format, csvEncodingRef.current, csvDelimiterRef.current);
         // Save As writes a different file; the document being edited is still dirty.
       } catch (error) {
-        console.error(`Failed to save Excel file: ${(error as Error).message}`);
+        console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
       }
     },
     [csvDelimiterRef, csvEncodingRef, spreadsheetRef],
