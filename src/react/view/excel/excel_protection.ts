@@ -15,6 +15,7 @@ function isRowData(row: unknown): row is { cells: Record<number, CellData> } {
 export function readWorksheetProtection(
   worksheet: ExcelJS.Worksheet,
 ): StoredSheetProtection | undefined {
+  // Type assertion required: ExcelJS has undocumented sheetProtection property
   const ws = worksheet as ExcelJS.Worksheet & { sheetProtection?: StoredSheetProtection };
   // exceljs's model type omits sheetProtection even though the object carries it.
   const model = worksheet.model as typeof worksheet.model & {
@@ -52,6 +53,7 @@ function protectionOptionsFromStored(
     algorithmName: _algorithmName,
     ...rest
   } = stored;
+  // Type assertion required: rest matches ExcelJS.WorksheetProtection after removing internal fields
   return rest as Partial<ExcelJS.WorksheetProtection>;
 }
 
