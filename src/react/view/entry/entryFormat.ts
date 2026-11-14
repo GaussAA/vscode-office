@@ -8,6 +8,7 @@
 
 import { JSONL_VALUE_TEXT_LIMIT } from "@/common/jsonlTypes";
 import { toDisplayText } from "@/common/displayText";
+import { isObject } from "@/common/typeGuards";
 
 export type PathSeg = string | number;
 
@@ -33,6 +34,7 @@ export const WRAP_NODE_LIMIT = 2_000;
 export const WRAP_TEXT_LIMIT = 2000;
 
 export const makePathKey = (path: PathSeg[]): string => JSON.stringify(path);
+// JSON.parse returns `any`; the type assertion is safe because we control the serialization
 export const readPathKey = (key: string): PathSeg[] => JSON.parse(String(key)) as PathSeg[];
 
 export function isComposite(value: unknown): value is Record<PathSeg, unknown> | unknown[] {
@@ -43,7 +45,7 @@ export function typeLabel(value: unknown): string {
   if (value === null) return "null";
   if (Array.isArray(value)) return `array[${value.length}]`;
   const kind = typeof value;
-  if (kind === "object") return `object{${Object.keys(value as object).length}}`;
+  if (isObject(value)) return `object{${Object.keys(value).length}}`;
   return kind;
 }
 
@@ -184,7 +186,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
   const walk = (current: unknown, path: PathSeg[]): NodeModel[] => {
     if (!isComposite(current) || path.length >= maxDepth) return [];
     const entries: [PathSeg, unknown][] = Array.isArray(current)
-      ? current.map((item, index) => [index, item] as [number, unknown])
+      ? current.map((item, index): [number, unknown] => [index, item])
       : Object.entries(current);
     const visible = entries.slice(0, maxChildren);
     const nodes: NodeModel[] = [];
@@ -205,7 +207,9 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
         childComposite && childPath.length >= maxDepth
           ? Array.isArray(child)
             ? child.length
-            : Object.keys(child as object).length
+            : isObject(child)
+              ? Object.keys(child).length
+              : 0
           : 0;
       const capped = hiddenKeys > 0;
       nodes.push({
@@ -281,7 +285,14 @@ export function valueAtPath(root: unknown, path: PathSeg[]): unknown {
   let current: unknown = root;
   for (const seg of path) {
     if (!isComposite(current)) return undefined;
-    current = (current as Record<PathSeg, unknown>)[seg];
+    // isComposite guarantees current is an object or array, both support bracket notation
+    if (Array.isArray(current) && typeof seg === "number") {
+      current = current[seg];
+    } else if (isObject(current) && typeof seg === "string") {
+      current = current[seg];
+    } else {
+      return undefined;
+    }
   }
   return current;
 }
