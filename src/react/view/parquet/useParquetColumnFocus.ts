@@ -62,7 +62,7 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
       // Wall-clock budget for retries: the virtual list may rebuild its scrollbar when the
       // active column changes, so we retry until settled or timeout.
       const deadline = Date.now() + 1200;
-      let scrollRequested = false;
+      let lastTarget: number | null = null;
 
       const scrollOnce = () => {
         const wrap = tableWrapRef.current;
@@ -102,13 +102,15 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
         const target = Math.max(0, Math.min(maxScroll, desired));
 
         const body = wrap.querySelector<HTMLElement>(".ant-table-body, .ant-table-content");
-        // Only initiate scroll once; subsequent checks just verify it completed
-        if (!scrollRequested && body && Math.abs(target - body.scrollLeft) >= 1) {
-          const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-            ? "auto"
-            : "smooth";
-          body.scrollTo({ left: target, behavior });
-          scrollRequested = true;
+        // Scroll if target changed (cell appeared) or if this is the first scroll
+        if (body && Math.abs(target - body.scrollLeft) >= 1) {
+          if (lastTarget === null || Math.abs(target - lastTarget) > 5) {
+            const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+              ? "auto"
+              : "smooth";
+            body.scrollTo({ left: target, behavior });
+            lastTarget = target;
+          }
         }
         syncHeader();
       };
