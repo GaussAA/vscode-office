@@ -1,4 +1,5 @@
 import type * as ExcelJS from "@cweijan/exceljs";
+import { hasProperty, isObject } from "@/common/typeGuards";
 
 /**
  * exceljs's bundled types alias its media input to `Buffer`, which in that declaration is
@@ -78,13 +79,16 @@ export function mediaToSheetImageData(
     };
   }
   if (media.buffer) {
+    // ExcelJS media.buffer can be ArrayBuffer, Uint8Array, or { buffer: ArrayBuffer }
     const raw = media.buffer as ArrayBuffer | Uint8Array | { buffer: ArrayBuffer };
     const bytes =
       raw instanceof Uint8Array
         ? raw
         : raw instanceof ArrayBuffer
           ? new Uint8Array(raw)
-          : new Uint8Array((raw as { buffer: ArrayBuffer }).buffer);
+          : isObject(raw) && hasProperty(raw, "buffer") && raw.buffer instanceof ArrayBuffer
+            ? new Uint8Array(raw.buffer)
+            : new Uint8Array(0); // Fallback for unexpected types
     return {
       extension: normalizeExtension(media.extension),
       base64: bytesToBase64(bytes),
@@ -189,6 +193,7 @@ export function writeWorksheetImages(
 ) {
   if (backgroundImage) {
     const bgBuffer = base64ToBytes(backgroundImage.base64);
+    // Type assertion required: our Uint8Array matches ExcelJS's Buffer-like input
     const bgId = workbook.addImage({
       buffer: bgBuffer,
       extension: backgroundImage.extension,
@@ -199,10 +204,12 @@ export function writeWorksheetImages(
   for (let i = 0; i < images.length; i += 1) {
     const img = images[i];
     const buffer = base64ToBytes(img.base64);
+    // Type assertion required: our Uint8Array matches ExcelJS's Buffer-like input
     const imageId = workbook.addImage({
       buffer,
       extension: img.extension,
     } as unknown as ImageMediaInput);
+    // Type assertion required: our anchor format matches ExcelJS's expected range input
     worksheet.addImage(imageId, buildExcelJsImageRange(img.anchor) as unknown as ImageRangeInput);
   }
 }
