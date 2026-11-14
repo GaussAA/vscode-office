@@ -228,12 +228,18 @@ export function formatHtmlClipboard(data, range) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${table}</body></html>`;
 }
 
+import { sanitizeClipboardHTML } from "../../../util/htmlSanitizer.ts";
+
 export function parseHtmlClipboard(html) {
   if (!html) return null;
+
+  // Sanitize HTML to prevent XSS attacks
+  const safeHtml = sanitizeClipboardHTML(html);
+
   const container = document.createElement("div");
   container.style.cssText =
     "position:fixed;left:-10000px;top:-10000px;visibility:hidden;pointer-events:none;";
-  container.innerHTML = html;
+  container.innerHTML = safeHtml;
   document.body.appendChild(container);
   try {
     const table = container.querySelector("table");
