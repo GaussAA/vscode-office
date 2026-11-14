@@ -228,7 +228,7 @@ export function formatHtmlClipboard(data, range) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${table}</body></html>`;
 }
 
-import { sanitizeClipboardHTML } from "../../../util/htmlSanitizer.ts";
+import { sanitizeClipboardHTML } from "../../../../util/htmlSanitizer.ts";
 
 export function parseHtmlClipboard(html) {
   if (!html) return null;
