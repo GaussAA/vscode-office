@@ -14,10 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parquet: empty arrays in LIST columns are now counted as null values in column profiles and
   top-N scans, giving a more accurate picture of data quality. A column with many empty lists
   previously reported 0% null when those rows carried no data.
-- Parquet: clicking a field in the schema sidebar now scrolls smoothly to its column instead of
-  jumping instantly. The animation respects `prefers-reduced-motion` and uses the browser's
-  native smooth scroll rather than synthetic drag events, making the transition more reliable
-  and fluid.
 - Parquet: UTF8 and STRING types are now displayed consistently as `STRING` throughout the
   schema sidebar and column headers. UTF8 is the default string encoding in Parquet, so the
   distinction was adding noise rather than information.
