@@ -22,6 +22,7 @@ import {
 import type { CellData, SheetData } from "./x-spreadsheet/index";
 import { toDisplayText } from "@/common/displayText";
 import { workbookRows, workbookRowsFromSheetJs, type WorkbookSheetRows } from "./workbookRows";
+import { hasProperty, isObject } from "@/common/typeGuards";
 
 type RowMap = NonNullable<SheetData["rows"]>;
 
@@ -72,14 +73,15 @@ const excelColWidthToPx = (width?: number) => {
 
 const normalizeMergeRange = (merge: unknown): string | null => {
   if (typeof merge === "string") return merge;
-  if (merge && typeof merge === "object" && "range" in merge) {
-    const range = (merge as { range?: unknown }).range;
+  if (isObject(merge) && hasProperty(merge, "range")) {
+    const range = merge.range;
     return typeof range === "string" ? range : null;
   }
   return null;
 };
 
 const readWorksheetMerges = (worksheet: ExcelJS.Worksheet): string[] => {
+  // Safe: ExcelJS.Worksheet has undocumented merge properties we need to access
   const ws = worksheet as ExcelJsWorksheetWithMerges;
   const mergeCandidates = [
     ...(ws.model?.merges ?? []),
@@ -126,15 +128,16 @@ const buildColsFromWorksheet = (worksheet: ExcelJS.Worksheet, colCount: number) 
 
 const formatCellText = (cell: ExcelJS.Cell) => {
   const raw = cell.value;
-  if (raw && typeof raw === "object" && "hyperlink" in raw) {
+  if (isObject(raw) && hasProperty(raw, "hyperlink")) {
+    // Type guard ensures raw has hyperlink property
     const hv = raw as ExcelJS.CellHyperlinkValue;
     return hv.text || hv.hyperlink || "";
   }
   if (cell.formula) return `=${cell.formula}`;
   const value = cell.value;
-  if (value && typeof value === "object" && "formula" in value) {
-    const formula = (value as { formula?: string }).formula;
-    if (formula) return `=${formula}`;
+  if (isObject(value) && hasProperty(value, "formula")) {
+    const formula = value.formula;
+    if (typeof formula === "string") return `=${formula}`;
   }
   if (cell.value == null) return "";
   if (cell.text) return cell.text;
