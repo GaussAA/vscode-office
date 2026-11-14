@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { $t } from "../../i18n/i18nConfig.ts";
 import {
   INSPECT_PREVIEW_LIMIT,
@@ -18,8 +19,10 @@ interface ParquetInspectorProps {
 /**
  * The bottom value surface: a one-line selection bar, the expanded reader, and the settled
  * announcement. It has no selection state of its own; the caller owns the cell.
+ *
+ * Memoized because inspection state changes are infrequent relative to parent updates.
  */
-export default function ParquetInspector({
+const ParquetInspector = memo(function ParquetInspector({
   inspected,
   inspection,
   hasRows,
@@ -139,4 +142,6 @@ export default function ParquetInspector({
       </div>
     </>
   );
-}
+});
+
+export default ParquetInspector;

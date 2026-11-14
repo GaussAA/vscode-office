@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { $t } from "../../i18n/i18nConfig.ts";
 import type { ParquetFailure } from "./parquetError";
 
@@ -10,8 +11,12 @@ interface ParquetErrorPaneProps {
   onRetry: () => void;
 }
 
-/** Named failure, likely cause, the raw detail and only the exits that can change the answer. */
-export default function ParquetErrorPane({
+/**
+ * Named failure, likely cause, the raw detail and only the exits that can change the answer.
+ *
+ * Memoized because error state rarely changes once displayed.
+ */
+const ParquetErrorPane = memo(function ParquetErrorPane({
   failure,
   fileName,
   copied,
@@ -75,4 +80,6 @@ export default function ParquetErrorPane({
       </div>
     </div>
   );
-}
+});
+
+export default ParquetErrorPane;
