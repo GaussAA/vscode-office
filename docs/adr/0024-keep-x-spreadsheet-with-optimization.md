@@ -76,14 +76,14 @@ Instead of migrating, we invest 3-5 days in targeted optimizations:
 - Remove unused locales (de, nl)
 - **Result**: 519 lines removed (3.8% reduction)
 
-### Day 3: Bundle Size Optimization (PLANNED)
+### Day 3: Bundle Size Optimization (PARTLY SHIPPED)
 
 - Bundle analysis with rollup-plugin-visualizer
-- Lazy-load locale files
-- Lazy-load modal components
+- Lazy-load locale files (not shipped; locales are static imports)
+- Lazy-load modal components (shipped: Find/Replace, Save As)
 - Tree-shake unused SVG icons
 
-### Day 4: Performance Optimization (PLANNED)
+### Day 4: Performance Optimization (SHIPPED: listener cleanup)
 
 - Event listener cleanup (prevent memory leaks)
 - Rendering optimizations

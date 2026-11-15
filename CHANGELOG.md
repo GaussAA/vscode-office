@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.14.1] - 2026-11-15
+
+### Fixed
+
+- **Excel viewer did not open** (present since 6.13.0, including 6.14.0): the webview threw
+  `r.channel is not a function` before anything mounted. `htmlSanitizer.ts` imported `jsdom`,
+  which pulled `undici` into the Excel bundle, and `undici` calls `util.channel()` at load while
+  the browser `util` polyfill has none. The sanitizer now binds DOMPurify to the global `window`
+  and never imports `jsdom`; unit tests install a jsdom window themselves.
+- Parquet: jumping to a field from the schema list now animates over ~200-400 ms instead of
+  moving the table in a single frame. Reduced-motion users keep the single jump.
+
+### Changed
+
+- Webview JavaScript is much smaller, measured with gzip over `out/webview/assets/*.js`:
+  2012 KB in 6.13.0, 873 KB now. Most of that is the removed `jsdom`/`undici` code, not the
+  6.14.0 optimizations.
+- CI no longer tolerates failures: removed `continue-on-error` on UI verification (`main.yml`)
+  and `|| true` on `check:full` (`release.yml`). The release gate had been open since 6.13.0.
+
+### Corrections to the 6.14.0 notes
+
+- Locale lazy loading was not shipped: `excel_i18n.ts` imports `en`, `zh-cn` and `zh-tw`
+  statically. Find/Replace and Save As are lazy-loaded.
+- The merge removed 468 lines in 3 files (`print.js`, `de.js`, `nl.js`), not 519 lines in 5.
+- The "-385 KB / -21.3 %" figure came from a branch that was not what shipped, and was not
+  re-measured on `main`. Use the numbers above.
+- The 6.13.0 note "Excel files now open in read-only mode (editing functionality removed)" was
+  wrong: grid mode (files up to 8 MB) still edits and saves, and the save scenarios pass.
+  The README "Excel editing is disabled" entry was removed for the same reason.
+- The 6.13.0 note "85.5% test pass rate" described the bug fixed here. UI verification is now
+  85/85 and the performance gate 12/12.
+
 ## [6.14.0] - 2026-11-15
 
 ### 🎉 Major Optimization

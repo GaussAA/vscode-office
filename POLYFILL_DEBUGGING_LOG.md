@@ -1,3 +1,5 @@
+> **OBSOLETE (6.14.1).** The failures described here were one bug: the webview bundled `jsdom` through `htmlSanitizer.ts`, which pulled in `undici` and its `util.channel()` call. It is fixed; UI verification is 85/85. Kept for history only.
+
 # Node.js Polyfill 调试日志
 
 ## 目标
