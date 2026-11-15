@@ -11,31 +11,20 @@
  */
 import {
   JSONL_RANGE_BYTE_BUDGET,
-  JSONL_SEARCH_BATCH,
-  JSONL_SEARCH_BYTE_BUDGET,
-  JSONL_SEARCH_MAX_MATCHES,
   type JsonlEntriesPayload,
   type JsonlEntryPayload,
-  type JsonlEntrySummary,
   type JsonlSearchBatch,
 } from "@/common/jsonlTypes";
-import {
-  buildJsonlEntry,
-  buildJsonlSummaries,
-  matchSnippet,
-  readJsonlLineText,
-  summarizeDecodedLine,
-} from "@/service/jsonlDocument";
+import { buildJsonlEntry, buildJsonlSummaries } from "@/service/jsonlDocument";
 import type { JsonlFile } from "@/service/jsonlFile";
-
-/** Lines decoded per event-loop turn; keeps a scan responsive on a huge file. */
-export const SEARCH_STEP = 20_000;
+import { jsonlAdapter, type JsonlAdapter } from "@/service/jsonlAdapter";
+import { createCancelToken } from "@/service/recordAddressableDocument";
 
 export interface JsonlSearchOptions {
+  /** Lines decoded per event-loop turn; keeps a scan responsive on a huge file. */
+  step?: number;
   /** Matches per message. */
   batchSize?: number;
-  /** Lines decoded per turn. */
-  step?: number;
   /** Hard stop, so a broad query cannot exhaust memory. */
   maxMatches?: number;
   /** Called for every batch, including the final `done` one. */
@@ -52,9 +41,13 @@ export interface JsonlSearchHandle {
 }
 
 export class JsonlSession {
-  private active: symbol | null = null;
+  private readonly document: JsonlAdapter;
+  private cancelToken: ReturnType<typeof createCancelToken> | null = null;
+  private currentSettle: (() => void) | null = null;
 
-  constructor(readonly file: JsonlFile) {}
+  constructor(readonly file: JsonlFile) {
+    this.document = jsonlAdapter(file);
+  }
 
   get lineCount(): number {
     return this.file.lineCount;
@@ -65,12 +58,19 @@ export class JsonlSession {
   }
 
   cancelSearch(): void {
-    this.active = null;
+    if (this.cancelToken) {
+      this.cancelToken.cancel();
+      this.cancelToken = null;
+    }
+    if (this.currentSettle) {
+      this.currentSettle();
+      this.currentSettle = null;
+    }
   }
 
   dispose(): void {
     this.cancelSearch();
-    this.file.close();
+    this.document.dispose?.();
   }
 
   async readRange(
@@ -130,119 +130,47 @@ export class JsonlSession {
    * next turn instead of reading the rest of the file for output nobody will use.
    */
   search(requestId: number, query: string, options: JsonlSearchOptions): JsonlSearchHandle {
-    const batchSize = options.batchSize ?? JSONL_SEARCH_BATCH;
-    const step = options.step ?? SEARCH_STEP;
-    const maxMatches = options.maxMatches ?? JSONL_SEARCH_MAX_MATCHES;
-    const schedule = options.schedule ?? ((run) => setTimeout(run, 0));
-    const total = this.file.lineCount;
-    const needle = (query ?? "").trim().toLowerCase();
-    const token = Symbol("search");
-
-    this.active = token;
-    const cancelled = () => this.active !== token;
+    this.cancelSearch();
+    const token = createCancelToken();
+    this.cancelToken = token;
 
     let settle: () => void = () => undefined;
     const finished = new Promise<void>((resolve) => {
       settle = resolve;
     });
+    this.currentSettle = settle;
 
-    if (!needle) {
-      options.onBatch({
-        requestId,
-        query,
-        entries: [],
-        scanned: 0,
-        total,
-        matches: 0,
-        done: true,
-        capped: false,
-      });
-      this.active = null;
-      settle();
-      return { cancel: () => undefined, done: true, finished };
-    }
-
-    let scanned = 0;
-    let matches = 0;
-    let capped = false;
-    let pending: JsonlEntrySummary[] = [];
-
-    const flush = (done: boolean) => {
-      options.onBatch({
-        requestId,
-        query,
-        entries: pending,
-        scanned,
-        total,
-        matches,
-        done,
-        capped,
-      });
-      pending = [];
+    const onBatch = (batch: any) => {
+      // Adapter returns JsonlSearchBatch with 'entries' field
+      options.onBatch(batch as JsonlSearchBatch);
+      if (batch.done) {
+        this.cancelToken = null;
+        this.currentSettle = null;
+        settle();
+      }
     };
 
-    const stepOnce = async () => {
-      if (cancelled()) return;
-      // Lines alone do not bound the read: 20,000 lines of a 500 KB transcript is 10 GB.
-      // `advance` stops on whichever limit comes first, and always moves at least one line.
-      const until = Math.max(
-        scanned + 1,
-        Math.min(total, this.file.advance(scanned, step, JSONL_SEARCH_BYTE_BUDGET)),
-      );
-      let window;
-      try {
-        window = await this.file.window(scanned, until);
-      } catch {
-        // A read failure ends the scan politely; the webview keeps what it has.
-        if (!cancelled()) flush(true);
-        if (this.active === token) this.active = null;
-        settle();
-        return;
-      }
-      if (cancelled()) {
-        settle();
-        return;
-      }
+    this.document.search(
+      requestId,
+      query,
+      {
+        step: options.step,
+        batchSize: options.batchSize,
+        maxMatches: options.maxMatches,
+        onBatch,
+        schedule: options.schedule,
+      },
+      token,
+    );
 
-      for (let offset = 0; offset < window.index.lineCount; offset++) {
-        const decoded = readJsonlLineText(window.bytes, window.index, offset);
-        if (!decoded.text.toLowerCase().includes(needle)) continue;
-        matches++;
-        pending.push({
-          ...summarizeDecodedLine(scanned + offset, decoded, needle),
-          snippet: matchSnippet(decoded.text, needle),
-        });
-        if (pending.length >= batchSize) flush(false);
-        if (matches >= maxMatches) {
-          capped = true;
-          break;
-        }
-      }
-      scanned = until;
-
-      if (capped || scanned >= total) {
-        flush(true);
-        if (this.active === token) this.active = null;
-        settle();
-        return;
-      }
-      flush(false);
-      schedule(() => {
-        void stepOnce();
-      });
-    };
-
-    schedule(() => {
-      void stepOnce();
-    });
-
-    // `this` inside the returned object's getter is the object itself, not the session —
-    // the getter used to read `this.active` and therefore always saw undefined. The arrow
-    // below keeps the session's `this` while still being safe to read from the getter.
-    const isDone = () => this.active !== token;
+    const isDone = () => this.cancelToken !== token;
     return {
       cancel: () => {
-        if (this.active === token) this.active = null;
+        token.cancel();
+        if (this.cancelToken === token) {
+          this.cancelToken = null;
+          this.currentSettle = null;
+        }
         settle();
       },
       get done() {

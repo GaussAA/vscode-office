@@ -13,8 +13,6 @@ import {
   JSON_RAW_PREVIEW_CHARS,
   JSON_RECORD_MAX_BYTES,
   JSON_RECORD_WINDOW,
-  JSON_SEARCH_BATCH,
-  JSON_SEARCH_MAX_MATCHES,
   type JsonInfoPayload,
   type JsonRecordSummary,
   type JsonRootKind,
@@ -22,7 +20,9 @@ import {
   type JsonSearchRecord,
   type JsonSyntaxErrorInfo,
 } from "@/common/jsonPreviewTypes";
-import { deriveLabel, matchSnippet } from "@/service/jsonlDocument";
+import { deriveLabel } from "@/service/jsonlDocument";
+import { jsonArrayAdapter, type JsonArrayAdapter } from "@/service/jsonArrayAdapter";
+import { createCancelToken } from "@/service/recordAddressableDocument";
 
 export interface JsonRecordRange {
   start: number;
@@ -264,113 +264,28 @@ export function readJsonRecordSummary(
   }
 }
 
-function findRecordIndex(records: JsonRecordRange[], offset: number): number {
-  let low = 0;
-  let high = records.length - 1;
-  let found = -1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (records[mid].start <= offset) {
-      found = mid;
-      low = mid + 1;
-    } else {
-      high = mid - 1;
-    }
-  }
-  if (found < 0 || offset >= records[found].end) return -1;
-  return found;
-}
-
 export interface JsonSearchOptions {
   batchSize?: number;
   maxMatches?: number;
   onBatch: (batch: JsonSearchBatch) => void;
-  /** Checked between batches; a newer search stops this one. */
-  shouldStop?: () => boolean;
 }
 
-function emitSearch(
-  text: string,
-  records: JsonRecordRange[],
-  requestId: number,
-  query: string,
-  options: JsonSearchOptions,
-): void {
-  const batchSize = options.batchSize ?? JSON_SEARCH_BATCH;
-  const maxMatches = options.maxMatches ?? JSON_SEARCH_MAX_MATCHES;
-  const needle = query.trim().toLowerCase();
-  const complete = (results: JsonSearchRecord[], matches: number) => {
-    const batches: JsonSearchRecord[][] = [];
-    for (let i = 0; i < results.length; i += batchSize) {
-      batches.push(results.slice(i, i + batchSize));
-    }
-    if (batches.length === 0) batches.push([]);
-    batches.forEach((batch, position) => {
-      if (options.shouldStop?.()) return;
-      options.onBatch({
-        requestId,
-        query,
-        records: batch,
-        scanned: text.length,
-        total: text.length,
-        matches,
-        done: position === batches.length - 1,
-        capped: maxMatches > 0 && matches >= maxMatches,
-      });
-    });
-  };
-
-  if (!needle) {
-    options.onBatch({
-      requestId,
-      query,
-      records: [],
-      scanned: 0,
-      total: text.length,
-      matches: 0,
-      done: true,
-      capped: false,
-    });
-    return;
-  }
-
-  const haystack = text.toLowerCase();
-  const first = new Map<number, { count: number; snippet: string }>();
-  let matches = 0;
-  let cursor = 0;
-  while (cursor < haystack.length && matches < maxMatches) {
-    const at = haystack.indexOf(needle, cursor);
-    if (at < 0) break;
-    const index = findRecordIndex(records, at);
-    if (index >= 0) {
-      const record = records[index];
-      const existing = first.get(index);
-      if (existing) existing.count++;
-      else {
-        const raw = text.slice(record.start, record.end);
-        first.set(index, {
-          count: 1,
-          snippet: matchSnippet(raw, needle) ?? previewText(raw),
-        });
-      }
-      matches++;
-    }
-    cursor = at + Math.max(1, needle.length);
-  }
-
-  const results = [...first.entries()].map(([index, entry]) => ({
-    index,
-    count: entry.count,
-    snippet: entry.snippet,
+function emitSearchRecords(
+  records: Array<{ index: number; count: number; snippet: string }>,
+): JsonSearchRecord[] {
+  return records.map((r) => ({
+    index: r.index,
+    count: r.count,
+    snippet: r.snippet,
   }));
-  complete(results, matches);
 }
 
 export class JsonPreviewSession {
   readonly info: JsonInfoPayload;
   readonly rootEntry: JsonlEntryDetail | null = null;
   private readonly records: JsonRecordRange[] | null = null;
-  private activeSearch: symbol | null = null;
+  private readonly document: JsonArrayAdapter | null = null;
+  private cancelToken: ReturnType<typeof createCancelToken> | null = null;
 
   constructor(
     readonly text: string,
@@ -393,6 +308,8 @@ export class JsonPreviewSession {
         this.records = indexJsonArray(text, first);
         rootKind = "array";
         recordCount = this.records.length;
+        // Create the document adapter for search
+        this.document = jsonArrayAdapter(text, this.records);
       } catch (caught) {
         rootKind = "invalid";
         error = errorInfo(text, caught);
@@ -479,31 +396,66 @@ export class JsonPreviewSession {
 
   search(requestId: number, query: string, options: Omit<JsonSearchOptions, "shouldStop">): void {
     this.cancelSearch();
-    const token = Symbol("json-search");
-    this.activeSearch = token;
-    const shouldStop = () => this.activeSearch !== token;
-    const onBatch = (batch: JsonSearchBatch) => {
-      if (this.activeSearch !== token) return;
-      options.onBatch(batch);
-      if (batch.done) this.activeSearch = null;
-    };
-    const schedule = (run: () => void) => setTimeout(run, 0);
-    schedule(() => {
-      if (shouldStop()) return;
-      emitSearch(this.text, this.records ?? [], requestId, query, {
-        ...options,
-        onBatch,
-        shouldStop,
+
+    if (!this.document) {
+      // No document adapter (e.g., object/scalar root or invalid)
+      options.onBatch({
+        requestId,
+        query,
+        records: [],
+        scanned: 0,
+        total: this.text.length,
+        matches: 0,
+        done: true,
+        capped: false,
       });
-    });
+      return;
+    }
+
+    const token = createCancelToken();
+    this.cancelToken = token;
+
+    const onBatch = (batch: any) => {
+      if (this.cancelToken !== token) return;
+      // Convert adapter results to JsonSearchRecord format
+      const searchBatch: JsonSearchBatch = {
+        requestId: batch.requestId,
+        query: batch.query,
+        records: emitSearchRecords(batch.records),
+        scanned: batch.scanned,
+        total: batch.total,
+        matches: batch.matches,
+        done: batch.done,
+        capped: batch.capped,
+      };
+      options.onBatch(searchBatch);
+      if (batch.done) {
+        this.cancelToken = null;
+      }
+    };
+
+    this.document.search(
+      requestId,
+      query,
+      {
+        batchSize: options.batchSize,
+        maxMatches: options.maxMatches,
+        onBatch,
+      },
+      token,
+    );
   }
 
   cancelSearch(): void {
-    this.activeSearch = null;
+    if (this.cancelToken) {
+      this.cancelToken.cancel();
+      this.cancelToken = null;
+    }
   }
 
   dispose(): void {
     this.cancelSearch();
+    this.document?.dispose?.();
   }
 }
 
