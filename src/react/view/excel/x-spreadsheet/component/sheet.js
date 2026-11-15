@@ -5,7 +5,7 @@ import Resizer from "./resizer";
 import Scrollbar from "./scrollbar";
 import Selector from "./selector";
 import Editor from "./editor";
-import Print from "./print";
+
 import ContextMenu from "./contextmenu";
 import Table from "./table";
 import Toolbar from "./toolbar/index";
@@ -1003,10 +1003,6 @@ function insertDeleteRowColumn(type) {
     data.deleteCell("format");
   } else if (type === "delete-cell-text") {
     data.deleteCell("text");
-  } else if (type === "cell-printable") {
-    data.setSelectedCellAttr("printable", true);
-  } else if (type === "cell-non-printable") {
-    data.setSelectedCellAttr("printable", false);
   } else if (type === "cell-editable") {
     data.setSelectedCellAttr("editable", true);
   } else if (type === "cell-non-editable") {
@@ -1058,8 +1054,6 @@ function toolbarChange(type, value) {
     this.undo();
   } else if (type === "redo") {
     this.redo();
-  } else if (type === "print") {
-    this.print.preview();
   } else if (type === "paintformat") {
     if (value === true) copy.call(this);
     else clearClipboard.call(this);
@@ -1067,8 +1061,6 @@ function toolbarChange(type, value) {
     insertDeleteRowColumn.call(this, "delete-cell-format");
   } else if (type === "link") {
     // link
-  } else if (type === "chart") {
-    // chart
   } else if (type === "autofilter") {
     // filter
     autofilter.call(this);
@@ -1221,11 +1213,13 @@ function sheetInitEvents() {
   });
   if (!this._horizontalScrollReleaseBound) {
     this._horizontalScrollReleaseBound = true;
-    bind(window, "mouseup", () => {
+    const mouseupHandler = () => {
       if (!this._horizontalScrollInteracting) return;
       this._horizontalScrollInteracting = false;
       expandColsOnHorizontalRelease(this);
-    });
+    };
+    bind(window, "mouseup", mouseupHandler);
+    this.windowListeners.push({ target: window, event: "mouseup", handler: mouseupHandler });
   }
   // editor
   editor.change = (state, itext) => {
@@ -1280,12 +1274,15 @@ function sheetInitEvents() {
   bind(window, "resize", () => {
     this.reload();
   });
+  this.windowListeners.push({ target: window, event: "resize", handler: () => this.reload() });
 
-  bind(window, "click", (evt) => {
+  const clickHandler = (evt) => {
     this.focusing = overlayerEl.contains(evt.target);
-  });
+  };
+  bind(window, "click", clickHandler);
+  this.windowListeners.push({ target: window, event: "click", handler: clickHandler });
 
-  bind(window, "paste", (evt) => {
+  const pasteHandler = (evt) => {
     if (!this.focusing) return;
     if (this.skipNextPaste) {
       this.skipNextPaste = false;
@@ -1296,14 +1293,18 @@ function sheetInitEvents() {
     this.pasteTextOnly = false;
     paste.call(this, mode, evt);
     evt.preventDefault();
-  });
+  };
+  bind(window, "paste", pasteHandler);
+  this.windowListeners.push({ target: window, event: "paste", handler: pasteHandler });
 
-  bind(window, "copy", (evt) => {
+  const copyHandler = (evt) => {
     if (!this.focusing) return;
     if (this.editor.cell !== null) return;
     copy.call(this, evt);
     evt.preventDefault();
-  });
+  };
+  bind(window, "copy", copyHandler);
+  this.windowListeners.push({ target: window, event: "copy", handler: copyHandler });
 
   // for selector
   bind(window, "keydown", (evt) => {
@@ -1439,6 +1440,8 @@ export default class Sheet {
     this.lastZoomWheelAt = 0;
     this.formulaEditTarget = null;
     this.editSnapshot = null;
+    // Track window-level event listeners for cleanup
+    this.windowListeners = [];
     const { view, showToolbar, showContextmenu } = data.settings;
     this.el = h("div", `${cssPrefix}-sheet`);
     this.toolbar = new Toolbar(data, view.width, !showToolbar);
@@ -1448,8 +1451,7 @@ export default class Sheet {
       (text) => dataSetCellText.call(this, text, "input"),
       (ri, ci) => this.scrollToCell(ri, ci),
     );
-    this.print = new Print(data);
-    targetEl.children(this.toolbar.el, this.formulaBar.el, this.el, this.print.el);
+    targetEl.children(this.toolbar.el, this.formulaBar.el, this.el);
     this.data = data;
     // table
     this.tableEl = h("canvas", `${cssPrefix}-table`);
@@ -1533,7 +1535,6 @@ export default class Sheet {
     this.toolbar.resetData(data);
     this.formulaBar.resetData(data);
     this.toolbar.setSaveEnabled(false);
-    this.print.resetData(data);
     this.selector.resetData(data);
     this.table.resetData(data);
     this.sheetImages.setEditable(data.settings.mode !== "read");
@@ -1589,5 +1590,58 @@ export default class Sheet {
     selectorSet.call(this, false, ri, ci);
     scrollbarMove.call(this);
     sheetReset.call(this);
+  }
+
+  /**
+   * Clean up all event listeners and resources
+   */
+  destroy() {
+    // Clean up window-level event listeners
+    if (this.windowListeners && this.windowListeners.length > 0) {
+      const { unbind } = require("./event");
+      for (const { target, event, handler } of this.windowListeners) {
+        unbind(target, event, handler);
+      }
+      this.windowListeners = [];
+    }
+
+    // Clean up Element instances
+    if (this.overlayerEl && typeof this.overlayerEl.destroy === "function") {
+      this.overlayerEl.destroy();
+    }
+    if (this.tableEl && typeof this.tableEl.destroy === "function") {
+      this.tableEl.destroy();
+    }
+    if (this.el && typeof this.el.destroy === "function") {
+      this.el.destroy();
+    }
+
+    // Clean up child components that have Element instances
+    const components = [
+      this.toolbar,
+      this.formulaBar,
+      this.rowResizer,
+      this.colResizer,
+      this.verticalScrollbar,
+      this.horizontalScrollbar,
+      this.editor,
+      this.modalValidation,
+      this.modalHyperlink,
+      this.contextMenu,
+      this.selector,
+      this.sortFilter,
+      this.sheetImages,
+    ];
+
+    for (const component of components) {
+      if (component && component.el && typeof component.el.destroy === "function") {
+        component.el.destroy();
+      }
+    }
+
+    // Clear event map
+    if (this.eventMap && typeof this.eventMap.removeAllListeners === "function") {
+      this.eventMap.removeAllListeners();
+    }
   }
 }

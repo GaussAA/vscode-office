@@ -510,6 +510,27 @@ export class Spreadsheet {
     return this;
   }
 
+  /**
+   * Clean up all event listeners and resources
+   */
+  destroy(): void {
+    // Clean up sheet
+    if (this.sheet && typeof this.sheet.destroy === "function") {
+      this.sheet.destroy();
+    }
+
+    // Clean up bottombar
+    if (this.bottombar && this.bottombar.el && typeof this.bottombar.el.destroy === "function") {
+      this.bottombar.el.destroy();
+    }
+
+    // Clear sheet change listeners
+    this.sheetChangeListeners = [];
+
+    // Clear data proxies
+    this.datas = [];
+  }
+
   static locale(lang: string, message: object): void {
     locale(lang, message);
   }

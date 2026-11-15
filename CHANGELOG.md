@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.14.0] - 2026-11-15
+
+### 🎉 Major Optimization
+
+This release brings significant performance and quality improvements through a comprehensive optimization effort.
+
+### 📦 Package Size Reduction (-21.3%)
+
+- Reduced Excel bundle from 1,805 KB to 1,420 KB (gzipped)
+- Removed 385 KB through aggressive minification and code splitting
+- Implemented lazy loading for locales and modal dialogs
+
+### 🔧 Memory Leak Fix (100% Resolution)
+
+- Fixed all 129 event listener leaks (3% → 100% cleanup rate)
+- Implemented proper lifecycle management for x-spreadsheet components
+- Added Element.destroy(), Sheet.destroy(), and Spreadsheet.destroy() methods
+- Users can now use the extension for extended periods without memory issues
+
+### 🗑️ Code Cleanup
+
+- Removed 519 lines of dead code
+- Deleted 5 unused files (Chart, Print, de/nl locales)
+- Improved code maintainability
+
+### ⚡ Performance Improvements
+
+- Lazy loading for language packs (en/zh-cn/zh-tw)
+- Lazy loading for Find/Replace panel and Save As dialog
+- Optimized Terser configuration for better compression
+- Manual code splitting for React, Ant Design, and xlsx
+
+### 📝 Documentation
+
+- Added comprehensive optimization reports in docs/
+- Created maintenance guide for x-spreadsheet
+- Documented all optimization decisions in ADR-0024
+
+### Technical Details
+
+For complete technical details, see:
+
+- docs/x-spreadsheet-optimization-final-report.md
+- docs/adr/0024-keep-x-spreadsheet-with-optimization.md
+
 ## [6.13.0] - 2026-11-15
 
 ### Changed

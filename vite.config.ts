@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import { visualizer } from "rollup-plugin-visualizer";
 
 const cwd = process.cwd();
 const argv = process.argv;
@@ -82,6 +83,12 @@ export default defineConfig(({ command, mode }) => ({
     }),
     patchNodePolyfills(),
     react(),
+    visualizer({
+      filename: "stats/bundle-analysis.html",
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
   ],
   define: {
     global: "globalThis",
@@ -114,8 +121,36 @@ export default defineConfig(({ command, mode }) => ({
   build: {
     outDir: "out/webview",
     chunkSizeWarningLimit: 2048,
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ["console.log", "console.info", "console.debug"],
+        passes: 2,
+      },
+      mangle: {
+        safari10: true,
+      },
+    },
     rollupOptions: {
       external: [],
+      output: {
+        manualChunks(id) {
+          // Split vendor libraries into separate chunks
+          if (id.includes("node_modules")) {
+            if (id.includes("react") || id.includes("react-dom")) {
+              return "vendor-react";
+            }
+            if (id.includes("antd") || id.includes("@ant-design")) {
+              return "vendor-antd";
+            }
+            if (id.includes("xlsx")) {
+              return "vendor-xlsx";
+            }
+          }
+        },
+      },
     },
   },
 }));

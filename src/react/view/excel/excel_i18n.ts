@@ -3,16 +3,12 @@ import Spreadsheet from "./x-spreadsheet/index";
 import en from "./x-spreadsheet/locale/en";
 import zhCn from "./x-spreadsheet/locale/zh-cn";
 import zhTw from "./x-spreadsheet/locale/zh-tw";
-import de from "./x-spreadsheet/locale/de";
-import nl from "./x-spreadsheet/locale/nl";
 import { t as localeT } from "./x-spreadsheet/locale/locale";
 
 const localeMessages: Record<string, object> = {
   en,
   "zh-cn": zhCn,
   "zh-tw": zhTw,
-  de,
-  nl,
 };
 
 const TRADITIONAL_ZH = new Set(["zh-tw", "zh-hk", "zh-mo", "zh-hant"]);
@@ -23,8 +19,6 @@ function resolveSpreadsheetLang(vscodeLang: string): string {
   if (SIMPLIFIED_ZH.has(lower)) return "zh-cn";
   if (TRADITIONAL_ZH.has(lower)) return "zh-tw";
   if (lower === "zh") return "zh-cn";
-  if (lower.startsWith("de")) return "de";
-  if (lower.startsWith("nl")) return "nl";
   return "en";
 }
 
