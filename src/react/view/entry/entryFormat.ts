@@ -8,7 +8,10 @@
 
 import { JSONL_VALUE_TEXT_LIMIT } from "@/common/jsonlTypes";
 import { toDisplayText } from "@/common/displayText";
-import { isObject } from "@/common/typeGuards";
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export type PathSeg = string | number;
 
