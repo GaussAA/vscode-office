@@ -22,7 +22,8 @@ import {
   type JsonSearchRecord,
   type JsonSyntaxErrorInfo,
 } from "@/common/jsonPreviewTypes";
-import { deriveLabel, matchSnippet } from "@/service/jsonlDocument";
+import { matchSnippet } from "@/service/jsonlDocument";
+import { classifyEntry } from "@/service/entryClassifier";
 
 export interface JsonRecordRange {
   start: number;
@@ -185,26 +186,8 @@ export function indexJsonArray(text: string, start = 0): JsonRecordRange[] {
   }
 }
 
-function utf8Size(text: string): number {
-  return new TextEncoder().encode(text).length;
-}
-
 function previewText(text: string): string {
   return text.length <= JSON_RAW_PREVIEW_CHARS ? text : `${text.slice(0, JSON_RAW_PREVIEW_CHARS)}…`;
-}
-
-function textFields(raw: string): {
-  text: string;
-  textChars: number;
-  textTruncated: boolean;
-  size: number;
-} {
-  return {
-    text: raw.slice(0, JSON_MAX_TEXT_CHARS),
-    textChars: raw.length,
-    textTruncated: raw.length > JSON_MAX_TEXT_CHARS,
-    size: utf8Size(raw),
-  };
 }
 
 /** Parse one nested record (or the object root) into the detail shape the JSONL tree uses. */
@@ -214,27 +197,41 @@ export function readJsonRecordDetail(
   index: number,
 ): JsonlEntryDetail {
   const raw = text.slice(range.start, range.end);
-  const fields = textFields(raw);
+  const classification = classifyEntry(raw, JSON_RECORD_MAX_BYTES);
+
+  const textChars = classification.text.length;
+  const textTruncated = textChars > JSON_MAX_TEXT_CHARS;
+  const displayText = textTruncated
+    ? classification.text.slice(0, JSON_MAX_TEXT_CHARS)
+    : classification.text;
+
   const base = {
     index,
-    size: fields.size,
+    size: classification.byteSize,
     raw: previewText(raw),
-    text: fields.text,
-    textChars: fields.textChars,
-    textTruncated: fields.textTruncated,
+    text: displayText,
+    textChars,
+    textTruncated,
   };
-  if (fields.size > JSON_RECORD_MAX_BYTES) {
-    return { ...base, kind: "too-large", textTruncated: true };
-  }
-  try {
-    return { ...base, kind: "value", value: JSON.parse(raw) };
-  } catch (error) {
+
+  // Empty is treated as invalid for JSON records (shouldn't happen in valid JSON)
+  if (classification.kind === "empty" || classification.kind === "invalid") {
     return {
       ...base,
       kind: "invalid",
-      error: error instanceof Error ? error.message : String(error),
+      error: classification.error ?? "Empty record",
     };
   }
+  if (classification.kind === "too-large") {
+    return { ...base, kind: "too-large", textTruncated: true };
+  }
+
+  return {
+    ...base,
+    kind: "value",
+    ...(classification.label ? { label: classification.label } : {}),
+    value: classification.value!,
+  };
 }
 
 export function readJsonRecordSummary(
@@ -243,25 +240,31 @@ export function readJsonRecordSummary(
   index: number,
 ): JsonRecordSummary {
   const raw = text.slice(range.start, range.end);
-  const size = utf8Size(raw);
-  const summary = {
+  const classification = classifyEntry(raw, JSON_RECORD_MAX_BYTES);
+
+  const base = {
     index,
-    size,
+    size: classification.byteSize,
     raw: previewText(raw),
   };
-  if (size > JSON_RECORD_MAX_BYTES) {
-    return { ...summary, kind: "too-large" };
-  }
-  try {
-    const value = JSON.parse(raw) as unknown;
-    return { ...summary, kind: "value", label: deriveLabel(value) };
-  } catch (error) {
+
+  // Empty is treated as invalid for JSON records (shouldn't happen in valid JSON)
+  if (classification.kind === "empty" || classification.kind === "invalid") {
     return {
-      ...summary,
+      ...base,
       kind: "invalid",
-      error: error instanceof Error ? error.message : String(error),
+      error: classification.error ?? "Empty record",
     };
   }
+  if (classification.kind === "too-large") {
+    return { ...base, kind: "too-large" };
+  }
+
+  return {
+    ...base,
+    kind: "value",
+    ...(classification.label ? { label: classification.label } : {}),
+  };
 }
 
 function findRecordIndex(records: JsonRecordRange[], offset: number): number {
@@ -403,14 +406,18 @@ export class JsonPreviewSession {
       } else {
         try {
           const raw = text.slice(first);
-          const fields = textFields(raw);
+          const classification = classifyEntry(raw, JSON_MAX_OBJECT_BYTES);
+          const textChars = classification.text.length;
+          const textTruncated = textChars > JSON_MAX_TEXT_CHARS;
           this.rootEntry = {
             index: 0,
-            size: fields.size,
+            size: classification.byteSize,
             raw: previewText(raw),
-            text: fields.text,
-            textChars: fields.textChars,
-            textTruncated: fields.textTruncated,
+            text: textTruncated
+              ? classification.text.slice(0, JSON_MAX_TEXT_CHARS)
+              : classification.text,
+            textChars,
+            textTruncated,
             kind: "value",
             value: JSON.parse(raw),
           };
@@ -426,14 +433,18 @@ export class JsonPreviewSession {
       } else {
         try {
           const raw = text.slice(first);
-          const fields = textFields(raw);
+          const classification = classifyEntry(raw, JSON_MAX_OBJECT_BYTES);
+          const textChars = classification.text.length;
+          const textTruncated = textChars > JSON_MAX_TEXT_CHARS;
           this.rootEntry = {
             index: 0,
-            size: fields.size,
+            size: classification.byteSize,
             raw: previewText(raw),
-            text: fields.text,
-            textChars: fields.textChars,
-            textTruncated: fields.textTruncated,
+            text: textTruncated
+              ? classification.text.slice(0, JSON_MAX_TEXT_CHARS)
+              : classification.text,
+            textChars,
+            textTruncated,
             kind: "value",
             value: JSON.parse(raw),
           };

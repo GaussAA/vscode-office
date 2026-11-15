@@ -5,10 +5,16 @@ import {
   buildJsonlEntry,
   buildJsonlIndex,
   buildJsonlSummary,
-  deriveLabel,
   matchSnippet,
   readJsonlLineText,
 } from "@/service/jsonlDocument";
+import { classifyEntry } from "@/service/entryClassifier";
+
+// Extract deriveLabel from the classifier for testing
+function deriveLabel(value: unknown): string | undefined {
+  const classification = classifyEntry(JSON.stringify(value));
+  return classification.kind === "value" ? classification.label : undefined;
+}
 
 const encoder = new TextEncoder();
 
@@ -20,32 +26,32 @@ function open(text: string) {
 test("index: splits lines and treats a trailing newline as a terminator", () => {
   const plain = open("a\nb\nc");
   assert.equal(plain.index.lineCount, 3);
-  assert.equal(readJsonlLineText(plain.bytes, plain.index, 0).text, "a");
-  assert.equal(readJsonlLineText(plain.bytes, plain.index, 2).text, "c");
+  assert.equal(readJsonlLineText(plain.bytes, plain.index, 0), "a");
+  assert.equal(readJsonlLineText(plain.bytes, plain.index, 2), "c");
 
   const trailing = open("a\nb\n");
   // 'a' and 'b' only: the final newline terminates the last line, it does not start a new one.
   assert.equal(trailing.index.lineCount, 2);
-  assert.equal(readJsonlLineText(trailing.bytes, trailing.index, 1).text, "b");
+  assert.equal(readJsonlLineText(trailing.bytes, trailing.index, 1), "b");
 });
 
 test("index: an empty file still exposes one line", () => {
   const empty = open("");
   assert.equal(empty.index.lineCount, 1);
-  assert.equal(readJsonlLineText(empty.bytes, empty.index, 0).text, "");
+  assert.equal(readJsonlLineText(empty.bytes, empty.index, 0), "");
 });
 
 test("read: strips a UTF-8 BOM from the first line", () => {
   const bom = open('\uFEFF{"a":1}\n{"b":2}\n');
-  assert.equal(readJsonlLineText(bom.bytes, bom.index, 0).text, '{"a":1}');
-  assert.equal(readJsonlLineText(bom.bytes, bom.index, 1).text, '{"b":2}');
+  assert.equal(readJsonlLineText(bom.bytes, bom.index, 0), '{"a":1}');
+  assert.equal(readJsonlLineText(bom.bytes, bom.index, 1), '{"b":2}');
 });
 
 test("read: strips a CRLF terminator from the decoded text", () => {
   const crlf = open('{"a":1}\r\n{"b":2}\n');
   assert.equal(crlf.index.lineCount, 2);
-  assert.equal(readJsonlLineText(crlf.bytes, crlf.index, 0).text, '{"a":1}');
-  assert.equal(readJsonlLineText(crlf.bytes, crlf.index, 1).text, '{"b":2}');
+  assert.equal(readJsonlLineText(crlf.bytes, crlf.index, 0), '{"a":1}');
+  assert.equal(readJsonlLineText(crlf.bytes, crlf.index, 1), '{"b":2}');
 });
 
 test("label: derives identity from configured top-level keys only", () => {
