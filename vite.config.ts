@@ -17,48 +17,49 @@ if (argv.join(",").includes("mode")) {
   void import("./build");
 }
 
-// Plugin to inject util.channel polyfill at the very start of Excel bundle
-function injectUtilPolyfill(): Plugin {
+// Plugin to add missing Node.js APIs (like util.channel)
+function patchNodePolyfills(): Plugin {
   return {
-    name: "inject-util-polyfill",
-    enforce: "post",
+    name: "patch-node-polyfills",
+    enforce: "post", // 在其他插件之后运行
+
     generateBundle(_options, bundle) {
       for (const fileName in bundle) {
         const chunk = bundle[fileName];
         if (chunk.type === "chunk" && fileName.includes("Excel")) {
-          console.log(`[inject-util-polyfill] Injecting util.channel polyfill into ${fileName}`);
+          console.log(`[patch-node-polyfills] Patching ${fileName}`);
 
-          // Inject at the very start of the chunk
-          const polyfillCode = `
-(function() {
-  // util.channel polyfill for xlsx and other pre-bundled libraries
-  if (typeof globalThis.util === "undefined") {
-    globalThis.util = {};
-  }
-  if (typeof globalThis.util.channel === "undefined") {
-    globalThis.util.channel = function() {
-      return {
-        hasSubscribers: false,
-        publish: function() {},
-        subscribe: function() {},
-        unsubscribe: function() {}
-      };
-    };
-  }
-  // Also inject other util methods that might be needed
-  if (!globalThis.util.debuglog) {
-    globalThis.util.debuglog = function() { return function() {}; };
-  }
-  if (!globalThis.util.format) {
-    globalThis.util.format = function(f) { return String(f); };
-  }
-  if (!globalThis.util.inspect) {
-    globalThis.util.inspect = function(v) { return String(v); };
-  }
-})();
-`;
+          let patchCount = 0;
 
-          chunk.code = polyfillCode + chunk.code;
+          // 1. 在 t.inspect 之后添加 t.channel
+          const utilPattern = /(t\.inspect\s*=\s*[^;]+;)/g;
+          chunk.code = chunk.code.replace(utilPattern, (match) => {
+            patchCount++;
+            return (
+              match +
+              "t.channel=function(){return{hasSubscribers:false,publish:function(){},subscribe:function(){},unsubscribe:function(){}}};"
+            );
+          });
+
+          // 2. 替换空的 util 模块导出为有 channel 的版本
+          // 模式: Kt=l(((e,t)=>{t.exports={}}))
+          const emptyModulePattern = /(\w+)=l\(\(\(e,t\)=>\{t\.exports=\{\}\}\)\)/g;
+          chunk.code = chunk.code.replace(emptyModulePattern, (match, varName) => {
+            patchCount++;
+            console.log(
+              `[patch-node-polyfills] Replacing empty module ${varName} with util polyfill`,
+            );
+            // 替换为包含 channel 的 util 模块
+            return `${varName}=l(((e,t)=>{
+              function debuglog(){return function(){}}
+              function format(f){return String(f)}
+              function inspect(v){return String(v)}
+              function channel(){return{hasSubscribers:false,publish:function(){},subscribe:function(){},unsubscribe:function(){}}}
+              t.exports={debuglog:debuglog,format:format,inspect:inspect,channel:channel}
+            }))`;
+          });
+
+          console.log(`[patch-node-polyfills] Applied ${patchCount} patches`);
         }
       }
     },
@@ -69,10 +70,8 @@ function injectUtilPolyfill(): Plugin {
 export default defineConfig(({ command, mode }) => ({
   plugins: [
     nodePolyfills({
-      // 包含需要的 Node.js 内置模块（不包括 util，我们用自己的 shim）
-      include: ["stream", "buffer", "process", "events"],
-      // 显式排除 util，使用我们的 shim
-      exclude: ["util"],
+      // 包含需要的 Node.js 内置模块
+      include: ["util", "stream", "buffer", "process", "events"],
       // 也包含子路径
       protocolImports: true,
       // 使用插件提供的 polyfills
@@ -82,8 +81,8 @@ export default defineConfig(({ command, mode }) => ({
         process: true,
       },
     }),
+    patchNodePolyfills(),
     react(),
-    injectUtilPolyfill(), // 在打包后注入 polyfill
     visualizer({
       filename: "stats/bundle-analysis.html",
       open: false,
@@ -98,10 +97,7 @@ export default defineConfig(({ command, mode }) => ({
     conditions: ["browser", "module", "import", "default"],
     alias: {
       // 为 Node.js 子模块提供 polyfill 或 stub
-      // 注意：更具体的路径必须在更通用的路径之前
       "node:util/types": resolve(cwd, "src/react/shims/util-types.ts"),
-      "node:util": resolve(cwd, "src/react/shims/util.ts"),
-      util: resolve(cwd, "src/react/shims/util.ts"),
       "node:stream/web": resolve(cwd, "src/react/shims/stream-web.ts"),
       "node:http2": resolve(cwd, "src/react/shims/http2-constants.ts"),
       http2: resolve(cwd, "src/react/shims/http2-constants.ts"),
@@ -109,7 +105,7 @@ export default defineConfig(({ command, mode }) => ({
   },
   optimizeDeps: {
     include: ["buffer"],
-    exclude: ["undici"], // 只排除 undici，让 Vite 处理 xlsx 并解析其 util 导入
+    exclude: ["xlsx", "undici"], // 不预构建，避免缓存问题
   },
   server: {
     cors: {
