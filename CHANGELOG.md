@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.13.0] - 2026-11-15
+
 ### Changed
 
 - **Excel library migration**: Migrated from @cweijan/exceljs to xlsx (SheetJS)

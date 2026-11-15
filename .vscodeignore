@@ -31,6 +31,7 @@ yarn.lock
 docs/**
 .ui-verify/**
 .perf/**
+.agents/**
 AGENTS.md
 CLAUDE.md
 GLOSSARY.md
