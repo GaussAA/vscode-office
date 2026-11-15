@@ -27,6 +27,7 @@
  *     covers is served from memory.
  */
 import type { AsyncBuffer } from "hyparquet";
+import { asyncBufferFrom } from "@/common/parquetSchema";
 
 /** Keeps the range cache bounded; pages are read in column-chunk sized slices. */
 const RANGE_CACHE_BYTES = 64 * 1024 * 1024;
@@ -181,15 +182,6 @@ export function rangeBackedBuffer(url: string, byteLength: number): AsyncBuffer 
   };
 }
 
-function makeBufferFromArrayBuffer(buffer: ArrayBuffer): AsyncBuffer {
-  return {
-    byteLength: buffer.byteLength,
-    slice(start: number, end?: number) {
-      return buffer.slice(start, end ?? buffer.byteLength);
-    },
-  };
-}
-
 export async function openParquetSource(url: string): Promise<ParquetSource> {
   // Probe with the smallest useful request: two bytes.
   let probeStatus = 0;
@@ -210,7 +202,7 @@ export async function openParquetSource(url: string): Promise<ParquetSource> {
       // so keep it instead of downloading the same bytes twice.
       const buffer = await probe.arrayBuffer();
       console.info("[parquet] source: full (no range support)", buffer.byteLength, "bytes");
-      return { file: makeBufferFromArrayBuffer(buffer) };
+      return { file: asyncBufferFrom(buffer) };
     }
     await probe.arrayBuffer().catch(() => undefined);
   } catch {
@@ -223,5 +215,5 @@ export async function openParquetSource(url: string): Promise<ParquetSource> {
   }
   const buffer = await response.arrayBuffer();
   console.info("[parquet] source: full", buffer.byteLength, "bytes");
-  return { file: makeBufferFromArrayBuffer(buffer) };
+  return { file: asyncBufferFrom(buffer) };
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { categorizeType, formatCellValue } from "@/react/view/parquet/parquetParser";
+import { categorizeType } from "@/common/parquetSchema";
+import { formatCellValue } from "@/react/view/parquet/parquetParser";
 
 test("categorizeType: one decode for the icon and the alignment", () => {
   const cases = {
