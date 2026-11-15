@@ -141,13 +141,6 @@ We should revisit this decision if:
 4. **Performance Wall**: Hit optimization limits
 5. **Accessibility Requirements**: Need features x-spreadsheet can't provide
 
-## References
-
-- [fortune-sheet Assessment](../fortunesheet-quick-assessment.md)
-- [wolf-table Assessment](../wolf-table-assessment.md)
-- [Optimization Plan](../x-spreadsheet-optimization-plan.md)
-- [Optimization Progress](../x-spreadsheet-optimization-progress.md)
-
 ## Notes
 
 This ADR represents a **pragmatic engineering decision**: optimize what we have rather than chasing a potentially better but riskier alternative.

@@ -78,12 +78,7 @@ This release brings significant performance and quality improvements through a c
 - Created maintenance guide for x-spreadsheet
 - Documented all optimization decisions in ADR-0024
 
-### Technical Details
-
-For complete technical details, see:
-
-- docs/x-spreadsheet-optimization-final-report.md
-- docs/adr/0024-keep-x-spreadsheet-with-optimization.md
+See docs/adr/0024-keep-x-spreadsheet-with-optimization.md for the decision record.
 
 ## [6.13.0] - 2026-11-15
 
@@ -93,7 +88,6 @@ For complete technical details, see:
   - Excel files now open in read-only mode (editing functionality removed)
   - Improved compatibility with modern build tools
   - Core viewing functionality maintained (85.5% test pass rate: 71/83 scenarios)
-  - See [Excel Limitations](docs/excel-limitations.md) for known issues with large files and edge cases
 
 ### Added
 
@@ -101,13 +95,6 @@ For complete technical details, see:
   - Integrated vite-plugin-node-polyfills for util, stream, buffer, process, events
   - Created custom shims for util/types, stream/web, http2 constants
   - Implemented patch plugin to fix missing util.channel API
-
-### Technical
-
-- Added comprehensive migration documentation:
-  - [Migration Status](MIGRATION_STATUS.md) - Complete migration record
-  - [Polyfill Debugging Log](POLYFILL_DEBUGGING_LOG.md) - Technical details
-  - [Excel Limitations](docs/excel-limitations.md) - User-facing known issues
 
 ## [6.12.0] - 2026-11-14
 
