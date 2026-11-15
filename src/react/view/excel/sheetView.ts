@@ -7,6 +7,7 @@
  * the README's "large files are read-only" claim has a single source of truth.
  */
 import { isOverPreviewLimit, previewLimitBytes } from "@/common/previewLimit";
+import { kindOf } from "./sheetKind";
 
 /** Above this, CSV/TSV are rendered by the windowed view instead of parsed into cells. */
 export const WINDOW_THRESHOLD_BYTES = 8 * 1024 * 1024;
@@ -18,13 +19,9 @@ export const WINDOW_THRESHOLD_BYTES = 8 * 1024 * 1024;
  */
 export const TEXT_WINDOW_MAX_BYTES = 200 * 1024 * 1024;
 
-/** The windowed view renders text formats and workbooks; both now have a `SheetSource`. */
+/** Text formats windowed when large. */
 const WINDOW_EXTENSIONS = new Set([".csv", ".tsv"]);
-/**
- * Workbooks the windowed view can render: `.xlsx`/`.xlsm` through ExcelJS, `.xls`/`.ods`
- * through SheetJS. Both keep the 15 MB guard — windowing fixes memory and rendering, not the
- * decoder's time.
- */
+/** Workbooks (all use SheetJS now): windowing fixes memory/rendering, not parse time. */
 const WORKBOOK_EXTENSIONS = new Set([".xlsx", ".xlsm", ".xls", ".ods"]);
 
 export interface SheetViewOptions {
@@ -54,24 +51,30 @@ export function sheetViewFor(
   size: number | undefined,
   options: SheetViewOptions = {},
 ): SheetView {
-  const lower = (ext ?? "").toLowerCase();
+  const normalized = kindOf(ext);
+  if (!normalized) {
+    // Unknown extension: apply default preview limit
+    return !size || size <= 0 || !isOverPreviewLimit(ext, size) ? "grid" : "refused";
+  }
   if (!size || size <= 0) return "grid";
-  if (WINDOW_EXTENSIONS.has(lower)) {
-    const limit = options.virtual ? previewLimitBytes(lower) : TEXT_WINDOW_MAX_BYTES;
+  if (WINDOW_EXTENSIONS.has(normalized)) {
+    const limit = options.virtual ? previewLimitBytes(normalized) : TEXT_WINDOW_MAX_BYTES;
     if (size > limit) return "refused";
     return size > WINDOW_THRESHOLD_BYTES ? "window" : "grid";
   }
-  if (WORKBOOK_EXTENSIONS.has(lower)) {
-    if (isOverPreviewLimit(lower, size)) return "refused";
+  if (WORKBOOK_EXTENSIONS.has(normalized)) {
+    if (isOverPreviewLimit(normalized, size)) return "refused";
     return size > WINDOW_THRESHOLD_BYTES ? "window" : "grid";
   }
-  return isOverPreviewLimit(lower, size) ? "refused" : "grid";
+  return isOverPreviewLimit(normalized, size) ? "refused" : "grid";
 }
 /** The size the refusal panel compares against, so its message matches the decision above. */
 export function limitForView(ext: string, options: SheetViewOptions = {}): number {
-  const lower = (ext ?? "").toLowerCase();
-  if (WINDOW_EXTENSIONS.has(lower) && !options.virtual) return TEXT_WINDOW_MAX_BYTES;
-  return previewLimitBytes(lower);
+  const normalized = kindOf(ext);
+  if (normalized && WINDOW_EXTENSIONS.has(normalized) && !options.virtual) {
+    return TEXT_WINDOW_MAX_BYTES;
+  }
+  return previewLimitBytes(ext);
 }
 
 /**

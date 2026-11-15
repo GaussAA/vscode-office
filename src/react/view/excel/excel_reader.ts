@@ -71,19 +71,9 @@ const buildCsvCols = (rows: any[][], colCount: number) => {
 
 /**
  * Rows-only load for the windowed view (ADR-0017 phase 4).
- * Uses SheetJS for all formats now.
+ * Uses SheetJS for all workbook formats.
  */
 export async function loadWorkbookRows(buffer: ArrayBuffer): Promise<WorkbookSheetRows[]> {
-  return workbookRowsFromSheetJs(XLSX.read(buffer, { type: "array" }));
-}
-
-/**
- * Rows-only load for legacy formats (`.xls`, `.ods`).
- *
- * Same idea as `loadWorkbookRows`, different decoder: SheetJS already has the bytes parsed for
- * the grid path, so the windowed path reuses that read and keeps only the text.
- */
-export async function loadLegacyWorkbookRows(buffer: ArrayBuffer): Promise<WorkbookSheetRows[]> {
   return workbookRowsFromSheetJs(XLSX.read(buffer, { type: "array" }));
 }
 

@@ -1,4 +1,5 @@
 import type { SheetView } from "./sheetView";
+import { kindOf, viewFor } from "./sheetKind";
 
 export type ExcelOpenPlan = "guard" | "load";
 
@@ -20,12 +21,7 @@ export type ExcelWindowKind = "workbook" | "text";
 
 /** A windowed payload is either a workbook (sheet picker) or a plain text source. */
 export function excelWindowKind(ext: string): ExcelWindowKind {
-  return /\.(xlsx|xlsm|xls|ods)$/i.test(ext) ? "workbook" : "text";
-}
-
-export type ExcelWorkbookParser = "legacy" | "exceljs";
-
-/** ExcelJS reads xlsx/xlsm; SheetJS has to handle the legacy `.xls` and `.ods` containers. */
-export function excelWorkbookParser(ext: string): ExcelWorkbookParser {
-  return /\.(xls|ods)$/i.test(ext) ? "legacy" : "exceljs";
+  const normalized = kindOf(ext);
+  if (!normalized) return "text";
+  return viewFor(normalized) === "windowed" ? "workbook" : "text";
 }

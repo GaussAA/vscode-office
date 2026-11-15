@@ -3,7 +3,7 @@ import type { App } from "antd";
 import { handler } from "../../util/vscode.ts";
 import { loadOfficeBuffer } from "../../util/loadOfficeContent.ts";
 import type { OfficeOpenMessage } from "@/common/openPayload";
-import { loadLegacyWorkbookRows, loadSheets, loadWorkbookRows } from "./excel_reader";
+import { loadSheets, loadWorkbookRows } from "./excel_reader";
 import { buildFormattingSnapshot } from "./excel_writer";
 import type Spreadsheet from "./x-spreadsheet/index";
 import { t } from "./excel_i18n";
@@ -13,7 +13,7 @@ import { limitForView, sheetViewFor } from "./sheetView";
 import type { ExcelTooLarge } from "./ExcelGuard";
 import { useExcelSave } from "./useExcelSave";
 import { mountExcelSpreadsheet } from "./excelSpreadsheetHost";
-import { excelWindowKind, excelWorkbookParser, planExcelOpen } from "./excelOpenPlan";
+import { excelWindowKind, planExcelOpen } from "./excelOpenPlan";
 
 export type ExcelOpenPayload = OfficeOpenMessage;
 
@@ -189,11 +189,7 @@ export function useExcelDocumentSession({
             });
             if (view === "window") {
               if (excelWindowKind(payload.ext ?? "") === "workbook") {
-                const parser = excelWorkbookParser(payload.ext ?? "");
-                const rows =
-                  parser === "legacy"
-                    ? await loadLegacyWorkbookRows(buffer)
-                    : await loadWorkbookRows(buffer);
+                const rows = await loadWorkbookRows(buffer);
                 if (seq !== openSeqRef.current) return;
                 const source = createWorkbookSheetSource(rows);
                 workbookRef.current = source;
