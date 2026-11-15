@@ -1,150 +1,34 @@
-# ADR 0024: Keep x-spreadsheet with Optimization
+# ADR 0024: 保留 x-spreadsheet，只做局部优化
 
-**Status**: Accepted  
-**Date**: 2024-11-15  
-**Deciders**: Development Team  
-**Related**: [ADR-0015](0015-narrow-to-three-viewers.md)
+**状态**：已采纳（2026-11-15）
+**相关**：[ADR-0015](0015-narrow-to-three-viewers.md)
 
-## Context
+## 背景
 
-After comprehensive research into x-spreadsheet alternatives (fortune-sheet, wolf-table), we faced a decision: migrate to a new library or optimize the existing x-spreadsheet integration.
+Excel 查看器的可编辑网格（文件 ≤ 8 MB）用的是 vendored 的 x-spreadsheet，已无上游维护。我们评估过能否换成现成的开源库。
 
-### Research Findings
+## 评估结果
 
-**fortune-sheet**:
+| 候选              | 结论                                                                                                 |
+| ----------------- | ---------------------------------------------------------------------------------------------------- |
+| ag-Grid Community | 不是电子表格：没有公式编辑、冻结窗格、合并单元格、多工作表；这些在企业版里，收费。做过 POC，已丢弃。 |
+| FortuneSheet      | 2023-11 起无维护，没有撤销和查找。                                                                   |
+| wolf-table        | 停在 v0.0.3 的原型，功能覆盖约 30%，API 不兼容。                                                     |
 
-- ❌ 20MB+ bundle size (vs current 2-3MB)
-- ❌ Canvas-only rendering (accessibility concerns)
-- ❌ Heavy migration cost (complete rewrite needed)
-- ✅ Active maintenance
-- ✅ Rich features
+SheetJS（`xlsx`）负责解析和写入，x-spreadsheet 负责渲染和编辑，两者互补，不是重复实现。Parquet（hyparquet）、CSV（uDSV）也已经是各自领域的常用方案。
 
-**wolf-table**:
+## 决定
 
-- ❌ Abandoned (last commit 3+ years ago)
-- ❌ Limited TypeScript support
-- ❌ Smaller community
+保留 x-spreadsheet 和编辑功能，只做局部清理：
 
-**x-spreadsheet** (current):
+- 删掉未使用的 Chart、Print、de/nl 语言包（468 行，3 个文件）。
+- 查找替换、另存为对话框改为懒加载。
+- 补上事件监听器的清理（`destroy()`），修复内存泄漏。
 
-- ✅ Already integrated and working
-- ✅ Reasonable bundle size (~2-3MB)
-- ✅ DOM-based rendering (better for VS Code webview)
-- ✅ Meets current requirements
-- ❌ Not actively maintained
-- ❌ Technical debt exists
+语言包没有做懒加载：测试中发现这会让 `t()` 在语言包加载完成前被调用，所以保持静态导入。
 
-### The Decision Point
+## 何时重新评估
 
-The core question: Is the migration ROI worth it?
-
-**Migration Cost**:
-
-- 5-10 days development
-- Complete rewrite of Excel viewer
-- New bug surface
-- Compatibility testing
-- User retraining (if UI changes significantly)
-
-**Optimization Cost**:
-
-- 3-5 days development
-- Incremental improvements
-- Lower risk
-- Existing code knowledge
-
-## Decision
-
-**We decided to keep x-spreadsheet and optimize it locally.**
-
-This is a pragmatic choice based on:
-
-1. **Risk/Reward**: Optimization has much lower risk than migration
-2. **Time Investment**: 3-5 days vs 5-10 days
-3. **Current State**: x-spreadsheet works well enough
-4. **Bundle Size**: Already acceptable (unlike fortune-sheet's 20MB+)
-5. **Rendering**: DOM-based is better for VS Code webview
-
-## Optimization Strategy
-
-Instead of migrating, we invest 3-5 days in targeted optimizations:
-
-### Day 1-2: Dead Code Removal ✅ COMPLETED
-
-- Remove Chart functionality (empty implementation)
-- Remove Print functionality (not needed in VS Code)
-- Remove unused locales (de, nl)
-- **Result**: 519 lines removed (3.8% reduction)
-
-### Day 3: Bundle Size Optimization (PARTLY SHIPPED)
-
-- Bundle analysis with rollup-plugin-visualizer
-- Lazy-load locale files (not shipped; locales are static imports)
-- Lazy-load modal components (shipped: Find/Replace, Save As)
-- Tree-shake unused SVG icons
-
-### Day 4: Performance Optimization (SHIPPED: listener cleanup)
-
-- Event listener cleanup (prevent memory leaks)
-- Rendering optimizations
-- Profiling large files
-
-### Day 5: Documentation (PLANNED)
-
-- Maintenance guide
-- Bug fix guide
-- Future migration considerations
-
-## Consequences
-
-### Positive
-
-1. **Low Risk**: Incremental changes, each tested independently
-2. **Cost Effective**: 3-5 days vs 5-10 days for migration
-3. **Immediate Value**: Each optimization improves current state
-4. **Reversible**: Git makes it easy to roll back if needed
-5. **Learning**: Better understanding of x-spreadsheet internals
-
-### Negative
-
-1. **Technical Debt**: We accept that x-spreadsheet is not actively maintained
-2. **No New Features**: Optimization doesn't add features fortune-sheet has
-3. **Future Migration**: Still an option if requirements change significantly
-4. **Maintenance Burden**: We own any future bug fixes
-
-### Neutral
-
-1. **Not Forever**: This decision can be revisited in 6-12 months
-2. **Documented Path**: We now have clear migration research if needed
-3. **Reduced Scope**: Each optimization makes potential future migration easier
-
-## Success Criteria
-
-Optimization succeeds if we achieve:
-
-- ✅ 10-20% code reduction (Target: ~1,400-2,800 lines)
-- ⏳ 50-100KB bundle size reduction
-- ⏳ 20%+ performance improvement (or no bottlenecks found)
-- ⏳ All tests passing
-- ⏳ Zero functionality loss
-- ⏳ Complete documentation
-
-**Current Progress**: Day 2 complete, 519 lines removed (3.8%)
-
-## When to Reconsider
-
-We should revisit this decision if:
-
-1. **New Requirements**: Need features only fortune-sheet provides
-2. **Maintenance Crisis**: Critical x-spreadsheet bugs we can't fix
-3. **Bundle Bloat**: Size grows beyond acceptable limits
-4. **Performance Wall**: Hit optimization limits
-5. **Accessibility Requirements**: Need features x-spreadsheet can't provide
-
-## Notes
-
-This ADR represents a **pragmatic engineering decision**: optimize what we have rather than chasing a potentially better but riskier alternative.
-
-The key insight: x-spreadsheet's technical debt is manageable, and the migration cost doesn't justify the benefits given current requirements.
-
-If future requirements change significantly (e.g., need collaborative editing, advanced charting, or massive file support), fortune-sheet becomes the obvious choice. But for our current needs, local optimization is the better investment.
+- 出现 x-spreadsheet 做不到的需求（协同编辑、图表）。
+- 出现修不动的 x-spreadsheet 缺陷。
+- 出现维护良好、带公式编辑和冻结窗格的开源替代。

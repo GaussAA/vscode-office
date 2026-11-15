@@ -48,14 +48,12 @@
 
 ### 了解项目
 
-1. 阅读 [README.md](../README.md) 了解项目概况
-2. 查看 [项目改进总结](./project-improvement-summary.md) 了解最新进展
-3. 浏览 [任务路线图](./tasks/improvement-roadmap.md) 了解未来计划
+1. 阅读 [README.md](./README.md) 了解项目概况
+2. 阅读 [AGENTS.md](./AGENTS.md) 和 [docs/adr/](./docs/adr/) 了解约定与已做的架构决策
 
 ### 寻找贡献点
 
 - 查看 [Issues](https://github.com/GaussAA/vscode-office/issues) 中标记为 `good first issue` 的问题
-- 阅读 [任务路线图](./tasks/improvement-roadmap.md) 中的待办任务
 - 提出你自己的改进想法
 
 ---
@@ -239,22 +237,23 @@ src/
 ### 编写测试
 
 ```typescript
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 
 describe("calculateSum", () => {
   it("should sum an array of numbers", () => {
     const result = calculateSum([1, 2, 3, 4]);
-    expect(result).toBe(10);
+    assert.equal(result, 10);
   });
 
   it("should return 0 for empty array", () => {
     const result = calculateSum([]);
-    expect(result).toBe(0);
+    assert.equal(result, 0);
   });
 
   it("should handle negative numbers", () => {
     const result = calculateSum([-1, -2, 3]);
-    expect(result).toBe(0);
+    assert.equal(result, 0);
   });
 });
 ```
@@ -265,11 +264,8 @@ describe("calculateSum", () => {
 # 运行所有测试
 pnpm test
 
-# 运行特定测试文件
-pnpm test parquetReducer
-
-# 观察模式
-pnpm test --watch
+# 运行单个测试文件
+pnpm exec tsx --test test/unit/type-guards.test.ts
 ```
 
 ### 测试标准
@@ -488,16 +484,15 @@ import { Profiler } from 'react';
 
 ### 项目文档
 
-- [类型守卫使用指南](./type-guards-guide.md)
-- [类型守卫最佳实践](./type-guard-best-practices.md)
-- [性能优化指南](./performance-optimization-guide.md)
-- [集成测试计划](./testing/integration-test-plan.md)
+- [类型守卫](./docs/type-guards.md)
+- [性能闸门](./docs/agents/perf.md)
+- [UI 验证](./docs/agents/ui-verify.md)
 
 ### 外部资源
 
 - [TypeScript 文档](https://www.typescriptlang.org/docs/)
 - [React 文档](https://react.dev/)
-- [Vitest 文档](https://vitest.dev/)
+- [Node.js 测试运行器](https://nodejs.org/api/test.html)
 
 ---
 
