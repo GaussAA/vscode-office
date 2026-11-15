@@ -5,13 +5,13 @@
  * (hundreds of MB, millions of lines) out of the webview.
  */
 import {
-  JSONL_LABEL_KEYS,
   JSONL_MAX_LINE_BYTES,
   JSONL_MAX_TEXT_CHARS,
   JSONL_RAW_PREVIEW_CHARS,
   type JsonlEntryDetail,
   type JsonlEntrySummary,
 } from "@/common/jsonlTypes";
+import { classifyEntry } from "@/service/entryClassifier";
 
 export interface JsonlIndex {
   lineCount: number;
@@ -41,8 +41,8 @@ function lineBytes(bytes: Uint8Array, index: JsonlIndex, line: number): Uint8Arr
   return bytes.subarray(start, end);
 }
 
-/** Line size in bytes, excluding the terminator (the same rule `readJsonlLineText` uses). */
-function lineSize(bytes: Uint8Array, index: JsonlIndex, line: number): number {
+/** Line size in bytes, excluding the terminator. Used to short-circuit decoding huge lines. */
+function lineSizeBytes(bytes: Uint8Array, index: JsonlIndex, line: number): number {
   const slice = lineBytes(bytes, index, line);
   if (slice.length === 0) return 0;
   return slice.length - (slice[slice.length - 1] === 0x0a ? 1 : 0);
@@ -70,81 +70,14 @@ function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/**
- * Derive a human-friendly label from the entry's TOP-LEVEL identity keys.
- *
- * A top-level identity key whose value is an object is still this entry's identity container
- * (agent transcripts commonly store `id: { query, ... }`). Look one level inside it, but never
- * descend into arbitrary nested objects: a child record's `id` is not this entry's identity.
- * Without this, every record of that shape falls back to its raw JSON head and the directory
- * becomes a wall of identical rows.
- */
-const NESTED_LABEL_KEYS = ["query", "name", "title", "label", "id", "key"] as const;
-
-function scalarLabel(candidate: unknown): string | undefined {
-  if (typeof candidate === "string") {
-    const trimmed = candidate.trim();
-    return trimmed ? truncate(trimmed, 40) : undefined;
-  }
-  if (
-    typeof candidate === "number" ||
-    typeof candidate === "bigint" ||
-    typeof candidate === "boolean"
-  ) {
-    return String(candidate);
-  }
-  return undefined;
-}
-
-export function deriveLabel(value: unknown): string | undefined {
-  if (!isRecord(value)) return undefined;
-  for (const key of JSONL_LABEL_KEYS) {
-    if (!(key in value)) continue;
-    const candidate = value[key];
-    const direct = scalarLabel(candidate);
-    if (direct) return direct;
-    if (Array.isArray(candidate)) {
-      // `query_search: ["..."]` stores the text in a one-element array. Reading the first
-      // scalar is enough for a row label; an array of objects yields nothing and falls through.
-      for (const item of candidate.slice(0, 3)) {
-        const label = scalarLabel(item);
-        if (label) return label;
-      }
-      continue;
-    }
-    if (isRecord(candidate)) {
-      for (const nestedKey of NESTED_LABEL_KEYS) {
-        const nested = scalarLabel(candidate[nestedKey]);
-        if (nested) return nested;
-      }
-    }
-  }
-  return undefined;
-}
-
-interface DecodedLine {
-  text: string;
-  size: number;
-}
-
 /** Decode one line to text. Exported so the searcher can scan without re-parsing. */
-export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: number): DecodedLine {
+export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: number): string {
   const slice = lineBytes(bytes, index, line);
   // A UTF-8 BOM at byte 0 would otherwise make the first line invalid JSON.
-  const text = decoder
+  return decoder
     .decode(slice)
     .replace(/^\uFEFF/, "")
     .replace(/[\r\n]+$/, "");
-  // size excludes the line terminator
-  const size = Math.max(
-    0,
-    text.length === 0 ? 0 : slice.length - (slice[slice.length - 1] === 0x0a ? 1 : 0),
-  );
-  return { text, size };
 }
 
 /**
@@ -155,10 +88,39 @@ export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: nu
  */
 export function summarizeDecodedLine(
   line: number,
-  decoded: DecodedLine,
+  rawText: string,
   needle?: string,
 ): JsonlEntrySummary {
-  return classify(line, decoded, needle);
+  const classification = classifyEntry(rawText);
+  const base = {
+    index: line,
+    size: classification.byteSize,
+    raw: truncate(classification.text, JSONL_RAW_PREVIEW_CHARS),
+  };
+
+  if (classification.kind === "empty") {
+    return { ...base, kind: "empty" };
+  }
+  if (classification.kind === "too-large") {
+    return { ...base, kind: "too-large" };
+  }
+  if (classification.kind === "invalid") {
+    return { ...base, kind: "invalid", error: classification.error! };
+  }
+
+  // kind === "value"
+  const summary: JsonlEntrySummary = {
+    ...base,
+    kind: "value",
+    ...(classification.label ? { label: classification.label } : {}),
+  };
+
+  if (needle) {
+    const hit = classifyHit(classification.value, needle);
+    if (hit) summary.hit = hit;
+  }
+
+  return summary;
 }
 
 /**
@@ -212,46 +174,13 @@ export function matchSnippet(text: string, needle: string, radius = 48): string 
   return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
 }
 
-/** One line of JSONL is exactly one of four things; this is where that is decided. */
-function classify(line: number, decoded: DecodedLine, needle?: string): JsonlEntrySummary {
-  const { text, size } = decoded;
-  const raw = truncate(text, JSONL_RAW_PREVIEW_CHARS);
-  if (text.trim() === "") {
-    return { index: line, size, raw: "", kind: "empty" };
-  }
-  if (size > JSONL_MAX_LINE_BYTES) {
-    return { index: line, size, raw, kind: "too-large" };
-  }
-  try {
-    const value = JSON.parse(text);
-    const summary: JsonlEntrySummary = {
-      index: line,
-      size,
-      raw,
-      kind: "value",
-      label: deriveLabel(value),
-    };
-    if (needle) {
-      const hit = classifyHit(value, needle);
-      if (hit) summary.hit = hit;
-    }
-    return summary;
-  } catch (error) {
-    return {
-      index: line,
-      size,
-      raw,
-      kind: "invalid",
-      error: error instanceof Error ? error.message : "Invalid JSON",
-    };
-  }
-}
-
 /**
  * Directory payload: parse only far enough to derive the identity label.
  *
  * `baseLine` exists because a caller may hold only a window of the file: the window's local
  * index starts at 0, but the entries it produces must still carry absolute line numbers.
+ *
+ * Performance: checks byte size BEFORE decoding; a 100 MB line never becomes a 100 MB string.
  */
 export function buildJsonlSummary(
   bytes: Uint8Array,
@@ -259,9 +188,10 @@ export function buildJsonlSummary(
   line: number,
   baseLine = 0,
 ): JsonlEntrySummary {
-  const size = lineSize(bytes, index, line);
+  const size = lineSizeBytes(bytes, index, line);
+
+  // Short-circuit: don't decode huge lines just to classify them as too-large
   if (size > JSONL_MAX_LINE_BYTES) {
-    // Do not decode a megabyte-scale line to show its size and 400-character head.
     return {
       index: baseLine + line,
       size,
@@ -269,7 +199,31 @@ export function buildJsonlSummary(
       kind: "too-large",
     };
   }
-  return classify(baseLine + line, readJsonlLineText(bytes, index, line));
+
+  const rawText = readJsonlLineText(bytes, index, line);
+  const classification = classifyEntry(rawText);
+
+  const base = {
+    index: baseLine + line,
+    size: classification.byteSize,
+    raw: truncate(classification.text, JSONL_RAW_PREVIEW_CHARS),
+  };
+
+  if (classification.kind === "empty") {
+    return { ...base, kind: "empty" };
+  }
+  if (classification.kind === "too-large") {
+    return { ...base, kind: "too-large" };
+  }
+  if (classification.kind === "invalid") {
+    return { ...base, kind: "invalid", error: classification.error! };
+  }
+
+  return {
+    ...base,
+    kind: "value",
+    ...(classification.label ? { label: classification.label } : {}),
+  };
 }
 
 export function buildJsonlSummaries(
@@ -295,32 +249,42 @@ export function buildJsonlEntry(
   line: number,
   baseLine = 0,
 ): JsonlEntryDetail {
-  const decoded = readJsonlLineText(bytes, index, line);
+  const rawText = readJsonlLineText(bytes, index, line);
+  const classification = classifyEntry(rawText);
   const at = baseLine + line;
-  const { size } = decoded;
-  const raw = truncate(decoded.text, JSONL_RAW_PREVIEW_CHARS);
+
   // A plain prefix, not a "…"-suffixed string: the flag is the truth, and the notice can
   // say how many characters are missing. The old truncate() made 200,000 characters look
   // like a complete value.
-  const textChars = decoded.text.length;
+  const textChars = classification.text.length;
   const textTruncated = textChars > JSONL_MAX_TEXT_CHARS;
-  const text = textTruncated ? decoded.text.slice(0, JSONL_MAX_TEXT_CHARS) : decoded.text;
-  const base = { index: at, size, raw, text, textChars, textTruncated };
+  const text = textTruncated
+    ? classification.text.slice(0, JSONL_MAX_TEXT_CHARS)
+    : classification.text;
 
-  if (decoded.text.trim() === "") {
+  const base = {
+    index: at,
+    size: classification.byteSize,
+    raw: truncate(classification.text, JSONL_RAW_PREVIEW_CHARS),
+    text,
+    textChars,
+    textTruncated,
+  };
+
+  if (classification.kind === "empty") {
     return { ...base, kind: "empty" };
   }
-  if (size > JSONL_MAX_LINE_BYTES) {
+  if (classification.kind === "too-large") {
     return { ...base, kind: "too-large" };
   }
-  try {
-    const value = JSON.parse(decoded.text);
-    return { ...base, kind: "value", label: deriveLabel(value), value };
-  } catch (error) {
-    return {
-      ...base,
-      kind: "invalid",
-      error: error instanceof Error ? error.message : "Invalid JSON",
-    };
+  if (classification.kind === "invalid") {
+    return { ...base, kind: "invalid", error: classification.error! };
   }
+
+  return {
+    ...base,
+    kind: "value",
+    ...(classification.label ? { label: classification.label } : {}),
+    value: classification.value!,
+  };
 }

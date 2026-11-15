@@ -179,9 +179,8 @@ test("jsonl: keys and value types may differ on every line", async () => {
 test("jsonl: unicode survives decoding", async () => {
   const bytes = new Uint8Array(await bytesOf("jsonl/unicode.jsonl"));
   const index = buildJsonlIndex(bytes);
-  const text = Array.from(
-    { length: index.lineCount },
-    (_, line) => readJsonlLineText(bytes, index, line).text,
+  const text = Array.from({ length: index.lineCount }, (_, line) =>
+    readJsonlLineText(bytes, index, line),
   ).join("\n");
   assert.ok(!text.includes("\uFFFD"), "a replacement character means a decoding error");
   assert.ok(/[\u4e00-\u9fff]/.test(text), "the fixture should contain CJK text");
@@ -196,7 +195,7 @@ test("jsonl: deep nesting and a 600-field entry are still values", async () => {
     ["value", "value", "value"],
   );
   const bytes = new Uint8Array(await bytesOf("jsonl/large-entry.jsonl"));
-  const wide = readJsonlLineText(bytes, buildJsonlIndex(bytes), 1).text;
+  const wide = readJsonlLineText(bytes, buildJsonlIndex(bytes), 1);
   assert.equal(Object.keys(JSON.parse(wide).fields).length, 600);
 });
 

@@ -205,12 +205,12 @@ export class JsonlSession {
       }
 
       for (let offset = 0; offset < window.index.lineCount; offset++) {
-        const decoded = readJsonlLineText(window.bytes, window.index, offset);
-        if (!decoded.text.toLowerCase().includes(needle)) continue;
+        const rawText = readJsonlLineText(window.bytes, window.index, offset);
+        if (!rawText.toLowerCase().includes(needle)) continue;
         matches++;
         pending.push({
-          ...summarizeDecodedLine(scanned + offset, decoded, needle),
-          snippet: matchSnippet(decoded.text, needle),
+          ...summarizeDecodedLine(scanned + offset, rawText, needle),
+          snippet: matchSnippet(rawText, needle),
         });
         if (pending.length >= batchSize) flush(false);
         if (matches >= maxMatches) {
