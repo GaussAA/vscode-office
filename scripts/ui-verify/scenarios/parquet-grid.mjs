@@ -263,14 +263,19 @@ export default [
       );
       // The header is a separate scroll surface; a jump that moves only the body leaves the
       // column labels one or two columns away from the values under them.
-      const alignment = json(
-        await page.evaluate(`JSON.stringify((() => {
+      // The jump is animated (~200-400 ms) and the cell is already "in view" while it slides in,
+      // so wait for the header to settle under it before asserting the end state.
+      const alignmentExpr = `(() => {
                 const cell = document.querySelector('.parquet-viewer__cell--link')?.closest('.ant-table-cell, td');
                 const head = [...document.querySelectorAll('.parquet-table thead th')].at(-1);
-                if (!cell || !head) return { diff: null };
-                return { diff: Math.abs(head.getBoundingClientRect().left - cell.getBoundingClientRect().left) };
-            })())`),
+                if (!cell || !head) return null;
+                return Math.abs(head.getBoundingClientRect().left - cell.getBoundingClientRect().left);
+            })()`;
+      await page.waitFor(
+        `(() => { const d = ${alignmentExpr}; return d !== null && d < 2; })()`,
+        4000,
       );
+      const alignment = json(await page.evaluate(`JSON.stringify({ diff: ${alignmentExpr} })`));
       expect(
         typeof alignment.diff === "number" && alignment.diff < 2,
         `header and body disagree by ${alignment.diff}px`,
