@@ -10,7 +10,9 @@ import { expect, json, openParquet } from "../helpers.mjs";
 export default [
   {
     name: "parquet-column-jump-animation",
-    async run({ page, base }) {
+    async run({ page, base, setReducedMotion }) {
+      // The emulation sticks to the page, so an earlier reduced-motion scenario would turn this into a single jump.
+      await setReducedMotion(false);
       // Open a parquet file with enough columns to require horizontal scrolling (12 columns)
       await openParquet(page, base, "?preview=1");
 
@@ -135,7 +137,8 @@ export default [
 
   {
     name: "parquet-column-jump-no-reduced-motion",
-    async run({ page, base }) {
+    async run({ page, base, setReducedMotion }) {
+      await setReducedMotion(false);
       // Test that column jump respects scroll-behavior: smooth when motion is enabled
       await openParquet(page, base, "?preview=1");
 

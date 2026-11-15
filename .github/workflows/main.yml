@@ -33,7 +33,6 @@ jobs:
         run: xvfb-run -a pnpm test:smoke:min
       - name: UI verification (headless DOM assertions)
         run: xvfb-run -a pnpm verify:ui
-        continue-on-error: true
       # The only layer that sees cost rather than appearance: bytes served, search passes,
       # window sizes. Its large fixtures are generated into .perf/, so the cache keeps a cold
       # run from regenerating 200 MB on every push; the key is the generator's own hash.

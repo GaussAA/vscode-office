@@ -51,9 +51,8 @@ jobs:
 
       # Same gate as CI, re-run on the tagged commit: a tag is not evidence that the
       # tree passed, so we do not take main.yml's word for it.
-      # Note: UI tests are allowed to fail for v6.13.0 due to known Excel polyfill limitations (85.5% pass rate)
       - name: Check, build, verify UI
-        run: xvfb-run -a pnpm check:full || true
+        run: xvfb-run -a pnpm check:full
 
       # Packaging prerequisites that only fail at the last step of a release: a missing icon,
       # a version the Marketplace will not accept, a tag that does not match package.json.

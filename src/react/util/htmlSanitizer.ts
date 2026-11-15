@@ -8,28 +8,16 @@
  */
 
 import DOMPurify from "dompurify";
-import { JSDOM } from "jsdom";
 
 /**
- * Create a DOMPurify instance that works in both browser and Node.js environments.
+ * DOMPurify bound to the global `window`.
  *
- * In the browser, uses the window object directly.
- * In Node.js (for testing), creates a JSDOM window.
- *
- * @returns DOMPurify instance configured for the current environment
+ * This module is bundled into the webview, so it must not import `jsdom`: that drags undici
+ * into the Excel bundle, and undici calls `util.channel` at load, which the browser polyfill
+ * lacks (`r.channel is not a function`, the Excel viewer never mounts). Unit tests install a
+ * jsdom `window` on `globalThis` before importing this module.
  */
-const createDOMPurify = () => {
-  if (typeof window !== "undefined") {
-    // Browser environment
-    return DOMPurify(window);
-  } else {
-    // Node.js environment - create a JSDOM window
-    const jsdomWindow = new JSDOM("").window;
-    return DOMPurify(jsdomWindow as unknown as Window & typeof globalThis);
-  }
-};
-
-const purify = createDOMPurify();
+const purify = DOMPurify(window);
 
 /**
  * Sanitize HTML from clipboard to prevent XSS attacks.

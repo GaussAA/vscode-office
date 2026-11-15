@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sanitizeClipboardHTML, sanitizeTooltipHTML } from "../../src/react/util/htmlSanitizer.ts";
+import { JSDOM } from "jsdom";
+
+// The module under test binds to the global `window` (it must not import jsdom itself, see its
+// header), so install one before the module is evaluated.
+(globalThis as { window?: unknown }).window = new JSDOM("").window;
+const { sanitizeClipboardHTML, sanitizeTooltipHTML } =
+  await import("../../src/react/util/htmlSanitizer.ts");
 
 test("sanitizeClipboardHTML: allows safe table HTML", () => {
   const input = `
