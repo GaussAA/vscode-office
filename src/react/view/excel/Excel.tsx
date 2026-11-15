@@ -1,15 +1,17 @@
 import { MoonOutlined, SunOutlined } from "@ant-design/icons";
 import { App, Spin } from "antd";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { handler } from "../../util/vscode.ts";
 import { isVscodeEditorDark, observeVscodeThemeChange } from "../../util/vscodeTheme.ts";
 import "./Excel.less";
-import FindReplacePanel, { type FindReplacePanelHandle } from "./FindReplacePanel";
+import type { FindReplacePanelHandle } from "./FindReplacePanel";
 import { initExcelLocale, t } from "./excel_i18n";
+
+const FindReplacePanel = lazy(() => import("./FindReplacePanel"));
+const ExcelSaveAsDialog = lazy(() => import("./ExcelSaveAsDialog"));
 import WindowedSheet from "./WindowedSheet";
 import ExcelGuard from "./ExcelGuard";
 import ExcelLoadError from "./ExcelLoadError";
-import ExcelSaveAsDialog from "./ExcelSaveAsDialog";
 import { useExcelDocumentSession } from "./useExcelDocumentSession";
 import { loadExcelColorMode, saveExcelColorMode, type ExcelColorMode } from "./excelViewState";
 import { ErrorBoundary } from "../../components/ErrorBoundary.tsx";
@@ -165,27 +167,33 @@ function ExcelViewer() {
         <div className="excel-readonly-banner">{t("viewer.readonlyBanner")}</div>
       )}
       {findPanel && !loading && !loadError && !tooLarge && !windowSource && (
-        <FindReplacePanel
-          ref={findReplacePanelRef}
-          spreadSheet={activeSpreadsheet}
-          mode={findPanel}
-          onClose={() => setFindPanel(null)}
-          readOnly={readOnly}
-          onChanged={() => {
-            if (!readOnlyRef.current) {
-              spreadSheetRef.current?.setSaveEnabled(true);
-            }
-          }}
-        />
+        <Suspense fallback={<div style={{ position: "absolute", top: 0, left: 0 }} />}>
+          <FindReplacePanel
+            ref={findReplacePanelRef}
+            spreadSheet={activeSpreadsheet}
+            mode={findPanel}
+            onClose={() => setFindPanel(null)}
+            readOnly={readOnly}
+            onChanged={() => {
+              if (!readOnlyRef.current) {
+                spreadSheetRef.current?.setSaveEnabled(true);
+              }
+            }}
+          />
+        </Suspense>
       )}
-      <ExcelSaveAsDialog
-        open={saveAsVisible}
-        onCancel={() => setSaveAsVisible(false)}
-        onSave={(format) => {
-          setSaveAsVisible(false);
-          void confirmSaveAs(format);
-        }}
-      />
+      {saveAsVisible && (
+        <Suspense fallback={null}>
+          <ExcelSaveAsDialog
+            open={saveAsVisible}
+            onCancel={() => setSaveAsVisible(false)}
+            onSave={(format) => {
+              setSaveAsVisible(false);
+              void confirmSaveAs(format);
+            }}
+          />
+        </Suspense>
+      )}
       <div id="container"></div>
       {windowSource && (
         <WindowedSheet

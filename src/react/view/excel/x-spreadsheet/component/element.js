@@ -9,6 +9,8 @@ class Element {
       this.el = tag;
     }
     this.data = {};
+    // Track event listeners for cleanup
+    this.listeners = [];
   }
 
   data(key, value) {
@@ -25,7 +27,7 @@ class Element {
     if (eventName === "mousewheel" && /Firefox/i.test(window.navigator.userAgent)) {
       eventName = "DOMMouseScroll";
     }
-    this.el.addEventListener(eventName, (evt) => {
+    const wrappedHandler = (evt) => {
       if (evt.type == "mousewheel" && document.activeElement?.tagName === "TEXTAREA") return;
       handler(evt);
       for (let i = 0; i < oen.length; i += 1) {
@@ -40,7 +42,10 @@ class Element {
           evt.stopPropagation();
         }
       }
-    });
+    };
+    this.el.addEventListener(eventName, wrappedHandler);
+    // Track for cleanup
+    this.listeners.push({ eventName, handler: wrappedHandler });
     return this;
   }
 
@@ -263,6 +268,18 @@ class Element {
   hide() {
     this.css("display", "none");
     return this;
+  }
+
+  /**
+   * Clean up all event listeners attached via .on()
+   */
+  destroy() {
+    if (this.listeners && this.listeners.length > 0) {
+      for (const { eventName, handler } of this.listeners) {
+        this.el.removeEventListener(eventName, handler);
+      }
+      this.listeners = [];
+    }
   }
 }
 

@@ -121,9 +121,14 @@ export function mountExcelSpreadsheet({
   return {
     spreadSheet,
     dispose() {
-      if (!viewTimer) return;
-      clearTimeout(viewTimer);
-      saveViewState(documentKey, spreadSheet.getSelection());
+      if (viewTimer) {
+        clearTimeout(viewTimer);
+        saveViewState(documentKey, spreadSheet.getSelection());
+      }
+      // Clean up all event listeners
+      if (spreadSheet && typeof spreadSheet.destroy === "function") {
+        spreadSheet.destroy();
+      }
     },
   };
 }
