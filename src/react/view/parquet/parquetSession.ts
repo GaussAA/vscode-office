@@ -70,6 +70,11 @@ export class ParquetSession {
   private currentPage = 0;
   private currentRows: ParquetRow[] = [];
 
+  /** Row to restore when the page size is known; cleared once restored. */
+  private restoreRow = 0;
+  /** True while waiting for the restore to land; prevents persisting page 0 over the stored row. */
+  private restorePending = false;
+
   constructor(source: ParquetRowsSource, options: ParquetSessionOptions = {}) {
     this.source = source;
     this.pageSizeValue = Math.max(1, options.pageSize ?? DEFAULT_PAGE_SIZE);
@@ -92,12 +97,24 @@ export class ParquetSession {
    *
    * A page is "one screenful", so it changes with the window. The cache is keyed by chunk, which
    * does not depend on the page size, so re-paging a big file must not cost another read.
-   * Returns the clamped page holding `keepRow`, so the caller can stay on the same row.
+   *
+   * If `keepRow` is provided, returns the page holding that row; otherwise, if a restore is
+   * pending, returns the page holding the restore row and clears the restore. If neither,
+   * returns the page holding the current first visible row (so a resize does not move the reader).
    */
-  setPageSize(size: number, keepRow = 0): number {
+  setPageSize(size: number, keepRow?: number): number {
     const next = Math.max(1, Math.min(this.chunkSize, Math.floor(size)));
     this.pageSizeValue = next;
-    return this.clampPage(Math.floor(Math.max(0, keepRow) / next));
+    const row =
+      keepRow !== undefined
+        ? keepRow
+        : this.restorePending
+          ? this.restoreRow
+          : this.startOf(this.currentPage);
+    if (this.restorePending && keepRow === undefined) {
+      this.restorePending = false;
+    }
+    return this.clampPage(Math.floor(Math.max(0, row) / next));
   }
 
   get page(): number {
@@ -115,6 +132,33 @@ export class ParquetSession {
 
   pageOf(row: number): number {
     return Math.floor(row / this.pageSize);
+  }
+
+  /** Alias for `pageOf`: clearer when computing which page holds a row. */
+  rowToPage(row: number): number {
+    return this.pageOf(row);
+  }
+
+  /** Alias for `startOf`: clearer when computing the first row of a page. */
+  pageToRow(page: number): number {
+    return this.startOf(page);
+  }
+
+  /** Mark a row to restore once the page size is known; typically called before the first render. */
+  restoreToRow(row: number): void {
+    this.restoreRow = Math.max(0, row);
+    this.restorePending = true;
+  }
+
+  /** Clear the restore target without restoring; used when the user navigates elsewhere. */
+  clearRestore(): void {
+    this.restoreRow = 0;
+    this.restorePending = false;
+  }
+
+  /** True while a restore is pending; the persister should not overwrite the stored row with page 0. */
+  get isRestorePending(): boolean {
+    return this.restorePending;
   }
 
   clampPage(page: number): number {
@@ -139,6 +183,10 @@ export class ParquetSession {
 
     this.currentPage = target;
     this.currentRows = rows;
+    // If we just loaded the page holding the restore row, mark the restore as complete.
+    if (this.restorePending && start === this.restoreRow) {
+      this.restorePending = false;
+    }
     return { page: target, start, end, rows, stale: false };
   }
 

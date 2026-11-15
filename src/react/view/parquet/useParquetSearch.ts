@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { ParquetFileInfo } from "./parquetParser";
+import type { ParquetSession } from "./parquetSession";
 import { searchParquetValues } from "./parquetSearch";
 import { SEARCH_MAX_ROWS } from "./parquetLayout";
 
 interface UseParquetSearchArgs {
   fileInfoRef: RefObject<ParquetFileInfo | null>;
+  sessionRef: RefObject<ParquetSession | null>;
   page: number;
   pageSize: number;
   goToPage: (next: number | ((current: number) => number)) => void;
@@ -39,6 +41,7 @@ export interface ParquetSearch {
  */
 export function useParquetSearch({
   fileInfoRef,
+  sessionRef,
   page,
   pageSize,
   goToPage,
@@ -119,7 +122,10 @@ export function useParquetSearch({
       );
       if (result.rows.length > 0) {
         setActiveMatch(0);
-        const target = Math.floor(result.rows[0] / pageSize);
+        const session = sessionRef.current;
+        const target = session
+          ? session.rowToPage(result.rows[0])
+          : Math.floor(result.rows[0] / pageSize);
         goToPage((current) => (current === target ? current : target));
         // A hit is a cell, not a row: bring its column into view too. `mark` stays false so
         // the tint keeps meaning "you clicked a schema field", not "a search ran".
@@ -130,24 +136,28 @@ export function useParquetSearch({
     } finally {
       if (seq === searchSeq.current) setSearching(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sessionRef is stable
   }, [fileInfoRef, focusColumn, goToPage, onError, pageSize, query]);
 
   const jumpMatch = useCallback(
     (direction: 1 | -1) => {
       if (matchRows.size === 0) return;
+      const session = sessionRef.current;
+      if (!session) return;
       const sorted = [...matchRows].sort((a, b) => a - b);
-      const pageStart = page * pageSize;
-      const pageEnd = pageStart + pageSize;
+      const pageStart = session.pageToRow(page);
+      const pageEnd = pageStart + session.pageSize;
       const target =
         direction > 0
           ? (sorted.find((row) => row >= pageEnd) ?? sorted[0])
           : ([...sorted].reverse().find((row) => row < pageStart) ?? sorted[sorted.length - 1]);
-      goToPage(Math.floor(target / pageSize));
+      goToPage(session.rowToPage(target));
       setActiveMatch(sorted.indexOf(target));
       const column = matchColumnsRef.current.get(target);
       if (column !== undefined) focusColumn(column, false);
     },
-    [focusColumn, goToPage, matchRows, page, pageSize],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sessionRef is stable
+    [focusColumn, goToPage, matchRows, page],
   );
 
   /** Abandon a running scan. The scan checks `searchSeq` between pages, so this stops it. */

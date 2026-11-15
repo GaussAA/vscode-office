@@ -204,6 +204,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const search = useParquetSearch({
     onSearched: announceSearch,
     fileInfoRef,
+    sessionRef,
     page,
     pageSize,
     goToPage,
@@ -425,10 +426,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   // table the row may not be in the DOM at all, so the scroller is asked instead of the DOM.
   useEffect(() => {
     if (targetRow == null) return;
-    const index = targetRow - page * pageSize;
+    const session = sessionRef.current;
+    if (!session) return;
+    const index = targetRow - session.pageToRow(page);
     if (index < 0 || index >= pageRows.length) return;
     tableRef.current?.scrollTo({ index });
-  }, [targetRow, page, pageSize, pageRows]);
+  }, [targetRow, page, pageRows, sessionRef]);
 
   const rowRange = useMemo(() => {
     if (!fileInfo) return "";
