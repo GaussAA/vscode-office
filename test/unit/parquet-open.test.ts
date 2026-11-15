@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import type { SchemaElement } from "hyparquet";
+import { categorizeType, describeColumn } from "@/common/parquetSchema";
 import {
-  categorizeType,
-  describeColumn,
   formatCellValue,
   openParquetFile,
   readParquetRows,

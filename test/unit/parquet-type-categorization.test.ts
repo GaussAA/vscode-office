@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { categorizeType } from "../../src/react/view/parquet/parquetParser.ts";
+import { categorizeType } from "@/common/parquetSchema";
 
 test("categorizeType: identifies boolean types", () => {
   assert.strictEqual(categorizeType("BOOLEAN"), "bool");

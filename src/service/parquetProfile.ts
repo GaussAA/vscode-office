@@ -10,9 +10,10 @@
  * the single place a parquet type string is decoded (`categorizeType`), and re-deriving column
  * types host-side would create the second place that can disagree with the schema rail.
  */
-import { parquetReadObjects, type AsyncBuffer, type FileMetaData } from "hyparquet";
+import { parquetReadObjects, type FileMetaData } from "hyparquet";
 import { compressors } from "hyparquet-compressors";
 import { toDisplayText } from "@/common/displayText";
+import { asyncBufferFrom } from "@/common/parquetSchema";
 import type {
   ParquetColumnProfile,
   ParquetColumnScan,
@@ -27,28 +28,6 @@ type MinMax = bigint | boolean | number | string | Date | Uint8Array;
 
 /** Footer magic (4 bytes) plus the metadata length (4 bytes). Nothing else is needed up front. */
 const PROFILE_TAIL_PROBE_BYTES = 8;
-
-/**
- * Take `[start, end)` straight from a host byte source.
- *
- * hyparquet only asks for the footer and the pages it needs, so this wrapper is what keeps a
- * profile from becoming a whole-file read: `parquetMetadataAsync` reads the last eight bytes and
- * then the footer, and nothing else.
- */
-export function asyncBufferFrom(source: ByteSource): AsyncBuffer {
-  return {
-    byteLength: source.size,
-    async slice(start: number, end?: number): Promise<ArrayBuffer> {
-      const from = Math.max(0, Math.min(start, source.size));
-      const to = Math.max(from, Math.min(end ?? source.size, source.size));
-      if (to <= from) return new ArrayBuffer(0);
-      const bytes = await source.read(from, to - from);
-      // `read` may return a view over a larger buffer; hyparquet wants exactly these bytes.
-      const exact = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-      return exact as ArrayBuffer;
-    },
-  };
-}
 
 function formatExtreme(value: MinMax): string {
   if (value instanceof Date) return value.toISOString();

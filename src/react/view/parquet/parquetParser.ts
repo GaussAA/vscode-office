@@ -20,83 +20,21 @@ import {
   parquetSchema,
   type AsyncBuffer,
   type FileMetaData,
-  type SchemaElement,
 } from "hyparquet";
 // Fork addition: decode ZSTD/GZIP/BROTLI/LZ4 columns (upstream shipped SNAPPY only).
 import { compressors } from "hyparquet-compressors";
 import { toDisplayText } from "@/common/displayText";
+import {
+  asyncBufferFrom,
+  describeColumn,
+  type ColumnCategory,
+  type ColumnDescription,
+} from "@/common/parquetSchema";
 
-export type ColumnCategory = "bool" | "numeric" | "string" | "datetime" | "structure" | "field";
+export type { ColumnCategory };
 
-/**
- * Categorize a Parquet column type for display purposes.
- *
- * This is the single source of truth for type classification.
- * Each column gets an icon and alignment based on its category.
- *
- * Categories:
- * - bool: Boolean values
- * - numeric: Integers, floats, decimals
- * - string: Text, UUIDs, enums, bytes
- * - datetime: Timestamps, dates, times
- * - structure: JSON, structs, maps, lists
- * - field: Unknown/fallback types
- *
- * @param type - Raw Parquet type string (e.g., "INT64", "UTF8", "TIMESTAMP_MILLIS")
- * @returns The display category
- * @example
- * ```ts
- * categorizeType("INT64") // "numeric"
- * categorizeType("UTF8") // "string"
- * categorizeType("TIMESTAMP_MILLIS") // "datetime"
- * categorizeType("LIST<STRING>") // "structure"
- * ```
- */
-export function categorizeType(type: string): ColumnCategory {
-  const upper = `${type}`.toUpperCase();
-  if (upper.includes("BOOL")) return "bool";
-  if (
-    upper.includes("JSON") ||
-    upper.includes("STRUCT") ||
-    upper.includes("MAP") ||
-    upper.includes("LIST")
-  ) {
-    return "structure";
-  }
-  if (upper.includes("TIMESTAMP") || upper.includes("DATE") || upper.includes("TIME"))
-    return "datetime";
-  // ENUM contains NUM; keep it string-like before the numeric fallback below.
-  if (upper.includes("UUID") || upper.includes("ENUM")) return "string";
-  if (
-    upper.includes("INT") ||
-    upper.includes("FLOAT") ||
-    upper.includes("DOUBLE") ||
-    upper.includes("DECIMAL") ||
-    upper.includes("NUM")
-  ) {
-    return "numeric";
-  }
-  if (
-    upper.includes("STRING") ||
-    upper.includes("UTF8") ||
-    upper.includes("BYTE") ||
-    upper.includes("CHAR")
-  ) {
-    return "string";
-  }
-  return "field";
-}
-
-export interface ParquetColumnInfo {
-  name: string;
-  /** Raw schema type, shown next to the name. */
-  type: string;
-  /** Display type, with special handling for URL-like columns. */
-  displayType?: string;
-  /** Derived once, so the icon and alignment cannot disagree. */
-  category: ColumnCategory;
-  /** Groups and legacy repeated primitives are one cell of JSON, not a scalar. */
-  nested: boolean;
+export interface ParquetColumnInfo extends ColumnDescription {
+  // All fields inherited from ColumnDescription
 }
 
 export interface ParquetFileInfo {
@@ -119,108 +57,6 @@ export const PARQUET_PAGE_SIZE = 50;
  */
 export const PARQUET_CHUNK_SIZE = 5_000;
 
-/**
- * Convert an ArrayBuffer to AsyncBuffer for hyparquet.
- *
- * AsyncBuffer is hyparquet's abstraction for file access that works
- * with both local buffers and remote files.
- *
- * @param buffer - The array buffer to wrap
- * @returns AsyncBuffer interface for hyparquet
- */
-function asyncBufferFromArrayBuffer(buffer: ArrayBuffer): AsyncBuffer {
-  return {
-    byteLength: buffer.byteLength,
-    slice(start: number, end?: number) {
-      return buffer.slice(start, end ?? buffer.byteLength);
-    },
-  };
-}
-
-/**
- * Format a schema element's type for display.
- *
- * Prefers logical_type over deprecated converted_type, with fallback to physical type.
- * Normalizes UTF8 to STRING for consistency.
- *
- * @param element - Parquet schema element
- * @returns Formatted type string (e.g., "STRING", "INT64", "TIMESTAMP_MILLIS")
- */
-function formatSchemaType(element: SchemaElement): string {
-  let type: string;
-  if (element.logical_type?.type) {
-    type = element.logical_type.type;
-  } else if (element.converted_type) {
-    type = element.converted_type;
-  } else {
-    type = element.type ?? "UNKNOWN";
-  }
-  // Normalize UTF8 to STRING for consistent display (UTF8 is the default encoding)
-  if (type.toUpperCase() === "UTF8") {
-    return "STRING";
-  }
-  return type;
-}
-
-/**
- * Format a top-level column's type for display.
- *
- * Handles both leaf columns and nested structures (LIST, MAP, STRUCT).
- * For groups, uses logical_type or converted_type; for leaves, uses formatSchemaType.
- *
- * @param element - Schema element
- * @param hasChildren - True if this is a group with nested elements
- * @returns Formatted type string (e.g., "LIST", "MAP", "STRUCT", "INT64")
- */
-function formatColumnType(element: SchemaElement, hasChildren: boolean): string {
-  let type: string;
-  if (hasChildren) {
-    type = element.converted_type ?? element.logical_type?.type ?? "STRUCT";
-  } else {
-    type = formatSchemaType(element);
-  }
-  // Normalize UTF8 to STRING for consistent display (UTF8 is the default encoding)
-  if (type.toUpperCase() === "UTF8") {
-    return "STRING";
-  }
-  return type;
-}
-
-/**
- * Build the column model from one top-level schema element.
- *
- * Exported for unit tests: a hand-built SchemaElement is the only way to cover a
- * logical-type-only LIST without committing a second binary fixture.
- */
-export function describeColumn(element: SchemaElement, hasChildren: boolean): ParquetColumnInfo {
-  const nested = hasChildren || element.repetition_type === "REPEATED";
-  const type = formatColumnType(element, hasChildren);
-  // A nested column is one cell of JSON, so it gets the structure icon and alignment.
-  const category = nested ? "structure" : categorizeType(type);
-
-  // Detect URL-like columns by name pattern (case-insensitive)
-  const name = element.name.toLowerCase();
-  const isLikelyUrl =
-    !nested &&
-    category === "string" &&
-    (name.includes("url") ||
-      name.includes("link") ||
-      name.includes("href") ||
-      name === "uri" ||
-      name.endsWith("_url") ||
-      name.endsWith("_link") ||
-      name.startsWith("url_") ||
-      name.startsWith("link_"));
-
-  return {
-    name: element.name,
-    type,
-    displayType: isLikelyUrl ? "link" : undefined,
-    category,
-    nested,
-  };
-}
-
 function isAsyncBuffer(source: ArrayBuffer | AsyncBuffer): source is AsyncBuffer {
   const candidate = source as AsyncBuffer;
   return typeof candidate?.slice === "function" && typeof candidate?.byteLength === "number";
@@ -239,7 +75,7 @@ export async function openParquetFile(
     initialFetchSize?: number;
   } = {},
 ): Promise<ParquetFileInfo> {
-  const file = isAsyncBuffer(source) ? source : asyncBufferFromArrayBuffer(source);
+  const file = isAsyncBuffer(source) ? source : asyncBufferFrom(source);
   const metadata = await parquetMetadataAsync(file, {
     initialFetchSize: options.initialFetchSize,
   });
