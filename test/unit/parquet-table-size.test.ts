@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pageSizeForBodyHeight } from "../../src/react/view/parquet/useParquetTableSize";
 import {
+  pageSizeForBodyHeight,
   MIN_ROWS_PER_PAGE,
   PARQUET_MAX_PAGE_SIZE,
   ROW_HEIGHT,

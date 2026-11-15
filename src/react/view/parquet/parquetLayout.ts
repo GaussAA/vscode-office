@@ -38,3 +38,11 @@ export const COLUMN_STRETCH_MAX = 240;
 export const ANNOUNCE_DELAY_MS = 600;
 /** Must agree with `.parquet-viewer__cell` in the stylesheet: 6px padding ×2 + 22px line-height. */
 export const ROW_HEIGHT = 34;
+
+/** Compute page size from the body height: fit as many rows as possible, clamped to the range. */
+export function pageSizeForBodyHeight(bodyHeight: number): number {
+  return Math.min(
+    PARQUET_MAX_PAGE_SIZE,
+    Math.max(MIN_ROWS_PER_PAGE, Math.floor(bodyHeight / ROW_HEIGHT)),
+  );
+}

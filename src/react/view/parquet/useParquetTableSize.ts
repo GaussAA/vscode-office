@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ParquetFileInfo } from "./parquetParser";
 import type { ParquetSession } from "./parquetSession";
-import { MIN_ROWS_PER_PAGE, PARQUET_MAX_PAGE_SIZE, ROW_HEIGHT } from "./parquetLayout";
-
-export function pageSizeForBodyHeight(bodyHeight: number): number {
-  return Math.min(
-    PARQUET_MAX_PAGE_SIZE,
-    Math.max(MIN_ROWS_PER_PAGE, Math.floor(bodyHeight / ROW_HEIGHT)),
-  );
-}
+import { MIN_ROWS_PER_PAGE, pageSizeForBodyHeight } from "./parquetLayout";
 
 interface UseParquetTableSizeArgs {
   tableWrapRef: RefObject<HTMLDivElement | null>;
