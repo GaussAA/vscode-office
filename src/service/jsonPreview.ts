@@ -13,8 +13,6 @@ import {
   JSON_RAW_PREVIEW_CHARS,
   JSON_RECORD_MAX_BYTES,
   JSON_RECORD_WINDOW,
-  JSON_SEARCH_BATCH,
-  JSON_SEARCH_MAX_MATCHES,
   type JsonInfoPayload,
   type JsonRecordSummary,
   type JsonRootKind,
@@ -22,8 +20,9 @@ import {
   type JsonSearchRecord,
   type JsonSyntaxErrorInfo,
 } from "@/common/jsonPreviewTypes";
-import { matchSnippet } from "@/service/jsonlDocument";
 import { classifyEntry } from "@/service/entryClassifier";
+import { jsonArrayAdapter, type JsonArrayAdapter } from "@/service/jsonArrayAdapter";
+import { createCancelToken } from "@/service/recordAddressableDocument";
 
 export interface JsonRecordRange {
   start: number;
@@ -186,8 +185,26 @@ export function indexJsonArray(text: string, start = 0): JsonRecordRange[] {
   }
 }
 
+function utf8Size(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
 function previewText(text: string): string {
   return text.length <= JSON_RAW_PREVIEW_CHARS ? text : `${text.slice(0, JSON_RAW_PREVIEW_CHARS)}…`;
+}
+
+function textFields(raw: string): {
+  text: string;
+  textChars: number;
+  textTruncated: boolean;
+  size: number;
+} {
+  return {
+    text: raw.slice(0, JSON_MAX_TEXT_CHARS),
+    textChars: raw.length,
+    textTruncated: raw.length > JSON_MAX_TEXT_CHARS,
+    size: utf8Size(raw),
+  };
 }
 
 /** Parse one nested record (or the object root) into the detail shape the JSONL tree uses. */
@@ -197,41 +214,27 @@ export function readJsonRecordDetail(
   index: number,
 ): JsonlEntryDetail {
   const raw = text.slice(range.start, range.end);
-  const classification = classifyEntry(raw, JSON_RECORD_MAX_BYTES);
-
-  const textChars = classification.text.length;
-  const textTruncated = textChars > JSON_MAX_TEXT_CHARS;
-  const displayText = textTruncated
-    ? classification.text.slice(0, JSON_MAX_TEXT_CHARS)
-    : classification.text;
-
+  const fields = textFields(raw);
   const base = {
     index,
-    size: classification.byteSize,
+    size: fields.size,
     raw: previewText(raw),
-    text: displayText,
-    textChars,
-    textTruncated,
+    text: fields.text,
+    textChars: fields.textChars,
+    textTruncated: fields.textTruncated,
   };
-
-  // Empty is treated as invalid for JSON records (shouldn't happen in valid JSON)
-  if (classification.kind === "empty" || classification.kind === "invalid") {
+  if (fields.size > JSON_RECORD_MAX_BYTES) {
+    return { ...base, kind: "too-large", textTruncated: true };
+  }
+  try {
+    return { ...base, kind: "value", value: JSON.parse(raw) };
+  } catch (error) {
     return {
       ...base,
       kind: "invalid",
-      error: classification.error ?? "Empty record",
+      error: error instanceof Error ? error.message : String(error),
     };
   }
-  if (classification.kind === "too-large") {
-    return { ...base, kind: "too-large", textTruncated: true };
-  }
-
-  return {
-    ...base,
-    kind: "value",
-    ...(classification.label ? { label: classification.label } : {}),
-    value: classification.value!,
-  };
 }
 
 export function readJsonRecordSummary(
@@ -240,140 +243,44 @@ export function readJsonRecordSummary(
   index: number,
 ): JsonRecordSummary {
   const raw = text.slice(range.start, range.end);
-  const classification = classifyEntry(raw, JSON_RECORD_MAX_BYTES);
-
-  const base = {
+  const size = utf8Size(raw);
+  const summary = {
     index,
-    size: classification.byteSize,
+    size,
     raw: previewText(raw),
   };
-
-  // Empty is treated as invalid for JSON records (shouldn't happen in valid JSON)
-  if (classification.kind === "empty" || classification.kind === "invalid") {
-    return {
-      ...base,
-      kind: "invalid",
-      error: classification.error ?? "Empty record",
-    };
+  if (size > JSON_RECORD_MAX_BYTES) {
+    return { ...summary, kind: "too-large" };
   }
-  if (classification.kind === "too-large") {
-    return { ...base, kind: "too-large" };
+  const classification = classifyEntry(raw);
+  if (classification.kind === "invalid") {
+    return { ...summary, kind: "invalid", error: classification.error };
   }
-
-  return {
-    ...base,
-    kind: "value",
-    ...(classification.label ? { label: classification.label } : {}),
-  };
-}
-
-function findRecordIndex(records: JsonRecordRange[], offset: number): number {
-  let low = 0;
-  let high = records.length - 1;
-  let found = -1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (records[mid].start <= offset) {
-      found = mid;
-      low = mid + 1;
-    } else {
-      high = mid - 1;
-    }
-  }
-  if (found < 0 || offset >= records[found].end) return -1;
-  return found;
+  return { ...summary, kind: "value", label: classification.label };
 }
 
 export interface JsonSearchOptions {
   batchSize?: number;
   maxMatches?: number;
   onBatch: (batch: JsonSearchBatch) => void;
-  /** Checked between batches; a newer search stops this one. */
-  shouldStop?: () => boolean;
 }
 
-function emitSearch(
-  text: string,
-  records: JsonRecordRange[],
-  requestId: number,
-  query: string,
-  options: JsonSearchOptions,
-): void {
-  const batchSize = options.batchSize ?? JSON_SEARCH_BATCH;
-  const maxMatches = options.maxMatches ?? JSON_SEARCH_MAX_MATCHES;
-  const needle = query.trim().toLowerCase();
-  const complete = (results: JsonSearchRecord[], matches: number) => {
-    const batches: JsonSearchRecord[][] = [];
-    for (let i = 0; i < results.length; i += batchSize) {
-      batches.push(results.slice(i, i + batchSize));
-    }
-    if (batches.length === 0) batches.push([]);
-    batches.forEach((batch, position) => {
-      if (options.shouldStop?.()) return;
-      options.onBatch({
-        requestId,
-        query,
-        records: batch,
-        scanned: text.length,
-        total: text.length,
-        matches,
-        done: position === batches.length - 1,
-        capped: maxMatches > 0 && matches >= maxMatches,
-      });
-    });
-  };
-
-  if (!needle) {
-    options.onBatch({
-      requestId,
-      query,
-      records: [],
-      scanned: 0,
-      total: text.length,
-      matches: 0,
-      done: true,
-      capped: false,
-    });
-    return;
-  }
-
-  const haystack = text.toLowerCase();
-  const first = new Map<number, { count: number; snippet: string }>();
-  let matches = 0;
-  let cursor = 0;
-  while (cursor < haystack.length && matches < maxMatches) {
-    const at = haystack.indexOf(needle, cursor);
-    if (at < 0) break;
-    const index = findRecordIndex(records, at);
-    if (index >= 0) {
-      const record = records[index];
-      const existing = first.get(index);
-      if (existing) existing.count++;
-      else {
-        const raw = text.slice(record.start, record.end);
-        first.set(index, {
-          count: 1,
-          snippet: matchSnippet(raw, needle) ?? previewText(raw),
-        });
-      }
-      matches++;
-    }
-    cursor = at + Math.max(1, needle.length);
-  }
-
-  const results = [...first.entries()].map(([index, entry]) => ({
-    index,
-    count: entry.count,
-    snippet: entry.snippet,
+function emitSearchRecords(
+  records: Array<{ index: number; count: number; snippet: string }>,
+): JsonSearchRecord[] {
+  return records.map((r) => ({
+    index: r.index,
+    count: r.count,
+    snippet: r.snippet,
   }));
-  complete(results, matches);
 }
 
 export class JsonPreviewSession {
   readonly info: JsonInfoPayload;
   readonly rootEntry: JsonlEntryDetail | null = null;
   private readonly records: JsonRecordRange[] | null = null;
-  private activeSearch: symbol | null = null;
+  private readonly document: JsonArrayAdapter | null = null;
+  private cancelToken: ReturnType<typeof createCancelToken> | null = null;
 
   constructor(
     readonly text: string,
@@ -396,6 +303,8 @@ export class JsonPreviewSession {
         this.records = indexJsonArray(text, first);
         rootKind = "array";
         recordCount = this.records.length;
+        // Create the document adapter for search
+        this.document = jsonArrayAdapter(text, this.records);
       } catch (caught) {
         rootKind = "invalid";
         error = errorInfo(text, caught);
@@ -406,18 +315,14 @@ export class JsonPreviewSession {
       } else {
         try {
           const raw = text.slice(first);
-          const classification = classifyEntry(raw, JSON_MAX_OBJECT_BYTES);
-          const textChars = classification.text.length;
-          const textTruncated = textChars > JSON_MAX_TEXT_CHARS;
+          const fields = textFields(raw);
           this.rootEntry = {
             index: 0,
-            size: classification.byteSize,
+            size: fields.size,
             raw: previewText(raw),
-            text: textTruncated
-              ? classification.text.slice(0, JSON_MAX_TEXT_CHARS)
-              : classification.text,
-            textChars,
-            textTruncated,
+            text: fields.text,
+            textChars: fields.textChars,
+            textTruncated: fields.textTruncated,
             kind: "value",
             value: JSON.parse(raw),
           };
@@ -433,18 +338,14 @@ export class JsonPreviewSession {
       } else {
         try {
           const raw = text.slice(first);
-          const classification = classifyEntry(raw, JSON_MAX_OBJECT_BYTES);
-          const textChars = classification.text.length;
-          const textTruncated = textChars > JSON_MAX_TEXT_CHARS;
+          const fields = textFields(raw);
           this.rootEntry = {
             index: 0,
-            size: classification.byteSize,
+            size: fields.size,
             raw: previewText(raw),
-            text: textTruncated
-              ? classification.text.slice(0, JSON_MAX_TEXT_CHARS)
-              : classification.text,
-            textChars,
-            textTruncated,
+            text: fields.text,
+            textChars: fields.textChars,
+            textTruncated: fields.textTruncated,
             kind: "value",
             value: JSON.parse(raw),
           };
@@ -490,31 +391,66 @@ export class JsonPreviewSession {
 
   search(requestId: number, query: string, options: Omit<JsonSearchOptions, "shouldStop">): void {
     this.cancelSearch();
-    const token = Symbol("json-search");
-    this.activeSearch = token;
-    const shouldStop = () => this.activeSearch !== token;
-    const onBatch = (batch: JsonSearchBatch) => {
-      if (this.activeSearch !== token) return;
-      options.onBatch(batch);
-      if (batch.done) this.activeSearch = null;
-    };
-    const schedule = (run: () => void) => setTimeout(run, 0);
-    schedule(() => {
-      if (shouldStop()) return;
-      emitSearch(this.text, this.records ?? [], requestId, query, {
-        ...options,
-        onBatch,
-        shouldStop,
+
+    if (!this.document) {
+      // No document adapter (e.g., object/scalar root or invalid)
+      options.onBatch({
+        requestId,
+        query,
+        records: [],
+        scanned: 0,
+        total: this.text.length,
+        matches: 0,
+        done: true,
+        capped: false,
       });
-    });
+      return;
+    }
+
+    const token = createCancelToken();
+    this.cancelToken = token;
+
+    const onBatch = (batch: any) => {
+      if (this.cancelToken !== token) return;
+      // Convert adapter results to JsonSearchRecord format
+      const searchBatch: JsonSearchBatch = {
+        requestId: batch.requestId,
+        query: batch.query,
+        records: emitSearchRecords(batch.records),
+        scanned: batch.scanned,
+        total: batch.total,
+        matches: batch.matches,
+        done: batch.done,
+        capped: batch.capped,
+      };
+      options.onBatch(searchBatch);
+      if (batch.done) {
+        this.cancelToken = null;
+      }
+    };
+
+    this.document.search(
+      requestId,
+      query,
+      {
+        batchSize: options.batchSize,
+        maxMatches: options.maxMatches,
+        onBatch,
+      },
+      token,
+    );
   }
 
   cancelSearch(): void {
-    this.activeSearch = null;
+    if (this.cancelToken) {
+      this.cancelToken.cancel();
+      this.cancelToken = null;
+    }
   }
 
   dispose(): void {
     this.cancelSearch();
+    this.document?.dispose?.();
   }
 }
 
