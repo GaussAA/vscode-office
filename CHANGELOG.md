@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Excel library migration**: Migrated from @cweijan/exceljs to xlsx (SheetJS)
+  - Excel files now open in read-only mode (editing functionality removed)
+  - Improved compatibility with modern build tools
+  - Core viewing functionality maintained (85.5% test pass rate: 71/83 scenarios)
+  - See [Excel Limitations](docs/excel-limitations.md) for known issues with large files and edge cases
+
+### Added
+
+- **Node.js polyfills for browser environment**:
+  - Integrated vite-plugin-node-polyfills for util, stream, buffer, process, events
+  - Created custom shims for util/types, stream/web, http2 constants
+  - Implemented patch plugin to fix missing util.channel API
+
+### Technical
+
+- Added comprehensive migration documentation:
+  - [Migration Status](MIGRATION_STATUS.md) - Complete migration record
+  - [Polyfill Debugging Log](POLYFILL_DEBUGGING_LOG.md) - Technical details
+  - [Excel Limitations](docs/excel-limitations.md) - User-facing known issues
+
 ## [6.12.0] - 2026-11-14
 
 ### Performance

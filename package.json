@@ -194,11 +194,11 @@
     "puppeteer-core": "^25.1.0",
     "tsx": "^4.23.15",
     "typescript": "7.0.2",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vite-plugin-node-polyfills": "^0.28.0"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.4",
-    "@cweijan/exceljs": "^5.0.3",
     "@vscode/codicons": "^0.0.45",
     "antd": "^6.7.0",
     "buffer": "^6.0.3",

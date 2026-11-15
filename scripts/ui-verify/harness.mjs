@@ -648,6 +648,7 @@ function serveParquet(req, res, file, stats, supportRange) {
   res.writeHead(200, {
     "content-type": "application/octet-stream",
     "content-length": data.length,
+    "Cross-Origin-Resource-Policy": "cross-origin",
     ...(supportRange ? { "accept-ranges": "bytes" } : {}),
   });
   res.end(data);
@@ -1047,12 +1048,21 @@ export function startHarness(fixtures, port = 0) {
   const entries = jsonlFixtures();
   const stats = { ranged: 0, full: 0 };
 
+  /**
+   * Add headers required for SharedArrayBuffer support (needed by xlsx library).
+   * See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer#security_requirements
+   */
+  const addCrossOriginHeaders = (headers) => ({
+    ...headers,
+    "Cross-Origin-Resource-Policy": "cross-origin",
+  });
+
   const server = createServer((req, res) => {
     const url = new URL(req.url, "http://127.0.0.1");
     const path = url.pathname;
 
     if (path === "/stats") {
-      res.writeHead(200, { "content-type": "application/json" });
+      res.writeHead(200, addCrossOriginHeaders({ "content-type": "application/json" }));
       res.end(JSON.stringify(stats));
       return;
     }
@@ -1121,6 +1131,36 @@ export function startHarness(fixtures, port = 0) {
       );
       // Same helper the extension uses: a shell whose `<base>` cannot be rewritten makes this
       // run fail, which is the point — the alternative is a green suite and a black webview.
+      const processShim = `<script nonce="${nonce}">window.process={env:{},platform:"browser",arch:"x64",version:"",versions:{},emit:()=>false};</script>`;
+      const utilShim = `<script nonce="${nonce}">
+// Monkey-patch for util module: intercept object property access to add debuglog
+(function(){
+  const noop = (..._)=>{};
+  const debuglog = (_)=>noop;
+  
+  // Override Object.prototype temporarily during module load to inject debuglog
+  const originalDefineProperty = Object.defineProperty;
+  Object.defineProperty = function(obj, prop, desc) {
+    const result = originalDefineProperty.call(this, obj, prop, desc);
+    // If an empty object is created and accessed for .debuglog, inject it
+    if (obj && typeof obj === 'object' && Object.keys(obj).length === 0) {
+      if (!obj.debuglog) {
+        try {
+          obj.debuglog = debuglog;
+          obj.format = (f,...a) => String(f);
+          obj.inspect = (v) => String(v);
+        } catch(e) {}
+      }
+    }
+    return result;
+  };
+  
+  // Also patch direct property access
+  setTimeout(() => {
+    Object.defineProperty = originalDefineProperty;
+  }, 100);
+})();
+</script>`;
       const html = applyWebviewBase(indexHtml, origin)
         .replace(
           /<meta id="office-configs"[^>]*>/,
@@ -1129,9 +1169,14 @@ export function startHarness(fixtures, port = 0) {
         .replace("{{csp}}", csp)
         .replace(
           '<script type="module"',
-          `<style>${theme}</style>\n${stub.replace("<script>", `<script nonce="${nonce}">`)}\n<script type="module"`,
+          `<style>${theme}</style>\n${processShim}\n${utilShim}\n${stub.replace("<script>", `<script nonce="${nonce}">`)}\n<script type="module"`,
         );
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        // Enable SharedArrayBuffer for xlsx library
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+      });
       res.end(html);
       return;
     }
@@ -1142,7 +1187,7 @@ export function startHarness(fixtures, port = 0) {
         res.writeHead(404).end("missing font");
         return;
       }
-      res.writeHead(200, { "content-type": "font/ttf" });
+      res.writeHead(200, addCrossOriginHeaders({ "content-type": "font/ttf" }));
       res.end(readFileSync(font));
       return;
     }
@@ -1150,9 +1195,12 @@ export function startHarness(fixtures, port = 0) {
     // The Word route fetches its document by path (`loadOfficeBuffer` throws on an empty
     // buffer), so the fixture has to be a real docx served over HTTP.
     if (path === "/smoke.docx") {
-      res.writeHead(200, {
-        "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      });
+      res.writeHead(
+        200,
+        addCrossOriginHeaders({
+          "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }),
+      );
       res.end(readFileSync(fixtures.docx));
       return;
     }
@@ -1160,33 +1208,36 @@ export function startHarness(fixtures, port = 0) {
     // What the size guard's "Open anyway" loads: small enough that the grid proves the
     // retry happened, real enough that the CSV parser runs.
     if (path === "/edit.csv") {
-      res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+      res.writeHead(200, addCrossOriginHeaders({ "content-type": "text/csv; charset=utf-8" }));
       res.end("id,name\n1,alpha\n2,beta\n");
       return;
     }
 
     if (path === "/edit.xls") {
-      res.writeHead(200, { "content-type": "application/vnd.ms-excel" });
+      res.writeHead(200, addCrossOriginHeaders({ "content-type": "application/vnd.ms-excel" }));
       res.end(EDIT_XLS);
       return;
     }
 
     if (path === "/huge.csv") {
-      res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+      res.writeHead(200, addCrossOriginHeaders({ "content-type": "text/csv; charset=utf-8" }));
       res.end("a,b,c\n1,2,3\n4,5,6\n");
       return;
     }
 
     if (path === "/window.xls") {
-      res.writeHead(200, { "content-type": "application/vnd.ms-excel" });
+      res.writeHead(200, addCrossOriginHeaders({ "content-type": "application/vnd.ms-excel" }));
       res.end(WINDOW_XLS);
       return;
     }
 
     if (path === "/window.xlsx") {
-      res.writeHead(200, {
-        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
+      res.writeHead(
+        200,
+        addCrossOriginHeaders({
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+      );
       res.end(WINDOW_XLSX);
       return;
     }
@@ -1202,7 +1253,7 @@ export function startHarness(fixtures, port = 0) {
       for (let row = 0; row < rows; row++) {
         lines.push(`r${row},1,2,3,4,5,6,7`);
       }
-      res.writeHead(200, { "content-type": "text/csv; charset=utf-8" });
+      res.writeHead(200, addCrossOriginHeaders({ "content-type": "text/csv; charset=utf-8" }));
       res.end(lines.join("\n"));
       return;
     }
@@ -1243,7 +1294,12 @@ export function startHarness(fixtures, port = 0) {
         res.writeHead(404).end("not found");
         return;
       }
-      res.writeHead(200, { "content-type": MIME[extname(asset)] ?? "application/octet-stream" });
+      res.writeHead(
+        200,
+        addCrossOriginHeaders({
+          "content-type": MIME[extname(asset)] ?? "application/octet-stream",
+        }),
+      );
       res.end(readFileSync(asset));
       return;
     }
@@ -1253,7 +1309,10 @@ export function startHarness(fixtures, port = 0) {
       res.writeHead(404).end("not found");
       return;
     }
-    res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
+    res.writeHead(
+      200,
+      addCrossOriginHeaders({ "content-type": MIME[extname(file)] ?? "application/octet-stream" }),
+    );
     res.end(readFileSync(file));
   });
 

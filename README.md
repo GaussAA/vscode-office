@@ -8,7 +8,7 @@ This extension previews **three things** in VS Code:
 
 | Format                                                         | What you get                                                                 |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Spreadsheets: `.xls`, `.xlsx`, `.xlsm`, `.csv`, `.tsv`, `.ods` | Editable grid and find/replace; large files open read-only in a window       |
+| Spreadsheets: `.xls`, `.xlsx`, `.xlsm`, `.csv`, `.tsv`, `.ods` | Read-only grid and find/replace; large files open in a windowed view         |
 | Parquet: `.parquet`                                            | ZSTD/GZIP/BROTLI/LZ4 columns, lazy paging, whole-file search, read-only      |
 | JSONL / NDJSON: `.jsonl`, `.ndjson`                            | A directory of entries on the left, the selected entry as a tree or raw text |
 
@@ -177,6 +177,11 @@ CI runs all three on every push, together with `pnpm build` and `pnpm run packag
 
 - Whole-file parquet search on a very large file is I/O bound because it reads every row
   group it visits.
+- **Excel editing is disabled**: After migrating from @cweijan/exceljs to xlsx (SheetJS),
+  spreadsheet files open in read-only mode. Viewing, searching, and navigating work normally
+  (85.5% test pass rate), but very large files (>200MB) and certain edge cases may fail due
+  to Node.js polyfill limitations in the browser environment. See [Excel Limitations](docs/excel-limitations.md)
+  for details.
 - Spreadsheets above 8 MB open in a read-only windowed view (viewport rows only), and every
   workbook format — `.xlsx`, `.xlsm`, `.xls`, `.ods` — is windowed as row text. Workbooks
   above 15 MB, and CSV/TSV from a virtual workspace above 25 MB, ask before loading at all;

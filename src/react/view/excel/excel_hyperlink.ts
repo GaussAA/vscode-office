@@ -1,4 +1,5 @@
-import type * as ExcelJS from "@cweijan/exceljs";
+// ExcelJS types no longer used - these functions are for the removed ExcelJS read/write paths
+// import type * as ExcelJS from "@cweijan/exceljs";
 
 export interface SpreadsheetHyperlink {
   link: string;
@@ -20,20 +21,8 @@ export function parseHyperlinkKey(key: string): { ri: number; ci: number } | nul
   return { ri, ci };
 }
 
-export function readCellHyperlink(cell: ExcelJS.Cell, ri: number, ci: number): HyperlinkMap {
-  const value = cell.value;
-  let link = "";
-  let tooltip: string | undefined;
-  if (value && typeof value === "object" && "hyperlink" in value) {
-    const hv = value as ExcelJS.CellHyperlinkValue;
-    link = hv.hyperlink ?? "";
-    tooltip = hv.tooltip;
-  } else if (cell.isHyperlink && cell.hyperlink) {
-    link = cell.hyperlink;
-  }
-  if (!link) return {};
-  return { [hyperlinkKey(ri, ci)]: { link, tooltip } };
-}
+// Disabled: ExcelJS-specific read function
+// export function readCellHyperlink(cell: ExcelJS.Cell, ri: number, ci: number): HyperlinkMap { ... }
 
 export function mergeHyperlinkMaps(...maps: HyperlinkMap[]): HyperlinkMap {
   const out: HyperlinkMap = {};
@@ -46,18 +35,8 @@ export function mergeHyperlinkMaps(...maps: HyperlinkMap[]): HyperlinkMap {
   return out;
 }
 
-export function writeCellHyperlink(
-  cell: ExcelJS.Cell,
-  text: string,
-  hyperlink?: SpreadsheetHyperlink,
-) {
-  if (!hyperlink?.link) return;
-  cell.value = {
-    text: text || hyperlink.link,
-    hyperlink: hyperlink.link,
-    ...(hyperlink.tooltip ? { tooltip: hyperlink.tooltip } : {}),
-  };
-}
+// Disabled: ExcelJS-specific write function
+// export function writeCellHyperlink(cell: ExcelJS.Cell, text: string, hyperlink?: SpreadsheetHyperlink) { ... }
 
 export type ParsedLink =
   | { type: "external"; url: string }
