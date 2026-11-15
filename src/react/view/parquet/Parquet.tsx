@@ -25,8 +25,15 @@ import {
   type ParquetFileInfo,
 } from "./parquetParser.ts";
 import { parquetAntdTheme } from "./parquetAntdTheme.ts";
-import { ROW_HEIGHT, SIDER_DEFAULT, SIDER_MAX, SIDER_MIN } from "./parquetLayout.ts";
-import { loadPersistedRow } from "./parquetPersistence.ts";
+import {
+  MIN_ROWS_PER_PAGE,
+  ROW_HEIGHT,
+  SIDER_DEFAULT,
+  SIDER_MAX,
+  SIDER_MIN,
+  pageSizeForBodyHeight,
+} from "./parquetLayout.ts";
+import { loadPersistedRow, savePersistedRow } from "./parquetPersistence.ts";
 import { type CellCursor, type TableRow } from "./parquetCell.tsx";
 
 import ParquetTopBar from "./ParquetTopBar.tsx";
@@ -41,13 +48,24 @@ import { useParquetColumnLayout } from "./useParquetColumnLayout.ts";
 import { useParquetSiderResize } from "./useParquetSiderResize.ts";
 import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
 import { useParquetSearch } from "./useParquetSearch.ts";
-import { useParquetPage } from "./useParquetPage.ts";
 import ParquetTable from "./ParquetTable.tsx";
-import { useParquetTableSize } from "./useParquetTableSize.ts";
 import { buildParquetColumns } from "./parquetColumns.tsx";
 import { resolveParquetKey } from "./parquetKeymap.ts";
 import { ErrorBoundary } from "../../components/ErrorBoundary.tsx";
 import "./Parquet.less";
+
+/**
+ * Run background work when the page is idle. Prefetching the next chunk is a full data page per
+ * column and runs on the same thread as React; let the visible render go first.
+ */
+function schedulePrefetch(run: () => void): () => void {
+  if (typeof requestIdleCallback === "function") {
+    const handle = requestIdleCallback(run, { timeout: 1_500 });
+    return () => cancelIdleCallback(handle);
+  }
+  const handle = window.setTimeout(run, 250);
+  return () => window.clearTimeout(handle);
+}
 
 /** A virtual document arrives as inline base64; a local one as a fetchable path. */
 type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBase64"> & {
@@ -79,12 +97,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanRequest = useRef(0);
-  /** Row to return to once the page size is known; consumed by the measuring effect. */
-  const restoreRowRef = useRef(0);
-  /** True until the restored page has actually loaded; nothing may be persisted before that. */
-  const restorePendingRef = useRef(false);
-  /** First row of the loaded page, shared by sizing and the page loader. */
-  const loadedStartRef = useRef(0);
   const [rowJump, setRowJump] = useState<number | null>(null);
   const [inspected, setInspected] = useState<{
     row: number;
@@ -117,16 +129,15 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const sessionRef = useRef<ParquetSession | null>(null);
   const { siderWidth, setSiderWidth, beginResize, moveResize, endResize } = useParquetSiderResize();
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
-  const { pageSize, pageSizeRef, tableBodyHeight, tableBodyWidth, reloadToken } =
-    useParquetTableSize({
-      tableWrapRef,
-      fileInfo,
-      siderWidth,
-      sessionRef,
-      restoreRowRef,
-      loadedStartRef,
-      onPageChange: setPage,
-    });
+  const [pageSize, setPageSize] = useState(MIN_ROWS_PER_PAGE);
+  const [tableBodyHeight, setTableBodyHeight] = useState(320);
+  const [tableBodyWidth, setTableBodyWidth] = useState(0);
+  /** Bumped when the page size changes, so the page loader runs against the new slicing. */
+  const [reloadToken, setReloadToken] = useState(0);
+  const [pageRows, setPageRows] = useState<Record<string, unknown>[]>([]);
+  const [loadedPage, setLoadedPage] = useState(0);
+  const [loadedStart, setLoadedStart] = useState(0);
+  const [pageLoading, setPageLoading] = useState(false);
   const {
     layout: columnLayout,
     setColumnWidth,
@@ -213,18 +224,20 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   });
   const { query, matchRows, resetSearch } = search;
 
-  const { pageRows, loadedPage, loadedStart, pageLoading, resetPage } = useParquetPage({
-    fileInfo,
-    page,
-    reloadToken,
-    sessionRef,
-    documentKeyRef,
-    restoreRowRef,
-    restorePendingRef,
-    loadedStartRef,
-    onError: setError,
-    onPageLoaded: announcePage,
-  });
+  const onPageLoadedRef = useRef<((start: number, loaded: number) => void) | undefined>(
+    announcePage,
+  );
+
+  useEffect(() => {
+    onPageLoadedRef.current = announcePage;
+  }, [announcePage]);
+
+  const resetPage = useCallback(() => {
+    setPageRows([]);
+    setLoadedPage(0);
+    setLoadedStart(0);
+    setPageLoading(false);
+  }, []);
 
   /** Briefly true right after a copy, so the button can answer instead of staying silent. */
   const [copied, setCopied] = useState(false);
@@ -294,25 +307,98 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         // is a screenful, and this document has not been measured — so remember the row and let
         // the measuring effect turn it into a page.
         documentKeyRef.current = payload.path;
-        restoreRowRef.current = loadPersistedRow(payload.path);
-        restorePendingRef.current = restoreRowRef.current !== 0;
 
-        sessionRef.current = new ParquetSession(
+        const session = new ParquetSession(
           {
             rowCount: info.rowCount,
             readRows: (start, end) =>
               readParquetRows(info.file, info.metadata, start, end, { utf8: false }),
           },
-          { pageSize: pageSizeRef.current, chunkSize: PARQUET_CHUNK_SIZE },
+          { pageSize, chunkSize: PARQUET_CHUNK_SIZE },
         );
+        session.restoreToRow(loadPersistedRow(payload.path));
+        sessionRef.current = session;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load parquet file");
       } finally {
         setLoading(false);
       }
     },
-    [pageSizeRef, resetPage, resetSearch, selectCell, setActiveColumn],
+    [pageSize, resetPage, resetSearch, selectCell, setActiveColumn],
   );
+
+  // Resize observer: measure the table body and update page size
+  useEffect(() => {
+    const element = tableWrapRef.current;
+    if (!element || !fileInfo) return;
+    const update = () => {
+      const header = element.querySelector<HTMLElement>(".ant-table-header");
+      const headerHeight = header?.offsetHeight ?? 38;
+      const bodyHeight = Math.max(80, Math.round(element.clientHeight - headerHeight));
+      setTableBodyHeight(bodyHeight);
+      setTableBodyWidth(element.clientWidth);
+      // A page is one screenful: the pager's row range should describe the rows you can see.
+      const rows = pageSizeForBodyHeight(bodyHeight);
+      if (rows !== pageSize) {
+        // Which page holds the row we want? If restore is pending, use the restore row;
+        // otherwise use the row already on screen, so a resize does not move the reader.
+        const session = sessionRef.current;
+        if (session) {
+          const keepRow = session.isRestorePending ? undefined : loadedStart;
+          setPage(session.setPageSize(rows, keepRow));
+        }
+        setPageSize(rows);
+        setReloadToken((token) => token + 1);
+      }
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [fileInfo, loadedStart, pageSize, sessionRef, siderWidth, tableWrapRef]);
+
+  // Page loading effect
+  useEffect(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+    setPageLoading(true);
+    // Aborted from the cleanup rather than flipping a captured `let`: the session already
+    // guards staleness, this only stops a superseded page from writing state.
+    const controller = new AbortController();
+    let cancelPrefetch: (() => void) | undefined;
+    void session
+      .showPage(page)
+      .then((snapshot) => {
+        if (controller.signal.aborted || snapshot.stale) return;
+        setPageRows(snapshot.rows);
+        setLoadedPage(page);
+        setLoadedStart(snapshot.start);
+        onPageLoadedRef.current?.(snapshot.start, snapshot.rows.length);
+        setPageLoading(false);
+        // Prefetch only once this page is on screen. Idle time keeps a cache hit fast.
+        cancelPrefetch = schedulePrefetch(() => {
+          if (!controller.signal.aborted) session.prefetch(page + 1);
+        });
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return;
+        setPageLoading(false);
+        setError(cause instanceof Error ? cause.message : "Failed to read rows");
+      });
+    return () => {
+      controller.abort();
+      cancelPrefetch?.();
+    };
+  }, [fileInfo, page, reloadToken, sessionRef]);
+
+  // Persistence effect: save the current row position
+  useEffect(() => {
+    // Nothing to remember before the first page has actually arrived — and while a restore is
+    // still pending, the page-0 load that wins the race must not write over the stored row.
+    const session = sessionRef.current;
+    if (!fileInfo || pageRows.length === 0 || !session || session.isRestorePending) return;
+    savePersistedRow(documentKeyRef.current, loadedStart);
+  }, [documentKeyRef, fileInfo, loadedStart, pageRows.length, sessionRef]);
 
   useEffect(() => {
     const onFind = (event: KeyboardEvent) => {

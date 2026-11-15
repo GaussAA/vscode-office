@@ -200,3 +200,62 @@ test("page size: a load sliced with the old size is discarded", async () => {
   const stale = await inFlight;
   assert.equal(stale.stale, true, "the old slice must not land on the new page grid");
 });
+
+test("restore: restoreToRow sets isRestorePending", () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 50 });
+  assert.equal(session.isRestorePending, false);
+  session.restoreToRow(120);
+  assert.equal(session.isRestorePending, true);
+});
+
+test("restore: clearRestore clears the restore state", () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 50 });
+  session.restoreToRow(120);
+  assert.equal(session.isRestorePending, true);
+  session.clearRestore();
+  assert.equal(session.isRestorePending, false);
+});
+
+test("restore: setPageSize with restore pending returns the restore row's page", () => {
+  const session = new ParquetSession(makeSource(5_000), { pageSize: 50 });
+  session.restoreToRow(120);
+  const page = session.setPageSize(20);
+  assert.equal(page, 6, "row 120 is on page 6 of 20-row pages");
+  assert.equal(session.isRestorePending, false, "setPageSize must clear restore pending");
+});
+
+test("restore: setPageSize with keepRow ignores restore pending", () => {
+  const session = new ParquetSession(makeSource(5_000), { pageSize: 50 });
+  session.restoreToRow(120);
+  const page = session.setPageSize(20, 200);
+  assert.equal(page, 10, "row 200 is on page 10 of 20-row pages");
+  assert.equal(session.isRestorePending, true, "keepRow must not clear restore pending");
+});
+
+test("restore: showPage clears restore pending when it loads the restore row's page", async () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 50 });
+  session.restoreToRow(100);
+  assert.equal(session.isRestorePending, true);
+  await session.showPage(2); // page 2 starts at row 100
+  assert.equal(
+    session.isRestorePending,
+    false,
+    "loading the restore row's page must clear pending",
+  );
+});
+
+test("restore: showPage does not clear restore pending for a different page", async () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 50 });
+  session.restoreToRow(100);
+  await session.showPage(0); // page 0 starts at row 0
+  assert.equal(session.isRestorePending, true, "loading a different page must not clear pending");
+});
+
+test("restore: restoreToRow(0) is treated as row 0, not as no restore", () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 50 });
+  session.restoreToRow(0);
+  assert.equal(session.isRestorePending, true);
+  const page = session.setPageSize(20);
+  assert.equal(page, 0, "row 0 is on page 0");
+  assert.equal(session.isRestorePending, false);
+});
