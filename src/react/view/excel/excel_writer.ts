@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import Spreadsheet from "./x-spreadsheet/index";
 import type { RowData, SheetData } from "./x-spreadsheet/index";
 import { CsvEncoding, encodeCsvText } from "./csvEncoding";
+import { bookTypeFor, kindOf } from "./sheetKind";
 
 // Re-export formatting utilities from excel_meta
 export { buildFormattingSnapshot, hasFormattingChanged } from "./excel_meta";
@@ -148,13 +149,15 @@ export async function export_xlsx(
     return;
   }
 
-  // For all Excel formats, use SheetJS
+  // For all Excel formats, use SheetJS with the correct bookType
   const wb = XLSX.utils.book_new();
   sheets.forEach((s, i) => {
     const ws = dataToSheetJs(s);
     XLSX.utils.book_append_sheet(wb, ws, s.name || `Sheet${i + 1}`);
   });
-  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const sheetExt = kindOf(extName);
+  const bookType = sheetExt ? bookTypeFor(sheetExt) : "xlsx";
+  const buf = XLSX.write(wb, { bookType, type: "array" });
   await emitSave(new Uint8Array(buf), options);
 }
 

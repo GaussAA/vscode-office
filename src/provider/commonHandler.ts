@@ -94,8 +94,6 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
         ods: { label: "OpenDocument Spreadsheet", exts: ["ods"] },
         csv: { label: "CSV (Comma delimited)", exts: ["csv"] },
         parquet: { label: "Apache Parquet", exts: ["parquet"] },
-        docx: { label: "Word Document", exts: ["docx"] },
-        dotx: { label: "Word Template", exts: ["dotx"] },
       };
       const info = filterMap[ext] ?? { label: ext.toUpperCase(), exts: [ext] };
       const target = await vscode.window.showSaveDialog({

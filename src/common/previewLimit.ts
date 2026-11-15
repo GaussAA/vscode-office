@@ -31,7 +31,11 @@ export type SpreadsheetKind = keyof typeof SPREADSHEET_PREVIEW_LIMITS;
  */
 export const PARQUET_PREVIEW_LIMIT = 50 * 1024 * 1024;
 
-/** Extensions include the dot, because that is what `extname` and the payload both carry. */
+/**
+ * Extensions include the dot, because that is what `extname` and the payload both carry.
+ * These sets are kept here for `spreadsheetKind`, which is called from the host side.
+ * The webview uses `sheetKind.ts` for validation and routing.
+ */
 const TEXT_EXTENSIONS = new Set([".csv", ".tsv"]);
 const WORKBOOK_EXTENSIONS = new Set([".xlsx", ".xlsm", ".xls", ".ods"]);
 
