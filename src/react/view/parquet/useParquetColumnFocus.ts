@@ -156,9 +156,7 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
             // The window listeners only exist after React commits `dragging` (post-paint), and
             // the scroll is applied on the frame after the move — releasing in the same tick
             // cancels it, because the drag effect cleans up with `raf.cancel`.
-            window.setTimeout(() => {
-              fire(window, "mousemove", startX + px * 0.5, { buttons: 1 });
-              fire(window, "mousemove", startX + px, { buttons: 1 });
+            const finish = () => {
               window.setTimeout(() => {
                 fire(window, "mouseup", startX + px, { buttons: 0 });
                 window.setTimeout(() => {
@@ -172,6 +170,28 @@ export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetC
                   if (!isSettled() && Date.now() <= deadline) requestAnimationFrame(attempt);
                 }, 32);
               }, 64);
+            };
+            // Move the thumb one frame at a time along an eased path. Firing every mousemove in
+            // one tick makes the scrollbar apply only the last one on its next frame, so the
+            // viewport jumps. The handler is relative to the mousedown, so absolute positions
+            // along the path are safe. Reduced motion keeps the single jump.
+            const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+            const duration = reduced ? 0 : Math.min(420, Math.max(220, 140 + Math.abs(px) * 0.25));
+            const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+            window.setTimeout(() => {
+              if (duration === 0) {
+                fire(window, "mousemove", startX + px, { buttons: 1 });
+                finish();
+                return;
+              }
+              const t0 = performance.now();
+              const step = (now: number) => {
+                const t = Math.min(1, (now - t0) / duration);
+                fire(window, "mousemove", startX + px * ease(t), { buttons: 1 });
+                if (t < 1) requestAnimationFrame(step);
+                else finish();
+              };
+              requestAnimationFrame(step);
             }, 80);
             return;
           }

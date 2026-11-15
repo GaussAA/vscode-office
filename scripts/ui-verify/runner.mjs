@@ -64,6 +64,7 @@ import excelMotion from "./scenarios/excel-motion.mjs";
 import parquetA11y from "./scenarios/parquet-a11y.mjs";
 import parquetFrames from "./scenarios/parquet-frames.mjs";
 import parquetMotion from "./scenarios/parquet-motion.mjs";
+import parquetColumnJump from "./scenarios/parquet-column-jump.mjs";
 import parquetSurfaces from "./scenarios/parquet-surfaces.mjs";
 import parquetTabOrder from "./scenarios/parquet-tab-order.mjs";
 import parquetBasics from "./scenarios/parquet-basics.mjs";
@@ -77,6 +78,7 @@ const scenarios = [
   ...parquetGrid,
   ...parquetSurfaces,
   ...parquetMotion,
+  ...parquetColumnJump,
   ...excelMotion,
   ...parquetA11y,
   ...parquetTabOrder,
