@@ -871,6 +871,7 @@ function excelEditStub(mode = "direct") {
 (function () {
   window.__excelMessages = [];
   window.__saveDone = false;
+  window.__saveFailed = false;
   const api = {
     postMessage(msg) {
       if (!msg) return;
@@ -896,6 +897,14 @@ function excelEditStub(mode = "direct") {
         byteLength: Array.isArray(content.content) ? content.content.length : 0,
       });
       if (msg.type === 'save') {
+        // ?failSave=1: stub replies with saveFailed instead of saveDone
+        if (new URLSearchParams(location.search).get('failSave') === '1') {
+          setTimeout(function () {
+            window.__saveFailed = true;
+            window.postMessage({ type: 'saveFailed', content: { reason: 'stub-error' } }, '*');
+          }, 30);
+          return;
+        }
         const release = function () {
           window.__saveDone = true;
           window.postMessage({ type: 'saveDone' }, '*');

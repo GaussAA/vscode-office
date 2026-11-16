@@ -9,7 +9,6 @@ export interface FindReplacePanelProps {
   mode: "find" | "replace";
   onClose: () => void;
   readOnly?: boolean;
-  onChanged?: () => void;
 }
 
 export interface FindReplacePanelHandle {
@@ -40,7 +39,7 @@ function OptionChip({
 }
 
 const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProps>(
-  function FindReplacePanel({ spreadSheet, mode, onClose, readOnly = false, onChanged }, ref) {
+  function FindReplacePanel({ spreadSheet, mode, onClose, readOnly = false }, ref) {
     const [findText, setFindText] = useState("");
     const [replaceText, setReplaceText] = useState("");
     const [matchCase, setMatchCase] = useState(false);
@@ -131,19 +130,17 @@ const FindReplacePanel = forwardRef<FindReplacePanelHandle, FindReplacePanelProp
         focusFindInput();
         return;
       }
-      onChanged?.();
       const next = spreadSheet.findNext(findText, match, options);
       gotoMatch(next ?? spreadSheet.findFirst(findText, options));
-    }, [spreadSheet, findText, replaceText, buildOptions, gotoMatch, onChanged, focusFindInput]);
+    }, [spreadSheet, findText, replaceText, buildOptions, gotoMatch, focusFindInput]);
 
     const handleReplaceAll = useCallback(() => {
       if (!spreadSheet || !findText) return;
       const count = spreadSheet.replaceAll(findText, replaceText, buildOptions());
-      if (count > 0) onChanged?.();
       setStatus({ text: t("findReplace.replacedCount", count) });
       lastMatchRef.current = null;
       focusFindInput();
-    }, [spreadSheet, findText, replaceText, buildOptions, onChanged, focusFindInput]);
+    }, [spreadSheet, findText, replaceText, buildOptions, focusFindInput]);
 
     const showReplace = mode === "replace" && !readOnly;
 
