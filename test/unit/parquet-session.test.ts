@@ -259,3 +259,52 @@ test("restore: restoreToRow(0) is treated as row 0, not as no restore", () => {
   assert.equal(page, 0, "row 0 is on page 0");
   assert.equal(session.isRestorePending, false);
 });
+
+test("page size: a resize without keepRow stays on the row that was on screen", async () => {
+  // Regression: the new size used to be assigned before `startOf(currentPage)` was read, so
+  // page 2 of 50 became "row 40" of a 20-row grid and the reader jumped back 60 rows.
+  const session = new ParquetSession(makeSource(5_000), { pageSize: 50, chunkSize: 5_000 });
+  await session.showPage(2); // rows 100..150
+  const page = session.setPageSize(20);
+  assert.equal(page, 5, "row 100 is on page 5 of 20-row pages");
+  assert.equal(session.pageToRow(page), 100);
+});
+
+test("fitPageSize: same size and nothing pending is a no-op", () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 20 });
+  assert.equal(session.fitPageSize(20), null, "no page change, so no reload");
+  assert.equal(session.fitPageSize(20.9), null, "the size is normalised before it is compared");
+});
+
+test("fitPageSize: a pending restore is applied even when the size already matches", () => {
+  // Regression: the view compared the measured size with its own copy of it. A session created
+  // in a viewer that already knew its size matched, so the restore row was never turned into a
+  // page and the document opened on page 0.
+  const session = new ParquetSession(makeSource(300), { pageSize: 21 });
+  session.restoreToRow(63);
+  const page = session.fitPageSize(21);
+  assert.equal(page, 3, "row 63 is on page 3 of 21-row pages");
+  assert.equal(session.isRestorePending, false, "the first measurement consumes the restore");
+  assert.equal(session.fitPageSize(21), null, "and a second identical measurement does nothing");
+});
+
+test("fitPageSize: a changed size without a restore keeps the loaded row", async () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 50 });
+  await session.showPage(1); // rows 50..100
+  assert.equal(session.fitPageSize(25), 2, "row 50 is on page 2 of 25-row pages");
+  assert.equal(session.pageSize, 25);
+});
+
+test("fitPageSize: a load started before the restore was applied cannot land", async () => {
+  // The viewer starts the page-0 load in the same commit that measures the table. The measurement
+  // changes the size, so that load must come back stale instead of replacing the restored page.
+  const session = new ParquetSession(makeSource(300, { delay: 5 }), { pageSize: 8 });
+  session.restoreToRow(100);
+  const early = session.showPage(0);
+  const page = session.fitPageSize(20);
+  const stale = await early;
+  assert.equal(stale.stale, true);
+  const restored = await session.showPage(page ?? 0);
+  assert.equal(restored.start, 100);
+  assert.equal(restored.rows[0].id, 100);
+});

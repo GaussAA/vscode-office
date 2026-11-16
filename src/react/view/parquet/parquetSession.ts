@@ -103,18 +103,38 @@ export class ParquetSession {
    * returns the page holding the current first visible row (so a resize does not move the reader).
    */
   setPageSize(size: number, keepRow?: number): number {
-    const next = Math.max(1, Math.min(this.chunkSize, Math.floor(size)));
-    this.pageSizeValue = next;
+    const next = this.normalizePageSize(size);
+    // The row on screen is read with the *old* size: `startOf` multiplies by `pageSize`, so
+    // assigning the new size first would turn page 2 of 50 into "row 40" of a 20-row grid.
     const row =
       keepRow !== undefined
         ? keepRow
         : this.restorePending
           ? this.restoreRow
           : this.startOf(this.currentPage);
+    this.pageSizeValue = next;
     if (this.restorePending && keepRow === undefined) {
       this.restorePending = false;
     }
     return this.clampPage(Math.floor(Math.max(0, row) / next));
+  }
+
+  /**
+   * Apply a measured screenful. Returns the page to show, or `null` when there is nothing to do.
+   *
+   * Two things make this more than `size !== pageSize`: a restore that is still pending must be
+   * turned into a page by the first measurement even when the size happens to match (a new
+   * document opened in a viewer that already knows its size, or a body that measures exactly the
+   * minimum), and the comparison has to be against the session's own size, not against a copy of
+   * it held by the view, which can already be up to date while this session is not.
+   */
+  fitPageSize(size: number): number | null {
+    if (!this.restorePending && this.normalizePageSize(size) === this.pageSizeValue) return null;
+    return this.setPageSize(size);
+  }
+
+  private normalizePageSize(size: number): number {
+    return Math.max(1, Math.min(this.chunkSize, Math.floor(size)));
   }
 
   get page(): number {

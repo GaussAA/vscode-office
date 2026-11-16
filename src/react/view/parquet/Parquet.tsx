@@ -129,7 +129,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const sessionRef = useRef<ParquetSession | null>(null);
   const { siderWidth, setSiderWidth, beginResize, moveResize, endResize } = useParquetSiderResize();
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  /** Mirrors `session.pageSize` / `session.totalPages` so renders can read them. */
   const [pageSize, setPageSize] = useState(MIN_ROWS_PER_PAGE);
+  const [totalPages, setTotalPages] = useState(1);
   const [tableBodyHeight, setTableBodyHeight] = useState(320);
   const [tableBodyWidth, setTableBodyWidth] = useState(0);
   /** Bumped when the page size changes, so the page loader runs against the new slicing. */
@@ -217,7 +219,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     fileInfoRef,
     sessionRef,
     page,
-    pageSize,
     goToPage,
     focusColumn,
     onError: setError,
@@ -237,6 +238,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     setLoadedPage(0);
     setLoadedStart(0);
     setPageLoading(false);
+    setTotalPages(1);
   }, []);
 
   /** Briefly true right after a copy, so the button can answer instead of staying silent. */
@@ -256,11 +258,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   }, []);
 
   useEffect(() => () => window.clearTimeout(copyTimer.current), []);
-
-  const totalPages = useMemo(() => {
-    if (!fileInfo?.rowCount) return 1;
-    return Math.max(1, Math.ceil(fileInfo.rowCount / pageSize));
-  }, [fileInfo, pageSize]);
 
   const tableRows = useMemo<TableRow[]>(() => {
     return pageRows.map((row, index) => ({
@@ -314,7 +311,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             readRows: (start, end) =>
               readParquetRows(info.file, info.metadata, start, end, { utf8: false }),
           },
-          { pageSize, chunkSize: PARQUET_CHUNK_SIZE },
+          // Not measured yet: the measuring effect fits the session to the viewport. Reading the
+          // view's `pageSize` here would put it in this callback's dependencies, and the `open`
+          // handler below is re-registered (and re-`init`ed, so the document reloads) whenever
+          // this callback changes identity.
+          { pageSize: MIN_ROWS_PER_PAGE, chunkSize: PARQUET_CHUNK_SIZE },
         );
         session.restoreToRow(loadPersistedRow(payload.path));
         sessionRef.current = session;
@@ -324,7 +325,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         setLoading(false);
       }
     },
-    [pageSize, resetPage, resetSearch, selectCell, setActiveColumn],
+    [resetPage, resetSearch, selectCell, setActiveColumn],
   );
 
   // Resize observer: measure the table body and update page size
@@ -338,24 +339,24 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setTableBodyHeight(bodyHeight);
       setTableBodyWidth(element.clientWidth);
       // A page is one screenful: the pager's row range should describe the rows you can see.
-      const rows = pageSizeForBodyHeight(bodyHeight);
-      if (rows !== pageSize) {
-        // Which page holds the row we want? If restore is pending, use the restore row;
-        // otherwise use the row already on screen, so a resize does not move the reader.
-        const session = sessionRef.current;
-        if (session) {
-          const keepRow = session.isRestorePending ? undefined : loadedStart;
-          setPage(session.setPageSize(rows, keepRow));
-        }
-        setPageSize(rows);
+      const session = sessionRef.current;
+      if (!session) return;
+      // The session decides whether this is a change, and which page keeps the reader where they
+      // were (the restore row on the first sizing, the row on screen afterwards). The view only
+      // mirrors the result; it never compares against its own copy of the size.
+      const nextPage = session.fitPageSize(pageSizeForBodyHeight(bodyHeight));
+      if (nextPage !== null) {
+        setPage(nextPage);
         setReloadToken((token) => token + 1);
       }
+      setPageSize(session.pageSize);
+      setTotalPages(session.totalPages);
     };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [fileInfo, loadedStart, pageSize, sessionRef, siderWidth, tableWrapRef]);
+  }, [fileInfo, sessionRef, siderWidth, tableWrapRef]);
 
   // Page loading effect
   useEffect(() => {
@@ -501,10 +502,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         return;
       }
       const row = Math.max(0, Math.min(info.rowCount - 1, Math.round(rowJump) - 1));
-      goToPage(Math.floor(row / pageSize));
+      const session = sessionRef.current;
+      if (!session) return;
+      goToPage(session.rowToPage(row));
       setTargetRow(row);
     },
-    [rowJump, goToPage, pageSize, message],
+    [rowJump, goToPage, message],
   );
 
   // Bring the jumped-to row into view once its page has rendered; without this the right page
@@ -563,7 +566,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
         return;
       }
-      const pageCount = Math.max(1, Math.ceil(fileInfo.rowCount / pageSize));
+      const pageCount = totalPages;
       const visibleRows = Math.max(1, Math.floor(tableBodyHeight / ROW_HEIGHT));
       const action = resolveParquetKey({
         key: event.key,
@@ -636,7 +639,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     [
       fileInfo,
       page,
-      pageSize,
+      totalPages,
       loadedStart,
       pageRows,
       selectCell,

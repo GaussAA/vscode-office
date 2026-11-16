@@ -8,7 +8,6 @@ interface UseParquetSearchArgs {
   fileInfoRef: RefObject<ParquetFileInfo | null>;
   sessionRef: RefObject<ParquetSession | null>;
   page: number;
-  pageSize: number;
   goToPage: (next: number | ((current: number) => number)) => void;
   focusColumn: (position: number, mark?: boolean) => void;
   onError: (message: string) => void;
@@ -43,7 +42,6 @@ export function useParquetSearch({
   fileInfoRef,
   sessionRef,
   page,
-  pageSize,
   goToPage,
   focusColumn,
   onError,
@@ -122,11 +120,8 @@ export function useParquetSearch({
       );
       if (result.rows.length > 0) {
         setActiveMatch(0);
-        const session = sessionRef.current;
-        const target = session
-          ? session.rowToPage(result.rows[0])
-          : Math.floor(result.rows[0] / pageSize);
-        goToPage((current) => (current === target ? current : target));
+        const target = sessionRef.current?.rowToPage(result.rows[0]);
+        if (target !== undefined) goToPage((current) => (current === target ? current : target));
         // A hit is a cell, not a row: bring its column into view too. `mark` stays false so
         // the tint keeps meaning "you clicked a schema field", not "a search ran".
         focusColumn(result.columns[0] ?? 0, false);
@@ -136,8 +131,7 @@ export function useParquetSearch({
     } finally {
       if (seq === searchSeq.current) setSearching(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sessionRef is stable
-  }, [fileInfoRef, focusColumn, goToPage, onError, pageSize, query]);
+  }, [fileInfoRef, focusColumn, goToPage, onError, query, sessionRef]);
 
   const jumpMatch = useCallback(
     (direction: 1 | -1) => {
@@ -156,8 +150,7 @@ export function useParquetSearch({
       const column = matchColumnsRef.current.get(target);
       if (column !== undefined) focusColumn(column, false);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sessionRef is stable
-    [focusColumn, goToPage, matchRows, page],
+    [focusColumn, goToPage, matchRows, page, sessionRef],
   );
 
   /** Abandon a running scan. The scan checks `searchSeq` between pages, so this stops it. */
