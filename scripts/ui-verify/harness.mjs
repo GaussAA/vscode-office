@@ -896,10 +896,16 @@ function excelEditStub(mode = "direct") {
         byteLength: Array.isArray(content.content) ? content.content.length : 0,
       });
       if (msg.type === 'save') {
-        setTimeout(function () {
+        const release = function () {
           window.__saveDone = true;
           window.postMessage({ type: 'saveDone' }, '*');
-        }, 30);
+        };
+        // ?holdSave=1: the host is still writing; the scenario decides when it finishes.
+        if (new URLSearchParams(location.search).get('holdSave') === '1') {
+          window.__releaseSaveDone = release;
+        } else {
+          setTimeout(release, 30);
+        }
       }
     },
     getState() { return undefined; },

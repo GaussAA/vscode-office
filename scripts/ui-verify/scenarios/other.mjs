@@ -716,4 +716,267 @@ export default [
       return `next page served from cache (0 extra reads)`;
     },
   },
+  {
+    name: "excel-save-as-keeps-dirty",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness-route?route=excel&edit=direct`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the editable grid did not render");
+
+      // Make an edit to get dirty state
+      await page.evaluate(`(() => {
+        const cell = document.querySelector('.x-spreadsheet-table .x-spreadsheet-cell');
+        if (cell) cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      })()`);
+      await page.sleep(100);
+      await page.evaluate(`(() => {
+        const editor = document.querySelector('.x-spreadsheet-editor-area textarea');
+        if (editor) {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+          setter.call(editor, 'modified');
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
+          editor.blur();
+        }
+      })()`);
+      await page.sleep(200);
+
+      const beforeSaveAs = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+          changeMessages: (window.__excelMessages || []).filter(m => m.type === 'change').length,
+        })`),
+      );
+      expect(beforeSaveAs.saveEnabled, "save button did not enable after edit");
+      expect(beforeSaveAs.changeMessages > 0, "no change message was sent after edit");
+
+      // Click the Save As button in the toolbar
+      await page.evaluate(`(() => {
+        const saveAsBtn = [...document.querySelectorAll('.x-spreadsheet-toolbar-btn')]
+          .find(btn => {
+            const tooltip = btn.getAttribute('data-tooltip') || '';
+            return tooltip.includes('Save As') || tooltip.includes('另存');
+          });
+        if (saveAsBtn) saveAsBtn.click();
+      })()`);
+      const modalOpen = await page.waitFor(
+        `!!document.querySelector('.ant-modal') && /Save As/i.test(document.querySelector('.ant-modal')?.innerText ?? '')`,
+        5000,
+      );
+      expect(modalOpen, "Save As dialog did not open");
+
+      // Confirm Save As (this posts saveAs to the host)
+      await page.evaluate(
+        `[...document.querySelectorAll('.ant-modal button')].find(btn => btn.classList.contains('ant-btn-primary'))?.click()`,
+      );
+      await page.sleep(300);
+
+      const afterSaveAs = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+          saveDoneReceived: window.__saveDone === true,
+          saveAsMessages: (window.__excelMessages || []).filter(m => m.type === 'saveAs').length,
+        })`),
+      );
+
+      expect(afterSaveAs.saveAsMessages > 0, "saveAs message was not posted");
+      expect(!afterSaveAs.saveDoneReceived, "saveDone arrived after Save As (should not)");
+      expect(
+        afterSaveAs.saveEnabled,
+        "save button disabled after Save As (document should stay dirty)",
+      );
+
+      return `Save As posted, original document stays dirty, no saveDone`;
+    },
+  },
+  {
+    name: "excel-save-edit-during-pending",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness-route?route=excel&edit=direct&holdSave=1`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the editable grid did not render");
+
+      // Make an edit
+      await page.evaluate(`(() => {
+        const cell = document.querySelector('.x-spreadsheet-table .x-spreadsheet-cell');
+        if (cell) cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      })()`);
+      await page.sleep(100);
+      await page.evaluate(`(() => {
+        const editor = document.querySelector('.x-spreadsheet-editor-area textarea');
+        if (editor) {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+          setter.call(editor, 'first-edit');
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
+          editor.blur();
+        }
+      })()`);
+      await page.sleep(200);
+
+      const afterFirstEdit = json(
+        await page.evaluate(`JSON.stringify({
+          changeCount: (window.__excelMessages || []).filter(m => m.type === 'change').length,
+        })`),
+      );
+      expect(
+        afterFirstEdit.changeCount === 1,
+        `first edit should send 1 change, got ${afterFirstEdit.changeCount}`,
+      );
+
+      // Trigger save (goes to pending-save state, saveDone is held back)
+      await page.evaluate(
+        `window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', code: 'KeyS', ctrlKey: true, bubbles: true, cancelable: true }))`,
+      );
+      await page.waitFor(`window.__excelMessages?.some(message => message.type === 'save')`, 5000);
+
+      const duringPending = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+          releaseFnExists: typeof window.__releaseSaveDone === 'function',
+        })`),
+      );
+      expect(!duringPending.saveEnabled, "save button still enabled during pending-save");
+      expect(duringPending.releaseFnExists, "holdSave mode did not expose __releaseSaveDone");
+
+      // Make another edit WHILE save is still pending
+      await page.evaluate(`(() => {
+        const cells = document.querySelectorAll('.x-spreadsheet-table .x-spreadsheet-cell');
+        if (cells[1]) cells[1].dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      })()`);
+      await page.sleep(100);
+      await page.evaluate(`(() => {
+        const editor = document.querySelector('.x-spreadsheet-editor-area textarea');
+        if (editor) {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+          setter.call(editor, 'second-edit');
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
+          editor.blur();
+        }
+      })()`);
+      await page.sleep(200);
+
+      const afterSecondEdit = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+          changeCount: (window.__excelMessages || []).filter(m => m.type === 'change').length,
+        })`),
+      );
+      expect(
+        afterSecondEdit.saveEnabled,
+        "save button did not re-enable after edit during pending",
+      );
+      expect(
+        afterSecondEdit.changeCount === 2,
+        `second edit should send another change, got ${afterSecondEdit.changeCount}`,
+      );
+
+      // Now release saveDone
+      await page.evaluate(`window.__releaseSaveDone?.()`);
+      const done = await page.waitFor(`window.__saveDone === true`, 5000);
+      expect(done, "saveDone did not arrive after release");
+
+      await page.sleep(100);
+      const afterSaveDone = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+        })`),
+      );
+
+      expect(
+        afterSaveDone.saveEnabled,
+        "save button disabled after saveDone (should stay enabled because of second edit)",
+      );
+
+      return `edit during pending-save keeps dirty after saveDone`;
+    },
+  },
+  {
+    name: "excel-replace-marks-dirty",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness-route?route=excel&edit=direct`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the editable grid did not render");
+
+      const beforeReplace = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+          changeMessages: (window.__excelMessages || []).filter(m => m.type === 'change').length,
+        })`),
+      );
+      expect(!beforeReplace.saveEnabled, "save button enabled before any edit");
+      expect(beforeReplace.changeMessages === 0, "change message sent before any edit");
+
+      // Open Find & Replace panel with Ctrl+H
+      await page.evaluate(
+        `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', code: 'KeyH', ctrlKey: true, bubbles: true, cancelable: true }))`,
+      );
+      const panelOpen = await page.waitFor(`!!document.querySelector('.frp-panel')`, 5000);
+      expect(panelOpen, "Find & Replace panel did not open");
+
+      // Enter find text
+      await page.evaluate(`(() => {
+        const input = document.querySelector('.frp-panel .frp-input');
+        if (input) {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+          setter.call(input, '1');
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      })()`);
+      await page.sleep(100);
+
+      // Enter replace text
+      await page.evaluate(`(() => {
+        const inputs = document.querySelectorAll('.frp-panel .frp-input');
+        if (inputs[1]) {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+          setter.call(inputs[1], 'replaced');
+          inputs[1].dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      })()`);
+      await page.sleep(100);
+
+      // Click Replace All (labeled as "All" in English)
+      await page.evaluate(`(() => {
+        const btns = [...document.querySelectorAll('.frp-action-btn')];
+        const replaceAll = btns.find(btn => {
+          const text = btn.textContent.trim();
+          return text === 'All' || text.includes('全部') || text.includes('Replace All');
+        });
+        replaceAll?.click();
+      })()`);
+      await page.sleep(300);
+
+      const afterReplace = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+          changeMessages: (window.__excelMessages || []).filter(m => m.type === 'change').length,
+          replaceStatus: document.querySelector('.frp-status')?.textContent ?? '',
+        })`),
+      );
+
+      expect(afterReplace.saveEnabled, "save button did not enable after replace");
+      expect(afterReplace.changeMessages > 0, "no change message sent to host after replace");
+      expect(
+        /\d+/.test(afterReplace.replaceStatus),
+        `replace did not report count: ${afterReplace.replaceStatus}`,
+      );
+
+      return `Replace All marked dirty and sent change to host`;
+    },
+  },
 ];
