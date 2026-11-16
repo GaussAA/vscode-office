@@ -6,12 +6,8 @@ import { getExtensionResourceRoots } from "@/common/extensionResource";
 import { buildDocumentCacheId } from "@/provider/handlers/officeContent";
 import { JsonlFile } from "@/service/jsonlFile";
 import { JsonlSession } from "@/service/jsonlSession";
-import { openByteSource } from "@/service/jsonlSource";
+import { openDocumentSource } from "./documentSource";
 import { createJsonlHandlers } from "./jsonlHandlers";
-
-/** Non-file documents (virtual, remote) can only be read whole. */
-const readAll = async (uri: { scheme: string; fsPath: string }) =>
-  vscode.workspace.fs.readFile(uri as vscode.Uri);
 
 class JsonlDocument implements vscode.CustomDocument {
   constructor(
@@ -38,7 +34,7 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
   }
 
   async openCustomDocument(uri: vscode.Uri): Promise<JsonlDocument> {
-    const file = await JsonlFile.open(await openByteSource(uri, readAll));
+    const file = await JsonlFile.open(await openDocumentSource(uri));
     return new JsonlDocument(uri, new JsonlSession(file));
   }
 
@@ -62,7 +58,7 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
       reopen: async () => {
         const previous = current();
         document.session = new JsonlSession(
-          await JsonlFile.open(await openByteSource(document.uri, readAll)),
+          await JsonlFile.open(await openDocumentSource(document.uri)),
         );
         previous.dispose();
       },

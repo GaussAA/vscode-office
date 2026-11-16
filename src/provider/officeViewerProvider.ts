@@ -5,8 +5,9 @@ import * as vscode from "vscode";
 import { Handler } from "../common/handler";
 import { getExtensionResourceRoots } from "@/common/extensionResource";
 import { handleCommonEvent } from "./commonHandler";
-import { openByteSource } from "@/service/jsonlSource";
+import { openDocumentSource } from "./documentSource";
 import { createParquetHandlers } from "./parquetHandlers";
+import { createSaveTracker } from "./saveHandlers";
 
 /**
  * Spreadsheet and parquet viewers.
@@ -16,6 +17,9 @@ import { createParquetHandlers } from "./parquetHandlers";
  * and everything else is either covered by VS Code or by a better dedicated reader.
  */
 export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider {
+  /** Shared by every panel: "save as" stamps another file's change event, not just our own. */
+  private readonly saves = createSaveTracker();
+
   constructor(private context: vscode.ExtensionContext) {}
 
   bindCustomEditors(viewOption: CustomEditorOptions) {
@@ -47,7 +51,7 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
     };
 
     const handler = Handler.bind(webviewPanel, uri);
-    handleCommonEvent(uri, handler);
+    handleCommonEvent(uri, handler, this.saves);
 
     let route: string;
     switch (getFileSuffix(uri.fsPath)) {
@@ -71,8 +75,7 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
       // The one message the host answers for parquet today: the profile is read from row-group
       // metadata, so it never pulls a data page through `openByteSource`.
       const parquet = createParquetHandlers({
-        openSource: () =>
-          openByteSource(uri, async (target) => vscode.workspace.fs.readFile(target as vscode.Uri)),
+        openSource: () => openDocumentSource(uri),
         emit: (type, payload) => handler.emit(type, payload),
       });
       handler
