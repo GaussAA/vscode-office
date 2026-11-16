@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatBytes } from "@/common/previewLimit";
 import { t } from "./excel_i18n";
-
-export interface ExcelTooLarge {
-  size: number;
-  name: string;
-  ext: string;
-  /** The limit this file missed; local text and virtual text have different ones. */
-  limit: number;
-}
+import type { ExcelTooLarge } from "./excelSession";
 
 interface ExcelGuardProps {
   file: ExcelTooLarge;

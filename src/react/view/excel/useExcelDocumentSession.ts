@@ -2,24 +2,46 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { App } from "antd";
 import { handler } from "../../util/vscode.ts";
 import { loadOfficeBuffer } from "../../util/loadOfficeContent.ts";
-import type { OfficeOpenMessage } from "@/common/openPayload";
 import { loadSheets, loadWorkbookRows } from "./excel_reader";
 import { buildFormattingSnapshot } from "./excel_writer";
 import type Spreadsheet from "./x-spreadsheet/index";
 import { t } from "./excel_i18n";
-import { createTextSheetSource, type SheetSource } from "./sheetSource";
-import { createWorkbookSheetSource, type WorkbookSheetSource } from "./workbookSource";
-import { limitForView, sheetViewFor } from "./sheetView";
-import type { ExcelTooLarge } from "./ExcelGuard";
+import type { SheetSource } from "./sheetSource";
+import type { WorkbookSheetSource } from "./workbookSource";
+import {
+  ExcelSession,
+  loadErrorMessage,
+  type ExcelLoadDeps,
+  type ExcelOpenPayload,
+  type ExcelTooLarge,
+} from "./excelSession";
 import { useExcelSave } from "./useExcelSave";
 import { mountExcelSpreadsheet } from "./excelSpreadsheetHost";
-import { excelWindowKind, planExcelOpen } from "./excelOpenPlan";
 
-export type ExcelOpenPayload = OfficeOpenMessage;
+export type { ExcelOpenPayload };
 
-/** Bump a generation ref from an effect cleanup without touching it directly there. */
-function invalidateOpen(ref: { current: number }) {
-  ref.current += 1;
+const LOAD_DEPS: ExcelLoadDeps = {
+  loadBuffer: loadOfficeBuffer,
+  loadWorkbookRows,
+  loadSheets,
+};
+
+/**
+ * Call `onChange` once, `delayMs` after the last change to `<head>` (the VS Code theme swaps
+ * stylesheets there). Returns the function that stops watching. The timer lives in a helper
+ * so the hook itself never reassigns a variable after render.
+ */
+function watchHeadChanges(onChange: () => void, delayMs: number): () => void {
+  const timer: { id?: ReturnType<typeof setTimeout> } = {};
+  const observer = new MutationObserver(() => {
+    clearTimeout(timer.id);
+    timer.id = setTimeout(onChange, delayMs);
+  });
+  observer.observe(document.head, { childList: true, subtree: true });
+  return () => {
+    observer.disconnect();
+    clearTimeout(timer.id);
+  };
 }
 
 interface UseExcelDocumentSessionArgs {
@@ -32,8 +54,9 @@ interface UseExcelDocumentSessionArgs {
 }
 
 /**
- * One document's open/guard/load/save session. It owns the payload lifetime, the generation
- * fence, the spreadsheet host and the save state; the viewer is left with theme, find-panel
+ * Adapter between one `ExcelSession` (the open/guard/load decisions and the generation fence)
+ * and React: it applies the session's outcomes to state, owns the spreadsheet host and the
+ * save state, and talks to the vscode bridge. The viewer is left with theme, find-panel
  * mounting and the windowed/grid choice's rendered output.
  */
 export function useExcelDocumentSession({
@@ -42,6 +65,7 @@ export function useExcelDocumentSession({
   onFind,
   onResetFind,
 }: UseExcelDocumentSessionArgs) {
+  const [session] = useState(() => new ExcelSession());
   const [loading, setLoading] = useState(true);
   const [readOnly, setReadOnly] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -54,16 +78,12 @@ export function useExcelDocumentSession({
   const [saveAsVisible, setSaveAsVisible] = useState(false);
   const [activeSpreadsheet, setActiveSpreadsheet] = useState<Spreadsheet | null>(null);
   const extRef = useRef("");
-  const documentCacheIdRef = useRef("");
   const readOnlyRef = useRef(false);
   const spreadSheetRef = useRef<Spreadsheet | null>(null);
   const csvEncodingRef = useRef<"utf8" | "gbk">("utf8");
   const csvDelimiterRef = useRef(",");
   const initialFormattingRef = useRef("");
-  const forcedRef = useRef(false);
-  const pendingPayloadRef = useRef<ExcelOpenPayload | null>(null);
   const loadPayloadRef = useRef<((payload: ExcelOpenPayload, seq: number) => void) | null>(null);
-  const openSeqRef = useRef(0);
   const gridReadyRef = useRef(false);
   const pendingSaveRef = useRef(false);
 
@@ -109,32 +129,31 @@ export function useExcelDocumentSession({
   }, []);
 
   const handleOpenAnyway = useCallback(() => {
-    const payload = pendingPayloadRef.current;
-    if (!payload) return;
-    forcedRef.current = true;
+    const result = session.openAnyway();
+    if (!result) return;
     setTooLarge(null);
     setLoadError(null);
     setLoading(true);
-    const seq = ++openSeqRef.current;
-    if (payload.scheme === "file" || payload.bufferBase64 || payload.buffer?.length) {
-      loadPayloadRef.current?.(payload, seq);
+    if (result.kind === "load") {
+      loadPayloadRef.current?.(result.payload, result.seq);
       return;
     }
     handler.emit("openForce");
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     const container = document.getElementById("container");
     if (!container) return;
     let activeHost: ReturnType<typeof mountExcelSpreadsheet> | null = null;
 
-    const initSpreadsheet = async (buffer: ArrayBuffer, payload: ExcelOpenPayload, seq: number) => {
-      const fileReadOnly = payload.readOnly === true;
-      const { sheets, maxLength, maxCols, csvDelimiter, csvEncoding } = await loadSheets(
-        buffer,
-        payload.ext,
-      );
-      if (seq !== openSeqRef.current) return;
+    const failLoad = (errorMessage: string, cause: unknown) => {
+      console.error(`Failed to load Excel file: ${errorMessage}`, cause);
+      setLoadError(errorMessage);
+      setLoading(false);
+    };
+
+    const mountGrid = (data: Awaited<ReturnType<typeof loadSheets>>, payload: ExcelOpenPayload) => {
+      const { sheets, maxLength, maxCols, csvDelimiter, csvEncoding } = data;
       if (csvDelimiter) csvDelimiterRef.current = csvDelimiter;
       if (csvEncoding) csvEncodingRef.current = csvEncoding;
       container.innerHTML = "";
@@ -142,8 +161,8 @@ export function useExcelDocumentSession({
         container,
         sheets,
         ext: payload.ext ?? "",
-        readOnly: fileReadOnly,
-        documentKey: documentCacheIdRef.current,
+        readOnly: payload.readOnly === true,
+        documentKey: session.documentCacheId,
         maxLength,
         maxCols,
         handlers: {
@@ -178,51 +197,45 @@ export function useExcelDocumentSession({
       initialFormattingRef.current = buildFormattingSnapshot(host.spreadSheet.getData());
     };
 
+    const showWindow = () => {
+      setWindowLoad((load) => load + 1);
+      setLoadError(null);
+      setLoading(false);
+    };
+
     const loadPayload = (payload: ExcelOpenPayload, seq: number) => {
       setWindowSource(null);
-      void loadOfficeBuffer(payload)
-        .then(async (buffer) => {
-          if (seq !== openSeqRef.current) return;
-          try {
-            const view = sheetViewFor(payload.ext ?? "", payload.size, {
-              virtual: payload.scheme !== "file",
-            });
-            if (view === "window") {
-              if (excelWindowKind(payload.ext ?? "") === "workbook") {
-                const rows = await loadWorkbookRows(buffer);
-                if (seq !== openSeqRef.current) return;
-                const source = createWorkbookSheetSource(rows);
-                workbookRef.current = source;
-                setSheetNames(source.sheetNames);
-                setActiveSheet(source.sheetIndex);
-                setWindowSource(source);
-              } else {
-                workbookRef.current = null;
-                setSheetNames([]);
-                setActiveSheet(0);
-                setWindowSource(createTextSheetSource(buffer));
-              }
-              setWindowLoad((load) => load + 1);
-              setLoadError(null);
-              setLoading(false);
-              return;
+      void session.load(payload, seq, LOAD_DEPS).then((outcome) => {
+        switch (outcome.kind) {
+          case "stale":
+            return;
+          case "error":
+            failLoad(outcome.message, outcome.cause);
+            return;
+          case "workbook":
+            workbookRef.current = outcome.source;
+            setSheetNames(outcome.source.sheetNames);
+            setActiveSheet(outcome.source.sheetIndex);
+            setWindowSource(outcome.source);
+            showWindow();
+            return;
+          case "text":
+            workbookRef.current = null;
+            setSheetNames([]);
+            setActiveSheet(0);
+            setWindowSource(outcome.source);
+            showWindow();
+            return;
+          case "grid":
+            try {
+              mountGrid(outcome.data, payload);
+            } catch (cause) {
+              if (!session.isCurrent(seq)) return;
+              failLoad(loadErrorMessage(cause), cause);
             }
-            await initSpreadsheet(buffer, payload, seq);
-          } catch (e) {
-            if (seq !== openSeqRef.current) return;
-            const msg = (e as Error).message || String(e);
-            console.error(`Failed to load Excel file: ${msg}`, e);
-            setLoadError(msg);
-            setLoading(false);
-          }
-        })
-        .catch((error) => {
-          if (seq !== openSeqRef.current) return;
-          const msg = (error as Error).message || String(error);
-          console.error(`Failed to load Excel file: ${msg}`, error);
-          setLoadError(msg);
-          setLoading(false);
-        });
+            return;
+        }
+      });
     };
     loadPayloadRef.current = loadPayload;
 
@@ -230,7 +243,7 @@ export function useExcelDocumentSession({
       .on("open", (payload: ExcelOpenPayload) => {
         activeHost?.dispose();
         activeHost = null;
-        const seq = ++openSeqRef.current;
+        const result = session.open(payload);
         setLoading(true);
         setLoadError(null);
         setTooLarge(null);
@@ -243,32 +256,16 @@ export function useExcelDocumentSession({
         setSheetNames([]);
         setActiveSheet(0);
         document.getElementById("container")?.replaceChildren();
-        const nextCacheId = payload.documentCacheId ?? "";
-        if (nextCacheId !== documentCacheIdRef.current) {
-          forcedRef.current = false;
-        }
-        documentCacheIdRef.current = nextCacheId;
         extRef.current = payload.ext ?? "";
         const fileReadOnly = payload.readOnly === true;
         readOnlyRef.current = fileReadOnly;
         setReadOnly(fileReadOnly);
-        pendingPayloadRef.current = payload;
-        const view = sheetViewFor(payload.ext ?? "", payload.size, {
-          virtual: payload.scheme !== "file",
-        });
-        if (
-          planExcelOpen({ forced: forcedRef.current, tooLarge: payload.tooLarge, view }) === "guard"
-        ) {
-          setTooLarge({
-            size: payload.size ?? 0,
-            name: payload.fileName ?? "",
-            ext: payload.ext ?? "",
-            limit: limitForView(payload.ext ?? "", { virtual: payload.scheme !== "file" }),
-          });
+        if (result.kind === "guard") {
+          setTooLarge(result.tooLarge);
           setLoading(false);
           return;
         }
-        loadPayload(payload, seq);
+        loadPayload(result.payload, result.seq);
       })
       .on("saveDone", () => {
         if (!pendingSaveRef.current) return;
@@ -277,28 +274,18 @@ export function useExcelDocumentSession({
       })
       .emit("init");
 
-    let themeTimer: ReturnType<typeof setTimeout>;
-    const themeObserver = new MutationObserver(() => {
-      clearTimeout(themeTimer);
-      themeTimer = setTimeout(() => spreadSheetRef.current?.reRender(), 120);
-    });
-    themeObserver.observe(document.head, { childList: true, subtree: true });
+    const stopThemeWatch = watchHeadChanges(() => spreadSheetRef.current?.reRender(), 120);
 
     return () => {
       activeHost?.dispose();
-      invalidateOpen(openSeqRef);
+      session.invalidate();
       gridReadyRef.current = false;
       pendingSaveRef.current = false;
       spreadSheetRef.current = null;
       setActiveSpreadsheet(null);
-      themeObserver.disconnect();
-      clearTimeout(themeTimer);
+      stopThemeWatch();
     };
-    // `handleAutoFitColumns` is deliberately omitted: this effect boots the spreadsheet and
-    // calls emit('init'), so re-running it when that callback's identity changes would
-    // re-initialise the whole sheet. It is stable enough that the stale closure is safe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handleSave, handleSaveAs, message, onFind, onResetFind]);
+  }, [handleAutoFitColumns, handleSave, handleSaveAs, message, onFind, onResetFind, session]);
 
   return {
     loading,
@@ -320,6 +307,6 @@ export function useExcelDocumentSession({
     handleSelectSheet,
     spreadSheetRef,
     readOnlyRef,
-    fileName: pendingPayloadRef.current?.fileName ?? "",
+    fileName: session.payload?.fileName ?? "",
   };
 }
