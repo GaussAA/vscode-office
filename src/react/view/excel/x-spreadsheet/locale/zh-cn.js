@@ -139,6 +139,7 @@ export default {
     save: "保存",
     saveAs: "另存为",
     ok: "确认",
+    copy: "复制",
   },
   sort: {
     desc: "降序",
@@ -163,6 +164,8 @@ export default {
     matchesMany: "{} 个匹配",
     sheet: "工作表",
     resizeColumn: "调整列宽",
+    autoFitColumns: "自动调整列宽",
+    autoFitDone: "已自动调整列宽",
     copied: "已复制",
     copyFailed: "无法复制单元格内容",
     goToRow: "跳转到行",

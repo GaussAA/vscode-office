@@ -172,12 +172,7 @@ if (hasProperty(value, "name") && typeof value.name === "string") {
 console.log((value as { name: string }).name);
 ```
 
-2. **必要的类型断言要添加注释**
-
-```typescript
-// Type assertion required: ExcelJS internal property access
-const ws = worksheet as ExcelJS.Worksheet & { sheetProtection?: ... };
-```
+2. **必要的类型断言要添加注释**，说明为什么类型系统表达不了这个事实
 
 ### React 规范
 
