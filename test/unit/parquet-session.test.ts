@@ -308,3 +308,103 @@ test("fitPageSize: a load started before the restore was applied cannot land", a
   assert.equal(restored.start, 100);
   assert.equal(restored.rows[0].id, 100);
 });
+
+test("paging: snapshot carries pageSize and totalPages and is immutable", () => {
+  const session = new ParquetSession(makeSource(120), { pageSize: 50 });
+  const paging = session.paging;
+  assert.deepEqual({ ...paging }, { pageSize: 50, totalPages: 3 });
+  assert.equal(
+    Object.isFrozen(paging),
+    true,
+    "a view must not be able to edit the session's numbers",
+  );
+});
+
+test("paging: the snapshot keeps its identity until the page size changes", () => {
+  // A view stores `session.paging` in one useState after every measurement. Same object means
+  // React bails out, so an unchanged measurement must not cost a render.
+  const session = new ParquetSession(makeSource(300), { pageSize: 50 });
+  const before = session.paging;
+  assert.equal(session.fitPageSize(50), null);
+  assert.equal(session.setPageSize(50), 0);
+  assert.equal(session.paging, before, "setting the same size keeps the same snapshot");
+
+  session.setPageSize(20);
+  assert.notEqual(session.paging, before, "a new size produces a new snapshot");
+  assert.deepEqual({ ...session.paging }, { pageSize: 20, totalPages: 15 });
+  assert.equal(before.pageSize, 50, "the old snapshot is not mutated");
+});
+
+test("paging: the snapshot follows fitPageSize, including the normalised size", () => {
+  const session = new ParquetSession(makeSource(5_000), { pageSize: 50, chunkSize: 100 });
+  session.fitPageSize(40.9);
+  assert.deepEqual({ ...session.paging }, { pageSize: 40, totalPages: 125 });
+  session.fitPageSize(10_000);
+  assert.deepEqual(
+    { ...session.paging },
+    { pageSize: 100, totalPages: 50 },
+    "clamped to the chunk",
+  );
+});
+
+test("paging: an empty file still has one page", () => {
+  const session = new ParquetSession(makeSource(0), { pageSize: 50 });
+  assert.deepEqual({ ...session.paging }, { pageSize: 50, totalPages: 1 });
+  assert.equal(session.rowToPage(0), 0);
+  assert.equal(session.endOf(0), 0);
+});
+
+test("endOf: a full page ends one page size after its start", () => {
+  const session = new ParquetSession(makeSource(120), { pageSize: 50 });
+  assert.equal(session.endOf(0), 50);
+  assert.equal(session.endOf(1), 100);
+});
+
+test("endOf: the last page is cut short at the row count", () => {
+  const session = new ParquetSession(makeSource(120), { pageSize: 50 });
+  assert.equal(session.endOf(2), 120);
+});
+
+test("endOf: follows a page size change and agrees with showPage", async () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 50, chunkSize: 300 });
+  session.setPageSize(20, 0);
+  assert.equal(session.endOf(3), 80);
+  const snapshot = await session.showPage(3);
+  assert.deepEqual([snapshot.start, snapshot.end], [session.pageToRow(3), session.endOf(3)]);
+});
+
+test("rowToPage and pageToRow: round trip on every page start, before and after a resize", () => {
+  const session = new ParquetSession(makeSource(1_000), { pageSize: 50, chunkSize: 1_000 });
+  for (const size of [50, 21, 8]) {
+    session.setPageSize(size, 0);
+    for (let page = 0; page < session.totalPages; page++) {
+      assert.equal(session.rowToPage(session.pageToRow(page)), page, `size ${size}, page ${page}`);
+    }
+  }
+});
+
+test("rowToPage: every row of a page maps back to that page", () => {
+  const session = new ParquetSession(makeSource(300), { pageSize: 21 });
+  const page = 4;
+  for (let row = session.pageToRow(page); row < session.endOf(page); row++) {
+    assert.equal(session.rowToPage(row), page, `row ${row}`);
+  }
+  assert.equal(session.rowToPage(session.endOf(page)), page + 1);
+});
+
+test("totalPages: rounds up and agrees with the page holding the last row", () => {
+  const session = new ParquetSession(makeSource(101), { pageSize: 50 });
+  assert.equal(session.totalPages, 3);
+  assert.equal(session.rowToPage(100), session.totalPages - 1);
+  session.setPageSize(101, 0);
+  assert.equal(session.totalPages, 1);
+  session.setPageSize(100, 0);
+  assert.equal(session.totalPages, 2);
+});
+
+test("setPageSize: the returned page is computed with the new size and clamped", () => {
+  const session = new ParquetSession(makeSource(100), { pageSize: 10 });
+  assert.equal(session.setPageSize(30, 99), 3, "row 99 is on page 3 of 30-row pages");
+  assert.equal(session.setPageSize(30, 5_000), 3, "a row past the end lands on the last page");
+  assert.equal(session.setPageSize(30, -5), 0, "a negative row lands on the first page");
+});
