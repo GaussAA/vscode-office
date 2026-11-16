@@ -286,6 +286,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       // rendered inside the column panel, which is closed below, and every panel open
       // (openProfilePanel) cancels the guard and clears the scan state before showing anything.
       profileRequest.current.cancel();
+      scanRequest.current.cancel();
       setProfilePanel(null);
       setColumnScan(null);
       setScanError(null);

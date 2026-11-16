@@ -289,9 +289,13 @@ export function useExcelDocumentSession({
         const effect = session.markSaveDone();
         applyDirtyEffect(effect);
       })
-      .on("saveFailed", () => {
+      .on("saveFailed", (payload: { reason?: string; message?: string } | undefined) => {
         const effect = session.markSaveFailed();
         applyDirtyEffect(effect);
+        modal.error({
+          title: t("viewer.saveFailed"),
+          content: payload?.message || "The save operation failed. Please try again.",
+        });
       })
       .emit("init");
 
@@ -312,6 +316,7 @@ export function useExcelDocumentSession({
     handleSave,
     handleSaveAs,
     message,
+    modal,
     onFind,
     onResetFind,
     session,
