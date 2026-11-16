@@ -19,7 +19,7 @@ import {
   type JsonSearchBatch,
   type JsonSyntaxErrorInfo,
 } from "@/common/jsonPreviewTypes";
-import { classifyEntry, utf8ByteSize } from "@/service/entryClassifier";
+import { classifyEntry, truncate, type EntryClassification } from "@/service/entryClassifier";
 import { jsonArrayAdapter, type JsonArrayAdapter } from "@/service/jsonArrayAdapter";
 import { createCancelToken } from "@/service/recordAddressableDocument";
 
@@ -53,11 +53,16 @@ export function lineColumnAt(text: string, offset: number): { line: number; colu
   return { line, column: limit - lineStart + 1 };
 }
 
-function errorInfo(text: string, error: unknown): JsonSyntaxErrorInfo {
+/**
+ * `base` is where the text that was parsed starts inside `text`: a root parsed from its first
+ * non-whitespace character reports positions relative to that character.
+ */
+function errorInfo(text: string, error: unknown, base = 0): JsonSyntaxErrorInfo {
   const offset =
     error instanceof JsonScanError
       ? error.offset
-      : (() => {
+      : base +
+        (() => {
           const match = /position (\d+)/.exec(error instanceof Error ? error.message : "");
           return match ? Number.parseInt(match[1], 10) : 0;
         })();
@@ -185,51 +190,43 @@ export function indexJsonArray(text: string, start = 0): JsonRecordRange[] {
 }
 
 function previewText(text: string): string {
-  return text.length <= JSON_RAW_PREVIEW_CHARS ? text : `${text.slice(0, JSON_RAW_PREVIEW_CHARS)}…`;
+  return truncate(text, JSON_RAW_PREVIEW_CHARS);
 }
 
-function textFields(raw: string): {
-  text: string;
-  textChars: number;
-  textTruncated: boolean;
-  size: number;
-} {
-  return {
-    text: raw.slice(0, JSON_MAX_TEXT_CHARS),
-    textChars: raw.length,
-    textTruncated: raw.length > JSON_MAX_TEXT_CHARS,
-    size: utf8ByteSize(raw),
+/** The detail shape the JSONL tree uses, built from one classification (no second parse). */
+function detailFrom(index: number, classification: EntryClassification): JsonlEntryDetail {
+  const textChars = classification.text.length;
+  const textTruncated = textChars > JSON_MAX_TEXT_CHARS;
+  const base = {
+    index,
+    size: classification.byteSize,
+    raw: previewText(classification.text),
+    text: textTruncated ? classification.text.slice(0, JSON_MAX_TEXT_CHARS) : classification.text,
+    textChars,
+    textTruncated,
   };
+  switch (classification.kind) {
+    case "empty":
+      return { ...base, kind: "empty" };
+    case "too-large":
+      return { ...base, kind: "too-large", textTruncated: true };
+    case "invalid":
+      return { ...base, kind: "invalid", error: classification.error ?? "Invalid JSON" };
+    case "value":
+      return { ...base, kind: "value", value: classification.value };
+  }
 }
 
-/** Parse one nested record (or the object root) into the detail shape the JSONL tree uses. */
+/** Parse one nested record into the detail shape the JSONL tree uses. */
 export function readJsonRecordDetail(
   text: string,
   range: { start: number; end: number },
   index: number,
 ): JsonlEntryDetail {
-  const raw = text.slice(range.start, range.end);
-  const fields = textFields(raw);
-  const base = {
+  return detailFrom(
     index,
-    size: fields.size,
-    raw: previewText(raw),
-    text: fields.text,
-    textChars: fields.textChars,
-    textTruncated: fields.textTruncated,
-  };
-  if (fields.size > JSON_RECORD_MAX_BYTES) {
-    return { ...base, kind: "too-large", textTruncated: true };
-  }
-  try {
-    return { ...base, kind: "value", value: JSON.parse(raw) };
-  } catch (error) {
-    return {
-      ...base,
-      kind: "invalid",
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
+    classifyEntry(text.slice(range.start, range.end), JSON_RECORD_MAX_BYTES),
+  );
 }
 
 export function readJsonRecordSummary(
@@ -293,51 +290,27 @@ export class JsonPreviewSession {
         rootKind = "invalid";
         error = errorInfo(text, caught);
       }
-    } else if (text[first] === "{") {
-      if (byteSize > JSON_MAX_OBJECT_BYTES) {
-        rootKind = "too-large";
-      } else {
-        try {
-          const raw = text.slice(first);
-          const fields = textFields(raw);
-          this.rootEntry = {
-            index: 0,
-            size: fields.size,
-            raw: previewText(raw),
-            text: fields.text,
-            textChars: fields.textChars,
-            textTruncated: fields.textTruncated,
-            kind: "value",
-            value: JSON.parse(raw),
-          };
-          rootKind = "object";
-        } catch (caught) {
-          rootKind = "invalid";
-          error = errorInfo(text, caught);
-        }
-      }
+    } else if (byteSize > JSON_MAX_OBJECT_BYTES) {
+      rootKind = "too-large";
     } else {
-      if (byteSize > JSON_MAX_OBJECT_BYTES) {
+      // An object or scalar root: classified once, from the first non-whitespace character.
+      const classification = classifyEntry(text.slice(first), JSON_MAX_OBJECT_BYTES);
+      if (classification.kind === "value") {
+        this.rootEntry = detailFrom(0, classification);
+        rootKind = text[first] === "{" ? "object" : "scalar";
+      } else if (classification.kind === "too-large") {
         rootKind = "too-large";
+      } else if (classification.kind === "empty") {
+        // Only characters that JS calls whitespace but JSON does not (U+00A0, U+2028, ...):
+        // nothing was parsed, so there is no thrown error to take a position from.
+        rootKind = "invalid";
+        error = {
+          message: "Unexpected non-JSON whitespace character",
+          ...lineColumnAt(text, first),
+        };
       } else {
-        try {
-          const raw = text.slice(first);
-          const fields = textFields(raw);
-          this.rootEntry = {
-            index: 0,
-            size: fields.size,
-            raw: previewText(raw),
-            text: fields.text,
-            textChars: fields.textChars,
-            textTruncated: fields.textTruncated,
-            kind: "value",
-            value: JSON.parse(raw),
-          };
-          rootKind = "scalar";
-        } catch (caught) {
-          rootKind = "invalid";
-          error = errorInfo(text, caught);
-        }
+        rootKind = "invalid";
+        error = errorInfo(text, classification.parseError, first);
       }
     }
 

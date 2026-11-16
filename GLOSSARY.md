@@ -145,3 +145,8 @@ _Avoid_: 已知限制、暂不支持（那会把两种东西混成一个词）
 承认还没做到、且将来可能被认领的缺口。每条都要能被下一步认领，也要能被性能闸门或 ADR 的
 判据检验——写不出判据的，只是抱怨。
 _Avoid_: bug 列表、TODO（那些是执行层的东西，不是对外的承诺）
+
+**recordConstants（记录常量）**:
+JSON 与 JSONL 共享的记录限制与搜索参数（`RECORD_MAX_BYTES` 8MB、`MAX_TEXT_CHARS` 1M、`RAW_PREVIEW_CHARS` 400、`SEARCH_BATCH` 200、`SEARCH_MAX_MATCHES` 10,000）。两种格式的类型文件从这里派生各自的命名导出，确保值只在一处定义。
+_位置_: `src/common/recordConstants.ts`
+_Avoid_: 常量重复、magic number

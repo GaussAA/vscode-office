@@ -11,7 +11,7 @@ import {
   type JsonlEntryDetail,
   type JsonlEntrySummary,
 } from "@/common/jsonlTypes";
-import { classifyEntry } from "@/service/entryClassifier";
+import { classifyEntry, truncate } from "@/service/entryClassifier";
 import {
   findCaseInsensitive,
   foldNeedle,
@@ -69,10 +69,6 @@ function readLineHead(bytes: Uint8Array, index: JsonlIndex, line: number): strin
   let text = decoder.decode(head);
   if (head.length < slice.length && text.endsWith("\uFFFD")) text = text.slice(0, -1);
   return text.replace(/^\uFEFF/, "").replace(/[\r\n]+$/, "");
-}
-
-function truncate(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
 
 /** Decode one line to text. Exported so the searcher can scan without re-parsing. */
