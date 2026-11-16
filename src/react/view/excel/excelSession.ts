@@ -146,8 +146,8 @@ export function dirtyTransition(ctx: DirtyContext, event: DirtyEvent): [DirtyCon
         { saveEnabled: true, notifyHost: "dirty" },
       ];
     }
-    // Already dirty/clean: no change (export threw before markSaveRequested)
-    return [ctx, { saveEnabled: true, notifyHost: null }];
+    // Already dirty: stay dirty with save enabled; clean: stay clean with save disabled
+    return [ctx, { saveEnabled: state === "dirty", notifyHost: null }];
   }
 
   return [ctx, { saveEnabled: false, notifyHost: null }];
