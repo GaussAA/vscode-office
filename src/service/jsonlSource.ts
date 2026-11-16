@@ -7,7 +7,8 @@
  * inline, where no test could reach it: `verify:ui` stubs `acquireVsCodeApi`, so the scheme
  * branch was the one decision in the JSONL path with no automated coverage.
  */
-import { fileByteSource, memoryByteSource, type ByteSource } from "./jsonlFile";
+import type { ByteSource } from "@/common/byteSource";
+import { fileByteSource, memoryByteSource } from "./jsonlFile";
 
 /** The slice of `vscode.Uri` this decision needs. */
 export interface UriLike {

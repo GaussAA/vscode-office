@@ -5,23 +5,19 @@
  * in the webview, and ADR-0020 raises it to the host one capability at a time. The profile is
  * the first capability, and it is the one that must never decode a column — so it is also the
  * one that has to be testable without a browser.
- *
- * It does import `openParquetFile` from the webview's parser. That is deliberate: the parser is
- * the single place a parquet type string is decoded (`categorizeType`), and re-deriving column
- * types host-side would create the second place that can disagree with the schema rail.
  */
 import { parquetReadObjects, type FileMetaData } from "hyparquet";
 import { compressors } from "hyparquet-compressors";
 import { toDisplayText } from "@/common/displayText";
 import { asyncBufferFrom } from "@/common/parquetSchema";
+import { openParquetFile, type ParquetColumnInfo } from "@/common/parquetReader";
 import type {
   ParquetColumnProfile,
   ParquetColumnScan,
   ParquetProfile,
   ParquetProfileState,
 } from "@/common/parquetProfileTypes";
-import { openParquetFile, type ParquetColumnInfo } from "@/react/view/parquet/parquetParser";
-import type { ByteSource } from "@/service/jsonlFile";
+import type { ByteSource } from "@/common/byteSource";
 
 /** The shapes hyparquet hands back for a statistics min/max. */
 type MinMax = bigint | boolean | number | string | Date | Uint8Array;

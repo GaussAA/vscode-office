@@ -50,7 +50,8 @@ parquet 首屏字节数、全文件搜索耗时、宽表翻页耗时、列画像
 
 - `src/extension.ts` —— 唯一入口，注册全部 custom editors
 - `src/provider/` —— 每个 viewer 一个 `CustomReadonlyEditorProvider`
-- `src/react/view/<viewer>/` —— webview 内的 React 视图。解析器与组件分文件（如 `parquet/parquetParser.ts` + `parquet/Parquet.tsx`）
+- `src/react/view/<viewer>/` —— webview 内的 React 视图
+- `src/common/` —— 类型、工具与 host/webview 共享的逻辑（如 `parquetReader.ts`、`parquetSchema.ts`）
 - `src/service/` —— 跨视图服务（如 `officeViewType.ts`、`csvService.ts`）
 - `vite.config.ts` + `build.ts` —— 构建，产出 `out/`；webview 每个视图一个 Vite 入口。根是 `"type": "module"`，但 `build.ts` 会给 `out/` 生成一个 `{"type":"commonjs"}` 的 `package.json` —— 扩展宿主跑的是 CJS（见 ADR-0012），不要删它
 - `package.json` 的 `contributes.customEditors` —— viewer 与文件模式的唯一登记处

@@ -20,7 +20,8 @@
 import { parquetRead, parquetReadObjects, type FileMetaData } from "hyparquet";
 import { compressors } from "hyparquet-compressors";
 import type { AsyncBuffer } from "hyparquet";
-import { formatCellValue, type ParquetColumnInfo, type ParquetFileInfo } from "./parquetParser";
+import { formatCellValue } from "@/common/parquetCellFormat";
+import type { ParquetColumnInfo, ParquetFileInfo } from "@/common/parquetReader";
 
 /** Rows per assembled read for a nested column. */
 const NESTED_CHUNK_ROWS = 20_000;

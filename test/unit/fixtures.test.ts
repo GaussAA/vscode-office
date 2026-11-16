@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { decodeCsvBuffer } from "@/react/view/excel/csvEncoding";
 import { parseCsv } from "@/react/view/excel/csvParser";
-import { openParquetFile, readParquetRows } from "@/react/view/parquet/parquetParser";
+import { openParquetFile, readParquetRows } from "@/common/parquetReader";
 import { buildJsonlIndex, readJsonlLineText, summarizeDecodedLine } from "@/service/jsonlDocument";
 
 /**

@@ -3,11 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import type { SchemaElement } from "hyparquet";
 import { categorizeType, describeColumn } from "@/common/parquetSchema";
-import {
-  formatCellValue,
-  openParquetFile,
-  readParquetRows,
-} from "@/react/view/parquet/parquetParser";
+import { formatCellValue } from "@/common/parquetCellFormat";
+import { openParquetFile, readParquetRows } from "@/common/parquetReader";
 
 /**
  * A tiny file with every shape the column model must survive: a scalar, a LIST and a
