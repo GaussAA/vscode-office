@@ -9,9 +9,10 @@ import {
 } from "react";
 import { headerCells } from "./sheetView";
 import { createSheetWindowReader } from "./sheetWindowReader";
-import { scrollHeightFor, scrollTopForRow, type VisibleRange } from "./sheetWindow";
+import { scrollHeightFor, type VisibleRange } from "./sheetWindow";
 import type { SheetSource } from "./sheetSource";
 import { HEADER_HEIGHT, OVERSCAN, ROW_HEIGHT, toBodySource } from "./windowedSheetModel";
+import { bodyScrollTopFor, rowScrollFor, scrollerTopForRow } from "./windowedSheetNavigation";
 
 export interface WindowedRows {
   scrollerRef: RefObject<HTMLDivElement | null>;
@@ -73,9 +74,7 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
   const compressed = dataRowCount * ROW_HEIGHT > totalHeight;
   // In compressed mode the seek bar spans header + capped body, so the raw scrollTop is the
   // coordinate the range model expects. Normal mode scrolls only the body inside the sticky header.
-  const bodyScrollTop = compressed
-    ? Math.max(0, scrollTop)
-    : Math.max(0, scrollTop - HEADER_HEIGHT);
+  const bodyScrollTop = bodyScrollTopFor(scrollTop, compressed);
 
   // Read the file's first row once. It becomes the frozen column header; the body never sees it.
   useEffect(() => {
@@ -144,34 +143,30 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
     };
   }, []);
 
+  const applyScrollTop = useCallback((top: number) => {
+    if (scrollerRef.current) scrollerRef.current.scrollTop = top;
+    latestTopRef.current = top;
+    setScrollTop(top);
+  }, []);
+
   const scrollToRow = useCallback(
-    (row: number) => {
-      const top = HEADER_HEIGHT + scrollTopForRow(row, viewport);
-      if (scrollerRef.current) scrollerRef.current.scrollTop = top;
-      latestTopRef.current = top;
-      setScrollTop(top);
-    },
-    [viewport],
+    (row: number) => applyScrollTop(scrollerTopForRow(row, viewport)),
+    [applyScrollTop, viewport],
   );
 
   const ensureRowVisible = useCallback(
     (row: number) => {
-      if (compressed) {
-        if (range && row >= range.start && row < range.end) return;
-        scrollToRow(row);
-        return;
-      }
-      const top = Math.max(0, scrollTop - HEADER_HEIGHT);
-      const rowTop = row * ROW_HEIGHT;
-      if (rowTop >= top && rowTop + ROW_HEIGHT <= top + bodyViewportHeight) return;
-      const desired = rowTop < top ? rowTop : rowTop - bodyViewportHeight + ROW_HEIGHT;
-      const maxBody = Math.max(0, dataRowCount * ROW_HEIGHT - bodyViewportHeight);
-      const next = HEADER_HEIGHT + Math.min(Math.max(0, desired), maxBody);
-      if (scrollerRef.current) scrollerRef.current.scrollTop = next;
-      latestTopRef.current = next;
-      setScrollTop(next);
+      const scroll = rowScrollFor(row, {
+        compressed,
+        range,
+        scrollTop,
+        bodyViewportHeight,
+        dataRowCount,
+      });
+      if (scroll.kind === "seek") scrollToRow(row);
+      else if (scroll.kind === "scroll") applyScrollTop(scroll.top);
     },
-    [bodyViewportHeight, compressed, dataRowCount, range, scrollToRow, scrollTop],
+    [applyScrollTop, bodyViewportHeight, compressed, dataRowCount, range, scrollToRow, scrollTop],
   );
 
   return {

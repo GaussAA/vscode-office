@@ -28,6 +28,15 @@ import {
   columnName,
   fileRowToBodyRow,
 } from "./windowedSheetModel";
+import {
+  clampCell,
+  moveCell,
+  pageRows,
+  resolveSelection,
+  startingCell,
+  withLoadedValue,
+  type CellSelection,
+} from "./windowedSheetNavigation";
 import "./WindowedSheet.less";
 
 /**
@@ -53,12 +62,6 @@ export interface WindowedSheetProps {
   onSelectSheet?: (index: number) => void;
   /** The parent's Ctrl+F handler focuses the inline Find instead of the dead grid panel. */
   findInputRef?: RefObject<HTMLInputElement | null>;
-}
-
-interface SelectedCell {
-  row: number;
-  col: number;
-  value: string;
 }
 
 export default function WindowedSheet({
@@ -92,7 +95,7 @@ export default function WindowedSheet({
 
   const [targetRow, setTargetRow] = useState<number | null>(null);
   const [jumpValue, setJumpValue] = useState("");
-  const [selected, setSelected] = useState<SelectedCell | null>(null);
+  const [selected, setSelected] = useState<CellSelection | null>(null);
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef<number | null>(null);
   const resize = useColumnResize(columnCount);
@@ -146,20 +149,20 @@ export default function WindowedSheet({
 
   const selectCell = useCallback(
     (row: number, col: number) => {
-      if (dataRowCount <= 0) return;
-      const nextRow = Math.max(0, Math.min(dataRowCount - 1, row));
-      const nextCol = Math.max(0, Math.min(columnCount - 1, col));
-      const visibleRow = rows[nextRow - (range?.start ?? 0)];
-      setSelected({ row: nextRow, col: nextCol, value: visibleRow?.[nextCol] ?? "" });
-      if (!visibleRow) {
+      const resolved = resolveSelection(
+        { row, col },
+        { rowCount: dataRowCount, columnCount },
+        rows,
+        range?.start ?? 0,
+      );
+      if (!resolved) return;
+      const { selection, needsRead } = resolved;
+      setSelected(selection);
+      if (needsRead) {
         void dataSource
-          .readRows(nextRow, nextRow + 1)
+          .readRows(selection.row, selection.row + 1)
           .then(([data]) => {
-            setSelected((current) =>
-              current && current.row === nextRow && current.col === nextCol
-                ? { ...current, value: data?.[nextCol] ?? "" }
-                : current,
-            );
+            setSelected((current) => withLoadedValue(current, selection, data));
           })
           .catch(() => {});
       }
@@ -170,9 +173,9 @@ export default function WindowedSheet({
   const moveSelection = useCallback(
     (row: number, col: number) => {
       selectCell(row, col);
-      ensureRowVisible(Math.max(0, Math.min(dataRowCount - 1, row)));
+      ensureRowVisible(clampCell({ row, col }, { rowCount: dataRowCount, columnCount }).row);
     },
-    [dataRowCount, ensureRowVisible, selectCell],
+    [columnCount, dataRowCount, ensureRowVisible, selectCell],
   );
 
   const handleJump = useCallback(() => {
@@ -215,55 +218,16 @@ export default function WindowedSheet({
         return;
       }
 
-      const current = selected ?? { row: range?.start ?? 0, col: 0 };
-      let row = current.row;
-      let col = current.col;
-      const page = Math.max(1, Math.floor(bodyViewportHeight / ROW_HEIGHT) - 1);
-
-      switch (event.key) {
-        case "ArrowDown":
-          row += 1;
-          break;
-        case "ArrowUp":
-          row -= 1;
-          break;
-        case "ArrowLeft":
-          col -= 1;
-          break;
-        case "ArrowRight":
-          col += 1;
-          break;
-        case "PageDown":
-          row += page;
-          break;
-        case "PageUp":
-          row -= page;
-          break;
-        case "Home":
-          if (event.ctrlKey || event.metaKey) {
-            row = 0;
-            col = 0;
-          } else {
-            col = 0;
-          }
-          break;
-        case "End":
-          if (event.ctrlKey || event.metaKey) {
-            row = dataRowCount - 1;
-            col = columnCount - 1;
-          } else {
-            col = columnCount - 1;
-          }
-          break;
-        default:
-          return;
-      }
+      const next = moveCell(
+        startingCell(selected, range),
+        { key: event.key, ctrl: event.ctrlKey || event.metaKey },
+        { rowCount: dataRowCount, columnCount },
+        pageRows(bodyViewportHeight),
+      );
+      if (!next) return;
 
       event.preventDefault();
-      moveSelection(
-        Math.max(0, Math.min(dataRowCount - 1, row)),
-        Math.max(0, Math.min(columnCount - 1, col)),
-      );
+      moveSelection(next.row, next.col);
     },
     [bodyViewportHeight, columnCount, copySelected, dataRowCount, moveSelection, range, selected],
   );
