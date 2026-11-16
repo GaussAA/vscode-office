@@ -190,6 +190,7 @@ export default {
     exportOdsDesc: "兼容 LibreOffice / WPS",
     switchToLightMode: "切换到浅色模式",
     switchToDarkMode: "切换到自适应模式（跟随 VS Code 主题）",
+    saveFailed: "保存失败",
   },
   findReplace: {
     title: "查找",

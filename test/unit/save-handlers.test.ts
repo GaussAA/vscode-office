@@ -85,7 +85,6 @@ function harness(options: { readOnly?: boolean; picked?: string | undefined } = 
   const writes: Array<{ target: string; bytes: Uint8Array }> = [];
   const pickRequests: SaveTargetRequest[] = [];
   let readOnly = options.readOnly ?? false;
-  let editVersion = 0;
   const handlers = createSaveHandlers<string>({
     document: "file:///dir/book.xlsx",
     baseName: "book",
@@ -102,12 +101,10 @@ function harness(options: { readOnly?: boolean; picked?: string | undefined } = 
       pickRequests.push(request);
       return options.picked;
     },
-    markClean: (capturedVersion: number) => {
-      if (editVersion === capturedVersion) {
-        log.push("clean");
-      }
+    setDirty: (dirty) => {
+      if (dirty) log.push("dirty");
+      else log.push("clean");
     },
-    getEditVersion: () => editVersion,
     openTarget: async (target) => {
       log.push(`open(${target})`);
     },
@@ -127,7 +124,7 @@ function harness(options: { readOnly?: boolean; picked?: string | undefined } = 
       clock += ms;
     },
     edit: () => {
-      editVersion += 1;
+      handlers.edited();
     },
   };
 }

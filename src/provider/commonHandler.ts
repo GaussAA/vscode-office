@@ -26,13 +26,14 @@ function setDirty(handler: Handler, uri: Uri, dirty: boolean) {
  */
 export function handleCommonEvent(uri: Uri, handler: Handler, saves: SaveTracker) {
   let readOnly = false;
-  let editVersion = 0; // Increment on every "change" event
 
   const send = async () => {
     if (saves.shouldSkip(uri.toString())) {
       return;
     }
     readOnly = await isUriReadOnly(uri);
+    // The webview is about to replace its document, dropping unsaved edits.
+    saveHandlers.opened();
     if (isVirtualUri(uri)) {
       void emitVirtualOfficeOpen(handler, uri);
       return;
@@ -53,12 +54,7 @@ export function handleCommonEvent(uri: Uri, handler: Handler, saves: SaveTracker
           : Uri.joinPath(uri, "..", defaultFileName);
       return vscode.window.showSaveDialog({ defaultUri, filters });
     },
-    markClean: (capturedVersion: number) => {
-      if (editVersion === capturedVersion) {
-        setDirty(handler, uri, false);
-      }
-    },
-    getEditVersion: () => editVersion,
+    setDirty: (dirty) => setDirty(handler, uri, dirty),
     openTarget: (target) =>
       vscode.commands.executeCommand("vscode.openWith", target, "GaussAA.officeViewer"),
     emit: (type, payload) => handler.emit(type, payload),
@@ -75,8 +71,7 @@ export function handleCommonEvent(uri: Uri, handler: Handler, saves: SaveTracker
       void send();
     })
     .on("change", () => {
-      editVersion += 1;
-      setDirty(handler, uri, true);
+      saveHandlers.edited();
     })
     .on("openForce", async () => {
       // The webview's size guard said "open anyway". A `file:` document is fetched by the
