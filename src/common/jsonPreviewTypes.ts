@@ -6,23 +6,30 @@
  * custom-editor selector, no default takeover, and no editing path.
  */
 import type { JsonlEntryDetail } from "./jsonlTypes";
+import {
+  MAX_TEXT_CHARS,
+  RAW_PREVIEW_CHARS,
+  RECORD_MAX_BYTES,
+  SEARCH_BATCH,
+  SEARCH_MAX_MATCHES,
+} from "./recordConstants";
 
 /** A top-level array larger than this is not indexed. */
 export const JSON_MAX_ARRAY_BYTES = 100 * 1024 * 1024;
 /** Object/scalar roots are parsed whole, so they have a smaller cap. */
 export const JSON_MAX_OBJECT_BYTES = 20 * 1024 * 1024;
 /** A single record above this is shown as raw text instead of a tree. */
-export const JSON_RECORD_MAX_BYTES = 8 * 1024 * 1024;
+export const JSON_RECORD_MAX_BYTES = RECORD_MAX_BYTES;
 /** Characters of raw text shipped for a record/root. */
-export const JSON_MAX_TEXT_CHARS = 1_000_000;
+export const JSON_MAX_TEXT_CHARS = MAX_TEXT_CHARS;
 /** Characters of raw text kept for a record label fallback / preview. */
-export const JSON_RAW_PREVIEW_CHARS = 400;
+export const JSON_RAW_PREVIEW_CHARS = RAW_PREVIEW_CHARS;
 /** Records parsed per summary window request. */
 export const JSON_RECORD_WINDOW = 100;
 /** Records per search result message. */
-export const JSON_SEARCH_BATCH = 200;
+export const JSON_SEARCH_BATCH = SEARCH_BATCH;
 /** Hard stop so a one-character query cannot exhaust memory. */
-export const JSON_SEARCH_MAX_MATCHES = 10_000;
+export const JSON_SEARCH_MAX_MATCHES = SEARCH_MAX_MATCHES;
 
 export type JsonRootKind = "array" | "object" | "scalar" | "too-large" | "invalid";
 

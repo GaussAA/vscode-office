@@ -17,10 +17,9 @@ import {
   type JsonRecordSummary,
   type JsonRootKind,
   type JsonSearchBatch,
-  type JsonSearchRecord,
   type JsonSyntaxErrorInfo,
 } from "@/common/jsonPreviewTypes";
-import { classifyEntry } from "@/service/entryClassifier";
+import { classifyEntry, utf8ByteSize } from "@/service/entryClassifier";
 import { jsonArrayAdapter, type JsonArrayAdapter } from "@/service/jsonArrayAdapter";
 import { createCancelToken } from "@/service/recordAddressableDocument";
 
@@ -185,10 +184,6 @@ export function indexJsonArray(text: string, start = 0): JsonRecordRange[] {
   }
 }
 
-function utf8Size(text: string): number {
-  return new TextEncoder().encode(text).length;
-}
-
 function previewText(text: string): string {
   return text.length <= JSON_RAW_PREVIEW_CHARS ? text : `${text.slice(0, JSON_RAW_PREVIEW_CHARS)}…`;
 }
@@ -203,7 +198,7 @@ function textFields(raw: string): {
     text: raw.slice(0, JSON_MAX_TEXT_CHARS),
     textChars: raw.length,
     textTruncated: raw.length > JSON_MAX_TEXT_CHARS,
-    size: utf8Size(raw),
+    size: utf8ByteSize(raw),
   };
 }
 
@@ -243,16 +238,15 @@ export function readJsonRecordSummary(
   index: number,
 ): JsonRecordSummary {
   const raw = text.slice(range.start, range.end);
-  const size = utf8Size(raw);
+  const classification = classifyEntry(raw, JSON_RECORD_MAX_BYTES);
   const summary = {
     index,
-    size,
+    size: classification.byteSize,
     raw: previewText(raw),
   };
-  if (size > JSON_RECORD_MAX_BYTES) {
+  if (classification.kind === "too-large") {
     return { ...summary, kind: "too-large" };
   }
-  const classification = classifyEntry(raw);
   if (classification.kind === "invalid") {
     return { ...summary, kind: "invalid", error: classification.error };
   }
@@ -263,16 +257,6 @@ export interface JsonSearchOptions {
   batchSize?: number;
   maxMatches?: number;
   onBatch: (batch: JsonSearchBatch) => void;
-}
-
-function emitSearchRecords(
-  records: Array<{ index: number; count: number; snippet: string }>,
-): JsonSearchRecord[] {
-  return records.map((r) => ({
-    index: r.index,
-    count: r.count,
-    snippet: r.snippet,
-  }));
 }
 
 export class JsonPreviewSession {
@@ -410,20 +394,9 @@ export class JsonPreviewSession {
     const token = createCancelToken();
     this.cancelToken = token;
 
-    const onBatch = (batch: any) => {
+    const onBatch = (batch: JsonSearchBatch) => {
       if (this.cancelToken !== token) return;
-      // Convert adapter results to JsonSearchRecord format
-      const searchBatch: JsonSearchBatch = {
-        requestId: batch.requestId,
-        query: batch.query,
-        records: emitSearchRecords(batch.records),
-        scanned: batch.scanned,
-        total: batch.total,
-        matches: batch.matches,
-        done: batch.done,
-        capped: batch.capped,
-      };
-      options.onBatch(searchBatch);
+      options.onBatch(batch);
       if (batch.done) {
         this.cancelToken = null;
       }

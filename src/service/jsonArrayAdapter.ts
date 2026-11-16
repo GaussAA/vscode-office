@@ -3,26 +3,21 @@
  *
  * Records are array elements; search uses case-insensitive matching without creating lowercase copies.
  */
-import { JSON_SEARCH_BATCH, JSON_SEARCH_MAX_MATCHES } from "@/common/jsonPreviewTypes";
-import type { JsonRecordRange } from "@/service/jsonPreview";
 import {
-  caseInsensitiveIndexOf,
-  matchSnippet,
-  type CancelToken,
-  type RecordRange,
-  type SearchOptions,
-} from "@/service/recordAddressableDocument";
+  JSON_SEARCH_BATCH,
+  JSON_SEARCH_MAX_MATCHES,
+  type JsonSearchBatch,
+} from "@/common/jsonPreviewTypes";
+import type { JsonRecordRange } from "@/service/jsonPreview";
+import type { CancelToken, SearchOptions } from "@/service/recordAddressableDocument";
+import { caseInsensitiveIndexOf, matchSnippet } from "@/service/recordAddressableDocument";
 
-interface JsonSearchRecord extends RecordRange {
+interface JsonSearchRecord {
+  index: number;
+  size: number;
+  raw: string;
+  snippet: string;
   count: number;
-}
-
-function previewText(text: string, maxChars: number): string {
-  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}…`;
-}
-
-function utf8Size(text: string): number {
-  return new TextEncoder().encode(text).length;
 }
 
 /**
@@ -42,13 +37,13 @@ export class JsonArrayAdapter {
   search(
     requestId: number,
     query: string,
-    options: SearchOptions<JsonSearchRecord>,
+    options: SearchOptions<JsonSearchBatch>,
     cancelToken: CancelToken,
   ): void {
     const needle = query.trim().toLowerCase();
 
     if (!needle) {
-      options.onBatch({
+      const emptyBatch: JsonSearchBatch = {
         requestId,
         query,
         records: [],
@@ -57,7 +52,8 @@ export class JsonArrayAdapter {
         matches: 0,
         done: true,
         capped: false,
-      });
+      };
+      options.onBatch(emptyBatch);
       return;
     }
 
@@ -73,17 +69,17 @@ export class JsonArrayAdapter {
     let pending: JsonSearchRecord[] = [];
 
     const flush = (done: boolean) => {
-      // Use 'records' field for the generic SearchBatch interface
-      options.onBatch({
+      const batch: JsonSearchBatch = {
         requestId,
         query,
-        records: pending,
+        records: pending.map((r) => ({ index: r.index, count: r.count, snippet: r.snippet })),
         scanned: Math.floor((processedRecords / this.records.length) * this.text.length),
         total: this.text.length,
         matches,
         done,
         capped,
-      });
+      };
+      options.onBatch(batch);
       pending = [];
     };
 
@@ -124,12 +120,10 @@ export class JsonArrayAdapter {
         }
 
         if (recordMatches > 0 && firstSnippet) {
-          const size = utf8Size(raw);
-          const rawPreview = previewText(raw, 400);
           pending.push({
             index,
-            size,
-            raw: rawPreview,
+            size: 0, // unused, for internal tracking only
+            raw: "",
             snippet: firstSnippet,
             count: recordMatches,
           });
@@ -142,12 +136,17 @@ export class JsonArrayAdapter {
 
       processedRecords = batchEnd;
 
-      if (capped || processedRecords >= this.records.length || cancelToken.cancelled) {
+      if (cancelToken.cancelled) {
+        // Exit without sending any batch after cancellation
+        return;
+      }
+
+      if (capped || processedRecords >= this.records.length) {
         flush(true);
         return;
       }
 
-      flush(false);
+      if (pending.length > 0) flush(false);
       schedule(() => processBatch());
     };
 
