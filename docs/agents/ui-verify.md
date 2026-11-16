@@ -9,7 +9,7 @@ viewer should be checked here before it ships.
 
 ```
 scripts/ui-verify/
-├── runner.mjs    scenarios + assertions + CLI
+├── runner.mjs    CLI, scenario loading, assertions
 ├── harness.mjs   HTTP server: built HTML from out/webview + fake VS Code bridge + parquet bytes
 ├── browser.mjs   Puppeteer driver (puppeteer-core + @puppeteer/browsers) + a CDP session for CSP logs
 ├── fixtures.mjs  generates mixed/big parquet with hyparquet-writer, uses committed zstd sample
@@ -74,7 +74,9 @@ window rather than a signal.
 
 ## Adding a scenario
 
-Append to `scenarios` in `runner.mjs`:
+Add the scenario to the module in `scenarios/` that matches its viewer (`parquet-*.mjs`,
+`jsonl.mjs`, `json.mjs`, `compare.mjs`, `excel-motion.mjs`, `other.mjs`); `runner.mjs` imports
+every module and merges them. A new module has to be imported there as well:
 
 ```js
 {
