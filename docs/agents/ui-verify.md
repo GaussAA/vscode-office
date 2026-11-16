@@ -115,3 +115,37 @@ the suite.
 
 No viewer is served outside the React route table anymore: the HTML preview panel and the PDF
 viewer were the last two, and both were removed in 6.0.0.
+
+## RequestGuard 回归场景
+
+`scenarios/parquet-request-guard.mjs` 和 `scenarios/request-guard-search.mjs` 守护 RequestGuard（commit fd6a63e0）的回归：
+
+| 场景                                         | 守护什么                              | 已验证的变异                                                                  |
+| -------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
+| `parquet-open-once`                          | 带窗口缩放后 `init` 只发一次          | M1: `paging.pageSize` 加入 `loadParquet` 依赖 → 失败 `range: 1–21 of 300`     |
+| `parquet-restore-first-measure-min-viewport` | 视口高 400、页大小 8 时恢复到 row 100 | M2: 去掉 `fitPageSize` 的 `                                                   |     | this.restorePending`→ 失败`1–8 of 300` |
+| `parquet-document-switch-stale-scan`         | 切换文档后旧扫描应答不渗入            | **未找到有效变异**（`openProfilePanel` 的 cancel 掩盖了影响）                 |
+| `parquet-document-switch-stale-profile`      | 切换文档时旧 profile 应答不渗入       | M3: 去掉 `profileRequest.cancel()` + 面板复位 → 失败 `["null 0%","null 77%"]` |
+| `jsonl-search-new-query-cancels-old`         | 新搜索取消旧搜索，旧批次不渲染        | M4: `isCurrent` 恒返回 true → 失败 `2 rows (stale batch)`                     |
+| `json-search-new-query-cancels-old`          | 同上                                  | M4: `isCurrent` 恒返回 true → 失败 `["[0]...","[2]..."]`                      |
+| `compare-reload-stale-reply-dropped`         | Compare 丢弃 requestId 不匹配的应答   | M4: `isCurrent` 恒返回 true → 失败 `accepted stale reply`                     |
+
+### Bridge 录制器
+
+harness 注入的 `window.__bridge` 对象，包装 `acquireVsCodeApi().postMessage` 和 `window.postMessage`，记录 webview 发出的消息和宿主返回的应答。API：
+
+- `sentCount(type)` / `sentOf(type)`：webview 发出了多少次 / 全部消息
+- `deliveredOf(type)`：实际到达 webview 的应答（已放出的）
+- `hold(type)` / `release(type)`：挂起 / 放出某类应答
+- `queued(type)`：该类应答有多少条在队列里
+- `deliver(type, content)`：注入一条应答（不经 stub）
+
+URL 参数 `?hold=type1,type2` 可从页面加载时自动挂起。
+
+### Viewport 控制
+
+场景通过 `setViewport(width, height)` 改变窗口大小，runner 在每个场景后自动调用 `resetViewport()` 恢复默认 1500×850。用于测试"窗口缩放触发页大小变化"的回归。
+
+### Delay 参数
+
+harness 的 parquet 路由支持 `?delay=<ms>`（最多 5000）延迟响应，模拟"文档加载中陈旧应答到达"的窗口。例如 `/mixed.parquet?delay=1500` 让每次 range 请求延迟 1.5 秒。

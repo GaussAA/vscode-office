@@ -67,6 +67,7 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
   });
 
   const page = await browser.newPage();
+  let viewportChanged = false;
 
   // Interaction smoothness has to be measurable or "it feels fast" is the only evidence
   // (ADR-0022). Measured as **frame gaps**, not as `longtask` entries: `PerformanceObserver`
@@ -164,6 +165,20 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
         window.__dshFrames.started = Date.now();
         return true;
       })()`),
+    /**
+     * Resize the viewport. The page size is a function of the window, so "the window changed"
+     * is a user action some regressions only show under. The runner restores the default after
+     * every scenario, so a scenario cannot leak its size into the next one.
+     */
+    setViewport: async (viewportWidth, viewportHeight) => {
+      viewportChanged = true;
+      await page.setViewport({ width: viewportWidth, height: viewportHeight });
+    },
+    resetViewport: async () => {
+      if (!viewportChanged) return;
+      viewportChanged = false;
+      await page.setViewport({ width, height });
+    },
     evaluate: (expression) => page.evaluate(expression),
     screenshot: async (file) => {
       await page.screenshot({ path: file });

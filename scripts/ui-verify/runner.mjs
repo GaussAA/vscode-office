@@ -69,6 +69,8 @@ import parquetSurfaces from "./scenarios/parquet-surfaces.mjs";
 import parquetTabOrder from "./scenarios/parquet-tab-order.mjs";
 import parquetBasics from "./scenarios/parquet-basics.mjs";
 import parquetGrid from "./scenarios/parquet-grid.mjs";
+import parquetRequestGuard from "./scenarios/parquet-request-guard.mjs";
+import requestGuardSearch from "./scenarios/request-guard-search.mjs";
 import other from "./scenarios/other.mjs";
 
 const scenarios = [
@@ -83,6 +85,8 @@ const scenarios = [
   ...parquetA11y,
   ...parquetTabOrder,
   ...parquetFrames,
+  ...parquetRequestGuard,
+  ...requestGuardSearch,
   ...compare,
   ...other,
 ];
@@ -108,6 +112,7 @@ async function main() {
         press: browser.press,
         frames: browser.frames,
         clearFrames: browser.clearFrames,
+        setViewport: browser.setViewport,
         stats: async () => (await fetch(`${harness.url}/stats`)).json(),
       };
       browser.clearViolations();
@@ -141,6 +146,8 @@ async function main() {
         } catch {
           // a page that cannot be captured is part of the failure, not a new one
         }
+      } finally {
+        await browser.resetViewport();
       }
     }
   } finally {

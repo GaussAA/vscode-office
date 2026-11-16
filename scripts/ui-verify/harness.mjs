@@ -1040,6 +1040,93 @@ function excelLegacyStub() {
 </script>`;
 }
 
+/**
+ * The recording and reordering layer every fake host shares.
+ *
+ * The per-viewer stubs only know how to *answer*. Three things scenarios kept needing could not be
+ * written against them: how many times the webview asked (`init` twice is a reload loop, and
+ * nothing in the DOM says so), a reply that arrives late, and a reply that arrives for a request
+ * nobody is waiting for. This script wraps the two seams every stub already goes through, so no
+ * stub changes and no existing scenario can notice it:
+ *
+ *  - `acquireVsCodeApi().postMessage` (webview → host) is recorded in `sent`;
+ *  - `window.postMessage` (host → webview, which is how every stub replies) is recorded in
+ *    `delivered`, and a type that is *held* is queued instead of delivered.
+ *
+ * `?hold=a,b` holds those reply types from the first byte of the page, which is the only way to
+ * hold a reply the page asks for while it mounts. `window.__bridge`:
+ *
+ *   sentCount(type) / sentOf(type)        what the webview posted
+ *   deliveredOf(type)                     what actually reached the webview, in order
+ *   hold(type) / release(type)            queue replies of a type / flush them in order and stop holding
+ *   queued(type)                          how many replies of a type are waiting
+ *   deliver(type, content)                post a reply the stub never made (a late or foreign one)
+ */
+function bridgeShim(nonce) {
+  return `<script nonce="${nonce}">
+(function () {
+  const realPost = window.postMessage.bind(window);
+  const sent = [];
+  const delivered = [];
+  const queue = [];
+  const held = new Set(
+    String(new URLSearchParams(location.search).get('hold') || '').split(',').filter(Boolean),
+  );
+  function entry(message) {
+    const content = message.content;
+    return {
+      type: message.type,
+      requestId: content && typeof content.requestId === 'number' ? content.requestId : undefined,
+      content: content,
+    };
+  }
+  window.postMessage = function (message, targetOrigin, transfer) {
+    if (message && typeof message.type === 'string') {
+      if (held.has(message.type)) {
+        queue.push(message);
+        return;
+      }
+      delivered.push(entry(message));
+    }
+    return realPost(message, targetOrigin, transfer);
+  };
+  const original = window.acquireVsCodeApi;
+  let wrapped;
+  window.acquireVsCodeApi = function () {
+    if (wrapped) return wrapped;
+    const api = original();
+    wrapped = {
+      postMessage(message) {
+        if (message && typeof message.type === 'string') sent.push(entry(message));
+        return api.postMessage(message);
+      },
+      getState() { return api.getState(); },
+      setState(state) { return api.setState(state); },
+    };
+    return wrapped;
+  };
+  window.__bridge = {
+    sent: sent,
+    delivered: delivered,
+    sentCount(type) { return sent.filter(function (m) { return m.type === type; }).length; },
+    sentOf(type) { return sent.filter(function (m) { return m.type === type; }); },
+    deliveredOf(type) { return delivered.filter(function (m) { return m.type === type; }); },
+    hold(type) { held.add(type); },
+    queued(type) { return queue.filter(function (m) { return m.type === type; }).length; },
+    release(type) {
+      held.delete(type);
+      const rest = [];
+      queue.splice(0).forEach(function (m) {
+        if (m.type === type) window.postMessage(m, '*');
+        else rest.push(m);
+      });
+      rest.forEach(function (m) { queue.push(m); });
+    },
+    deliver(type, content) { window.postMessage({ type: type, content: content }, '*'); },
+  };
+})();
+</script>`;
+}
 export function startHarness(fixtures, port = 0) {
   if (!existsSync(join(WEBVIEW_ROOT, "index.html"))) {
     throw new Error("out/webview/index.html is missing — run `pnpm build` first");
@@ -1169,7 +1256,7 @@ export function startHarness(fixtures, port = 0) {
         .replace("{{csp}}", csp)
         .replace(
           '<script type="module"',
-          `<style>${theme}</style>\n${processShim}\n${utilShim}\n${stub.replace("<script>", `<script nonce="${nonce}">`)}\n<script type="module"`,
+          `<style>${theme}</style>\n${processShim}\n${utilShim}\n${stub.replace("<script>", `<script nonce="${nonce}">`)}\n${bridgeShim(nonce)}\n<script type="module"`,
         );
       res.writeHead(200, {
         "content-type": "text/html; charset=utf-8",
@@ -1284,7 +1371,14 @@ export function startHarness(fixtures, port = 0) {
                     : path === "/bad.parquet"
                       ? fixtures.bad
                       : fixtures.big;
-      serveParquet(req, res, file, stats, url.searchParams.get("range") !== "off");
+      // `?delay=ms` slows every response for that URL. A scenario that needs "a document is
+      // still opening" (a stale reply arriving mid-load) cannot get that window from a local
+      // fixture that answers in a millisecond.
+      const delay = Math.min(Math.max(Number(url.searchParams.get("delay") ?? 0) || 0, 0), 5000);
+      const respond = () =>
+        serveParquet(req, res, file, stats, url.searchParams.get("range") !== "off");
+      if (delay > 0) setTimeout(respond, delay);
+      else respond();
       return;
     }
 
