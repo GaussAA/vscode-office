@@ -132,23 +132,25 @@ function harness(options: { readOnly?: boolean; picked?: string | undefined } = 
   };
 }
 
-test("save: a read-only document is rerouted to save-as and never written", async () => {
+test("save: a read-only document rejects with saveFailed", async () => {
   const h = harness({ readOnly: true });
   await h.handlers.save({ contentBase64: bytesOfText("hello") });
 
   assert.equal(h.writes.length, 0, "a read-only file must not be written");
+  // TOCTOU race: file became readonly between webview open and host save.
+  // Host emits saveFailed so webview reverts pending-save → dirty.
   assert.equal(h.emitted.length, 1);
-  assert.equal(h.emitted[0].type, "saveAs");
-  assert.equal(h.emitted[0].payload.contentBase64, bytesOfText("hello"));
-  assert.equal(h.saves.shouldSkip("file:///dir/book.xlsx"), false, "nothing was written to echo");
-  assert.deepEqual(h.log, [], "the tab must not be marked clean");
+  assert.equal(h.emitted[0].type, "saveFailed");
+  assert.deepEqual(h.emitted[0].payload, { reason: "readonly" });
+  assert.equal(h.saves.shouldSkip("file:///dir/book.xlsx"), false, "nothing was written");
+  assert.deepEqual(h.log, [], "the tab stays dirty");
 });
 
 test("save: readOnly is read at call time, not when the handlers were built", async () => {
   const h = harness({ readOnly: false });
   h.setReadOnly(true);
   await h.handlers.save("text");
-  assert.equal(h.emitted[0]?.type, "saveAs");
+  assert.equal(h.emitted[0]?.type, "saveFailed");
 });
 
 test("save: a normal save writes in place, stamps around the write, then reports done", async () => {

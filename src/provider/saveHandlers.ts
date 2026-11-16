@@ -7,11 +7,7 @@
  * running a real VS Code window. They are here, parameterised over the document type and the
  * dialog/fs calls, and `commonHandler` is left with the wiring.
  */
-import {
-  bytesToSavePayload,
-  saveContentToBytes,
-  type SaveContentPayload,
-} from "@/common/saveContent";
+import { saveContentToBytes, type SaveContentPayload } from "@/common/saveContent";
 
 /** A file-change event this soon after our own write is the echo of that write. */
 export const INTERNAL_SAVE_CHANGE_WINDOW_MS = 1500;
@@ -124,7 +120,8 @@ export function createSaveHandlers<Target>(context: SaveHandlerContext<Target>) 
     async save(content: SaveContentPayload | number[] | string) {
       const bytes = saveContentToBytes(content);
       if (isReadOnly()) {
-        emit("saveAs", bytesToSavePayload(bytes));
+        // TOCTOU race: file became readonly after webview's open. Reject the save.
+        emit("saveFailed", { reason: "readonly" });
         return;
       }
       const key = keyOf(document);

@@ -289,6 +289,10 @@ export function useExcelDocumentSession({
         const effect = session.markSaveDone();
         applyDirtyEffect(effect);
       })
+      .on("saveFailed", () => {
+        const effect = session.markSaveFailed();
+        applyDirtyEffect(effect);
+      })
       .emit("init");
 
     const stopThemeWatch = watchHeadChanges(() => spreadSheetRef.current?.reRender(), 120);

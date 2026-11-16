@@ -81,6 +81,7 @@ type DirtyEvent =
   | { type: "edit" }
   | { type: "saveRequested" }
   | { type: "saveDone" }
+  | { type: "saveFailed" }
   | { type: "opened"; readOnly: boolean };
 
 export interface DirtyContext {
@@ -137,6 +138,18 @@ export function dirtyTransition(ctx: DirtyContext, event: DirtyEvent): [DirtyCon
     return [ctx, { saveEnabled: false, notifyHost: null }];
   }
 
+  if (event.type === "saveFailed") {
+    if (state === "pending-save") {
+      // Save failed: revert to dirty, re-enable save, notify host
+      return [
+        { ...ctx, state: "dirty" },
+        { saveEnabled: true, notifyHost: "dirty" },
+      ];
+    }
+    // Already dirty/clean: no change (export threw before markSaveRequested)
+    return [ctx, { saveEnabled: true, notifyHost: null }];
+  }
+
   return [ctx, { saveEnabled: false, notifyHost: null }];
 }
 
@@ -191,6 +204,12 @@ export class ExcelSession {
 
   markSaveDone(): DirtyEffect {
     const [newCtx, effect] = dirtyTransition(this.dirtyCtx, { type: "saveDone" });
+    this.dirtyCtx = newCtx;
+    return effect;
+  }
+
+  markSaveFailed(): DirtyEffect {
+    const [newCtx, effect] = dirtyTransition(this.dirtyCtx, { type: "saveFailed" });
     this.dirtyCtx = newCtx;
     return effect;
   }
