@@ -110,7 +110,12 @@ export function useExcelSave({
                         csvDelimiter,
                       });
                     } catch (error) {
-                      console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
+                      const effect = session.markSaveFailed();
+                      applyDirtyEffect(effect);
+                      modal.error({
+                        title: t("viewer.saveFailed"),
+                        content: getErrorMessage(error),
+                      });
                     }
                   })();
                 }}
@@ -130,7 +135,10 @@ export function useExcelSave({
                         csvDelimiter,
                       });
                     } catch (error) {
-                      console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
+                      modal.error({
+                        title: t("viewer.saveFailed"),
+                        content: getErrorMessage(error),
+                      });
                     }
                   })();
                 }}
@@ -154,7 +162,12 @@ export function useExcelSave({
         csvDelimiter,
       });
     } catch (error) {
-      console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
+      const effect = session.markSaveFailed();
+      applyDirtyEffect(effect);
+      modal.error({
+        title: t("viewer.saveFailed"),
+        content: getErrorMessage(error),
+      });
     }
   }, [
     applyDirtyEffect,
@@ -181,10 +194,13 @@ export function useExcelSave({
         });
         // Save As writes a different file; the document being edited is still dirty.
       } catch (error) {
-        console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
+        modal.error({
+          title: t("viewer.saveFailed"),
+          content: getErrorMessage(error),
+        });
       }
     },
-    [csvDelimiterRef, csvEncodingRef, spreadsheetRef],
+    [csvDelimiterRef, csvEncodingRef, modal, spreadsheetRef],
   );
 
   return { handleSave, confirmSaveAs };
