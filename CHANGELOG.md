@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Parquet: opening another file while a column scan or the profile was still answering could
+  paint the previous file's column statistics onto the new one, and left the profile panel open
+  on a column of the old file. Switching documents now drops every pending profile and scan
+  request and closes the panel. Closing the panel, or opening a column that has no statistics,
+  also stops waiting for a scan that was still running.
+
 ## [6.14.1] - 2026-11-15
 
 ### Fixed

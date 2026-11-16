@@ -3,6 +3,7 @@ import type { ColumnsType, TableRef } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@vscode/codicons/dist/codicon.css";
 import { $t } from "../../i18n/i18nConfig.ts";
+import { RequestGuard } from "../../util/requestGuard.ts";
 import { handler } from "../../util/vscode.ts";
 import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { formatRowRange } from "./parquetAnnounce.ts";
@@ -88,7 +89,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    * showing a zero.
    */
   const [profile, setProfile] = useState<ParquetProfile | null>(null);
-  const profileRequest = useRef(0);
+  const profileRequest = useRef(new RequestGuard());
   /**
    * The column whose profile panel is docked above the bottom bar.
    *
@@ -99,7 +100,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [columnScan, setColumnScan] = useState<ParquetColumnScan | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
-  const scanRequest = useRef(0);
+  const scanRequest = useRef(new RequestGuard());
   const [rowJump, setRowJump] = useState<number | null>(null);
   const [inspected, setInspected] = useState<{
     row: number;
@@ -279,6 +280,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setError(null);
       setFileInfo(null);
       setProfile(null);
+      // Everything the previous document asked the host is now unwanted. The profile request
+      // is only re-issued once this file has opened, so without this a late reply from the old
+      // file lands in the gap; and a column scan has no other reset, so its reply would paint
+      // the old column's statistics onto the new file.
+      profileRequest.current.cancel();
+      scanRequest.current.cancel();
+      setProfilePanel(null);
+      setColumnScan(null);
+      setScanError(null);
+      setScanLoading(false);
       fileInfoRef.current = null;
       sessionRef.current?.reset();
       sessionRef.current = null;
@@ -305,8 +316,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         // Ask the host for the profile in the same turn the file opens. Request ids are
         // monotonic, so a reply that belongs to the previous document is ignored instead of
         // painting another file's null rates.
-        profileRequest.current += 1;
-        handler.emit("parquetProfile", { requestId: profileRequest.current });
+        handler.emit("parquetProfile", { requestId: profileRequest.current.issue() });
         // Come back to where this document was left. The page cannot be computed yet — a page
         // is a screenful, and this document has not been measured — so remember the row and let
         // the measuring effect turn it into a page.
@@ -423,14 +433,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   // every document would be a no-op at best.
   useEffect(() => {
     handler.on("parquetProfileData", (payload: ParquetProfilePayload | undefined) => {
-      if (!payload || payload.requestId !== profileRequest.current) return;
+      if (!payload || !profileRequest.current.isCurrent(payload.requestId)) return;
+      profileRequest.current.settle(payload.requestId);
       setProfile(payload.profile);
     });
   }, []);
 
   useEffect(() => {
     handler.on("parquetColumnScanData", (payload: ParquetColumnScanPayload | undefined) => {
-      if (!payload || payload.requestId !== scanRequest.current) return;
+      if (!payload || !scanRequest.current.isCurrent(payload.requestId)) return;
+      scanRequest.current.settle(payload.requestId);
       setScanLoading(false);
       if (payload.scan) setColumnScan(payload.scan);
       else setScanError(payload.error ?? "The scan failed.");
@@ -446,6 +458,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    */
   const closeProfilePanel = useCallback(() => {
     const name = profilePanel?.column.name;
+    // Nobody is waiting for the scan any more; a late reply must not fill the next panel.
+    scanRequest.current.cancel();
     setProfilePanel(null);
     setColumnScan(null);
     setScanError(null);
@@ -458,17 +472,20 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   }, [profilePanel]);
 
   const startScan = useCallback((column: ParquetColumnInfo) => {
-    scanRequest.current += 1;
+    const requestId = scanRequest.current.issue();
     setScanLoading(true);
     setScanError(null);
     setColumnScan(null);
-    handler.emit("parquetColumnScan", { requestId: scanRequest.current, name: column.name });
+    handler.emit("parquetColumnScan", { requestId, name: column.name });
   }, []);
 
   const openProfilePanel = useCallback(
     (column: ParquetColumnInfo) => {
       // The value panel docks in the same slot; one of them at a time.
       setInspected(null);
+      // A scan still running for the previous column must not answer for this one: when this
+      // column has no statistics no new scan is issued, so nothing else would make it stale.
+      scanRequest.current.cancel();
       setProfilePanel({ column });
       setColumnScan(null);
       setScanError(null);
