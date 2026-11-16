@@ -1,117 +1,64 @@
-# UI verification
+# UI verification (webview)
 
-`pnpm verify:ui` runs the built webviews in headless Chrome, asserts the DOM, and writes
-screenshots to `.ui-verify/shots/`. It exists because the webviews only run inside a
-`postMessage` bridge, so "looks right in the code" is not evidence — every change to a
-viewer should be checked here before it ships.
+Webview 的验收方式是无头浏览器断言 + 截图。`pnpm verify:ui` 跑全部场景（CI 也在每次 push 上跑），`--filter=<substring>` 可以只跑名字包含指定字符串的场景，`--headed` 打开可见浏览器窗口（调试时用）。
 
-## How it works
+## 基础设施
 
-```
-scripts/ui-verify/
-├── runner.mjs    scenarios + assertions + CLI
-├── harness.mjs   HTTP server: built HTML from out/webview + fake VS Code bridge + parquet bytes
-├── browser.mjs   Puppeteer driver (puppeteer-core + @puppeteer/browsers) + a CDP session for CSP logs
-├── fixtures.mjs  generates mixed/big parquet with hyparquet-writer, uses committed zstd sample
-└── fixtures/zstd.parquet
-```
+- **harness (`scripts/ui-verify/harness.mjs`)**：fake host，在 `http://localhost:<port>` 上提供 webview HTML + 带 CSP nonce 的 stub 脚本，挂载到真实的 Chromium 页面里。stub 用 `setTimeout` 模拟异步应答（延迟 40 ms），payload 来自 `fixtures/` 或内联数据。
+- **bridge recorder**：harness 注入的 `window.__bridge` 对象，包装 `acquireVsCodeApi().postMessage` 和 `window.postMessage`，记录 webview 发出的消息（`sent`）和宿主返回的应答（`delivered`）。支持按类型挂起应答（`hold(type)`）、放出（`release(type)`）、查询计数（`sentCount(type)`、`queued(type)`）、直接注入消息（`deliver(type, content)`）。场景可通过 `?hold=type1,type2` 参数在页面加载时自动挂起指定类型的应答。
+- **`?delay=<ms>` 参数**：harness 的 parquet 路由支持延迟响应（最多 5 秒），用于模拟"文档加载中陈旧应答到达"的窗口。例如 `/mixed.parquet?delay=1500` 让每次 range 请求延迟 1.5 秒。
+- **viewport control**：场景通过 `setViewport(width, height)` 改变浏览器窗口大小（runner 在每个场景后自动调用 `resetViewport` 恢复默认的 1500×850）。用于测试"窗口缩放触发页大小变化"的回归。
+- **browser (`scripts/ui-verify/browser.mjs`)**：Puppeteer wrapper，提供 `navigate`、`waitFor`、`evaluate`、`press`、`sleep`、`screenshot`、`setViewport`、`resetViewport`。
+- **runner (`scripts/ui-verify/runner.mjs`)**：遍历 `scenarios/*.mjs` 里的场景数组，每个场景拿到 `{ page, base, setViewport, setReducedMotion, press, frames, clearFrames, stats }` context，返回一行总结文本（PASS）或抛异常（FAIL + 截图）。
+- **helpers (`scripts/ui-verify/helpers.mjs`)**：`expect`、`json`、`openParquet`、`openJsonl`、`openJson`、`pageSize`、`pagerState`、`rangeOf`、`setInput` 等常用操作。
 
-The fake bridge posts the same messages the extension host does (`jsonlInfo`,
-`jsonlEntries`, `jsonlSearchBatch`, `jsonlEntryData`, `jsonInfo`, `jsonRecordsData`,
-`jsonRecordData`, `jsonSearchBatch`, `jsonRoot`, `open`), so the real React bundles
-run unchanged. Parquet fixtures are served with `Range` support and every request is
-counted in `/stats` — that counter is how lazy loading and the next-page prefetch are
-asserted (`0` new range reads when paging forward).
+## RequestGuard 回归场景
 
-## Commands
+在 `scenarios/parquet-request-guard.mjs` 和 `scenarios/request-guard-search.mjs` 里，守护以下回归：
 
-```bash
-pnpm build            # required: the harness serves out/webview
-pnpm verify:ui                  # assert only
-pnpm verify:ui --docs           # also refresh docs/screenshots
-pnpm verify:ui --filter=parquet # only matching scenarios (pnpm forwards args directly)
-pnpm verify:ui --headed         # watch it run
-```
+| 场景                                         | 守护什么                               | 变异（能让场景失败）                                                                   |
+| -------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------- |
+| `parquet-open-once`                          | 带窗口缩放后 `init` 只发一次           | M1: 把 `paging.pageSize` 加进 `loadParquet` 依赖 → 失败 `range: 1–21 of 300`           |
+| `parquet-restore-first-measure`              | 恢复到 row 100（默认视口，页大小≠8）   | M2: 去掉 `fitPageSize` 的 `                                                            |     | this.restorePending` → **不失败**（页大小 21≠8，分支走不到） |
+| `parquet-restore-first-measure-min-viewport` | 恢复到 row 100（视口高 400，页大小=8） | M2: 去掉 `                                                                             |     | this.restorePending`→ 失败`1–8 of 300`                       |
+| `parquet-document-switch-stale-scan`         | 切换文档后旧扫描应答不渗入新文档       | **未找到能让它失败的变异**（`selectCell(null)` + `openProfilePanel` 的重置掩盖了影响） |
+| `parquet-document-switch-stale-profile`      | 切换文档时旧 profile 应答不渗入新文档  | M3: 去掉 `profileRequest.cancel()` + 面板复位 → 失败 `["null 0%","null 77%"]`          |
+| `jsonl-search-new-query-cancels-old`         | 新搜索取消旧搜索，旧批次不渲染         | M4: `isCurrent` 恒返回 true → 失败 `2 rows (stale batch rendered)`                     |
+| `json-search-new-query-cancels-old`          | 同上                                   | M4: `isCurrent` 恒返回 true → 失败 `["[0]...","[2]..."]`                               |
+| `compare-reload-stale-reply-dropped`         | Compare 丢弃 requestId 不匹配的应答    | M4: `isCurrent` 恒返回 true → 失败 `the view accepted the stale reply`                 |
 
-Chrome or Edge is auto-detected; set `CHROME_PATH` to override. Node >= 22 is required
-(global `WebSocket`). No network access is needed: the 4 KB ZSTD sample is committed and
-the other fixtures are generated locally.
+## 添加新场景的步骤
 
-### Reproducing a CI-only flake
+1. 在 `scenarios/<name>.mjs` 里 `export default [...]` 数组。
+2. 在 `runner.mjs` 里 `import` 并展开到 `scenarios` 数组。
+3. 每个场景对象：`{ name, async run({ page, base, ... }) { ... } }`，`run` 返回一行总结或抛异常。
+4. 用 `expect(condition, message)` 断言，失败时抛 `Error(message)`。
+5. 用 `await page.waitFor(condition, timeoutMs)` 等待 DOM 条件成立（默认超时 15 秒）。
+6. `await page.evaluate(expr)` 在浏览器里执行 JS 表达式，返回 JSON-serializable 结果。
+7. 提交前**必须**找到一个能让新场景失败的变异（改源码、重新 build、跑场景、看失败信息、恢复源码）。变异要记录在场景文件的注释里或本文档的表格里。
 
-A scenario that passes locally and fails in CI is almost always a timing difference, and
-re-running it locally proves nothing. `UI_VERIFY_CPU=8` throttles the browser through
-`Emulation.setCPUThrottlingRate`, which makes the machine behave like a loaded runner:
+## 变异验证流程
 
-```bash
-UI_VERIFY_CPU=8 node scripts/ui-verify/runner.mjs --filter=parquet-json-links-column-jump
-```
+每个新场景必须证明它能抓到真实回归。流程：
 
-Note what it does _not_ prove: at high rates an unrelated earlier wait (mounting the table)
-times out first, so a failure under throttling is not automatically the same failure you saw
-in CI. Read the message — `table did not render` and `did not bring the column into view` are
-different bugs. Prefer making the scenario wait for the _precondition_ its assertion needs
-("the table can scroll sideways") over adding a retry: a retry hides the next real regression.
+1. **定义变异**：在源码里做一个"恢复原 bug"的改动（如去掉某行 `cancel()`、改某个条件判断）。
+2. `pnpm build`。
+3. `pnpm verify:ui --filter=<scenario-name>`，预期**失败**并记录失败信息。
+4. `git checkout <file>` 恢复源码。
+5. `pnpm build`。
+6. `pnpm verify:ui --filter=<scenario-name>`，预期**通过**。
+7. `git status --short` 确认工作区干净。
 
-### Preconditions: wait for the answer, not the shell
+如果找不到能让场景失败的变异，说明场景没有覆盖到真实的回归风险，需要重新设计或删除。
 
-Every flake this suite has had was the same shape — the fake host answers asynchronously, the
-scenario acts on whatever exists before that answer lands. Three real cases, all fixed the same
-way:
+## 截图刷新
 
-| Symptom                                                 | What existed too early                                  | What the scenario waits for now                             |
-| ------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------- |
-| `the automatic scan produced no top-N`                  | the docked panel (it opens before the profile answer)   | the null-share badge — only rendered once statistics arrive |
-| `Cannot read properties of undefined (reading 'click')` | the schema list without its badges                      | `list-null` count ≥ 1 before clicking badge #3              |
-| `compare-*` asserting on "Loading…"                     | `.compare-view`, which renders in the loading state too | a group heading or the error line                           |
+`pnpm verify:ui --docs` 会把所有标注了 `docs: "<filename>.png"` 的场景的截图刷新到 `docs/screenshots/` 下（当前 18 张，覆盖 parquet / jsonl / json / compare / excel 的主要 UI）。`docs/*.md` 里用 `![caption](./screenshots/<filename>.png)` 引用。刷新前先目视对比新旧截图，确认变化符合预期。
 
-The rule: **wait for a node that can only exist after the answer**, never for a container that
-renders empty first. If the scenario is asserting an _absence_ (a silent host must produce no
-number), the honest construct is "the page is otherwise ready, then a bounded grace period" —
-`parquet-profile-silent-host` waits for the table and then 250 ms, because an absence needs a
-window rather than a signal.
+## 性能闸门
 
-## Adding a scenario
+`pnpm verify:perf` 跑 12 个性能检查（parquet 首屏字节数、全文件搜索耗时、宽表翻页、列画像读出的字节数、列扫描字节数，大表格窗口视图首屏/堆/渲染行数，JSONL 字节预算窗口、20 万行搜索，JSON 100 MB 数组的索引/窗口/搜索）。脚本在 `scripts/perf/runner.mjs`，fixture 缓存在 `.perf/`（首次跑时下载）。CI 在每次 push 上跑。不变量见 `scripts/perf/runner.mjs` 里的断言阈值。
 
-Append to `scenarios` in `runner.mjs`:
+## 烟雾测试
 
-```js
-{
-    name: 'viewer-what-it-proves',
-    docs: 'optional-screenshot-name.png',   // copied to docs/screenshots with --docs
-    async run({ page, base, stats }) {
-        await openParquet(page, base, '?mixed=1')
-        const state = json(await page.evaluate(`JSON.stringify({ /* read DOM */ })`))
-        expect(state.range === '1–50 of 300', `unexpected range: ${state.range}`)
-        return 'one line of evidence for the summary table'
-    },
-}
-```
-
-Rules that keep this suite useful:
-
-- Assert on **user-visible facts** (text, ranges, counts, computed heights), not internals.
-- One scenario per behaviour; name it after the fact it proves.
-- A scenario must fail for a real regression: no screenshot-only checks.
-- Colours are user-visible too: `parquet-theme-follows-vscode` asserts the _luminance_ of the
-  native input and of the antd input under both themes, because the two used to be driven by
-  different colour sources (a VS Code CSS variable and antd's default light tokens) and
-  disagreed with the page whenever the theme did not match.
-
-## Route smoke vs. real scenarios
-
-`remaining-routes-smoke` walks the **React** routes without a behavioural scenario of their
-own — `excel` since the Git History panel was removed in 6.8.0 — with a minimal `open`
-payload and asserts that
-something mounted and nothing threw. Its job is to catch fork-wide breakage (entry, provider,
-shared utilities), **not** rendering correctness. It polls for the mount (`page.waitFor`)
-rather than sleeping a fixed delay: the excel chunk is ~1.3 MB and mounts slower on a loaded
-machine than any fixed delay we would pick.
-
-`parquet` (`parquet-*`), `jsonl` (`jsonl-*`) and `json` (`json-*`) have their own scenarios instead.
-`test/unit/viewer-registry.test.ts` asserts that every route in `main.tsx` is covered one way
-or the other, so adding a route without coverage fails the build instead of silently shrinking
-the suite.
-
-No viewer is served outside the React route table anymore: the HTML preview panel and the PDF
-viewer were the last two, and both were removed in 6.0.0.
+`pnpm test:smoke` 在真实 VS Code stable 里验证激活与 custom editor 路由（9 个用例）。`pnpm test:smoke:min` 在 `engines.vscode` 下限上跑同样的测试。两者都需要先 `pnpm build`。CI 在每次 push 上跑这两个。
