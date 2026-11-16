@@ -3,21 +3,13 @@ import { basename, join, parse } from "path";
 import { Handler } from "@/common/handler";
 import { normalizeExternalUrl } from "@/common/externalLink";
 import { isUriReadOnly } from "@/common/fileReadOnly";
-import { bytesToSavePayload, saveContentToBytes } from "@/common/saveContent";
 import { Uri, workspace } from "vscode";
 import {
   emitFileOfficeOpen,
   emitVirtualOfficeOpen,
   isVirtualUri,
 } from "@/provider/handlers/officeContent";
-
-const fileSaveTimes: Record<string, number> = {};
-const INTERNAL_SAVE_CHANGE_WINDOW_MS = 1500;
-
-export function shouldSkipFileChange(uri: Uri): boolean {
-  const lastSaveTime = fileSaveTimes[uri.toString()];
-  return !!(lastSaveTime && Date.now() - lastSaveTime < INTERNAL_SAVE_CHANGE_WINDOW_MS);
-}
+import { createSaveHandlers, type SaveAsPayload, type SaveTracker } from "./saveHandlers";
 
 function setDirty(handler: Handler, uri: Uri, dirty: boolean) {
   const panel = handler.panel;
@@ -28,10 +20,19 @@ function setDirty(handler: Handler, uri: Uri, dirty: boolean) {
   }
 }
 
-export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOpen?: boolean }) {
+/**
+ * @param saves who wrote what and when. The provider owns it and shares one instance between
+ * its panels; the save rules themselves are in `saveHandlers`.
+ */
+export function handleCommonEvent(
+  uri: Uri,
+  handler: Handler,
+  saves: SaveTracker,
+  options?: { skipOpen?: boolean },
+) {
   let readOnly = false;
   const send = async () => {
-    if (shouldSkipFileChange(uri)) {
+    if (saves.shouldSkip(uri.toString())) {
       return;
     }
     readOnly = await isUriReadOnly(uri);
@@ -41,6 +42,25 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
     }
     await emitFileOfficeOpen(handler, uri, handler.panel.webview);
   };
+  const saveHandlers = createSaveHandlers<Uri>({
+    document: uri,
+    baseName: parse(uri.fsPath).name,
+    saves,
+    keyOf: (target) => target.toString(),
+    isReadOnly: () => readOnly,
+    writeFile: (target, bytes) => workspace.fs.writeFile(target, bytes),
+    pickTarget: ({ defaultFileName, filters }) => {
+      const defaultUri =
+        uri.scheme === "file"
+          ? Uri.file(join(parse(uri.fsPath).dir, defaultFileName))
+          : Uri.joinPath(uri, "..", defaultFileName);
+      return vscode.window.showSaveDialog({ defaultUri, filters });
+    },
+    markClean: () => setDirty(handler, uri, false),
+    openTarget: (target) =>
+      vscode.commands.executeCommand("vscode.openWith", target, "GaussAA.officeViewer"),
+    emit: (type, payload) => handler.emit(type, payload),
+  });
   const events = handler.on("editInVSCode", (full: boolean) => {
     const side = full ? vscode.ViewColumn.Active : vscode.ViewColumn.Beside;
     vscode.commands.executeCommand("vscode.openWith", uri, "default", side);
@@ -66,48 +86,8 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
         await emitVirtualOfficeOpen(handler, uri, { force: true });
       }
     })
-    .on("save", async (content) => {
-      const res = saveContentToBytes(content);
-      if (readOnly) {
-        handler.emit("saveAs", bytesToSavePayload(res));
-        return;
-      }
-      fileSaveTimes[uri.toString()] = Date.now();
-      await workspace.fs.writeFile(uri, res);
-      fileSaveTimes[uri.toString()] = Date.now();
-      setDirty(handler, uri, false);
-      handler.emit("saveDone");
-    })
-    .on("saveAs", async (payload: { contentBase64?: string; content?: number[]; ext?: string }) => {
-      const res = saveContentToBytes(payload as Parameters<typeof saveContentToBytes>[0]);
-      const ext = (payload.ext ?? "xlsx").toLowerCase();
-      const { dir, name } = parse(uri.fsPath);
-      const defaultFileName = `${name}.${ext}`;
-      const defaultUri =
-        uri.scheme === "file"
-          ? Uri.file(join(dir, defaultFileName))
-          : Uri.joinPath(uri, "..", defaultFileName);
-      const filterMap: Record<string, { label: string; exts: string[] }> = {
-        xlsx: { label: "Excel Workbook", exts: ["xlsx"] },
-        xlsm: { label: "Excel Macro-Enabled Workbook", exts: ["xlsm"] },
-        xls: { label: "Excel 97-2003 Workbook", exts: ["xls"] },
-        ods: { label: "OpenDocument Spreadsheet", exts: ["ods"] },
-        csv: { label: "CSV (Comma delimited)", exts: ["csv"] },
-        parquet: { label: "Apache Parquet", exts: ["parquet"] },
-      };
-      const info = filterMap[ext] ?? { label: ext.toUpperCase(), exts: [ext] };
-      const target = await vscode.window.showSaveDialog({
-        defaultUri,
-        filters: { [info.label]: info.exts },
-      });
-      if (!target) return;
-      fileSaveTimes[target.toString()] = Date.now();
-      await workspace.fs.writeFile(target, res);
-      fileSaveTimes[target.toString()] = Date.now();
-      setDirty(handler, uri, false);
-      handler.emit("saveDone");
-      await vscode.commands.executeCommand("vscode.openWith", target, "GaussAA.officeViewer");
-    })
+    .on("save", (content) => saveHandlers.save(content))
+    .on("saveAs", (payload: SaveAsPayload) => saveHandlers.saveAs(payload))
     .on("developerTool", () => vscode.commands.executeCommand("workbench.action.toggleDevTools"))
     .on("revealFile", async () => {
       // The one exit a broken file actually has. A virtual document has nothing to reveal, and
@@ -128,6 +108,6 @@ export function handleCommonEvent(uri: Uri, handler: Handler, options?: { skipOp
       }
     })
     .on("dispose", () => {
-      delete fileSaveTimes[uri.toString()];
+      saves.forget(uri.toString());
     });
 }

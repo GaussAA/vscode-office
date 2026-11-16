@@ -4,24 +4,18 @@
  * A **Command preview**: the command asks for two files, nothing is registered against a file
  * pattern, and the panel never becomes an editor for either of them. It reads each file's
  * footer once (through the ADR-0020 seam) and answers a pure diff — no column is decoded, so
- * the pair can be 377 MB each and still open instantly.
+ * the pair can be 377 MB each and still open instantly. Which side failed and how the answer
+ * is built are in `compareHandlers`; this file is the panel and the wiring.
  */
 import * as vscode from "vscode";
 import { Handler } from "@/common/handler";
 import { ReactApp } from "@/common/reactApp";
 import { getExtensionResourceRoots } from "@/common/extensionResource";
-import type { NamedParquetProfile, ParquetComparePayload } from "@/common/parquetCompareTypes";
-import type { ByteSource } from "@/service/jsonlFile";
-import { openByteSource } from "@/service/jsonlSource";
-import { compareParquetProfiles } from "@/service/parquetCompare";
-import { readParquetProfile } from "@/service/parquetProfile";
+import { createCompareHandlers } from "./compareHandlers";
+import { openDocumentSource } from "./documentSource";
 
 const VIEW_TYPE = "GaussAA.compareParquet";
 const COMMAND = "GaussAA.office.compareParquet";
-
-/** Non-file documents can only be read whole; the same rule the JSONL viewer uses. */
-const readAll = async (uri: { scheme: string; fsPath: string }) =>
-  vscode.workspace.fs.readFile(uri as vscode.Uri);
 
 function fileNameOf(uri: vscode.Uri): string {
   return uri.path.split("/").pop() ?? uri.fsPath;
@@ -31,18 +25,7 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function profileOf(uri: vscode.Uri): Promise<NamedParquetProfile> {
-  const source: ByteSource = await openByteSource(uri, readAll);
-  try {
-    return { fileName: fileNameOf(uri), profile: await readParquetProfile(source) };
-  } finally {
-    await source.close?.();
-  }
-}
-
 class ComparePanel {
-  private readonly handler: Handler;
-
   static open(context: vscode.ExtensionContext, left: vscode.Uri, right: vscode.Uri) {
     const panel = vscode.window.createWebviewPanel(
       VIEW_TYPE,
@@ -56,57 +39,19 @@ class ComparePanel {
     return new ComparePanel(panel, left, right);
   }
 
-  private constructor(
-    panel: vscode.WebviewPanel,
-    private readonly left: vscode.Uri,
-    private readonly right: vscode.Uri,
-  ) {
-    this.handler = Handler.bind(panel, left);
-    this.handler
-      .on("init", () => void this.answer(0))
-      .on("compareReload", (request?: { requestId?: number }) =>
-        this.answer(typeof request?.requestId === "number" ? request.requestId : 0),
-      );
+  private constructor(panel: vscode.WebviewPanel, left: vscode.Uri, right: vscode.Uri) {
+    const handler = Handler.bind(panel, left);
+    const handlers = createCompareHandlers({
+      left: { fileName: fileNameOf(left), open: () => openDocumentSource(left) },
+      right: { fileName: fileNameOf(right), open: () => openDocumentSource(right) },
+      emit: (type, payload) => handler.emit(type, payload),
+    });
+    handler
+      .on("init", () => void handlers.init())
+      .on("compareReload", (request) => handlers.reload(request));
     void ReactApp.view(panel.webview, { route: "compare" });
   }
-
-  /**
-   * Read both sides and answer.
-   *
-   * The sides are read separately so a failure can name the file that failed: "the left one
-   * could not be read" sends the reader to the right place, "comparison failed" does not.
-   */
-  private async answer(requestId: number) {
-    let left: NamedParquetProfile;
-    try {
-      left = await profileOf(this.left);
-    } catch (error) {
-      this.fail(requestId, "left", error);
-      return;
-    }
-    let right: NamedParquetProfile;
-    try {
-      right = await profileOf(this.right);
-    } catch (error) {
-      this.fail(requestId, "right", error);
-      return;
-    }
-    this.handler.emit("compareData", {
-      requestId,
-      compare: compareParquetProfiles(left, right),
-    } satisfies ParquetComparePayload);
-  }
-
-  private fail(requestId: number, failedSide: "left" | "right", error: unknown) {
-    this.handler.emit("compareData", {
-      requestId,
-      compare: null,
-      failedSide,
-      error: messageOf(error),
-    } satisfies ParquetComparePayload);
-  }
 }
-
 async function pick(label: string): Promise<vscode.Uri | undefined> {
   const picked = await vscode.window.showOpenDialog({
     canSelectMany: false,
