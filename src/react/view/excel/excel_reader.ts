@@ -38,20 +38,8 @@ const calculateColWidth = (rows: any[], colIndex: number): number => {
   return clampColWidth(maxLength * CHAR_WIDTH);
 };
 
-// Utility functions for potential future use
-const _excelColWidthToPx = (width?: number) => {
-  if (width == null) return null;
-  return Math.round(width * 7 + 5);
-};
-
 const readSheetJsMerges = (worksheet: XLSX.WorkSheet) =>
   (worksheet["!merges"] ?? []).map((merge) => XLSX.utils.encode_range(merge));
-
-const _expandSizeForMerge = (merge: string, size: { maxRow: number; maxCols: number }) => {
-  const range = XLSX.utils.decode_range(merge);
-  size.maxRow = Math.max(size.maxRow, range.e.r + 1);
-  size.maxCols = Math.max(size.maxCols, range.e.c + 1);
-};
 
 const expandSizeForSheetJsMerge = (
   merge: XLSX.Range,
@@ -217,22 +205,11 @@ const loadCsv = (buffer: ArrayBuffer, delimiter?: string): ExcelData => {
 };
 
 const isCsvExt = (ext: string) => /csv|tsv/.test(ext.toLowerCase());
-const _isOdsExt = (ext: string) => ext.toLowerCase().includes("ods");
-const _isXlsExt = (ext: string) => ext.toLowerCase().replace(/^\./, "") === "xls";
 
 export async function loadSheets(buffer: ArrayBuffer, ext: string): Promise<ExcelData> {
   if (isCsvExt(ext)) {
     return loadCsv(buffer, ext.toLowerCase().replace(/^\./, "") === "tsv" ? "\t" : undefined);
   }
   // Use SheetJS for all Excel formats: .xlsx, .xls, .ods
-  return loadWithSheetJs(buffer);
-}
-
-export function readCSV(buffer: ArrayBuffer): ExcelData {
-  return loadCsv(buffer);
-}
-
-export async function readExcel(buffer: ArrayBuffer): Promise<ExcelData> {
-  // Use SheetJS for all .xlsx files
   return loadWithSheetJs(buffer);
 }

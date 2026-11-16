@@ -76,25 +76,3 @@ export function limitForView(ext: string, options: SheetViewOptions = {}): numbe
   }
   return previewLimitBytes(ext);
 }
-
-/**
- * The cell text the windowed table shows.
- *
- * Long values are cut instead of wrapped: a windowed row has a fixed height, and one giant
- * cell must not stretch it (the full value is reachable by widening the column or opening the
- * file in the text editor).
- */
-export function cellText(value: string | undefined, max = 200): string {
-  if (!value) return "";
-  return value.length > max ? `${value.slice(0, max)}…` : value;
-}
-
-/** Header labels, padded to the grid's column count so every cell has a column. */
-export function headerCells(rows: string[][], columnCount: number): string[] {
-  const first = rows[0] ?? [];
-  const labels: string[] = [];
-  for (let column = 0; column < columnCount; column++) {
-    labels.push(cellText(first[column]) || String(column + 1));
-  }
-  return labels;
-}

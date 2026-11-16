@@ -9,13 +9,35 @@ export const MAX_COLUMN_WIDTH = 420;
 export const OVERSCAN = 4;
 export const COPY_FEEDBACK_MS = 1_200;
 
-/** Body source: the file source without its first (frozen header) row. */
+/**
+ * The windowed table freezes row 1 as the header (HEADER_ROWS = 1). Every offset derives from
+ * this constant, so toBodySource, fileRowToBodyRow, bodyRowToFileRow, and the initial header
+ * read all reference the same rule instead of duplicating magic offsets.
+ */
+export const HEADER_ROWS = 1;
+
+/** Body source: the file source without its frozen header row(s). */
 export function toBodySource(source: SheetSource): SheetSource {
   return {
     ...source,
-    rowCount: Math.max(0, source.rowCount - 1),
-    readRows: (start, end) => source.readRows(start + 1, end + 1),
+    rowCount: Math.max(0, source.rowCount - HEADER_ROWS),
+    readRows: (start, end) => source.readRows(start + HEADER_ROWS, end + HEADER_ROWS),
   };
+}
+
+/**
+ * The file is 1-based and row 1 is the frozen header; the body is 0-based and starts at row 2.
+ * An out-of-range file row clamps to the body's valid range.
+ */
+export function fileRowToBodyRow(fileRow: number, fileRowCount: number): number {
+  if (fileRowCount <= HEADER_ROWS) return 0;
+  const bodyCount = fileRowCount - HEADER_ROWS;
+  return Math.max(0, Math.min(fileRow - HEADER_ROWS - 1, bodyCount - 1));
+}
+
+/** The grid displays file coordinates, so body row 0 is file row 2. */
+export function bodyRowToFileRow(bodyRow: number): number {
+  return bodyRow + HEADER_ROWS + 1;
 }
 
 export function clampColumnWidth(width: number): number {
@@ -34,28 +56,43 @@ export function gridTemplateFor(
   return `${INDEX_WIDTH}px ${columns.join(" ")}`;
 }
 
-/** The file is 1-based and row 1 is the frozen header; the body is 0-based. */
-export function fileRowToBodyRow(fileRow: number, fileRowCount: number): number {
-  if (fileRowCount <= 1) return 0;
-  return Math.max(0, Math.min(fileRow - 2, fileRowCount - 2));
-}
-
-/** The grid displays file coordinates, so body row 0 is file row 2. */
-export function bodyRowToFileRow(bodyRow: number): number {
-  return bodyRow + 2;
-}
-
 export function cellId(row: number, column: number): string {
   return `windowed-sheet-cell-${row}-${column}`;
 }
 
-/** Spreadsheet column labels: A..Z, AA.. (the grid view shows the same, so the two agree). */
-export function columnName(index: number): string {
-  let name = "";
-  let remaining = index;
-  do {
-    name = String.fromCharCode(65 + (remaining % 26)) + name;
-    remaining = Math.floor(remaining / 26) - 1;
-  } while (remaining >= 0);
-  return name;
+/**
+ * The cell text the windowed table shows.
+ *
+ * Long values are cut instead of wrapped: a windowed row has a fixed height, and one giant
+ * cell must not stretch it (the full value is reachable by widening the column or opening the
+ * file in the text editor).
+ */
+export function cellText(value: string | undefined, max = 200): string {
+  if (!value) return "";
+  return value.length > max ? `${value.slice(0, max)}…` : value;
 }
+
+/** Header labels, padded to the grid's column count so every cell has a column. */
+export function headerCells(rows: string[][], columnCount: number): string[] {
+  const first = rows[0] ?? [];
+  const labels: string[] = [];
+  for (let column = 0; column < columnCount; column++) {
+    labels.push(cellText(first[column]) || String(column + 1));
+  }
+  return labels;
+}
+
+/**
+ * Parse a jump-to-row input: positive integers jump to that file row (clamped to the body).
+ * Invalid input returns undefined. Zero, negative values, and the header row (1) jump to the
+ * first body row (0).
+ */
+export function parseJumpRow(text: string, fileRowCount: number): number | undefined {
+  const trimmed = text.replace(/,/g, "").trim();
+  const parsed = parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed)) return undefined;
+  const clamped = Math.max(HEADER_ROWS + 1, Math.min(fileRowCount, parsed));
+  return fileRowToBodyRow(clamped, fileRowCount);
+}
+
+export { columnLabel as columnName } from "@/common/columnLabel";

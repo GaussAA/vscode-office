@@ -1,33 +1,6 @@
 import "./_.prototypes";
 
-const alphabets = [
-  "A",
-  "B",
-  "C",
-  "D",
-  "E",
-  "F",
-  "G",
-  "H",
-  "I",
-  "J",
-  "K",
-  "L",
-  "M",
-  "N",
-  "O",
-  "P",
-  "Q",
-  "R",
-  "S",
-  "T",
-  "U",
-  "V",
-  "W",
-  "X",
-  "Y",
-  "Z",
-];
+import { columnIndex, columnLabel } from "../../../../../common/columnLabel";
 
 /** index number 2 letters
  * @example stringAt(26) ==> 'AA'
@@ -37,16 +10,7 @@ const alphabets = [
  * @returns {string}
  */
 export function stringAt(index) {
-  let str = "";
-  let cindex = index;
-  while (cindex >= alphabets.length) {
-    cindex /= alphabets.length;
-    cindex -= 1;
-    str += alphabets[parseInt(cindex, 10) % alphabets.length];
-  }
-  const last = index % alphabets.length;
-  str += alphabets[last];
-  return str;
+  return columnLabel(index);
 }
 
 /** translate letter in A1-tag to number
@@ -56,9 +20,7 @@ export function stringAt(index) {
  * @returns {number}
  */
 export function indexAt(str) {
-  let ret = 0;
-  for (let i = 0; i !== str.length; ++i) ret = 26 * ret + str.charCodeAt(i) - 64;
-  return ret - 1;
+  return columnIndex(str);
 }
 
 // B10 => x,y

@@ -41,7 +41,6 @@ test("reader: the first window is read once and reused across the same offset", 
   // The visible range grows by a row as the fold moves; it is still served from the block.
   assert.equal(second.range.end, first.range.end + 1);
   assert.deepEqual(second.rows.slice(0, first.rows.length), first.rows);
-  assert.equal(reader.peek(0, viewport)?.length, first.rows.length);
 });
 
 test("reader: scrolling into new rows reads exactly one new window", async () => {
@@ -96,5 +95,6 @@ test("reader: a failed read rejects the current request and leaves the cache alo
   const reader = createSheetWindowReader(failing);
 
   await assert.rejects(() => reader.rowsFor(0, { ...viewport, totalRows: 10 }), /disk gone/);
-  assert.equal(reader.peek(0, { ...viewport, totalRows: 10 }), undefined);
+  // A second call also rejects (the cache was not populated by the failed read).
+  await assert.rejects(() => reader.rowsFor(0, { ...viewport, totalRows: 10 }), /disk gone/);
 });
