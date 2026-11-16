@@ -483,6 +483,118 @@ export default [
     },
   },
   {
+    name: "excel-save-format-original-success",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness-route?route=excel&edit=format`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the editable grid did not render");
+
+      // Make it formatted
+      await page.evaluate(`(() => {
+        const bold = [...document.querySelectorAll('.x-spreadsheet-toolbar-btn')]
+          .find(button => (button.getAttribute('data-tooltip') || '').toLowerCase().includes('bold'));
+        bold?.click();
+      })()`);
+      await page.sleep(120);
+
+      // Ctrl+S opens the format-loss dialog
+      await page.evaluate(
+        `window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', code: 'KeyS', ctrlKey: true, bubbles: true, cancelable: true }))`,
+      );
+      const asked = await page.waitFor(
+        `/Formatting cannot be preserved/i.test(document.querySelector('.ant-modal')?.innerText ?? '')`,
+        10000,
+      );
+      expect(asked, "format-loss dialog did not open");
+
+      const beforeClick = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+        })`),
+      );
+      expect(beforeClick.saveEnabled, "save button was not enabled before clicking");
+
+      // Click "Save as original format"
+      await page.evaluate(`[...document.querySelectorAll('.ant-modal button')]
+        .find(button => /original/i.test(button.textContent))?.click()`);
+      const saved = await page.waitFor(
+        `window.__excelMessages?.some(message => message.type === 'save')`,
+        5000,
+      );
+      expect(saved, "clicking the original-format button did not post save");
+
+      const done = await page.waitFor(`window.__saveDone === true`, 5000);
+      expect(done, "saveDone did not arrive");
+
+      await page.sleep(100);
+      const afterSaveDone = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+        })`),
+      );
+      expect(!afterSaveDone.saveEnabled, "save button did not disable after saveDone");
+
+      return `original-format button called markSaveRequested, saveDone cleared dirty`;
+    },
+  },
+  {
+    name: "excel-save-format-original-failed",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness-route?route=excel&edit=format&failSave=1`);
+      const grid = await page.waitFor(
+        `!!document.querySelector('#container .x-spreadsheet')`,
+        15000,
+      );
+      expect(grid, "the editable grid did not render");
+
+      // Make it formatted
+      await page.evaluate(`(() => {
+        const bold = [...document.querySelectorAll('.x-spreadsheet-toolbar-btn')]
+          .find(button => (button.getAttribute('data-tooltip') || '').toLowerCase().includes('bold'));
+        bold?.click();
+      })()`);
+      await page.sleep(120);
+
+      // Ctrl+S opens the format-loss dialog
+      await page.evaluate(
+        `window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', code: 'KeyS', ctrlKey: true, bubbles: true, cancelable: true }))`,
+      );
+      const asked = await page.waitFor(
+        `/Formatting cannot be preserved/i.test(document.querySelector('.ant-modal')?.innerText ?? '')`,
+        10000,
+      );
+      expect(asked, "format-loss dialog did not open");
+
+      // Click "Save as original format"
+      await page.evaluate(`[...document.querySelectorAll('.ant-modal button')]
+        .find(button => /original/i.test(button.textContent))?.click()`);
+      const saved = await page.waitFor(
+        `window.__excelMessages?.some(message => message.type === 'save')`,
+        5000,
+      );
+      expect(saved, "clicking the original-format button did not post save");
+
+      const failed = await page.waitFor(`window.__saveFailed === true`, 5000);
+      expect(failed, "saveFailed did not arrive");
+
+      await page.sleep(100);
+      const afterSaveFailed = json(
+        await page.evaluate(`JSON.stringify({
+          saveEnabled: !document.querySelector('.x-spreadsheet-toolbar-btn[data-tooltip*="Ctrl+S"]')
+            ?.classList.contains('disabled'),
+        })`),
+      );
+      expect(afterSaveFailed.saveEnabled, "save button did not re-enable after saveFailed");
+
+      return `saveFailed transitioned back to dirty, save button re-enabled`;
+    },
+  },
+  {
     name: "excel-save-readonly-saveas",
     async run({ page, base }) {
       await page.navigate(`${base}/harness-route?route=excel&edit=readonly`);

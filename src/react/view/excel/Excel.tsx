@@ -66,7 +66,6 @@ function ExcelViewer() {
     handleAutoFitColumns,
     handleOpenAnyway,
     handleSelectSheet,
-    handleEdited,
     spreadSheetRef,
     readOnlyRef,
     fileName,
@@ -178,7 +177,6 @@ function ExcelViewer() {
             mode={findPanel}
             onClose={() => setFindPanel(null)}
             readOnly={readOnly}
-            onChanged={handleEdited}
           />
         </Suspense>
       )}
