@@ -86,8 +86,11 @@ test("parseJumpRow: valid positive integers jump to the clamped body row", () =>
 test("parseJumpRow: invalid input returns undefined", () => {
   assert.equal(parseJumpRow("", 100), undefined);
   assert.equal(parseJumpRow("abc", 100), undefined);
-  assert.equal(parseJumpRow("0", 100), undefined);
-  assert.equal(parseJumpRow("1", 100), undefined, "row 1 is the header");
-  assert.equal(parseJumpRow("-5", 100), undefined);
-  assert.equal(parseJumpRow("3.14", 100), 1, "parseInt ignores fractional part");
+  assert.equal(parseJumpRow("NaN", 100), undefined);
+});
+
+test("parseJumpRow: zero, negative, and header row all jump to the first body row", () => {
+  assert.equal(parseJumpRow("0", 100), 0, "0 clamps to body row 0");
+  assert.equal(parseJumpRow("-5", 100), 0, "negative clamps to body row 0");
+  assert.equal(parseJumpRow("1", 100), 0, "row 1 is the header, jump to body row 0");
 });

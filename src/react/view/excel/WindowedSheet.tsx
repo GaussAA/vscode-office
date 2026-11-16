@@ -26,7 +26,7 @@ import {
   cellId,
   cellText,
   columnName,
-  fileRowToBodyRow,
+  parseJumpRow,
 } from "./windowedSheetModel";
 import {
   clampCell,
@@ -179,10 +179,8 @@ export default function WindowedSheet({
   );
 
   const handleJump = useCallback(() => {
-    const parsed = Number.parseInt(jumpValue.replace(/,/g, ""), 10);
-    if (!Number.isFinite(parsed)) return;
-    const fileRow = Math.max(1, Math.min(source.rowCount, parsed));
-    jumpToRow(fileRowToBodyRow(fileRow, source.rowCount));
+    const bodyRow = parseJumpRow(jumpValue, source.rowCount);
+    if (bodyRow !== undefined) jumpToRow(bodyRow);
   }, [jumpValue, jumpToRow, source.rowCount]);
 
   const changeQuery = find.handleQueryChange;

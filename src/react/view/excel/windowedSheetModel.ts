@@ -84,13 +84,15 @@ export function headerCells(rows: string[][], columnCount: number): string[] {
 
 /**
  * Parse a jump-to-row input: positive integers jump to that file row (clamped to the body).
- * Invalid input, zero, or negative values return undefined.
+ * Invalid input returns undefined. Zero, negative values, and the header row (1) jump to the
+ * first body row (0).
  */
 export function parseJumpRow(text: string, fileRowCount: number): number | undefined {
   const trimmed = text.replace(/,/g, "").trim();
   const parsed = parseInt(trimmed, 10);
-  if (!Number.isFinite(parsed) || parsed <= HEADER_ROWS) return undefined;
-  return fileRowToBodyRow(parsed, fileRowCount);
+  if (!Number.isFinite(parsed)) return undefined;
+  const clamped = Math.max(HEADER_ROWS + 1, Math.min(fileRowCount, parsed));
+  return fileRowToBodyRow(clamped, fileRowCount);
 }
 
 export { columnLabel as columnName } from "@/common/columnLabel";
