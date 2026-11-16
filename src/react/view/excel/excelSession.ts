@@ -70,11 +70,82 @@ function hasReadableBytes(payload: ExcelOpenPayload): boolean {
   return payload.scheme === "file" || Boolean(payload.bufferBase64) || !!payload.buffer?.length;
 }
 
+export type DirtyState = "clean" | "dirty" | "pending-save";
+
+export interface DirtyEffect {
+  saveEnabled: boolean;
+  notifyHost: "dirty" | "clean" | null;
+}
+
+type DirtyEvent =
+  | { type: "edit" }
+  | { type: "saveRequested" }
+  | { type: "saveDone" }
+  | { type: "opened"; readOnly: boolean };
+
+interface DirtyContext {
+  state: DirtyState;
+  readOnly: boolean;
+}
+
+function dirtyTransition(ctx: DirtyContext, event: DirtyEvent): [DirtyContext, DirtyEffect] {
+  const { state, readOnly } = ctx;
+
+  if (event.type === "opened") {
+    const newCtx = { state: "clean" as DirtyState, readOnly: event.readOnly };
+    return [newCtx, { saveEnabled: false, notifyHost: null }];
+  }
+
+  if (event.type === "edit") {
+    if (readOnly) return [ctx, { saveEnabled: false, notifyHost: null }];
+    if (state === "clean") {
+      return [
+        { ...ctx, state: "dirty" },
+        { saveEnabled: true, notifyHost: "dirty" },
+      ];
+    }
+    if (state === "pending-save") {
+      return [
+        { ...ctx, state: "dirty" },
+        { saveEnabled: true, notifyHost: null },
+      ];
+    }
+    return [ctx, { saveEnabled: true, notifyHost: null }];
+  }
+
+  if (event.type === "saveRequested") {
+    if (readOnly) return [ctx, { saveEnabled: false, notifyHost: null }];
+    if (state === "clean" || state === "dirty") {
+      return [
+        { ...ctx, state: "pending-save" },
+        { saveEnabled: false, notifyHost: null },
+      ];
+    }
+    return [ctx, { saveEnabled: false, notifyHost: null }];
+  }
+
+  if (event.type === "saveDone") {
+    if (state === "pending-save") {
+      return [
+        { ...ctx, state: "clean" },
+        { saveEnabled: false, notifyHost: "clean" },
+      ];
+    }
+    if (state === "dirty") {
+      return [ctx, { saveEnabled: true, notifyHost: "dirty" }];
+    }
+    return [ctx, { saveEnabled: false, notifyHost: null }];
+  }
+
+  return [ctx, { saveEnabled: false, notifyHost: null }];
+}
+
 export class ExcelSession {
   private generation = 0;
   private forced = false;
   private cacheId = "";
   private current: ExcelOpenPayload | null = null;
+  private dirtyCtx: DirtyContext = { state: "clean", readOnly: false };
 
   /** The newest payload the host sent, or null before the first `open`. */
   get payload(): ExcelOpenPayload | null {
@@ -98,6 +169,32 @@ export class ExcelSession {
     this.generation += 1;
   }
 
+  get dirtyState(): DirtyState {
+    return this.dirtyCtx.state;
+  }
+
+  get isReadOnly(): boolean {
+    return this.dirtyCtx.readOnly;
+  }
+
+  markEdited(): DirtyEffect {
+    const [newCtx, effect] = dirtyTransition(this.dirtyCtx, { type: "edit" });
+    this.dirtyCtx = newCtx;
+    return effect;
+  }
+
+  markSaveRequested(): DirtyEffect {
+    const [newCtx, effect] = dirtyTransition(this.dirtyCtx, { type: "saveRequested" });
+    this.dirtyCtx = newCtx;
+    return effect;
+  }
+
+  markSaveDone(): DirtyEffect {
+    const [newCtx, effect] = dirtyTransition(this.dirtyCtx, { type: "saveDone" });
+    this.dirtyCtx = newCtx;
+    return effect;
+  }
+
   /** A new payload from the host: start a generation and decide guard or load. */
   open(payload: ExcelOpenPayload): ExcelOpenResult {
     const seq = ++this.generation;
@@ -105,6 +202,13 @@ export class ExcelSession {
     if (nextCacheId !== this.cacheId) this.forced = false;
     this.cacheId = nextCacheId;
     this.current = payload;
+
+    // Reset dirty state on open
+    const [newDirtyCtx] = dirtyTransition(this.dirtyCtx, {
+      type: "opened",
+      readOnly: payload.readOnly === true,
+    });
+    this.dirtyCtx = newDirtyCtx;
 
     const ext = payload.ext ?? "";
     const virtual = isVirtual(payload);

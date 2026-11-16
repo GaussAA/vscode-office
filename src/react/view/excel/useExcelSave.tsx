@@ -7,6 +7,8 @@ import { t } from "./excel_i18n";
 import { chooseExcelSaveRoute } from "./excelSave";
 import { exportWorkbook, hasFormattingChanged } from "./excel_writer";
 
+import type { ExcelSession, DirtyEffect } from "./excelSession";
+
 // Helper to safely extract error message
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) return error.message;
@@ -23,8 +25,8 @@ interface UseExcelSaveArgs {
   csvEncodingRef: { current: CsvEncoding };
   csvDelimiterRef: { current: string };
   initialFormattingRef: { current: string };
-  /** Set when bytes were posted; cleared by the host's saveDone, not by the export itself. */
-  pendingSaveRef: { current: boolean };
+  session: ExcelSession;
+  applyDirtyEffect: (effect: DirtyEffect) => void;
   onSaveAs: () => void;
   modal: SaveModal;
 }
@@ -41,7 +43,8 @@ export function useExcelSave({
   csvEncodingRef,
   csvDelimiterRef,
   initialFormattingRef,
-  pendingSaveRef,
+  session,
+  applyDirtyEffect,
   onSaveAs,
   modal,
 }: UseExcelSaveArgs) {
@@ -99,6 +102,8 @@ export function useExcelSave({
                   void (async () => {
                     dialog.destroy();
                     try {
+                      const effect = session.markSaveRequested();
+                      applyDirtyEffect(effect);
                       exportWorkbook(spreadSheet, extRef.current, {
                         mode: "save",
                         csvEncoding,
@@ -141,26 +146,26 @@ export function useExcelSave({
     }
 
     try {
+      const effect = session.markSaveRequested();
+      applyDirtyEffect(effect);
       exportWorkbook(spreadSheet, extRef.current, {
         mode: "save",
         csvEncoding,
         csvDelimiter,
       });
-      // export only posts the bytes; the host writes them. Clear dirty on saveDone, not here.
-      pendingSaveRef.current = true;
     } catch (error) {
-      pendingSaveRef.current = false;
       console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
     }
   }, [
+    applyDirtyEffect,
     csvDelimiterRef,
     csvEncodingRef,
     extRef,
     initialFormattingRef,
     modal,
     onSaveAs,
-    pendingSaveRef,
     readOnlyRef,
+    session,
     spreadsheetRef,
   ]);
 

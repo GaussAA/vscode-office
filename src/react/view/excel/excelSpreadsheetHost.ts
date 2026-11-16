@@ -1,5 +1,4 @@
 import { t } from "./excel_i18n";
-import { handler } from "../../util/vscode.ts";
 import Spreadsheet, { type SheetData } from "./x-spreadsheet/index";
 import { parseSpreadsheetLink } from "./excel_hyperlink";
 import { loadViewState, restoreViewState, saveViewState } from "./excelViewState";
@@ -18,6 +17,7 @@ interface ExcelSpreadsheetHostHandlers {
   onOpenExternal: (url: string) => void;
   onProtectedCell: () => void;
   onValidationError: (message: string) => void;
+  onEdited: () => void;
 }
 
 interface MountExcelSpreadsheetArgs {
@@ -92,8 +92,7 @@ export function mountExcelSpreadsheet({
   spreadSheet.onValidationError(handlers.onValidationError);
   spreadSheet.on("change", () => {
     if (!readOnly) {
-      spreadSheet.setSaveEnabled(true);
-      handler.emit("change");
+      handlers.onEdited();
     }
   });
 

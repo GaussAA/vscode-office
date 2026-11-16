@@ -102,7 +102,9 @@ export interface SaveHandlerContext<Target> {
   /** The "save as" dialog; resolves `undefined` when the user cancels. */
   pickTarget: (request: SaveTargetRequest) => PromiseLike<Target | undefined>;
   /** The editor no longer has unsaved edits (clears the `*` in the tab title). */
-  markClean: () => void;
+  markClean: (capturedVersion: number) => void;
+  /** Current edit version: increments on every "change" event. */
+  getEditVersion: () => number;
   openTarget: (target: Target) => PromiseLike<unknown>;
   emit: (type: string, payload?: unknown) => void;
 }
@@ -110,7 +112,7 @@ export interface SaveHandlerContext<Target> {
 export function createSaveHandlers<Target>(context: SaveHandlerContext<Target>) {
   const { document, baseName, saves, keyOf, isReadOnly, writeFile, pickTarget, markClean } =
     context;
-  const { openTarget, emit } = context;
+  const { openTarget, emit, getEditVersion } = context;
 
   return {
     /**
@@ -126,10 +128,11 @@ export function createSaveHandlers<Target>(context: SaveHandlerContext<Target>) 
         return;
       }
       const key = keyOf(document);
+      const versionAtStart = getEditVersion();
       saves.markSaved(key);
       await writeFile(document, bytes);
       saves.markSaved(key);
-      markClean();
+      markClean(versionAtStart); // Only clear star if no edits happened during save
       emit("saveDone");
     },
 
