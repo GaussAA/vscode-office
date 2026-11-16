@@ -15,7 +15,10 @@
  *     202 MB / 1.1 M row file: 50 rows and 20,000 rows both read 22.6 MB and took ~1.4 s. With a
  *     page-sized read every turn paid that cost; with a chunk it is paid once per chunk and the
  *     turns inside it cost nothing.
- *  4. Page <-> row arithmetic lives here. Nothing else may do `page * pageSize` again.
+ *  4. Page <-> row arithmetic lives here: `rowToPage`, `pageToRow`, `endOf`, `totalPages` and
+ *     `clampPage`. Nothing else may do `page * pageSize`, `row / pageSize` or
+ *     `Math.ceil(rowCount / pageSize)` again. A view that must re-render on a change keeps
+ *     `session.paging` (one immutable snapshot) in state; it never recomputes from its own copy.
  *
  * The viewer is read-only: there is no edit map, no patch and no save payload. Rows go straight
  * from the source to the table.
@@ -34,6 +37,16 @@ export interface ParquetSessionOptions {
   chunkSize?: number;
   /** Chunks kept in memory; the viewer prefetches the next one. */
   maxCachedChunks?: number;
+}
+
+/**
+ * The paging numbers a view needs in order to render: the page size and how many pages that
+ * makes. Immutable, and the same object until the page size changes, so a view can hold it in
+ * one `useState` and `setState(session.paging)` after every measurement without an extra render.
+ */
+export interface PagingSnapshot {
+  readonly pageSize: number;
+  readonly totalPages: number;
 }
 
 export interface PageSnapshot {
@@ -61,6 +74,7 @@ export class ParquetSession {
   private readonly pending = new Map<number, Promise<ParquetRow[]>>();
 
   private pageSizeValue: number;
+  private pagingValue: PagingSnapshot;
 
   /** Bumped by reset(); in-flight work from an older generation is discarded. */
   private generation = 0;
@@ -81,6 +95,7 @@ export class ParquetSession {
     this.chunkSize = Math.max(this.pageSizeValue, options.chunkSize ?? DEFAULT_CHUNK_SIZE);
     this.rowCount = Math.max(0, source.rowCount);
     this.maxCachedChunks = Math.max(1, options.maxCachedChunks ?? DEFAULT_MAX_CACHED_CHUNKS);
+    this.pagingValue = this.buildPaging();
   }
 
   /** Rows per page. The viewer keeps this equal to the rows its viewport shows. */
@@ -90,6 +105,19 @@ export class ParquetSession {
 
   get totalPages(): number {
     return Math.max(1, Math.ceil(this.rowCount / this.pageSizeValue));
+  }
+
+  /**
+   * `pageSize` and `totalPages` as one immutable value, for a view that has to re-render when
+   * they change. The identity only changes with the page size (the row count is fixed for the
+   * life of a session), so storing it in React state is a no-op while nothing changed.
+   */
+  get paging(): PagingSnapshot {
+    return this.pagingValue;
+  }
+
+  private buildPaging(): PagingSnapshot {
+    return Object.freeze({ pageSize: this.pageSize, totalPages: this.totalPages });
   }
 
   /**
@@ -112,11 +140,14 @@ export class ParquetSession {
         : this.restorePending
           ? this.restoreRow
           : this.startOf(this.currentPage);
-    this.pageSizeValue = next;
+    if (next !== this.pageSizeValue) {
+      this.pageSizeValue = next;
+      this.pagingValue = this.buildPaging();
+    }
     if (this.restorePending && keepRow === undefined) {
       this.restorePending = false;
     }
-    return this.clampPage(Math.floor(Math.max(0, row) / next));
+    return this.clampPage(this.pageOf(Math.max(0, row)));
   }
 
   /**
@@ -154,6 +185,11 @@ export class ParquetSession {
     return Math.floor(row / this.pageSize);
   }
 
+  /** Exclusive end row of `page`: the page size past its start, cut short by the last page. */
+  endOf(page: number): number {
+    return Math.min(this.rowCount, this.startOf(page) + this.pageSize);
+  }
+
   /** Alias for `pageOf`: clearer when computing which page holds a row. */
   rowToPage(row: number): number {
     return this.pageOf(row);
@@ -189,7 +225,7 @@ export class ParquetSession {
   async showPage(page: number): Promise<PageSnapshot> {
     const target = this.clampPage(page);
     const start = this.startOf(target);
-    const end = Math.min(this.rowCount, start + this.pageSize);
+    const end = this.endOf(target);
     const seq = ++this.loadSeq;
     const generation = this.generation;
     // A load sliced with one page size must not land after another page size took over: the
