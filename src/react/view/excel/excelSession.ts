@@ -83,12 +83,12 @@ type DirtyEvent =
   | { type: "saveDone" }
   | { type: "opened"; readOnly: boolean };
 
-interface DirtyContext {
+export interface DirtyContext {
   state: DirtyState;
   readOnly: boolean;
 }
 
-function dirtyTransition(ctx: DirtyContext, event: DirtyEvent): [DirtyContext, DirtyEffect] {
+export function dirtyTransition(ctx: DirtyContext, event: DirtyEvent): [DirtyContext, DirtyEffect] {
   const { state, readOnly } = ctx;
 
   if (event.type === "opened") {
@@ -107,7 +107,7 @@ function dirtyTransition(ctx: DirtyContext, event: DirtyEvent): [DirtyContext, D
     if (state === "pending-save") {
       return [
         { ...ctx, state: "dirty" },
-        { saveEnabled: true, notifyHost: null },
+        { saveEnabled: true, notifyHost: "dirty" },
       ];
     }
     return [ctx, { saveEnabled: true, notifyHost: null }];

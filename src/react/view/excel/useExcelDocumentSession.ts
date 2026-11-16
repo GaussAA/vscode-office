@@ -331,6 +331,7 @@ export function useExcelDocumentSession({
     handleAutoFitColumns,
     handleOpenAnyway,
     handleSelectSheet,
+    handleEdited,
     spreadSheetRef,
     readOnlyRef,
     fileName: session.payload?.fileName ?? "",

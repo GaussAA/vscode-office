@@ -1,96 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { dirtyTransition, type DirtyContext } from "@/react/view/excel/excelSession";
 
 /**
- * Pure dirty-state machine for Excel documents.
- *
+ * Test the real dirty-state machine from ExcelSession, not a copy.
  * States: clean, dirty, pending-save
  * Events: edit, saveRequested, saveDone, opened
- *
- * Effects tell the caller what to do (enable save button, notify host of dirty state).
  */
-
-export type DirtyState = "clean" | "dirty" | "pending-save";
-
-export interface DirtyEffect {
-  saveEnabled: boolean;
-  notifyHost: "dirty" | "clean" | null;
-}
-
-export type DirtyEvent =
-  | { type: "edit" }
-  | { type: "saveRequested" }
-  | { type: "saveDone" }
-  | { type: "opened"; readOnly: boolean };
-
-export interface DirtyContext {
-  state: DirtyState;
-  readOnly: boolean;
-}
-
-/**
- * Transition function for the dirty-state machine.
- * Returns [newState, effect].
- */
-export function dirtyTransition(ctx: DirtyContext, event: DirtyEvent): [DirtyContext, DirtyEffect] {
-  const { state, readOnly } = ctx;
-
-  if (event.type === "opened") {
-    const newCtx = { state: "clean" as DirtyState, readOnly: event.readOnly };
-    return [newCtx, { saveEnabled: false, notifyHost: null }];
-  }
-
-  if (event.type === "edit") {
-    if (readOnly) return [ctx, { saveEnabled: false, notifyHost: null }];
-    if (state === "clean") {
-      return [
-        { ...ctx, state: "dirty" },
-        { saveEnabled: true, notifyHost: "dirty" },
-      ];
-    }
-    if (state === "pending-save") {
-      return [
-        { ...ctx, state: "dirty" },
-        { saveEnabled: true, notifyHost: null }, // already notified when entering pending
-      ];
-    }
-    // already dirty: no change
-    return [ctx, { saveEnabled: true, notifyHost: null }];
-  }
-
-  if (event.type === "saveRequested") {
-    if (readOnly) return [ctx, { saveEnabled: false, notifyHost: null }];
-    if (state === "clean" || state === "dirty") {
-      return [
-        { ...ctx, state: "pending-save" },
-        { saveEnabled: false, notifyHost: null },
-      ];
-    }
-    // already pending: no change
-    return [ctx, { saveEnabled: false, notifyHost: null }];
-  }
-
-  if (event.type === "saveDone") {
-    if (state === "pending-save") {
-      return [
-        { ...ctx, state: "clean" },
-        { saveEnabled: false, notifyHost: "clean" },
-      ];
-    }
-    if (state === "dirty") {
-      // Edit happened after saveRequested but before saveDone arrived: stay dirty, re-notify host
-      return [ctx, { saveEnabled: true, notifyHost: "dirty" }];
-    }
-    // clean + saveDone: spurious, ignore
-    return [ctx, { saveEnabled: false, notifyHost: null }];
-  }
-
-  return [ctx, { saveEnabled: false, notifyHost: null }];
-}
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 test("dirty state: clean → edit → dirty, enables save and notifies host", () => {
   const [next, effect] = dirtyTransition({ state: "clean", readOnly: false }, { type: "edit" });
@@ -137,7 +53,7 @@ test("dirty state: pending-save → saveDone → clean, notifies host clean", ()
 
 test("dirty state: edit during pending-save → dirty, then saveDone stays dirty and re-notifies", () => {
   let ctx: DirtyContext = { state: "clean", readOnly: false };
-  let effect: DirtyEffect;
+  let effect;
 
   // clean → edit → dirty
   [ctx, effect] = dirtyTransition(ctx, { type: "edit" });
@@ -147,11 +63,11 @@ test("dirty state: edit during pending-save → dirty, then saveDone stays dirty
   [ctx, effect] = dirtyTransition(ctx, { type: "saveRequested" });
   assert.equal(ctx.state, "pending-save");
 
-  // pending-save → edit → dirty
+  // pending-save → edit → dirty, MUST notify host so editVersion increments
   [ctx, effect] = dirtyTransition(ctx, { type: "edit" });
   assert.equal(ctx.state, "dirty");
   assert.equal(effect.saveEnabled, true);
-  assert.equal(effect.notifyHost, null); // no new notification yet
+  assert.equal(effect.notifyHost, "dirty", "edit during save must notify host");
 
   // dirty → saveDone → stays dirty, re-notifies host
   [ctx, effect] = dirtyTransition(ctx, { type: "saveDone" });
