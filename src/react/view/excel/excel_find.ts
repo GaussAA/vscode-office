@@ -1,5 +1,15 @@
 import type { SheetData } from "./x-spreadsheet/data";
 
+/**
+ * Find and replace over the grid's cell model: a hit is one cell.
+ *
+ * Differs from the windowed view's `sheetSearch` (a hit is one row, the query is trimmed):
+ * here the query is used verbatim, so " " finds cells containing a space and "foo " does not
+ * find "foo". It is not trimmed because Replace uses the same `findText` verbatim; trimming
+ * only in Find would let Find and Replace disagree about what a cell contains. The windowed
+ * view is read-only and has no Replace, so trimming there cannot cause that.
+ * Only the empty string is "no query" in both views.
+ */
 export interface FindMatch {
   sheetIndex: number;
   ri: number;

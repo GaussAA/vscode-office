@@ -8,7 +8,6 @@ import {
   type RefObject,
 } from "react";
 import { highlightRuns } from "../../common/highlight.ts";
-import { cellText } from "./sheetView";
 import type { SheetSource } from "./sheetSource";
 import { t } from "./excel_i18n";
 import { useWindowedRows } from "./useWindowedRows";
@@ -25,6 +24,7 @@ import {
   ROW_HEIGHT,
   bodyRowToFileRow,
   cellId,
+  cellText,
   columnName,
   fileRowToBodyRow,
 } from "./windowedSheetModel";

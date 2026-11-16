@@ -122,3 +122,13 @@ test("stepMatch: a centered hit advances instead of returning itself", () => {
   assert.equal(stepMatch(matches, null, 1, 32), 43);
   assert.equal(stepMatch([], 43, 1, 32), undefined);
 });
+
+test("search: the query is trimmed and case-insensitive, matching the grid find's defaults", async () => {
+  const { source } = sourceWith(sheet(10));
+
+  const padded = await searchSheetRows(source, "  ROW-4 ");
+  const exact = await searchSheetRows(source, "row-4");
+
+  assert.deepEqual(padded.rows, exact.rows);
+  assert.deepEqual(padded.rows, [5]);
+});

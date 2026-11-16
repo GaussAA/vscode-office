@@ -5,10 +5,12 @@ import {
   MIN_COLUMN_WIDTH,
   bodyRowToFileRow,
   cellId,
+  cellText,
   clampColumnWidth,
   columnName,
   fileRowToBodyRow,
   gridTemplateFor,
+  headerCells,
   toBodySource,
 } from "@/react/view/excel/windowedSheetModel";
 import type { SheetSource } from "@/react/view/excel/sheetSource";
@@ -58,4 +60,15 @@ test("toBodySource removes only the header and offsets reads", async () => {
     ["r2", "x"],
   ]);
   assert.deepEqual(await source.readRows(0, 1), [["r0", "x"]]);
+});
+
+test("cellText: long values are cut instead of wrapping a fixed-height row", () => {
+  assert.equal(cellText("short"), "short");
+  assert.equal(cellText(undefined), "");
+  assert.equal(cellText("x".repeat(500)).length, 201);
+});
+
+test("headerCells: pads unnamed columns with their number", () => {
+  assert.deepEqual(headerCells([["a", "b"]], 3), ["a", "b", "3"]);
+  assert.deepEqual(headerCells([], 2), ["1", "2"]);
 });
