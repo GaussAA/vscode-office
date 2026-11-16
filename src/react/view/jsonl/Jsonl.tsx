@@ -11,6 +11,7 @@ import {
   type JsonlSearchBatch,
 } from "../../../common/jsonlTypes.ts";
 import { jsonViewerThemeTokens } from "../../common/jsonViewerTheme.ts";
+import { PendingRequests, RequestGuard } from "../../util/requestGuard.ts";
 import { handler } from "../../util/vscode.ts";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
@@ -67,13 +68,11 @@ function JsonlViewerContent() {
   const infoRef = useRef<JsonlInfoPayload | null>(null);
   const selectedRef = useRef(0);
   const queryRef = useRef("");
-  const rangeSeq = useRef(0);
-  /** requestId -> what that request is allowed to do to the window when its reply lands. */
-  const rangeMode = useRef(new Map<number, "replace" | "append">());
-  const entrySeq = useRef(0);
-  const searchSeq = useRef(0);
-  /** A scan is running on the host; cancel it even if the render state has not caught up. */
-  const searchInFlight = useRef(false);
+  /** Index windows in flight; the tag is what that request may do to the window when it lands. */
+  const ranges = useRef(new PendingRequests<"replace" | "append">());
+  const entries = useRef(new RequestGuard());
+  /** The search scan. `cancel()` says whether the host is still running one, so no mirror flag. */
+  const search = useRef(new RequestGuard());
   const searchTimer = useRef<number | undefined>(undefined);
   const searchAutoSelected = useRef(false);
   const pendingJump = useRef<number | null>(null);
@@ -87,8 +86,7 @@ function JsonlViewerContent() {
 
   const requestRange = useCallback(
     (start: number, end: number, mode: "replace" | "append", anchor?: number) => {
-      const requestId = ++rangeSeq.current;
-      rangeMode.current.set(requestId, mode);
+      const requestId = ranges.current.issue(mode);
       setChunkLoading(true);
       handler.emit("jsonlIndex", {
         requestId,
@@ -101,7 +99,7 @@ function JsonlViewerContent() {
   );
 
   const requestEntry = useCallback((index: number) => {
-    const requestId = ++entrySeq.current;
+    const requestId = entries.current.issue();
     setDetail(null);
     setDetailLoading(true);
     handler.emit("jsonlEntry", { requestId, index });
@@ -126,18 +124,14 @@ function JsonlViewerContent() {
 
   const startSearch = useCallback((text: string) => {
     const trimmed = text.trim();
-    const previous = searchSeq.current;
-    const requestId = ++searchSeq.current;
     // Tell the host to stop the old scan; ignoring its output would leave it running.
-    if (previous && searchInFlight.current) {
-      handler.emit("jsonlSearchCancel", { requestId: previous });
-    }
-    searchInFlight.current = false;
+    const stale = search.current.cancel();
+    if (stale !== null) handler.emit("jsonlSearchCancel", { requestId: stale });
     searchAutoSelected.current = false;
     setSearchEntries([]);
     setSearchMeta(null);
     if (!trimmed) return;
-    searchInFlight.current = true;
+    const requestId = search.current.issue();
     setSearching(true);
     handler.emit("jsonlSearch", { requestId, query: trimmed });
   }, []);
@@ -162,11 +156,8 @@ function JsonlViewerContent() {
         setSearching(false);
         setSearchEntries([]);
         setSearchMeta(null);
-        if (searchInFlight.current) {
-          handler.emit("jsonlSearchCancel", { requestId: searchSeq.current });
-        }
-        searchInFlight.current = false;
-        searchSeq.current++;
+        const stale = search.current.cancel();
+        if (stale !== null) handler.emit("jsonlSearchCancel", { requestId: stale });
       }
       target = Math.max(0, Math.min(payload.lineCount - 1, target));
 
@@ -188,30 +179,28 @@ function JsonlViewerContent() {
     });
 
     handler.on("jsonlEntries", (payload: JsonlEntriesPayload) => {
-      const mode = rangeMode.current.get(payload.requestId);
-      if (!mode) return; // a reply nobody is waiting for any more
-      rangeMode.current.delete(payload.requestId);
-      const isNewest = payload.requestId === rangeSeq.current;
-      if (isNewest) setChunkLoading(false);
+      const taken = ranges.current.take(payload.requestId);
+      if (!taken) return; // a reply nobody is waiting for any more
+      if (taken.newest) setChunkLoading(false);
       setDirectory((previous) =>
         applyWindowReply(
           previous,
           { start: payload.start, items: payload.entries },
-          mode,
-          isNewest,
+          taken.tag,
+          taken.newest,
         ),
       );
     });
 
     handler.on("jsonlEntryData", (payload: JsonlEntryPayload) => {
-      if (payload.requestId !== entrySeq.current) return;
+      if (!entries.current.isCurrent(payload.requestId)) return;
       if (payload.index !== selectedRef.current) return;
       setDetail(payload.entry);
       setDetailLoading(false);
     });
 
     handler.on("jsonlSearchBatch", (batch: JsonlSearchBatch) => {
-      if (batch.requestId !== searchSeq.current) return;
+      if (!search.current.isCurrent(batch.requestId)) return;
       if (batch.entries.length) {
         setSearchEntries((prev) => [...prev, ...batch.entries]);
         if (!searchAutoSelected.current) {
@@ -228,7 +217,7 @@ function JsonlViewerContent() {
         capped: batch.capped,
       });
       if (batch.done) {
-        searchInFlight.current = false;
+        search.current.settle(batch.requestId);
         setSearching(false);
       }
     });
@@ -238,14 +227,10 @@ function JsonlViewerContent() {
 
   const clearSearch = useCallback(() => {
     // Stop the host-side scan instead of letting it run to completion unread.
-    const previous = searchSeq.current;
-    if (searchInFlight.current) {
-      handler.emit("jsonlSearchCancel", { requestId: previous });
-    }
-    searchInFlight.current = false;
-    // Reject batches already in flight. Without the bump a late batch can append results and
-    // auto-select an entry after the user has left search mode.
-    searchSeq.current++;
+    // `cancel()` also rejects batches already in flight: without it a late batch can append
+    // results and auto-select an entry after the user has left search mode.
+    const stale = search.current.cancel();
+    if (stale !== null) handler.emit("jsonlSearchCancel", { requestId: stale });
     searchAutoSelected.current = false;
     setSearching(false);
     setSearchEntries([]);

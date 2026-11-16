@@ -6,6 +6,7 @@ import type {
   ParquetCompareState,
 } from "@/common/parquetCompareTypes";
 import { $t } from "../../i18n/i18nConfig.ts";
+import { RequestGuard } from "../../util/requestGuard.ts";
 import { handler } from "../../util/vscode.ts";
 import "./Compare.less";
 
@@ -78,11 +79,11 @@ export default function Compare() {
   const [compare, setCompare] = useState<ParquetCompare | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [onlyChanged, setOnlyChanged] = useState(false);
-  const request = useRef(0);
+  const request = useRef(new RequestGuard());
 
   useEffect(() => {
     handler.on("compareData", (payload: ParquetComparePayload | undefined) => {
-      if (!payload || payload.requestId !== request.current) return;
+      if (!payload || !request.current.isCurrent(payload.requestId)) return;
       if (payload.compare) {
         setCompare(payload.compare);
         setError(null);
@@ -94,8 +95,7 @@ export default function Compare() {
         }),
       );
     });
-    request.current += 1;
-    handler.emit("compareReload", { requestId: request.current });
+    handler.emit("compareReload", { requestId: request.current.issue() });
   }, []);
 
   const groups = useMemo(() => {
