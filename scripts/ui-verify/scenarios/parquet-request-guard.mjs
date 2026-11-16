@@ -11,7 +11,7 @@ import { ROWS, expect, json, openParquet, pageSize, pagerState, rangeOf } from "
 export default [
   {
     name: "parquet-open-once",
-    async run({ page, base }) {
+    async run({ page, base, setViewport }) {
       await openParquet(page, base, "?mixed=1&profile=1");
       const size = await pageSize(page);
       const state = await pagerState(page);
@@ -22,6 +22,15 @@ export default [
         `document.querySelectorAll('.parquet-viewer__list-null').length`,
       );
       expect(badges === 4, `expected 4 badges, got ${badges}`);
+
+      // A window resize changes the page size. Before the fix that identity change re-ran the
+      // `open` registration, which emitted `init` again and reloaded the document.
+      await setViewport(1500, 600);
+      const resized = await page.waitFor(
+        `Number(document.querySelector('.parquet-viewer__table-wrap')?.dataset.pageSize ?? 0) !== ${size}`,
+      );
+      expect(resized, "the page size did not follow the window");
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
       // Baseline: init and parquetProfile each sent exactly once
       const counts = json(
@@ -182,7 +191,7 @@ export default [
   },
   {
     name: "parquet-document-switch-stale-profile",
-    async run({ page, base }) {
+    async run({ page, base, setViewport }) {
       await openParquet(page, base, "?mixed=1&profile=1");
       const profiled = await page.waitFor(
         `document.querySelectorAll('.parquet-viewer__list-null').length === 4`,
