@@ -77,7 +77,9 @@ test("saveTargetFor: a name inherited from Object.prototype is not a format", ()
 
 // ------------------------------------------------------------ the routing
 
-function harness(options: { readOnly?: boolean; picked?: string | undefined } = {}) {
+function harness(
+  options: { readOnly?: boolean; picked?: string | undefined; writeFails?: boolean } = {},
+) {
   let clock = 1_000;
   const saves = createSaveTracker(() => clock);
   const log: string[] = [];
@@ -94,6 +96,9 @@ function harness(options: { readOnly?: boolean; picked?: string | undefined } = 
     writeFile: async (target, bytes) => {
       // The stamp before the write is what makes an echo during the write skippable.
       log.push(`write(skip=${saves.shouldSkip(target)})`);
+      if (options.writeFails) {
+        throw new Error("mock write failure");
+      }
       writes.push({ target, bytes });
       clock += 40;
     },
@@ -101,7 +106,10 @@ function harness(options: { readOnly?: boolean; picked?: string | undefined } = 
       pickRequests.push(request);
       return options.picked;
     },
-    markClean: () => log.push("clean"),
+    setDirty: (dirty) => {
+      if (dirty) log.push("dirty");
+      else log.push("clean");
+    },
     openTarget: async (target) => {
       log.push(`open(${target})`);
     },
@@ -120,26 +128,31 @@ function harness(options: { readOnly?: boolean; picked?: string | undefined } = 
     advance: (ms: number) => {
       clock += ms;
     },
+    edit: () => {
+      handlers.edited();
+    },
   };
 }
 
-test("save: a read-only document is rerouted to save-as and never written", async () => {
+test("save: a read-only document rejects with saveFailed", async () => {
   const h = harness({ readOnly: true });
   await h.handlers.save({ contentBase64: bytesOfText("hello") });
 
   assert.equal(h.writes.length, 0, "a read-only file must not be written");
+  // TOCTOU race: file became readonly between webview open and host save.
+  // Host emits saveFailed so webview reverts pending-save → dirty.
   assert.equal(h.emitted.length, 1);
-  assert.equal(h.emitted[0].type, "saveAs");
-  assert.equal(h.emitted[0].payload.contentBase64, bytesOfText("hello"));
-  assert.equal(h.saves.shouldSkip("file:///dir/book.xlsx"), false, "nothing was written to echo");
-  assert.deepEqual(h.log, [], "the tab must not be marked clean");
+  assert.equal(h.emitted[0].type, "saveFailed");
+  assert.deepEqual(h.emitted[0].payload, { reason: "readonly" });
+  assert.equal(h.saves.shouldSkip("file:///dir/book.xlsx"), false, "nothing was written");
+  assert.deepEqual(h.log, [], "the tab stays dirty");
 });
 
 test("save: readOnly is read at call time, not when the handlers were built", async () => {
   const h = harness({ readOnly: false });
   h.setReadOnly(true);
   await h.handlers.save("text");
-  assert.equal(h.emitted[0]?.type, "saveAs");
+  assert.equal(h.emitted[0]?.type, "saveFailed");
 });
 
 test("save: a normal save writes in place, stamps around the write, then reports done", async () => {
@@ -209,13 +222,55 @@ test("saveAs: the picked target is stamped, the original document is not", async
   );
 });
 
-test("saveAs: writes, marks clean, reports done, then opens the target", async () => {
+test("saveAs: writes the target, then opens it", async () => {
   const h = harness({ picked: "file:///elsewhere/copy.xlsx" });
   await h.handlers.saveAs({ contentBase64: bytesOfText("x"), ext: "xlsx" });
 
-  assert.deepEqual(h.log, ["write(skip=true)", "clean", "open(file:///elsewhere/copy.xlsx)"]);
+  assert.deepEqual(h.log, ["write(skip=true)", "open(file:///elsewhere/copy.xlsx)"]);
+});
+
+test("saveAs: the document being edited is not marked clean and gets no saveDone", async () => {
+  const h = harness({ picked: "file:///elsewhere/copy.xlsx" });
+  await h.handlers.saveAs({ contentBase64: bytesOfText("x"), ext: "xlsx" });
+
+  // Save As wrote a different file. The original still has its unsaved edits, so the tab keeps
+  // its `*` and the webview must not be told "the save you asked for is done".
+  assert.ok(!h.log.includes("clean"), "the original document was not saved");
   assert.deepEqual(
     h.emitted.map((message) => message.type),
-    ["saveDone"],
+    [],
   );
+  assert.deepEqual(h.log, ["write(skip=true)", "open(file:///elsewhere/copy.xlsx)"]);
+});
+
+test("save: edit during write does not mark clean (version guard)", async () => {
+  const h = harness();
+  h.edit(); // dirty
+  const savePromise = h.handlers.save({ contentBase64: bytesOfText("v1") });
+  h.edit(); // edit during write
+  await savePromise;
+  assert.ok(h.log.includes("dirty"), "edited during save, so stays dirty");
+  assert.ok(!h.log.includes("clean"), "version guard prevented markClean");
+});
+
+test("save: writeFile failure emits saveFailed and leaves dirty", async () => {
+  const h = harness({ writeFails: true });
+  h.edit();
+  await h.handlers.save({ contentBase64: bytesOfText("fail") });
+  assert.equal(h.emitted.length, 1);
+  assert.equal(h.emitted[0].type, "saveFailed");
+  assert.equal(h.emitted[0].payload.reason, "write");
+  assert.ok(!h.log.includes("clean"), "write failed, so stays dirty");
+});
+
+test("save: opened() clears dirty and bumps version", async () => {
+  const h = harness();
+  h.edit();
+  assert.ok(h.log.includes("dirty"));
+  h.handlers.opened();
+  assert.ok(h.log.includes("clean"), "opened clears dirty");
+  // Now edit again and save; it should clear since no edit happened during this save
+  h.edit();
+  await h.handlers.save({ contentBase64: bytesOfText("v2") });
+  assert.ok(h.log.filter((x) => x === "clean").length === 2, "save after opened can mark clean");
 });

@@ -7,11 +7,7 @@
  * running a real VS Code window. They are here, parameterised over the document type and the
  * dialog/fs calls, and `commonHandler` is left with the wiring.
  */
-import {
-  bytesToSavePayload,
-  saveContentToBytes,
-  type SaveContentPayload,
-} from "@/common/saveContent";
+import { saveContentToBytes, type SaveContentPayload } from "@/common/saveContent";
 
 /** A file-change event this soon after our own write is the echo of that write. */
 export const INTERNAL_SAVE_CHANGE_WINDOW_MS = 1500;
@@ -60,7 +56,6 @@ const SAVE_FILTERS = new Map<string, SaveFilter>([
   ["xls", { label: "Excel 97-2003 Workbook", exts: ["xls"] }],
   ["ods", { label: "OpenDocument Spreadsheet", exts: ["ods"] }],
   ["csv", { label: "CSV (Comma delimited)", exts: ["csv"] }],
-  ["parquet", { label: "Apache Parquet", exts: ["parquet"] }],
 ]);
 
 /** What the "save as" dialog starts from, derived from the document name and the asked format. */
@@ -102,41 +97,73 @@ export interface SaveHandlerContext<Target> {
   writeFile: (target: Target, bytes: Uint8Array) => PromiseLike<void>;
   /** The "save as" dialog; resolves `undefined` when the user cancels. */
   pickTarget: (request: SaveTargetRequest) => PromiseLike<Target | undefined>;
-  /** The editor no longer has unsaved edits (clears the `*` in the tab title). */
-  markClean: () => void;
+  /** Show or clear the unsaved marker (`*`) in the tab title. */
+  setDirty: (dirty: boolean) => void;
   openTarget: (target: Target) => PromiseLike<unknown>;
   emit: (type: string, payload?: unknown) => void;
 }
 
 export function createSaveHandlers<Target>(context: SaveHandlerContext<Target>) {
-  const { document, baseName, saves, keyOf, isReadOnly, writeFile, pickTarget, markClean } =
-    context;
+  const { document, baseName, saves, keyOf, isReadOnly, writeFile, pickTarget, setDirty } = context;
   const { openTarget, emit } = context;
+  /** Bumped by every edit and every (re)open; a save may only clear the marker if it is unchanged. */
+  let version = 0;
 
   return {
+    /** The webview reported an edit: the document has unsaved changes. */
+    edited() {
+      version += 1;
+      setDirty(true);
+    },
+
     /**
-     * A read-only document is never written: the webview is asked to save under another name
-     * instead. Anything else is written in place; the document is stamped before the write
-     * (so an event that arrives while it runs is skipped) and again after it (so the window is
-     * measured from when the write finished).
+     * The host (re)sent the document to the webview. The webview drops what it had, including
+     * unsaved edits, so the marker must go too; and a save that is still writing was for the
+     * previous content, so it must not clear anything afterwards.
+     */
+    opened() {
+      version += 1;
+      setDirty(false);
+    },
+
+    /**
+     * A read-only document is never written, and the webview is told so with `saveFailed`
+     * (it already routes read-only documents to Save As before posting, so this is only
+     * reachable when the file turned read-only after it was opened). Anything else is written
+     * in place; the document is stamped before the write (so an event that arrives while it
+     * runs is skipped) and again after it (so the window is measured from when the write
+     * finished). A failed write is reported with `saveFailed` and leaves the marker alone.
+     * The marker is cleared only if no edit arrived while the write was running.
      */
     async save(content: SaveContentPayload | number[] | string) {
       const bytes = saveContentToBytes(content);
       if (isReadOnly()) {
-        emit("saveAs", bytesToSavePayload(bytes));
+        emit("saveFailed", { reason: "readonly" });
         return;
       }
       const key = keyOf(document);
+      const versionAtStart = version;
       saves.markSaved(key);
-      await writeFile(document, bytes);
+      try {
+        await writeFile(document, bytes);
+      } catch (error) {
+        emit("saveFailed", {
+          reason: "write",
+          message: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
       saves.markSaved(key);
-      markClean();
+      if (version === versionAtStart) setDirty(false);
       emit("saveDone");
     },
 
     /**
      * Write to a place the user picked, then open it. The *target* is stamped, not the
      * document: the target is the file whose change event we are about to cause.
+     *
+     * Save As does NOT clear the marker or emit saveDone: only a copy was written elsewhere,
+     * the original document keeps its unsaved edits.
      */
     async saveAs(payload: SaveAsPayload) {
       const bytes = saveContentToBytes(payload as Parameters<typeof saveContentToBytes>[0]);
@@ -150,8 +177,6 @@ export function createSaveHandlers<Target>(context: SaveHandlerContext<Target>) 
       saves.markSaved(key);
       await writeFile(target, bytes);
       saves.markSaved(key);
-      markClean();
-      emit("saveDone");
       await openTarget(target);
     },
   };

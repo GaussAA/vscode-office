@@ -85,22 +85,38 @@ export function useExcelDocumentSession({
   const initialFormattingRef = useRef("");
   const loadPayloadRef = useRef<((payload: ExcelOpenPayload, seq: number) => void) | null>(null);
   const gridReadyRef = useRef(false);
-  const pendingSaveRef = useRef(false);
+  // Dirty-state effects: apply save-enabled and notify host
+  const applyDirtyEffect = useCallback(
+    (effect: { saveEnabled: boolean; notifyHost: "dirty" | "clean" | null }) => {
+      const spreadSheet = spreadSheetRef.current;
+      if (spreadSheet && gridReadyRef.current) {
+        spreadSheet.setSaveEnabled(effect.saveEnabled);
+      }
+      // Host manages its own clean state via editVersion check, so only notify on dirty
+      if (effect.notifyHost === "dirty") {
+        handler.emit("change");
+      }
+    },
+    [],
+  );
+
+  const handleEdited = useCallback(() => {
+    const effect = session.markEdited();
+    applyDirtyEffect(effect);
+  }, [session, applyDirtyEffect]);
 
   const handleAutoFitColumns = useCallback(() => {
     const spreadSheet = spreadSheetRef.current;
     if (!spreadSheet || !gridReadyRef.current) return;
     spreadSheet.autoFitColumns();
-    if (!readOnlyRef.current) {
-      spreadSheet.setSaveEnabled(true);
-      handler.emit("change");
-    }
+    const effect = session.markEdited();
+    applyDirtyEffect(effect);
     message.success({
       duration: 1.5,
       content: t("viewer.autoFitDone"),
       className: "excel-save-success-message",
     });
-  }, [message]);
+  }, [message, session, applyDirtyEffect]);
 
   const handleSaveAs = useCallback(() => {
     setSaveAsVisible(true);
@@ -113,7 +129,8 @@ export function useExcelDocumentSession({
     csvEncodingRef,
     csvDelimiterRef,
     initialFormattingRef,
-    pendingSaveRef,
+    session,
+    applyDirtyEffect,
     onSaveAs: handleSaveAs,
     modal,
   });
@@ -167,6 +184,7 @@ export function useExcelDocumentSession({
         maxCols,
         handlers: {
           onAutoFit: handleAutoFitColumns,
+          onEdited: handleEdited,
           onSave: () => void handleSave(),
           onSaveAs: handleSaveAs,
           onEditInVSCode: () => handler.emit("editInVSCode", true),
@@ -268,9 +286,12 @@ export function useExcelDocumentSession({
         loadPayload(result.payload, result.seq);
       })
       .on("saveDone", () => {
-        if (!pendingSaveRef.current) return;
-        pendingSaveRef.current = false;
-        spreadSheetRef.current?.setSaveEnabled(false);
+        const effect = session.markSaveDone();
+        applyDirtyEffect(effect);
+      })
+      .on("saveFailed", () => {
+        const effect = session.markSaveFailed();
+        applyDirtyEffect(effect);
       })
       .emit("init");
 
@@ -280,12 +301,21 @@ export function useExcelDocumentSession({
       activeHost?.dispose();
       session.invalidate();
       gridReadyRef.current = false;
-      pendingSaveRef.current = false;
       spreadSheetRef.current = null;
       setActiveSpreadsheet(null);
       stopThemeWatch();
     };
-  }, [handleAutoFitColumns, handleSave, handleSaveAs, message, onFind, onResetFind, session]);
+  }, [
+    applyDirtyEffect,
+    handleAutoFitColumns,
+    handleEdited,
+    handleSave,
+    handleSaveAs,
+    message,
+    onFind,
+    onResetFind,
+    session,
+  ]);
 
   return {
     loading,
@@ -305,6 +335,7 @@ export function useExcelDocumentSession({
     handleAutoFitColumns,
     handleOpenAnyway,
     handleSelectSheet,
+    handleEdited,
     spreadSheetRef,
     readOnlyRef,
     fileName: session.payload?.fileName ?? "",

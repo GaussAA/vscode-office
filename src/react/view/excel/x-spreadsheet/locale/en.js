@@ -192,6 +192,7 @@ export default {
     exportOdsDesc: "Compatible with LibreOffice / WPS",
     autoFitColumns: "Auto fit columns",
     autoFitDone: "Columns auto-fitted",
+    saveFailed: "Save failed",
     switchToLightMode: "Switch to light mode",
     switchToDarkMode: "Switch to adaptive mode (follow VS Code theme)",
   },

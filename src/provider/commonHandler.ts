@@ -24,18 +24,16 @@ function setDirty(handler: Handler, uri: Uri, dirty: boolean) {
  * @param saves who wrote what and when. The provider owns it and shares one instance between
  * its panels; the save rules themselves are in `saveHandlers`.
  */
-export function handleCommonEvent(
-  uri: Uri,
-  handler: Handler,
-  saves: SaveTracker,
-  options?: { skipOpen?: boolean },
-) {
+export function handleCommonEvent(uri: Uri, handler: Handler, saves: SaveTracker) {
   let readOnly = false;
+
   const send = async () => {
     if (saves.shouldSkip(uri.toString())) {
       return;
     }
     readOnly = await isUriReadOnly(uri);
+    // The webview is about to replace its document, dropping unsaved edits.
+    saveHandlers.opened();
     if (isVirtualUri(uri)) {
       void emitVirtualOfficeOpen(handler, uri);
       return;
@@ -56,7 +54,7 @@ export function handleCommonEvent(
           : Uri.joinPath(uri, "..", defaultFileName);
       return vscode.window.showSaveDialog({ defaultUri, filters });
     },
-    markClean: () => setDirty(handler, uri, false),
+    setDirty: (dirty) => setDirty(handler, uri, dirty),
     openTarget: (target) =>
       vscode.commands.executeCommand("vscode.openWith", target, "GaussAA.officeViewer"),
     emit: (type, payload) => handler.emit(type, payload),
@@ -65,18 +63,15 @@ export function handleCommonEvent(
     const side = full ? vscode.ViewColumn.Active : vscode.ViewColumn.Beside;
     vscode.commands.executeCommand("vscode.openWith", uri, "default", side);
   });
-  if (!options?.skipOpen) {
-    events
-      .on("init", () => {
-        void send();
-      })
-      .on("fileChange", () => {
-        void send();
-      });
-  }
   events
+    .on("init", () => {
+      void send();
+    })
+    .on("fileChange", () => {
+      void send();
+    })
     .on("change", () => {
-      setDirty(handler, uri, true);
+      saveHandlers.edited();
     })
     .on("openForce", async () => {
       // The webview's size guard said "open anyway". A `file:` document is fetched by the
