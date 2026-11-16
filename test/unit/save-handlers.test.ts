@@ -77,7 +77,9 @@ test("saveTargetFor: a name inherited from Object.prototype is not a format", ()
 
 // ------------------------------------------------------------ the routing
 
-function harness(options: { readOnly?: boolean; picked?: string | undefined } = {}) {
+function harness(
+  options: { readOnly?: boolean; picked?: string | undefined; writeFails?: boolean } = {},
+) {
   let clock = 1_000;
   const saves = createSaveTracker(() => clock);
   const log: string[] = [];
@@ -94,6 +96,9 @@ function harness(options: { readOnly?: boolean; picked?: string | undefined } = 
     writeFile: async (target, bytes) => {
       // The stamp before the write is what makes an echo during the write skippable.
       log.push(`write(skip=${saves.shouldSkip(target)})`);
+      if (options.writeFails) {
+        throw new Error("mock write failure");
+      }
       writes.push({ target, bytes });
       clock += 40;
     },
@@ -236,4 +241,36 @@ test("saveAs: the document being edited is not marked clean and gets no saveDone
     [],
   );
   assert.deepEqual(h.log, ["write(skip=true)", "open(file:///elsewhere/copy.xlsx)"]);
+});
+
+test("save: edit during write does not mark clean (version guard)", async () => {
+  const h = harness();
+  h.edit(); // dirty
+  const savePromise = h.handlers.save({ contentBase64: bytesOfText("v1") });
+  h.edit(); // edit during write
+  await savePromise;
+  assert.ok(h.log.includes("dirty"), "edited during save, so stays dirty");
+  assert.ok(!h.log.includes("clean"), "version guard prevented markClean");
+});
+
+test("save: writeFile failure emits saveFailed and leaves dirty", async () => {
+  const h = harness({ writeFails: true });
+  h.edit();
+  await h.handlers.save({ contentBase64: bytesOfText("fail") });
+  assert.equal(h.emitted.length, 1);
+  assert.equal(h.emitted[0].type, "saveFailed");
+  assert.equal(h.emitted[0].payload.reason, "write");
+  assert.ok(!h.log.includes("clean"), "write failed, so stays dirty");
+});
+
+test("save: opened() clears dirty and bumps version", async () => {
+  const h = harness();
+  h.edit();
+  assert.ok(h.log.includes("dirty"));
+  h.handlers.opened();
+  assert.ok(h.log.includes("clean"), "opened clears dirty");
+  // Now edit again and save; it should clear since no edit happened during this save
+  h.edit();
+  await h.handlers.save({ contentBase64: bytesOfText("v2") });
+  assert.ok(h.log.filter((x) => x === "clean").length === 2, "save after opened can mark clean");
 });
