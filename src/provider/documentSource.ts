@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { ByteSource } from "@/service/jsonlFile";
+import type { ByteSource } from "@/common/byteSource";
 import { openByteSource } from "@/service/jsonlSource";
 
 /**

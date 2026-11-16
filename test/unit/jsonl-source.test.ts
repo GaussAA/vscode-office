@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import type { ByteSource } from "@/service/jsonlFile";
+import type { ByteSource } from "@/common/byteSource";
 import { openByteSource, type UriLike } from "@/service/jsonlSource";
 
 const encoder = new TextEncoder();

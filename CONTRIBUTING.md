@@ -160,11 +160,16 @@ export function calculateSum(numbers: any): any {
 
 ### 类型安全
 
-1. **使用类型守卫代替类型断言**
+1. **用运行时检查代替类型断言**
 
 ```typescript
 // ✅ 好的做法
-if (hasProperty(value, "name") && typeof value.name === "string") {
+if (
+  typeof value === "object" &&
+  value !== null &&
+  "name" in value &&
+  typeof value.name === "string"
+) {
   console.log(value.name); // TypeScript 知道类型
 }
 

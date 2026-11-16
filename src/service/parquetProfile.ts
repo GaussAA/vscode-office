@@ -17,7 +17,7 @@ import type {
   ParquetProfile,
   ParquetProfileState,
 } from "@/common/parquetProfileTypes";
-import type { ByteSource } from "@/service/jsonlFile";
+import type { ByteSource } from "@/common/byteSource";
 
 /** The shapes hyparquet hands back for a statistics min/max. */
 type MinMax = bigint | boolean | number | string | Date | Uint8Array;

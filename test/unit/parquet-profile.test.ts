@@ -4,7 +4,8 @@ import test from "node:test";
 import type { ParquetColumnProfile, ParquetProfile } from "@/common/parquetProfileTypes";
 import { createParquetHandlers } from "@/provider/parquetHandlers";
 import { openParquetFile } from "@/common/parquetReader";
-import { memoryByteSource, type ByteSource } from "@/service/jsonlFile";
+import type { ByteSource } from "@/common/byteSource";
+import { memoryByteSource } from "@/service/jsonlFile";
 import {
   profileFromParquet,
   readParquetProfile,

@@ -12,7 +12,7 @@ import type {
   ParquetProfilePayload,
   ParquetProfileRequest,
 } from "../common/parquetProfileTypes";
-import type { ByteSource } from "../service/jsonlFile";
+import type { ByteSource } from "../common/byteSource";
 import { readParquetProfile, scanParquetColumn } from "../service/parquetProfile";
 
 export interface ParquetHandlerContext {
