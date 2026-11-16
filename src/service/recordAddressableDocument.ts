@@ -40,73 +40,106 @@ export function createCancelToken(): CancelToken & { check(): boolean } {
 }
 
 /**
- * Case-insensitive substring search without creating a lowercase copy.
+ * The one case-insensitive matcher for JSON and JSONL search.
  *
- * This fixes the Unicode bug: `toLowerCase()` on the whole haystack can change string length
- * (e.g., Turkish İ becomes two UTF-16 code units), causing match offsets to misalign with
- * record boundaries and snippet extraction.
- *
- * Instead, we compare character by character, using a precomputed lowercase fold table for
- * performance. The needle is expected to already be lowercased by the caller.
- *
- * @param haystack The text to search in (not lowercased)
- * @param needleLower The search term, already lowercased
- * @param fromIndex Starting position (default 0)
+ * Lowercasing the haystack and searching that copy is wrong twice over: it allocates a copy of
+ * a record that can be megabytes, and `toLowerCase()` can change length ("İ".toLowerCase() is two
+ * UTF-16 units, "i" + U+0307), so an offset measured in the copy points somewhere else in the
+ * original. Here only the needle is lowercased; the haystack is folded one code point at a time
+ * while comparing, and the result is an offset into the ORIGINAL text.
  */
-export function caseInsensitiveIndexOf(
-  haystack: string,
-  needleLower: string,
-  fromIndex = 0,
-): number {
-  if (needleLower.length === 0) return fromIndex;
-  const haystackLen = haystack.length;
-  const needleLen = needleLower.length;
-  const searchLimit = haystackLen - needleLen;
 
-  for (let i = fromIndex; i <= searchLimit; i++) {
-    let match = true;
-    for (let j = 0; j < needleLen; j++) {
-      const hChar = haystack.charCodeAt(i + j);
-      const nChar = needleLower.charCodeAt(j);
-      // Fast path: exact match
-      if (hChar === nChar) continue;
-      // Slow path: case-insensitive comparison using toLowerCase on single characters
-      if (haystack[i + j].toLowerCase() !== needleLower[j]) {
-        match = false;
-        break;
-      }
-    }
-    if (match) return i;
-  }
-  return -1;
+/** Lowercase a query the way the matcher folds haystack characters (per code point). */
+export function foldNeedle(query: string): string {
+  const trimmed = query.trim();
+  let out = "";
+  for (const char of trimmed) out += char.toLowerCase();
+  return out;
 }
 
 /**
- * Extract a snippet with context around the first match of `needle` in `text`.
- * Returns up to 200 characters centered on the match.
- *
- * @param text The text to extract from
- * @param needleLower The lowercased search term
+ * End offset (exclusive, in `haystack`) of a match of `needle` starting exactly at `start`,
+ * or -1. `needle` must come from `foldNeedle`. A haystack character whose lowercase form is
+ * longer than one unit may be consumed only partly at the end of the needle, so the query "i"
+ * still finds "İ" (as a whole-line `toLowerCase().includes` did).
  */
-export function matchSnippet(text: string, needleLower: string): string {
-  const at = caseInsensitiveIndexOf(text, needleLower);
-  if (at < 0) {
-    // No match; return head of text
-    return text.length <= 200 ? text : `${text.slice(0, 200)}…`;
+function matchEndAt(haystack: string, start: number, needle: string): number {
+  let at = start;
+  let used = 0;
+  const length = haystack.length;
+  while (used < needle.length) {
+    if (at >= length) return -1;
+    const unit = haystack.charCodeAt(at);
+    if (unit < 0x80) {
+      const folded = unit >= 65 && unit <= 90 ? unit + 32 : unit;
+      if (folded !== needle.charCodeAt(used)) return -1;
+      used++;
+      at++;
+      continue;
+    }
+    const codePoint = haystack.codePointAt(at) as number;
+    const lower = String.fromCodePoint(codePoint).toLowerCase();
+    for (let k = 0; k < lower.length && used < needle.length; k++, used++) {
+      if (lower.charCodeAt(k) !== needle.charCodeAt(used)) return -1;
+    }
+    at += codePoint > 0xffff ? 2 : 1;
   }
+  return at;
+}
 
-  // Center the snippet on the match with more context after than before
-  const contextBefore = 50;
-  const contextAfter = 150;
-  const start = Math.max(0, at - contextBefore);
-  const end = Math.min(text.length, at + needleLower.length + contextAfter);
+export interface TextMatch {
+  /** Offset of the first matched unit in the original text. */
+  start: number;
+  /** Offset just past the last matched unit in the original text. */
+  end: number;
+}
 
-  // Extract the base snippet
-  let snippet = text.slice(start, end);
+/** First match of `needle` (from `foldNeedle`) in `haystack` at or after `fromIndex`. */
+export function findCaseInsensitive(
+  haystack: string,
+  needle: string,
+  fromIndex = 0,
+): TextMatch | null {
+  if (needle.length === 0) return null;
+  const first = needle.charCodeAt(0);
+  const firstAscii = first < 0x80;
+  const last = haystack.length - 1;
+  for (let i = fromIndex; i <= last; i++) {
+    if (firstAscii) {
+      const unit = haystack.charCodeAt(i);
+      if (unit < 0x80 && (unit >= 65 && unit <= 90 ? unit + 32 : unit) !== first) continue;
+    }
+    const end = matchEndAt(haystack, i, needle);
+    if (end >= 0) return { start: i, end };
+  }
+  return null;
+}
 
-  // Add ellipsis markers
-  const prefix = start > 0 ? "…" : "";
-  const suffix = end < text.length ? "…" : "";
+/** Offset of the first match, or -1. `needle` must come from `foldNeedle`. */
+export function caseInsensitiveIndexOf(haystack: string, needle: string, fromIndex = 0): number {
+  if (needle.length === 0) return fromIndex;
+  return findCaseInsensitive(haystack, needle, fromIndex)?.start ?? -1;
+}
 
-  return prefix + snippet + suffix;
+/** A window of `text` around [start, end): `before`/`after` characters, "…" where cut. */
+export function snippetAround(
+  text: string,
+  start: number,
+  end: number,
+  before: number,
+  after: number,
+): string {
+  const from = Math.max(0, start - before);
+  const to = Math.min(text.length, end + after);
+  return `${from > 0 ? "…" : ""}${text.slice(from, to)}${to < text.length ? "…" : ""}`;
+}
+
+/**
+ * Snippet around the first match of `needle` (from `foldNeedle`): 50 characters before and 150
+ * after. Without a match it is the head of the text.
+ */
+export function matchSnippet(text: string, needle: string): string {
+  const match = findCaseInsensitive(text, needle);
+  if (!match) return text.length <= 200 ? text : `${text.slice(0, 200)}…`;
+  return snippetAround(text, match.start, match.end, 50, 150);
 }

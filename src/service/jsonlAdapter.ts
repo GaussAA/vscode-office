@@ -15,8 +15,11 @@ import {
   summarizeDecodedLine,
 } from "@/service/jsonlDocument";
 import type { JsonlFile } from "@/service/jsonlFile";
-import type { CancelToken, SearchOptions } from "@/service/recordAddressableDocument";
-import { matchSnippet } from "@/service/recordAddressableDocument";
+import {
+  foldNeedle,
+  type CancelToken,
+  type SearchOptions,
+} from "@/service/recordAddressableDocument";
 
 /** Lines decoded per event-loop turn; keeps a scan responsive on a huge file. */
 const SEARCH_STEP = 20_000;
@@ -38,7 +41,7 @@ export class JsonlAdapter {
     options: SearchOptions<JsonlSearchBatch>,
     cancelToken: CancelToken,
   ): void {
-    const needle = query.trim().toLowerCase();
+    const needle = foldNeedle(query);
 
     if (!needle) {
       const emptyBatch: JsonlSearchBatch = {
@@ -110,14 +113,13 @@ export class JsonlAdapter {
       for (let offset = 0; offset < window.index.lineCount; offset++) {
         const rawText = readJsonlLineText(window.bytes, window.index, offset);
         // Case-insensitive match; needle is already lowercased by caller
-        if (!rawText.toLowerCase().includes(needle)) continue;
+        // One pass decides the hit and yields the snippet; no lowercase copy of the line.
+        const snippet = jsonlMatchSnippet(rawText, needle);
+        if (snippet === undefined) continue;
 
         matches++;
         const summary = summarizeDecodedLine(scanned + offset, rawText, needle);
-        pending.push({
-          ...summary,
-          snippet: jsonlMatchSnippet(rawText, needle) ?? matchSnippet(rawText, needle),
-        });
+        pending.push({ ...summary, snippet });
 
         if (pending.length >= batchSize) {
           if (cancelToken.cancelled) return;

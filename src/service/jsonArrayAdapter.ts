@@ -10,7 +10,7 @@ import {
 } from "@/common/jsonPreviewTypes";
 import type { JsonRecordRange } from "@/service/jsonPreview";
 import type { CancelToken, SearchOptions } from "@/service/recordAddressableDocument";
-import { caseInsensitiveIndexOf, matchSnippet } from "@/service/recordAddressableDocument";
+import { findCaseInsensitive, foldNeedle, matchSnippet } from "@/service/recordAddressableDocument";
 
 interface JsonSearchRecord {
   index: number;
@@ -40,7 +40,7 @@ export class JsonArrayAdapter {
     options: SearchOptions<JsonSearchBatch>,
     cancelToken: CancelToken,
   ): void {
-    const needle = query.trim().toLowerCase();
+    const needle = foldNeedle(query);
 
     if (!needle) {
       const emptyBatch: JsonSearchBatch = {
@@ -101,8 +101,8 @@ export class JsonArrayAdapter {
 
         // Find all matches in this record using case-insensitive search
         while (cursor < raw.length) {
-          const at = caseInsensitiveIndexOf(raw, needle, cursor);
-          if (at < 0) break;
+          const found = findCaseInsensitive(raw, needle, cursor);
+          if (!found) break;
 
           if (recordMatches === 0) {
             // Capture snippet from first match
@@ -111,7 +111,7 @@ export class JsonArrayAdapter {
 
           recordMatches++;
           matches++;
-          cursor = at + Math.max(1, needle.length);
+          cursor = Math.max(found.end, found.start + 1);
 
           if (matches >= maxMatches) {
             capped = true;

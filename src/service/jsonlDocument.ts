@@ -12,6 +12,11 @@ import {
   type JsonlEntrySummary,
 } from "@/common/jsonlTypes";
 import { classifyEntry } from "@/service/entryClassifier";
+import {
+  findCaseInsensitive,
+  foldNeedle,
+  snippetAround,
+} from "@/service/recordAddressableDocument";
 
 export interface JsonlIndex {
   lineCount: number;
@@ -146,13 +151,13 @@ export function classifyHit(value: unknown, needle: string): "key" | "value" | "
     }
     if (node !== null && typeof node === "object") {
       for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
-        if (key.toLowerCase().includes(needle)) inKey = true;
+        if (findCaseInsensitive(key, foldNeedle(needle))) inKey = true;
         stack.push(child);
       }
       continue;
     }
     if (typeof node === "string" || typeof node === "number" || typeof node === "boolean") {
-      if (String(node).toLowerCase().includes(needle)) inValue = true;
+      if (findCaseInsensitive(String(node), foldNeedle(needle))) inValue = true;
     }
   }
   if (inKey && inValue) return "both";
@@ -167,11 +172,9 @@ export function classifyHit(value: unknown, needle: string): "key" | "value" | "
  * line's head when a search is active.
  */
 export function matchSnippet(text: string, needle: string, radius = 48): string | undefined {
-  const at = text.toLowerCase().indexOf(needle);
-  if (at < 0) return undefined;
-  const start = Math.max(0, at - radius);
-  const end = Math.min(text.length, at + needle.length + radius);
-  return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
+  const match = findCaseInsensitive(text, foldNeedle(needle));
+  if (!match) return undefined;
+  return snippetAround(text, match.start, match.end, radius, radius);
 }
 
 /**
