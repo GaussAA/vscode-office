@@ -69,6 +69,7 @@ import parquetSurfaces from "./scenarios/parquet-surfaces.mjs";
 import parquetTabOrder from "./scenarios/parquet-tab-order.mjs";
 import parquetBasics from "./scenarios/parquet-basics.mjs";
 import parquetGrid from "./scenarios/parquet-grid.mjs";
+import parquetRequestGuard from "./scenarios/parquet-request-guard.mjs";
 import other from "./scenarios/other.mjs";
 
 const scenarios = [
@@ -83,6 +84,7 @@ const scenarios = [
   ...parquetA11y,
   ...parquetTabOrder,
   ...parquetFrames,
+  ...parquetRequestGuard,
   ...compare,
   ...other,
 ];
