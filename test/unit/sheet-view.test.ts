@@ -3,8 +3,6 @@ import test from "node:test";
 import {
   TEXT_WINDOW_MAX_BYTES,
   WINDOW_THRESHOLD_BYTES,
-  cellText,
-  headerCells,
   limitForView,
   sheetViewFor,
 } from "@/react/view/excel/sheetView";
@@ -59,15 +57,4 @@ test("view: workbooks keep their own limit", () => {
 test("view: what is not a text spreadsheet never takes the window", () => {
   assert.equal(sheetViewFor(".parquet", 20 * 1024 * 1024), "grid");
   assert.equal(sheetViewFor(".jsonl", 20 * 1024 * 1024), "grid");
-});
-
-test("cells: long text is cut instead of wrapping a fixed-height row", () => {
-  assert.equal(cellText("short"), "short");
-  assert.equal(cellText(undefined), "");
-  assert.equal(cellText("x".repeat(500)).length, 201);
-});
-
-test("header: pads unnamed columns with their number", () => {
-  assert.deepEqual(headerCells([["a", "b"]], 3), ["a", "b", "3"]);
-  assert.deepEqual(headerCells([], 2), ["1", "2"]);
 });

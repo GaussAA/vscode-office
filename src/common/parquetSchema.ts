@@ -8,7 +8,7 @@
  */
 
 import type { AsyncBuffer, SchemaElement } from "hyparquet";
-import type { ByteSource } from "@/service/jsonlFile";
+import type { ByteSource } from "@/common/byteSource";
 
 export type { SchemaElement };
 

@@ -19,7 +19,7 @@ export async function activate(context: vscode.ExtensionContext) {
   activateXml(context);
   const viewOption = customEditorOptions;
   FileUtil.init(context);
-  ReactApp.init(context);
+  ReactApp.init(context, IconService.getInstance());
   activateJsonPreview(context);
   activateCompare(context);
   const viewerInstance = new OfficeViewerProvider(context);

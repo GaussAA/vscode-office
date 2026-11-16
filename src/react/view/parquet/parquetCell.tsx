@@ -3,10 +3,12 @@ import { normalizeExternalUrl } from "@/common/externalLink";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { handler } from "../../util/vscode.ts";
 import { highlightRuns } from "../../common/highlight.ts";
-import { formatCellValue, type ColumnCategory, type ParquetColumnInfo } from "./parquetParser.ts";
+import { formatCellValue } from "@/common/parquetCellFormat";
+import type { ParquetColumnInfo } from "@/common/parquetReader";
+import type { ColumnCategory } from "@/common/parquetSchema";
 import { jsonPreviewText, tokenizeJson, type JsonToken } from "./parquetPreview.ts";
 
-/** Icon per category. The category itself is decided once, in parquetParser.categorizeType. */
+/** Icon per category. The category itself is decided once, in parquetSchema.categorizeType. */
 export const COLUMN_ICONS: Record<ColumnCategory, string> = {
   bool: "codicon-symbol-boolean",
   numeric: "codicon-symbol-numeric",
