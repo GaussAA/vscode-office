@@ -5,6 +5,7 @@
  */
 import {
   JSON_SEARCH_BATCH,
+  JSON_SEARCH_CHAR_BUDGET,
   JSON_SEARCH_MAX_MATCHES,
   type JsonSearchBatch,
 } from "@/common/jsonPreviewTypes";
@@ -47,7 +48,7 @@ export class JsonArrayAdapter {
         requestId,
         query,
         records: [],
-        scanned: 0,
+        scanned: this.text.length,
         total: this.text.length,
         matches: 0,
         done: true,
@@ -57,12 +58,12 @@ export class JsonArrayAdapter {
       return;
     }
 
+    const schedule = options.schedule ?? ((run) => setTimeout(run, 0));
     const batchSize = options.batchSize ?? JSON_SEARCH_BATCH;
     const maxMatches = options.maxMatches ?? JSON_SEARCH_MAX_MATCHES;
-    const schedule = options.schedule ?? ((run) => setTimeout(run, 0));
+    const step = options.step ?? 1000;
 
-    // Process records in batches
-    const BATCH_SIZE = 1000;
+    let scanned = 0; // character offset reached so far
     let processedRecords = 0;
     let matches = 0;
     let capped = false;
@@ -73,7 +74,7 @@ export class JsonArrayAdapter {
         requestId,
         query,
         records: pending.map((r) => ({ index: r.index, count: r.count, snippet: r.snippet })),
-        scanned: Math.floor((processedRecords / this.records.length) * this.text.length),
+        scanned,
         total: this.text.length,
         matches,
         done,
@@ -86,15 +87,27 @@ export class JsonArrayAdapter {
     const processBatch = () => {
       if (cancelToken.cancelled) return;
 
-      const batchEnd = Math.min(processedRecords + BATCH_SIZE, this.records.length);
+      const recordLimit = Math.min(processedRecords + step, this.records.length);
+      let charsRead = 0;
 
       for (
-        let index = processedRecords;
-        index < batchEnd && !cancelToken.cancelled && !capped;
-        index++
+        ;
+        processedRecords < recordLimit && !cancelToken.cancelled && !capped;
+        processedRecords++
       ) {
-        const range = this.records[index];
+        const range = this.records[processedRecords];
+        const recordSize = range.end - range.start;
+
+        // Apply character budget: if adding this record would exceed the budget and we've
+        // already read something this turn, defer it to the next turn.
+        if (charsRead > 0 && charsRead + recordSize > JSON_SEARCH_CHAR_BUDGET) {
+          break;
+        }
+
         const raw = this.text.slice(range.start, range.end);
+        charsRead += recordSize;
+        scanned = range.end;
+
         let cursor = 0;
         let recordMatches = 0;
         let firstSnippet: string | null = null;
@@ -121,7 +134,7 @@ export class JsonArrayAdapter {
 
         if (recordMatches > 0 && firstSnippet) {
           pending.push({
-            index,
+            index: processedRecords,
             size: 0, // unused, for internal tracking only
             raw: "",
             snippet: firstSnippet,
@@ -134,19 +147,19 @@ export class JsonArrayAdapter {
         }
       }
 
-      processedRecords = batchEnd;
-
       if (cancelToken.cancelled) {
         // Exit without sending any batch after cancellation
         return;
       }
 
       if (capped || processedRecords >= this.records.length) {
+        scanned = this.text.length;
         flush(true);
         return;
       }
 
-      if (pending.length > 0) flush(false);
+      // Always flush after a turn, even with no matches, so scanned advances
+      flush(false);
       schedule(() => processBatch());
     };
 

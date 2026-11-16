@@ -30,6 +30,8 @@ export const JSON_RECORD_WINDOW = 100;
 export const JSON_SEARCH_BATCH = SEARCH_BATCH;
 /** Hard stop so a one-character query cannot exhaust memory. */
 export const JSON_SEARCH_MAX_MATCHES = SEARCH_MAX_MATCHES;
+/** Characters read per search turn before yielding control. */
+export const JSON_SEARCH_CHAR_BUDGET = 2_000_000;
 
 export type JsonRootKind = "array" | "object" | "scalar" | "too-large" | "invalid";
 
