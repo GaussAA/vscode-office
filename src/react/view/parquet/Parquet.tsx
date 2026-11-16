@@ -15,7 +15,7 @@ import type {
   ParquetProfile,
   ParquetProfilePayload,
 } from "@/common/parquetProfileTypes";
-import { ParquetSession } from "./parquetSession.ts";
+import { ParquetSession, type PagingSnapshot } from "./parquetSession.ts";
 import { describeParquetFailure } from "./parquetError.ts";
 import {
   PARQUET_CHUNK_SIZE,
@@ -66,6 +66,9 @@ function schedulePrefetch(run: () => void): () => void {
   const handle = window.setTimeout(run, 250);
   return () => window.clearTimeout(handle);
 }
+
+/** What the view shows before a session has measured anything. The session owns the real values. */
+const UNMEASURED_PAGING: PagingSnapshot = { pageSize: MIN_ROWS_PER_PAGE, totalPages: 1 };
 
 /** A virtual document arrives as inline base64; a local one as a fetchable path. */
 type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBase64"> & {
@@ -129,9 +132,13 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const sessionRef = useRef<ParquetSession | null>(null);
   const { siderWidth, setSiderWidth, beginResize, moveResize, endResize } = useParquetSiderResize();
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
-  /** Mirrors `session.pageSize` / `session.totalPages` so renders can read them. */
-  const [pageSize, setPageSize] = useState(MIN_ROWS_PER_PAGE);
-  const [totalPages, setTotalPages] = useState(1);
+  /**
+   * The one mirror of the session's page size and page count, so renders can read them. It only
+   * ever holds `session.paging` (or the unmeasured placeholder); nothing here computes a page
+   * number or a page count, and nothing but the measuring effect writes it.
+   */
+  const [paging, setPaging] = useState<PagingSnapshot>(UNMEASURED_PAGING);
+  const { pageSize, totalPages } = paging;
   const [tableBodyHeight, setTableBodyHeight] = useState(320);
   const [tableBodyWidth, setTableBodyWidth] = useState(0);
   /** Bumped when the page size changes, so the page loader runs against the new slicing. */
@@ -238,7 +245,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     setLoadedPage(0);
     setLoadedStart(0);
     setPageLoading(false);
-    setTotalPages(1);
+    setPaging(UNMEASURED_PAGING);
   }, []);
 
   /** Briefly true right after a copy, so the button can answer instead of staying silent. */
@@ -349,8 +356,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         setPage(nextPage);
         setReloadToken((token) => token + 1);
       }
-      setPageSize(session.pageSize);
-      setTotalPages(session.totalPages);
+      // Same object while the size is unchanged, so this only re-renders on a real change.
+      setPaging(session.paging);
     };
     update();
     const observer = new ResizeObserver(update);

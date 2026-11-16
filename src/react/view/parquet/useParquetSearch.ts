@@ -140,7 +140,7 @@ export function useParquetSearch({
       if (!session) return;
       const sorted = [...matchRows].sort((a, b) => a - b);
       const pageStart = session.pageToRow(page);
-      const pageEnd = pageStart + session.pageSize;
+      const pageEnd = session.endOf(page);
       const target =
         direction > 0
           ? (sorted.find((row) => row >= pageEnd) ?? sorted[0])
