@@ -1,12 +1,6 @@
 import type { SheetSource } from "./sheetSource";
 
-/**
- * Geometry and coordinate rules shared by the windowed sheet and its tests.
- *
- * The windowed table freezes row 1 as the header (HEADER_ROWS = 1). Every offset derives from
- * this constant, so toBodySource, fileRowToBodyRow, bodyRowToFileRow, and the initial header
- * read all reference the same rule instead of duplicating magic offsets.
- */
+/** Geometry and coordinate rules shared by the windowed sheet and its tests. */
 export const ROW_HEIGHT = 22;
 export const HEADER_HEIGHT = 38;
 export const INDEX_WIDTH = 56;
@@ -15,7 +9,11 @@ export const MAX_COLUMN_WIDTH = 420;
 export const OVERSCAN = 4;
 export const COPY_FEEDBACK_MS = 1_200;
 
-/** The windowed sheet freezes the first row as the header. */
+/**
+ * The windowed table freezes row 1 as the header (HEADER_ROWS = 1). Every offset derives from
+ * this constant, so toBodySource, fileRowToBodyRow, bodyRowToFileRow, and the initial header
+ * read all reference the same rule instead of duplicating magic offsets.
+ */
 export const HEADER_ROWS = 1;
 
 /** Body source: the file source without its frozen header row(s). */
@@ -82,6 +80,17 @@ export function headerCells(rows: string[][], columnCount: number): string[] {
     labels.push(cellText(first[column]) || String(column + 1));
   }
   return labels;
+}
+
+/**
+ * Parse a jump-to-row input: positive integers jump to that file row (clamped to the body).
+ * Invalid input, zero, or negative values return undefined.
+ */
+export function parseJumpRow(text: string, fileRowCount: number): number | undefined {
+  const trimmed = text.replace(/,/g, "").trim();
+  const parsed = parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed) || parsed <= HEADER_ROWS) return undefined;
+  return fileRowToBodyRow(parsed, fileRowCount);
 }
 
 export { columnLabel as columnName } from "@/common/columnLabel";

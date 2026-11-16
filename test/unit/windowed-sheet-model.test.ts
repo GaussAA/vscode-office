@@ -11,6 +11,7 @@ import {
   fileRowToBodyRow,
   gridTemplateFor,
   headerCells,
+  parseJumpRow,
   toBodySource,
 } from "@/react/view/excel/windowedSheetModel";
 import type { SheetSource } from "@/react/view/excel/sheetSource";
@@ -71,4 +72,22 @@ test("cellText: long values are cut instead of wrapping a fixed-height row", () 
 test("headerCells: pads unnamed columns with their number", () => {
   assert.deepEqual(headerCells([["a", "b"]], 3), ["a", "b", "3"]);
   assert.deepEqual(headerCells([], 2), ["1", "2"]);
+});
+
+test("parseJumpRow: valid positive integers jump to the clamped body row", () => {
+  const fileRowCount = 100;
+  assert.equal(parseJumpRow("2", fileRowCount), 0, "row 2 is body row 0");
+  assert.equal(parseJumpRow("50", fileRowCount), 48);
+  assert.equal(parseJumpRow("100", fileRowCount), 98, "last row");
+  assert.equal(parseJumpRow("200", fileRowCount), 98, "clamps to last");
+  assert.equal(parseJumpRow("1,234", fileRowCount), 98, "commas are stripped");
+});
+
+test("parseJumpRow: invalid input returns undefined", () => {
+  assert.equal(parseJumpRow("", 100), undefined);
+  assert.equal(parseJumpRow("abc", 100), undefined);
+  assert.equal(parseJumpRow("0", 100), undefined);
+  assert.equal(parseJumpRow("1", 100), undefined, "row 1 is the header");
+  assert.equal(parseJumpRow("-5", 100), undefined);
+  assert.equal(parseJumpRow("3.14", 100), 1, "parseInt ignores fractional part");
 });
