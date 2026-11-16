@@ -12,6 +12,7 @@ import {
 } from "../../../common/jsonPreviewTypes.ts";
 import { savePersistedState } from "../../common/persistedState.ts";
 import { jsonViewerThemeTokens } from "../../common/jsonViewerTheme.ts";
+import { PendingRequests, RequestGuard } from "../../util/requestGuard.ts";
 import { handler } from "../../util/vscode.ts";
 import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import { $t } from "../../i18n/i18nConfig.ts";
@@ -83,13 +84,11 @@ export default function JsonPreview() {
   const infoRef = useRef<JsonInfoPayload | null>(null);
   const selectedRef = useRef(0);
   const queryRef = useRef("");
-  const entrySeq = useRef(0);
-  const recordsSeq = useRef(0);
-  /** Which document a record-window request belongs to; replies for an old one are ignored. */
-  const recordsEpoch = useRef(0);
-  const requestEpoch = useRef(new Map<number, number>());
-  const searchSeq = useRef(0);
-  const searchRequestId = useRef(0);
+  const entries = useRef(new RequestGuard());
+  /** Record windows in flight. A new document clears them, so an old document's reply is dropped. */
+  const records = useRef(new PendingRequests());
+  /** The search scan; `cancel()` says whether the host is still running one. */
+  const search = useRef(new RequestGuard());
   const requestedWindows = useRef(new Set<number>());
 
   useEffect(() => {
@@ -110,8 +109,7 @@ export default function JsonPreview() {
     for (let windowStart = first; windowStart <= last; windowStart += JSON_RECORD_WINDOW) {
       if (requestedWindows.current.has(windowStart)) continue;
       requestedWindows.current.add(windowStart);
-      const requestId = ++recordsSeq.current;
-      requestEpoch.current.set(requestId, recordsEpoch.current);
+      const requestId = records.current.issue();
       handler.emit("jsonRecords", {
         requestId,
         start: windowStart,
@@ -123,7 +121,7 @@ export default function JsonPreview() {
   const requestDetail = useCallback((index: number) => {
     const current = infoRef.current;
     if (!current || current.rootKind !== "array" || current.recordCount === 0) return;
-    const requestId = ++entrySeq.current;
+    const requestId = entries.current.issue();
     setDetailLoading(true);
     handler.emit("jsonRecord", { requestId, index });
   }, []);
@@ -135,13 +133,9 @@ export default function JsonPreview() {
       const sameShape = sameFile && previous?.rootKind === payload.rootKind;
       infoRef.current = payload;
       requestedWindows.current = new Set();
-      recordsEpoch.current++;
-      requestEpoch.current.clear();
-      if (searchRequestId.current) {
-        handler.emit("jsonSearchCancel", { requestId: searchRequestId.current });
-        searchRequestId.current = 0;
-      }
-      searchSeq.current++;
+      records.current.clear();
+      const staleSearch = search.current.cancel();
+      if (staleSearch !== null) handler.emit("jsonSearchCancel", { requestId: staleSearch });
       setInfo(payload);
       labels.clear();
       setLabelsVersion((version) => version + 1);
@@ -182,8 +176,7 @@ export default function JsonPreview() {
         setDetailLoading(false);
       })
       .on("jsonRecordsData", (payload: JsonRecordsPayload) => {
-        if (requestEpoch.current.get(payload.requestId) !== recordsEpoch.current) return;
-        requestEpoch.current.delete(payload.requestId);
+        if (!records.current.take(payload.requestId)) return;
         if (!payload.records.length) return;
         for (const record of payload.records) labels.set(record.index, record);
         setLabelsVersion((version) => version + 1);
@@ -191,7 +184,7 @@ export default function JsonPreview() {
       .on(
         "jsonRecordData",
         (payload: { requestId: number; index: number; entry: JsonlEntryDetail | null }) => {
-          if (payload.requestId !== entrySeq.current) return;
+          if (!entries.current.isCurrent(payload.requestId)) return;
           if (payload.index !== selectedRef.current) return;
           setDetail(payload.entry);
           setDetailLoading(false);
@@ -205,12 +198,15 @@ export default function JsonPreview() {
         },
       )
       .on("jsonSearchBatch", (batch: JsonSearchBatch) => {
-        if (batch.requestId !== searchSeq.current) return;
+        if (!search.current.isCurrent(batch.requestId)) return;
         if (batch.records.length) {
           setResults((previous) => [...previous, ...batch.records]);
         }
         setSearchMeta({ capped: batch.capped });
-        if (batch.done) setSearching(false);
+        if (batch.done) {
+          search.current.settle(batch.requestId);
+          setSearching(false);
+        }
       });
 
     handler.emit("init");
@@ -226,8 +222,7 @@ export default function JsonPreview() {
     if (!term || infoRef.current?.rootKind !== "array") return;
     setSearching(true);
     const timer = window.setTimeout(() => {
-      const requestId = ++searchSeq.current;
-      searchRequestId.current = requestId;
+      const requestId = search.current.issue();
       handler.emit("jsonSearch", { requestId, query: term });
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
@@ -246,11 +241,8 @@ export default function JsonPreview() {
     const term = value.trim();
     setQuery(value);
     queryRef.current = term;
-    searchSeq.current++;
-    if (searchRequestId.current) {
-      handler.emit("jsonSearchCancel", { requestId: searchRequestId.current });
-      searchRequestId.current = 0;
-    }
+    const stale = search.current.cancel();
+    if (stale !== null) handler.emit("jsonSearchCancel", { requestId: stale });
     setResults([]);
     setSearchMeta(null);
     setReveal(null);
