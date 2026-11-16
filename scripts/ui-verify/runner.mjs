@@ -123,7 +123,6 @@ async function main() {
           copyFileSync(join(shotsDir, `${scenario.name}.png`), join(docsDir, scenario.docs));
         }
         results.push({ name: scenario.name, ok: true, detail, ms: Date.now() - started });
-        await browser.resetViewport();
       } catch (error) {
         // Page-level exceptions are the single most useful thing when a scenario times out,
         // and they were being collected but never reported.
@@ -145,6 +144,8 @@ async function main() {
         } catch {
           // a page that cannot be captured is part of the failure, not a new one
         }
+      } finally {
+        await browser.resetViewport();
       }
     }
   } finally {

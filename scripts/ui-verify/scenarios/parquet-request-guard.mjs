@@ -74,4 +74,48 @@ export default [
       return `row 100 restored to ${state.range} (page size ${size})`;
     },
   },
+  {
+    name: "parquet-restore-first-measure-min-viewport",
+    async run({ page, base, setViewport }) {
+      // Root cause 2 only manifests when measured page size equals MIN_ROWS_PER_PAGE (8).
+      // Default viewport produces ~21, so the same-size skip never triggers. Height 400
+      // produces exactly 8 rows, exercising the edge case where fitPageSize would skip.
+      await setViewport(1500, 400);
+
+      await page.navigate(`${base}/stats`);
+      await page.evaluate(`(() => {
+        Object.keys(localStorage)
+          .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width')
+          .forEach(key => localStorage.removeItem(key));
+        localStorage.setItem('parquet-state:/mixed.parquet', JSON.stringify({ row: 100 }));
+      })()`);
+
+      await page.navigate(`${base}/harness-parquet?mixed=1`);
+      const mounted = await page.waitFor(
+        `!!document.querySelector('.parquet-table .ant-table-row') && Number(document.querySelector('.parquet-viewer__table-wrap')?.dataset.pageSize ?? 0) > 0`,
+      );
+      expect(mounted, "table did not render");
+
+      const size = await pageSize(page);
+      expect(size === 8, `precondition: pageSize is ${size}, expected 8`);
+
+      // With pageSize=8, row 100 lands on page 12 (rows 97-104)
+      const expectedPage = 12;
+      const expectedRange = rangeOf(8, expectedPage, 300);
+      const expectedFirst = "97";
+
+      const restored = await page.waitFor(
+        `document.querySelector('.parquet-viewer__pager-info')?.innerText === ${JSON.stringify(expectedRange)}` +
+          ` && (${ROWS}[0])?.children[0]?.innerText === ${JSON.stringify(expectedFirst)}`,
+        8000,
+      );
+      const state = await pagerState(page);
+      expect(
+        restored,
+        `row 100 not restored: expected ${expectedRange}/row ${expectedFirst}, got ${state.range}/row ${state.first}`,
+      );
+
+      return `row 100 restored at pageSize=8: ${state.range}`;
+    },
+  },
 ];
