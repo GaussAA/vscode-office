@@ -20,7 +20,7 @@ JSON 预览以**显式命令**打开，**不注册为 Viewer**：
 - 不写 `contributes.customEditors`，不注册 `.json` 文件选择器，不接管默认双击；`.json` 仍然由 VS Code 文本编辑器打开。
 - 入口三处：命令面板（`Data File Viewer: Preview JSON`）、资源管理器右键、JSON 编辑器标题。
 - 只读 webview 面板；保留“Open in Text Editor”。编辑器有未保存修改时读编辑器 buffer，并标明来源。
-- 顶层数组：读入内存后扫描记录边界，建立记录索引；10–100 MB 的数组在字符串切片后按需解析各条记录，不整份 `JSON.parse`；内存峰值约为文件字节大小的 2–3 倍（100 MB 文件 → 100 MB buffer + 最多 200 MB UTF-16 字符串）；左栏是虚拟记录列表（`[index]` + 身份标签，无身份回退原始 JSON 头），右栏是选中记录的树和底栏值面板；复用 JSONL 的 Splitter、树、值面板与键盘。
+- 顶层数组：读入内存后扫描记录边界，建立记录索引；10–100 MB 的数组在字符串切片后按需解析各条记录，不整份 `JSON.parse`；内存开销取决于内容字符集（实测 91.6 MB 文件，Node v24.20.0 / Windows x64，独立子进程 `--expose-gc` 采样 3 次，测量方法见 `scripts/perf/measure-json-memory.mjs`）：**纯 ASCII** 瞬时峰值 2.0x（readFile Uint8Array + decode 字符串同时在内存），稳态 1.07x（Uint8Array 释放后，字符串 + 索引）；**含非 Latin-1 字符**（一个 CJK 字符强制整份字符串用 UTF-16）瞬时峰值 3.0x，稳态 2.07x；左栏是虚拟记录列表（`[index]` + 身份标签，无身份回退原始 JSON 头），右栏是选中记录的树和底栏值面板；复用 JSONL 的 Splitter、树、值面板与键盘。
 - 对象根：整份解析，上限 20 MB；超过显示 too-large 并给文本编辑器出口。
 - 全文件记录级搜索：结果替换左栏，带片段与命中数；选中记录后树展开并高亮首个命中；`Esc`/清空恢复记录列表。
 - 严格 JSON。注释/尾逗号不做兼容；解析错误给行/列与文本编辑器出口。
@@ -48,6 +48,6 @@ JSON 预览以**显式命令**打开，**不注册为 Viewer**：
 
 ## 实现结果（6.7.0）
 
-- 100 MB 数组 fixture（91.6 MB、50,000 条记录）在宿主侧测得：索引 0.49–1.37 s、100 条记录窗口 1–3 ms、单条详情 <1 ms、全文件搜索 63–114 ms；闸门预算分别为 6 s / 2 s / 8 s。
+- 100 MB 数组 fixture（91.6 MB、50,000 条记录）在宿主侧测得：索引 350–614 ms、100 条记录窗口 2–3 ms、单条详情 <1 ms、全文件搜索 559–1137 ms（`pnpm verify:perf` 中 `json-array-index-window-search` 场景，跑 3 次）；闸门预算分别为 6 s / 2 s / 8 s。
 - UI 场景覆盖记录列表虚拟化（500 条记录时 DOM <100 行）、记录搜索高亮、对象根路径搜索、buffer 标签、invalid / too-large / 空数组；真实 VS Code smoke 覆盖命令打开 webview 面板，并断言 `.json` 没有 custom editor 声明。
 - JSON 的 tree/value panel/keyboard 复用 `EntryDetail`，只给它加了可选的 `entryLabel`、`highlight`、`revealKey`；JSONL 的既有场景保持通过。

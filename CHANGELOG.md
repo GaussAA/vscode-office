@@ -11,13 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **JSON/JSONL search**: record limits, search batch sizes, and text caps now share a single source (`recordConstants.ts`), eliminating duplicate magic numbers across JSON and JSONL type files.
 - **Type safety**: search adapter batch types now flow through generics (`SearchOptions<TBatch>`), removing unsafe `any` casts in adapter flush logic.
+- **Parquet Session**: page size, total page count, and page-to-row conversion now belong to `ParquetSession`, removing duplicate state in the view and fixing restore-before-first-measure bugs.
+- **Parquet layering**: parser and cell-format modules moved to `src/common`, resolving service→react and common→service reverse dependencies; host and webview both import from `@/common/parquetReader`.
+- **Excel dirty state**: dirty/clean/pending-save state machine with edit-version guard ensures save handlers only mark clean when no edits occurred during the write; export failures now emit `saveFailed` and revert to dirty state with user-facing error modals.
+- **Webview request lifecycle**: `RequestGuard` and `PendingRequests` classes centralize request id generation, stale-reply detection, and cancellation bookkeeping; JSONL, JSON Preview, and Compare use these instead of hand-rolled counters.
 
 ### Fixed
 
 - **Unicode search**: Turkish İ (U+0130) and similar characters whose lowercase form has a different UTF-16 length no longer shift snippet offsets in JSONL search, and queries containing İ now match İ in both JSON and JSONL records. The old implementation computed match offsets in a lowercased copy, causing every İ before the match to shift the snippet cut by one position.
 - **JSON search progress**: `scanned` now reports the actual character offset reached (the `end` of the last processed record) rather than a ratio of record counts, fixing NaN on empty arrays (`0 / 0`) and misreported progress when a few huge records dominated the file. The `step` option now limits records per turn (was ignored, fixed at 1000), and a 2M-character budget prevents huge records from blocking the event loop. Final batches set `scanned = text.length` exactly.
 - **Entry classification**: JSON record detail, summary, and root entry construction now route through a single `classifyEntry` call that parses each record exactly once. The old paths called `JSON.parse` independently after classification, or (in the summary path) encoded the text twice—once in `classifyEntry`'s size check and again when computing byte size from the raw slice. UTF-8 byte size is now counted without allocating a `TextEncoder` buffer, avoiding allocation cost on 8MB records and 100MB editor buffers.
-- **Duplicate code removal**: the `truncate` helper is now exported once from `entryClassifier`; `jsonlDocument`'s local copy has been removed. Dead code including unused `streamingSearch`, `RecordAddressableDocument` interface, and `RecordRange`/`SearchBatch` types has been deleted.
+- **Duplicate code removal**: the `truncate` helper is now exported once from `entryClassifier`; `jsonlDocument`'s local copy has been removed. Dead code including unused `streamingSearch` function, `RecordAddressableDocument` interface, and duplicated search implementations has been deleted.
+- **Excel workbook export**: `workbookBytes` now correctly produces `.xls` (D0CF signature) and `.ods` (mimetype) files; the old `export_xlsx` path wrote PK-prefixed xlsx bytes for both (the `bookType` was hard-coded to `"xlsx"` regardless of the requested extension). Format selection without a leading dot (e.g., `'xls'` instead of `'.xls'`) now works correctly; unrecognized extensions throw instead of silently producing xlsx bytes.
+- **Excel column labels**: columns ≥728 (e.g., 1378) now convert correctly; the old `stringAt` implementations in `excel_meta` and `alphabet.js` produced wrong labels—for example, index 1378 gave ABA instead of the correct BAA. All callers now use shared `columnLabel`/`columnIndex` from `src/common/columnLabel.ts`, tested across the full 0–16383 range.
+- **Excel i18n**: missing keys `button.copy`, `viewer.autoFitColumns`, and `viewer.autoFitDone` added to all locales (en / zh-cn / zh-tw); `button.copy` was rendering empty in `WindowedSelectionBar`. Added `excel-i18n-parity.test.ts` to ensure locale key sets stay synchronized.
+- **Excel save failures**: export errors during pending-save now revert to dirty state and show a user-facing error modal instead of leaving the UI stuck with a disabled save button. When file permissions change between webview open (`readOnly=false`) and host save (`isReadOnly()=true`), the host emits `saveFailed` with `reason: readonly` and the webview notifies the user.
+- **Parquet stale replies**: opening a new file now cancels profile and scan requests from the previous file; late replies no longer land on the new document. Closing the profile panel or opening a column without statistics also stops waiting for a running scan.
 
 ### Internal
 
@@ -25,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `unicode-search-regression.test.ts` (10 tests) covering İ padding, snippet offset alignment, whole-line toLowerCase spy, and cross-format İ matching.
 - Add `json-progress-cancel.test.ts` (11 tests) verifying real character offset progress, empty-array NaN fix, `step` option behavior, character budget enforcement, and cancellation semantics.
 - Add `entry-single-parse.test.ts` (13 tests) spying on `JSON.parse` and `TextEncoder.prototype.encode` to verify each record is parsed exactly once and byte size is counted without encoding.
+
+- Add `excel-dirty-state.test.ts` (12 tests) covering dirty state machine transitions, `saveFailed` handling, and edit-version guard semantics; `column-label.test.ts` (7 tests) testing full 0–16383 column range; `excel-i18n-parity.test.ts` (5 tests) ensuring locale key sets match.
+- Add UI verification scenarios for RequestGuard (parquet open-once, restore-first-measure, document-switch stale-reply, JSONL/JSON search cancellation) and Excel save flows (Save As dirty state, edit-during-pending, replace).
+- Remove `benchmark.test.ts`: it only tested JavaScript built-ins (`Array.map`, `JSON.parse`, `Array.sort`) without importing any project code, caused intermittent pre-commit failures due to timing flakes, and provided zero regression protection for the actual codebase.
 
 ## [6.14.1] - 2026-11-15
 

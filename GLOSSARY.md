@@ -77,7 +77,7 @@ _Avoid_: line number、row number
 _Avoid_: store, state（太泛，且暗示全局单例）
 
 **Byte source（字节来源）**:
-打开文件时选定的读取原语（`fileByteSource` 走 `fs`，`memoryByteSource` 走内存副本），决定这个文件是「按窗口读」还是「整份在内存」。JSONL 与 parquet 共用这层抽象。
+打开文件时选定的读取原语（`fileByteSource` 走 `fs`，`memoryByteSource` 走内存副本），决定这个文件是「按窗口读」还是「整份在内存」。JSONL 与 parquet 共用这层抽象；JSON 预览不使用 Byte source，整份读入内存后扫描记录边界。
 _Avoid_: loader, reader（本仓库的 reader 指解析器）
 
 **Provider glue（provider 胶水层）**:
