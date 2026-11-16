@@ -110,6 +110,7 @@ async function main() {
         press: browser.press,
         frames: browser.frames,
         clearFrames: browser.clearFrames,
+        setViewport: browser.setViewport,
         stats: async () => (await fetch(`${harness.url}/stats`)).json(),
       };
       browser.clearViolations();
@@ -122,6 +123,7 @@ async function main() {
           copyFileSync(join(shotsDir, `${scenario.name}.png`), join(docsDir, scenario.docs));
         }
         results.push({ name: scenario.name, ok: true, detail, ms: Date.now() - started });
+        await browser.resetViewport();
       } catch (error) {
         // Page-level exceptions are the single most useful thing when a scenario times out,
         // and they were being collected but never reported.

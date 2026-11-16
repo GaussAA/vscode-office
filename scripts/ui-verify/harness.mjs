@@ -1371,7 +1371,14 @@ export function startHarness(fixtures, port = 0) {
                     : path === "/bad.parquet"
                       ? fixtures.bad
                       : fixtures.big;
-      serveParquet(req, res, file, stats, url.searchParams.get("range") !== "off");
+      // `?delay=ms` slows every response for that URL. A scenario that needs "a document is
+      // still opening" (a stale reply arriving mid-load) cannot get that window from a local
+      // fixture that answers in a millisecond.
+      const delay = Math.min(Math.max(Number(url.searchParams.get("delay") ?? 0) || 0, 0), 5000);
+      const respond = () =>
+        serveParquet(req, res, file, stats, url.searchParams.get("range") !== "off");
+      if (delay > 0) setTimeout(respond, delay);
+      else respond();
       return;
     }
 
