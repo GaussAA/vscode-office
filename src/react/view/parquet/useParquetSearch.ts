@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import type { ParquetFileInfo } from "./parquetParser";
+import type { ParquetFileInfo } from "@/common/parquetReader";
 import type { ParquetSession } from "./parquetSession";
 import { searchParquetValues } from "./parquetSearch";
 import { SEARCH_MAX_ROWS } from "./parquetLayout";
+import { ParquetHitSet, normalizeSearchQuery } from "./parquetHitSet";
 
 interface UseParquetSearchArgs {
   fileInfoRef: RefObject<ParquetFileInfo | null>;
@@ -65,7 +66,7 @@ export function useParquetSearch({
   const [searchedEmpty, setSearchedEmpty] = useState(false);
   const [searchedQuery, setSearchedQuery] = useState("");
   const searchSeq = useRef(0);
-  const matchColumnsRef = useRef<Map<number, number>>(new Map());
+  const hitSetRef = useRef<ParquetHitSet | null>(null);
 
   const resetSearch = useCallback((clearQuery = false) => {
     searchSeq.current++;
@@ -76,7 +77,7 @@ export function useParquetSearch({
     setMatchRows(new Set());
     setSearchedEmpty(false);
     setActiveMatch(null);
-    matchColumnsRef.current = new Map();
+    hitSetRef.current = null;
     if (clearQuery) setQuery("");
   }, []);
 
@@ -111,14 +112,13 @@ export function useParquetSearch({
         },
       });
       if (seq !== searchSeq.current || result.cancelled) return;
-      setMatchRows(new Set(result.rows));
+      const hitSet = new ParquetHitSet(result.rows, result.columns, needle);
+      hitSetRef.current = hitSet;
+      setMatchRows(hitSet.rowSet);
       setCapped(result.capped);
-      setSearchedEmpty(result.rows.length === 0);
-      onSearchedRef.current?.(result.rows.length);
-      matchColumnsRef.current = new Map(
-        result.rows.map((row, at) => [row, result.columns[at] ?? 0] as const),
-      );
-      if (result.rows.length > 0) {
+      setSearchedEmpty(hitSet.isEmpty);
+      onSearchedRef.current?.(hitSet.size);
+      if (!hitSet.isEmpty) {
         setActiveMatch(0);
         const target = sessionRef.current?.rowToPage(result.rows[0]);
         if (target !== undefined) goToPage((current) => (current === target ? current : target));
@@ -135,22 +135,16 @@ export function useParquetSearch({
 
   const jumpMatch = useCallback(
     (direction: 1 | -1) => {
-      if (matchRows.size === 0) return;
       const session = sessionRef.current;
-      if (!session) return;
-      const sorted = [...matchRows].sort((a, b) => a - b);
-      const pageStart = session.pageToRow(page);
-      const pageEnd = session.endOf(page);
-      const target =
-        direction > 0
-          ? (sorted.find((row) => row >= pageEnd) ?? sorted[0])
-          : ([...sorted].reverse().find((row) => row < pageStart) ?? sorted[sorted.length - 1]);
-      goToPage(session.rowToPage(target));
-      setActiveMatch(sorted.indexOf(target));
-      const column = matchColumnsRef.current.get(target);
-      if (column !== undefined) focusColumn(column, false);
+      const hitSet = hitSetRef.current;
+      if (!session || !hitSet || hitSet.isEmpty) return;
+      const match = hitSet.step(direction, page, session);
+      if (!match) return;
+      goToPage(session.rowToPage(match.row));
+      setActiveMatch(match.index);
+      focusColumn(match.column, false);
     },
-    [focusColumn, goToPage, matchRows, page, sessionRef],
+    [focusColumn, goToPage, page, sessionRef],
   );
 
   /** Abandon a running scan. The scan checks `searchSeq` between pages, so this stops it. */
@@ -176,7 +170,7 @@ export function useParquetSearch({
     activeMatch,
     capped,
     searchedEmpty,
-    hasCurrentResults: matchRows.size > 0 && query.trim().toLowerCase() === searchedQuery,
+    hasCurrentResults: matchRows.size > 0 && normalizeSearchQuery(query) === searchedQuery,
     runSearch,
     jumpMatch,
     cancelSearch,

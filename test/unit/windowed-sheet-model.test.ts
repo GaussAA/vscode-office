@@ -5,10 +5,13 @@ import {
   MIN_COLUMN_WIDTH,
   bodyRowToFileRow,
   cellId,
+  cellText,
   clampColumnWidth,
   columnName,
   fileRowToBodyRow,
   gridTemplateFor,
+  headerCells,
+  parseJumpRow,
   toBodySource,
 } from "@/react/view/excel/windowedSheetModel";
 import type { SheetSource } from "@/react/view/excel/sheetSource";
@@ -58,4 +61,36 @@ test("toBodySource removes only the header and offsets reads", async () => {
     ["r2", "x"],
   ]);
   assert.deepEqual(await source.readRows(0, 1), [["r0", "x"]]);
+});
+
+test("cellText: long values are cut instead of wrapping a fixed-height row", () => {
+  assert.equal(cellText("short"), "short");
+  assert.equal(cellText(undefined), "");
+  assert.equal(cellText("x".repeat(500)).length, 201);
+});
+
+test("headerCells: pads unnamed columns with their number", () => {
+  assert.deepEqual(headerCells([["a", "b"]], 3), ["a", "b", "3"]);
+  assert.deepEqual(headerCells([], 2), ["1", "2"]);
+});
+
+test("parseJumpRow: valid positive integers jump to the clamped body row", () => {
+  const fileRowCount = 100;
+  assert.equal(parseJumpRow("2", fileRowCount), 0, "row 2 is body row 0");
+  assert.equal(parseJumpRow("50", fileRowCount), 48);
+  assert.equal(parseJumpRow("100", fileRowCount), 98, "last row");
+  assert.equal(parseJumpRow("200", fileRowCount), 98, "clamps to last");
+  assert.equal(parseJumpRow("1,234", fileRowCount), 98, "commas are stripped");
+});
+
+test("parseJumpRow: invalid input returns undefined", () => {
+  assert.equal(parseJumpRow("", 100), undefined);
+  assert.equal(parseJumpRow("abc", 100), undefined);
+  assert.equal(parseJumpRow("NaN", 100), undefined);
+});
+
+test("parseJumpRow: zero, negative, and header row all jump to the first body row", () => {
+  assert.equal(parseJumpRow("0", 100), 0, "0 clamps to body row 0");
+  assert.equal(parseJumpRow("-5", 100), 0, "negative clamps to body row 0");
+  assert.equal(parseJumpRow("1", 100), 0, "row 1 is the header, jump to body row 0");
 });

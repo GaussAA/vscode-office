@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ParquetColumnInfo } from "./parquetParser";
+import type { ParquetColumnInfo } from "@/common/parquetReader";
 import {
   COLUMN_MAX_WIDTH,
   COLUMN_MIN_WIDTH,

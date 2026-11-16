@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createCompareHandlers, type CompareSideContext } from "@/provider/compareHandlers";
-import { memoryByteSource, type ByteSource } from "@/service/jsonlFile";
+import type { ByteSource } from "@/common/byteSource";
+import { memoryByteSource } from "@/service/jsonlFile";
 
 const fixture = (name: string) => new URL(`../fixtures/parquet/${name}.parquet`, import.meta.url);
 

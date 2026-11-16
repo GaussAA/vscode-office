@@ -10,14 +10,8 @@
  * to holding the bytes it was already given. The module itself imports neither `vscode` nor
  * `fs`, so both paths are exercised by `node --test`.
  */
+import type { ByteSource } from "@/common/byteSource";
 import { buildJsonlIndex, type JsonlIndex } from "@/service/jsonlDocument";
-
-/** Random access to a file's bytes. */
-export interface ByteSource {
-  readonly size: number;
-  read(offset: number, length: number): Promise<Uint8Array>;
-  close?(): Promise<void> | void;
-}
 
 /** A window of the file plus an index local to that window. */
 export interface ByteWindow {

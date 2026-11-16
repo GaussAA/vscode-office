@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { ParquetProfile } from "@/common/parquetProfileTypes";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { COLUMN_ICONS } from "./parquetCell";
-import type { ParquetColumnInfo } from "./parquetParser";
+import type { ParquetColumnInfo } from "@/common/parquetReader";
 
 interface ParquetSchemaProps {
   columns: ParquetColumnInfo[];

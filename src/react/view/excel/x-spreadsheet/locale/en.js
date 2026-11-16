@@ -139,6 +139,7 @@ export default {
     save: "Save",
     saveAs: "Save As",
     ok: "OK",
+    copy: "Copy",
   },
   sort: {
     desc: "Sort Z -> A",

@@ -6,6 +6,7 @@ import { isVscodeEditorDark, observeVscodeThemeChange } from "../../util/vscodeT
 import "./Excel.less";
 import type { FindReplacePanelHandle } from "./FindReplacePanel";
 import { initExcelLocale, t } from "./excel_i18n";
+import { computeExcelSurface } from "./excelSurface";
 
 const FindReplacePanel = lazy(() => import("./FindReplacePanel"));
 const ExcelSaveAsDialog = lazy(() => import("./ExcelSaveAsDialog"));
@@ -152,22 +153,24 @@ function ExcelViewer() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [focusFindPanel, handleAutoFitColumns, handleSave, handleSaveAs, readOnlyRef, windowSource]);
 
+  const surface = computeExcelSurface({ loading, loadError, tooLarge: !!tooLarge, windowSource });
+
   return (
     <div className="excel-viewer">
       <Spin spinning={loading} fullscreen={true} />
-      {loadError && !loading && <ExcelLoadError message={loadError} />}
-      {tooLarge && !loading && (
+      {surface === "error" && <ExcelLoadError message={loadError!} />}
+      {surface === "guard" && (
         <ExcelGuard
-          key={`${tooLarge.name}-${tooLarge.size}`}
-          file={tooLarge}
+          key={`${tooLarge!.name}-${tooLarge!.size}`}
+          file={tooLarge!}
           onOpenAnyway={handleOpenAnyway}
           onOpenInVSCode={() => handler.emit("editInVSCode", true)}
         />
       )}
-      {readOnly && !loading && !loadError && !tooLarge && !windowSource && (
+      {surface === "grid" && readOnly && (
         <div className="excel-readonly-banner">{t("viewer.readonlyBanner")}</div>
       )}
-      {findPanel && !loading && !loadError && !tooLarge && !windowSource && (
+      {surface === "grid" && findPanel && (
         <Suspense fallback={<div style={{ position: "absolute", top: 0, left: 0 }} />}>
           <FindReplacePanel
             ref={findReplacePanelRef}
@@ -192,7 +195,7 @@ function ExcelViewer() {
         </Suspense>
       )}
       <div id="container"></div>
-      {windowSource && (
+      {surface === "window" && windowSource && (
         <WindowedSheet
           key={windowLoad}
           source={windowSource}
@@ -204,7 +207,7 @@ function ExcelViewer() {
           findInputRef={windowedFindInputRef}
         />
       )}
-      {!loading && !loadError && !windowSource && !tooLarge && (
+      {surface === "grid" && (
         <button
           type="button"
           className="dark-mode-toggle"

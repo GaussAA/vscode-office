@@ -5,6 +5,10 @@
  * model — that is the point — so a search reads row blocks from the source and stops at the
  * first N matches. Same contract as the parquet search: cancel between blocks, report progress
  * in rows, and keep the earliest matches in row order so "next" is predictable.
+ *
+ * Unlike the grid find in excel_find.ts (cell hits, query used verbatim), a hit here is a row and
+ * the query is trimmed. The grid cannot trim because its Replace shares the query; this view has
+ * no Replace. A whitespace-only query is "no search" here and a literal search there.
  */
 import type { SheetSource } from "./sheetSource";
 

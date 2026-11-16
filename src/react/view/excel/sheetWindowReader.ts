@@ -24,8 +24,6 @@ export interface SheetWindowSnapshot {
 
 export interface SheetWindowReader {
   rowsFor(scrollTop: number, viewport: SheetViewport): Promise<SheetWindowSnapshot>;
-  /** Rows already in hand for this offset, without waiting; undefined when none match. */
-  peek(scrollTop: number, viewport: SheetViewport): string[][] | undefined;
 }
 
 interface Block {
@@ -80,10 +78,6 @@ export function createSheetWindowReader(source: SheetSource): SheetWindowReader 
         range,
         stale: false,
       };
-    },
-
-    peek(scrollTop, viewport) {
-      return sliceCached(visibleRange(scrollTop, viewport));
     },
   };
 }

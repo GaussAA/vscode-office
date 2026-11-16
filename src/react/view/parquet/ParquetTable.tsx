@@ -5,7 +5,7 @@ import { $t } from "../../i18n/i18nConfig.ts";
 import { CursorContext, type CellCursor, type TableRow } from "./parquetCell.tsx";
 import type { ParquetColumnLayout } from "./parquetColumnLayout.ts";
 import { PresentationTable, ResizableHeaderCell } from "./parquetHeaders.tsx";
-import type { ParquetFileInfo } from "./parquetParser.ts";
+import type { ParquetFileInfo } from "@/common/parquetReader";
 
 interface ParquetTableProps {
   tableRef: RefObject<TableRef | null>;

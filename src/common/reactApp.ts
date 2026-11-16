@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { extensionResource, getExtensionUri, readExtensionText } from "./extensionResource";
-import { IconService } from "../service/icon/iconService";
+
 import { applyWebviewBase, applyWebviewConfig } from "./webviewBase";
 import { buildWebviewCsp } from "./webviewCsp";
 
@@ -9,20 +9,30 @@ interface ViewOption {
   fileName?: string;
 }
 
+/**
+ * Supplies the icon theme config that is merged into every webview's config. The host
+ * (`extension.ts`) passes the concrete service in, so `common` does not import `service`.
+ */
+export interface WebviewConfigSource {
+  getWebviewConfig(context: vscode.ExtensionContext, webview: vscode.Webview): object;
+}
+
 export class ReactApp {
   private static context: vscode.ExtensionContext;
+  private static icons: WebviewConfigSource;
   private static webviewUri: vscode.Uri;
   public static IS_DEV = false;
 
-  public static init(context: vscode.ExtensionContext) {
+  public static init(context: vscode.ExtensionContext, icons: WebviewConfigSource) {
     this.context = context;
+    this.icons = icons;
     this.webviewUri = extensionResource(context, "out", "webview");
     this.IS_DEV = context.extensionMode == vscode.ExtensionMode.Development;
   }
 
   public static async view(webview: vscode.Webview, option: ViewOption) {
     const html = await this.readContent();
-    const iconConfig = IconService.getInstance().getWebviewConfig(this.context, webview);
+    const iconConfig = this.icons.getWebviewConfig(this.context, webview);
 
     webview.html = applyWebviewConfig(
       this.buildPath(html, webview).replace(`{{csp}}`, buildWebviewCsp(webview.cspSource)),
