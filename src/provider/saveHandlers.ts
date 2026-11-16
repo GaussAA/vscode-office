@@ -60,7 +60,6 @@ const SAVE_FILTERS = new Map<string, SaveFilter>([
   ["xls", { label: "Excel 97-2003 Workbook", exts: ["xls"] }],
   ["ods", { label: "OpenDocument Spreadsheet", exts: ["ods"] }],
   ["csv", { label: "CSV (Comma delimited)", exts: ["csv"] }],
-  ["parquet", { label: "Apache Parquet", exts: ["parquet"] }],
 ]);
 
 /** What the "save as" dialog starts from, derived from the document name and the asked format. */
@@ -137,6 +136,10 @@ export function createSaveHandlers<Target>(context: SaveHandlerContext<Target>) 
     /**
      * Write to a place the user picked, then open it. The *target* is stamped, not the
      * document: the target is the file whose change event we are about to cause.
+     *
+     * Save As does NOT mark the original document clean or emit saveDone, since the original
+     * file was not saved — only a copy was written elsewhere. The original document keeps its
+     * unsaved edits.
      */
     async saveAs(payload: SaveAsPayload) {
       const bytes = saveContentToBytes(payload as Parameters<typeof saveContentToBytes>[0]);
@@ -150,8 +153,7 @@ export function createSaveHandlers<Target>(context: SaveHandlerContext<Target>) 
       saves.markSaved(key);
       await writeFile(target, bytes);
       saves.markSaved(key);
-      markClean();
-      emit("saveDone");
+      // The original document was not saved, so don't mark it clean or emit saveDone.
       await openTarget(target);
     },
   };

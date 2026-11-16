@@ -24,12 +24,7 @@ function setDirty(handler: Handler, uri: Uri, dirty: boolean) {
  * @param saves who wrote what and when. The provider owns it and shares one instance between
  * its panels; the save rules themselves are in `saveHandlers`.
  */
-export function handleCommonEvent(
-  uri: Uri,
-  handler: Handler,
-  saves: SaveTracker,
-  options?: { skipOpen?: boolean },
-) {
+export function handleCommonEvent(uri: Uri, handler: Handler, saves: SaveTracker) {
   let readOnly = false;
   const send = async () => {
     if (saves.shouldSkip(uri.toString())) {
@@ -65,16 +60,13 @@ export function handleCommonEvent(
     const side = full ? vscode.ViewColumn.Active : vscode.ViewColumn.Beside;
     vscode.commands.executeCommand("vscode.openWith", uri, "default", side);
   });
-  if (!options?.skipOpen) {
-    events
-      .on("init", () => {
-        void send();
-      })
-      .on("fileChange", () => {
-        void send();
-      });
-  }
   events
+    .on("init", () => {
+      void send();
+    })
+    .on("fileChange", () => {
+      void send();
+    })
     .on("change", () => {
       setDirty(handler, uri, true);
     })

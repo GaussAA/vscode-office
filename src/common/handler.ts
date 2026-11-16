@@ -51,16 +51,10 @@ export class Handler {
       eventEmitter.emit("fileChange", e);
     });
 
-    const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument((e) => {
-      if (e.document.uri.toString() === uri.toString() && e.contentChanges.length > 0) {
-        eventEmitter.emit("externalUpdate", e);
-      }
-    });
     const handle = new Handler(panel, eventEmitter);
     panel.onDidDispose(() => {
       handle.isEnd = true;
       fileWatcher?.dispose();
-      changeDocumentSubscription.dispose();
       eventEmitter.emit("dispose");
     });
 

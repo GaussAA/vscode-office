@@ -5,7 +5,7 @@ import type Spreadsheet from "./x-spreadsheet/index";
 import type { CsvEncoding } from "./csvEncoding";
 import { t } from "./excel_i18n";
 import { chooseExcelSaveRoute } from "./excelSave";
-import { exportSaveAs, export_xlsx, hasFormattingChanged } from "./excel_writer";
+import { exportWorkbook, hasFormattingChanged } from "./excel_writer";
 
 // Helper to safely extract error message
 const getErrorMessage = (error: unknown): string => {
@@ -74,7 +74,11 @@ export function useExcelSave({
           getContainer: () => document.body,
           onOk: async () => {
             try {
-              await export_xlsx(spreadSheet, "xlsx", csvEncoding, { saveAs: true }, csvDelimiter);
+              exportWorkbook(spreadSheet, ".xlsx", {
+                mode: "saveAs",
+                csvEncoding,
+                csvDelimiter,
+              });
             } catch (error) {
               console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
               throw error;
@@ -95,13 +99,11 @@ export function useExcelSave({
                   void (async () => {
                     dialog.destroy();
                     try {
-                      await export_xlsx(
-                        spreadSheet,
-                        extRef.current,
+                      exportWorkbook(spreadSheet, extRef.current, {
+                        mode: "save",
                         csvEncoding,
-                        undefined,
                         csvDelimiter,
-                      );
+                      });
                     } catch (error) {
                       console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
                     }
@@ -117,13 +119,11 @@ export function useExcelSave({
                   void (async () => {
                     try {
                       dialog.destroy();
-                      await export_xlsx(
-                        spreadSheet,
-                        "xlsx",
+                      exportWorkbook(spreadSheet, ".xlsx", {
+                        mode: "saveAs",
                         csvEncoding,
-                        { saveAs: true },
                         csvDelimiter,
-                      );
+                      });
                     } catch (error) {
                       console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);
                     }
@@ -141,7 +141,11 @@ export function useExcelSave({
     }
 
     try {
-      await export_xlsx(spreadSheet, extRef.current, csvEncoding, undefined, csvDelimiter);
+      exportWorkbook(spreadSheet, extRef.current, {
+        mode: "save",
+        csvEncoding,
+        csvDelimiter,
+      });
       // export only posts the bytes; the host writes them. Clear dirty on saveDone, not here.
       pendingSaveRef.current = true;
     } catch (error) {
@@ -165,7 +169,11 @@ export function useExcelSave({
       const spreadSheet = spreadsheetRef.current;
       if (!spreadSheet) return;
       try {
-        await exportSaveAs(spreadSheet, format, csvEncodingRef.current, csvDelimiterRef.current);
+        exportWorkbook(spreadSheet, format, {
+          mode: "saveAs",
+          csvEncoding: csvEncodingRef.current,
+          csvDelimiter: csvDelimiterRef.current,
+        });
         // Save As writes a different file; the document being edited is still dirty.
       } catch (error) {
         console.error(`Failed to save Excel file: ${getErrorMessage(error)}`);

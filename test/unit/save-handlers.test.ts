@@ -209,13 +209,23 @@ test("saveAs: the picked target is stamped, the original document is not", async
   );
 });
 
-test("saveAs: writes, marks clean, reports done, then opens the target", async () => {
+test("saveAs: writes the target, then opens it", async () => {
   const h = harness({ picked: "file:///elsewhere/copy.xlsx" });
   await h.handlers.saveAs({ contentBase64: bytesOfText("x"), ext: "xlsx" });
 
-  assert.deepEqual(h.log, ["write(skip=true)", "clean", "open(file:///elsewhere/copy.xlsx)"]);
+  assert.deepEqual(h.log, ["write(skip=true)", "open(file:///elsewhere/copy.xlsx)"]);
+});
+
+test("saveAs: the document being edited is not marked clean and gets no saveDone", async () => {
+  const h = harness({ picked: "file:///elsewhere/copy.xlsx" });
+  await h.handlers.saveAs({ contentBase64: bytesOfText("x"), ext: "xlsx" });
+
+  // Save As wrote a different file. The original still has its unsaved edits, so the tab keeps
+  // its `*` and the webview must not be told "the save you asked for is done".
+  assert.ok(!h.log.includes("clean"), "the original document was not saved");
   assert.deepEqual(
     h.emitted.map((message) => message.type),
-    ["saveDone"],
+    [],
   );
+  assert.deepEqual(h.log, ["write(skip=true)", "open(file:///elsewhere/copy.xlsx)"]);
 });
