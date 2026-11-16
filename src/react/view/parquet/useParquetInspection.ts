@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { $t } from "../../i18n/i18nConfig.ts";
-import { formatCellValue } from "./parquetParser";
-import type { ParquetColumnInfo } from "./parquetParser";
+import { formatCellValue } from "@/common/parquetCellFormat";
+import type { ParquetColumnInfo } from "@/common/parquetReader";
 import { ANNOUNCE_DELAY_MS } from "./parquetLayout";
 import { jsonPreviewText } from "./parquetPreview";
 

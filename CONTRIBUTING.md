@@ -210,15 +210,14 @@ src/
     view/
       parquet/
         Parquet.tsx           # 主组件
-        parquetReducer.ts     # 状态管理
-        useParquetDocument.ts # 自定义 hooks
-        __tests__/            # 测试文件
-          parquetReducer.test.ts
+        parquetSession.ts     # 分页会话
+        useParquetSearch.ts   # 搜索 hook
+        __tests__/            # 测试文件（如有）
 ```
 
 ### 命名规范
 
-- **文件名**: camelCase（如 `parquetReducer.ts`）
+- **文件名**: camelCase（如 `parquetSession.ts`）
 - **组件名**: PascalCase（如 `ParquetViewer`）
 - **函数名**: camelCase（如 `calculateSum`）
 - **常量**: UPPER_SNAKE_CASE（如 `ROW_HEIGHT`）
@@ -265,7 +264,7 @@ describe("calculateSum", () => {
 pnpm test
 
 # 运行单个测试文件
-pnpm exec tsx --test test/unit/type-guards.test.ts
+pnpm exec tsx --test test/unit/parquet-open.test.ts
 ```
 
 ### 测试标准
@@ -484,7 +483,6 @@ import { Profiler } from 'react';
 
 ### 项目文档
 
-- [类型守卫](./docs/type-guards.md)
 - [性能闸门](./docs/agents/perf.md)
 - [UI 验证](./docs/agents/ui-verify.md)
 

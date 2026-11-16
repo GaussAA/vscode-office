@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import type { ParquetColumnProfile, ParquetProfile } from "@/common/parquetProfileTypes";
 import { createParquetHandlers } from "@/provider/parquetHandlers";
-import { openParquetFile } from "@/react/view/parquet/parquetParser";
+import { openParquetFile } from "@/common/parquetReader";
 import { memoryByteSource, type ByteSource } from "@/service/jsonlFile";
 import {
   profileFromParquet,

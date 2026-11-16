@@ -1,5 +1,5 @@
 import { useCallback, useState, type RefObject } from "react";
-import type { ParquetFileInfo } from "./parquetParser";
+import type { ParquetFileInfo } from "@/common/parquetReader";
 import { DATA_COLUMN_WIDTH, INDEX_COLUMN_WIDTH } from "./parquetLayout";
 
 interface UseParquetColumnFocusArgs {

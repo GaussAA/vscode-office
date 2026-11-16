@@ -1,6 +1,6 @@
 import type { RefObject } from "react";
 import { $t } from "../../i18n/i18nConfig.ts";
-import type { ParquetFileInfo } from "./parquetParser";
+import type { ParquetFileInfo } from "@/common/parquetReader";
 import { SEARCH_MAX_ROWS } from "./parquetLayout";
 import { ParquetMetaBar } from "./ParquetMetaBar.tsx";
 import type { ParquetSearch } from "./useParquetSearch";

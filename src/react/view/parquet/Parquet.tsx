@@ -24,7 +24,7 @@ import {
   readParquetRows,
   type ParquetColumnInfo,
   type ParquetFileInfo,
-} from "./parquetParser.ts";
+} from "@/common/parquetReader";
 import { parquetAntdTheme } from "./parquetAntdTheme.ts";
 import {
   MIN_ROWS_PER_PAGE,

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { parquetWriteBuffer } from "hyparquet-writer";
-import { openParquetFile } from "@/react/view/parquet/parquetParser";
+import { openParquetFile } from "@/common/parquetReader";
 import { searchParquetValues } from "@/react/view/parquet/parquetSearch";
 
 /**
