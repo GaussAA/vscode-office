@@ -3,26 +3,22 @@
  *
  * Records are array elements; search uses case-insensitive matching without creating lowercase copies.
  */
-import { JSON_SEARCH_BATCH, JSON_SEARCH_MAX_MATCHES } from "@/common/jsonPreviewTypes";
-import type { JsonRecordRange } from "@/service/jsonPreview";
 import {
-  caseInsensitiveIndexOf,
-  matchSnippet,
-  type CancelToken,
-  type RecordRange,
-  type SearchOptions,
-} from "@/service/recordAddressableDocument";
+  JSON_SEARCH_BATCH,
+  JSON_SEARCH_CHAR_BUDGET,
+  JSON_SEARCH_MAX_MATCHES,
+  type JsonSearchBatch,
+} from "@/common/jsonPreviewTypes";
+import type { JsonRecordRange } from "@/service/jsonPreview";
+import type { CancelToken, SearchOptions } from "@/service/recordAddressableDocument";
+import { findCaseInsensitive, foldNeedle, matchSnippet } from "@/service/recordAddressableDocument";
 
-interface JsonSearchRecord extends RecordRange {
+interface JsonSearchRecord {
+  index: number;
+  size: number;
+  raw: string;
+  snippet: string;
   count: number;
-}
-
-function previewText(text: string, maxChars: number): string {
-  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}…`;
-}
-
-function utf8Size(text: string): number {
-  return new TextEncoder().encode(text).length;
 }
 
 /**
@@ -42,71 +38,84 @@ export class JsonArrayAdapter {
   search(
     requestId: number,
     query: string,
-    options: SearchOptions<JsonSearchRecord>,
+    options: SearchOptions<JsonSearchBatch>,
     cancelToken: CancelToken,
   ): void {
-    const needle = query.trim().toLowerCase();
+    const needle = foldNeedle(query);
 
     if (!needle) {
-      options.onBatch({
+      const emptyBatch: JsonSearchBatch = {
         requestId,
         query,
         records: [],
-        scanned: 0,
+        scanned: this.text.length,
         total: this.text.length,
         matches: 0,
         done: true,
         capped: false,
-      });
+      };
+      options.onBatch(emptyBatch);
       return;
     }
 
+    const schedule = options.schedule ?? ((run) => setTimeout(run, 0));
     const batchSize = options.batchSize ?? JSON_SEARCH_BATCH;
     const maxMatches = options.maxMatches ?? JSON_SEARCH_MAX_MATCHES;
-    const schedule = options.schedule ?? ((run) => setTimeout(run, 0));
+    const step = options.step ?? 1000;
 
-    // Process records in batches
-    const BATCH_SIZE = 1000;
+    let scanned = 0; // character offset reached so far
     let processedRecords = 0;
     let matches = 0;
     let capped = false;
     let pending: JsonSearchRecord[] = [];
 
     const flush = (done: boolean) => {
-      // Use 'records' field for the generic SearchBatch interface
-      options.onBatch({
+      const batch: JsonSearchBatch = {
         requestId,
         query,
-        records: pending,
-        scanned: Math.floor((processedRecords / this.records.length) * this.text.length),
+        records: pending.map((r) => ({ index: r.index, count: r.count, snippet: r.snippet })),
+        scanned,
         total: this.text.length,
         matches,
         done,
         capped,
-      });
+      };
+      options.onBatch(batch);
       pending = [];
     };
 
     const processBatch = () => {
       if (cancelToken.cancelled) return;
 
-      const batchEnd = Math.min(processedRecords + BATCH_SIZE, this.records.length);
+      const recordLimit = Math.min(processedRecords + step, this.records.length);
+      let charsRead = 0;
 
       for (
-        let index = processedRecords;
-        index < batchEnd && !cancelToken.cancelled && !capped;
-        index++
+        ;
+        processedRecords < recordLimit && !cancelToken.cancelled && !capped;
+        processedRecords++
       ) {
-        const range = this.records[index];
+        const range = this.records[processedRecords];
+        const recordSize = range.end - range.start;
+
+        // Apply character budget: if adding this record would exceed the budget and we've
+        // already read something this turn, defer it to the next turn.
+        if (charsRead > 0 && charsRead + recordSize > JSON_SEARCH_CHAR_BUDGET) {
+          break;
+        }
+
         const raw = this.text.slice(range.start, range.end);
+        charsRead += recordSize;
+        scanned = range.end;
+
         let cursor = 0;
         let recordMatches = 0;
         let firstSnippet: string | null = null;
 
         // Find all matches in this record using case-insensitive search
         while (cursor < raw.length) {
-          const at = caseInsensitiveIndexOf(raw, needle, cursor);
-          if (at < 0) break;
+          const found = findCaseInsensitive(raw, needle, cursor);
+          if (!found) break;
 
           if (recordMatches === 0) {
             // Capture snippet from first match
@@ -115,7 +124,7 @@ export class JsonArrayAdapter {
 
           recordMatches++;
           matches++;
-          cursor = at + Math.max(1, needle.length);
+          cursor = Math.max(found.end, found.start + 1);
 
           if (matches >= maxMatches) {
             capped = true;
@@ -124,12 +133,10 @@ export class JsonArrayAdapter {
         }
 
         if (recordMatches > 0 && firstSnippet) {
-          const size = utf8Size(raw);
-          const rawPreview = previewText(raw, 400);
           pending.push({
-            index,
-            size,
-            raw: rawPreview,
+            index: processedRecords,
+            size: 0, // unused, for internal tracking only
+            raw: "",
             snippet: firstSnippet,
             count: recordMatches,
           });
@@ -140,13 +147,18 @@ export class JsonArrayAdapter {
         }
       }
 
-      processedRecords = batchEnd;
+      if (cancelToken.cancelled) {
+        // Exit without sending any batch after cancellation
+        return;
+      }
 
-      if (capped || processedRecords >= this.records.length || cancelToken.cancelled) {
+      if (capped || processedRecords >= this.records.length) {
+        scanned = this.text.length;
         flush(true);
         return;
       }
 
+      // Always flush after a turn, even with no matches, so scanned advances
       flush(false);
       schedule(() => processBatch());
     };

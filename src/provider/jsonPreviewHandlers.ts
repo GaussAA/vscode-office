@@ -11,6 +11,7 @@ import {
   type JsonRecordsRequest,
   type JsonSearchRequest,
 } from "@/common/jsonPreviewTypes";
+import { utf8ByteSize } from "@/service/entryClassifier";
 import { JsonPreviewSession } from "@/service/jsonPreview";
 
 export interface JsonSource {
@@ -28,10 +29,6 @@ export interface JsonSourceReader {
   readFile(): PromiseLike<Uint8Array>;
 }
 
-function utf8Size(text: string): number {
-  return new TextEncoder().encode(text).length;
-}
-
 /**
  * Read the open buffer when the file is open, otherwise the bytes on disk. The buffer wins
  * because the preview is explicitly opened from an editor and should show what that editor
@@ -40,7 +37,7 @@ function utf8Size(text: string): number {
 export async function readJsonSource(reader: JsonSourceReader): Promise<JsonSource> {
   const open = reader.openBuffer();
   if (open) {
-    return { text: open.text, byteSize: utf8Size(open.text), fromBuffer: open.isDirty };
+    return { text: open.text, byteSize: utf8ByteSize(open.text), fromBuffer: open.isDirty };
   }
 
   const stat = await reader.stat();

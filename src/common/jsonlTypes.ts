@@ -11,6 +11,7 @@
  *    right detail pane. Keeping them apart means scrolling the directory never
  *    ships hundreds of full JSON documents to the webview.
  */
+import { MAX_TEXT_CHARS, RAW_PREVIEW_CHARS, RECORD_MAX_BYTES } from "./recordConstants";
 
 /**
  * A line larger than this is not parsed; it is shown as raw text instead.
@@ -20,7 +21,7 @@
  * viewer refused it. The tree model is already bounded (20k nodes, 200 children per level,
  * depth 12), so the cap only has to keep `JSON.parse` and the postMessage payload finite.
  */
-export const JSONL_MAX_LINE_BYTES = 8 * 1024 * 1024;
+export const JSONL_MAX_LINE_BYTES = RECORD_MAX_BYTES;
 
 /**
  * Bytes, not lines, bound a directory window. A line window of 500 huge records used to read
@@ -35,25 +36,11 @@ export const JSONL_CHUNK_SIZE = 500;
 /** Bytes decoded per search turn, in addition to the line step. */
 export const JSONL_SEARCH_BYTE_BUDGET = 8 * 1024 * 1024;
 
-/** Top-level keys tried, in order, when deriving a human-friendly label. */
-export const JSONL_LABEL_KEYS = [
-  "id",
-  "_id",
-  "uuid",
-  "key",
-  "name",
-  "title",
-  "ts",
-  "timestamp",
-  // Agent transcripts often carry the actual human query here instead of in `id`.
-  "query_search",
-] as const;
-
 /** How many characters of the raw line are kept for previews. */
-export const JSONL_RAW_PREVIEW_CHARS = 400;
+export const JSONL_RAW_PREVIEW_CHARS = RAW_PREVIEW_CHARS;
 
 /** Upper bound for the full text shipped to the raw view. */
-export const JSONL_MAX_TEXT_CHARS = 1_000_000;
+export const JSONL_MAX_TEXT_CHARS = MAX_TEXT_CHARS;
 
 /** Upper bound for the selection panel's text; `Copy value` still copies the whole value. */
 export const JSONL_VALUE_TEXT_LIMIT = 200_000;
@@ -158,11 +145,13 @@ export interface JsonlEntryPayload {
 
 /* ---------- search ---------- */
 
+import { SEARCH_BATCH, SEARCH_MAX_MATCHES } from "./recordConstants";
+
 /** Matches streamed to the directory pane per message. */
-export const JSONL_SEARCH_BATCH = 200;
+export const JSONL_SEARCH_BATCH = SEARCH_BATCH;
 
 /** Hard stop for a single scan, so a broad query cannot exhaust memory. */
-export const JSONL_SEARCH_MAX_MATCHES = 10_000;
+export const JSONL_SEARCH_MAX_MATCHES = SEARCH_MAX_MATCHES;
 
 export interface JsonlSearchRequest {
   requestId: number;

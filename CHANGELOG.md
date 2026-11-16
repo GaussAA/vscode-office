@@ -7,13 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **JSON/JSONL search**: record limits, search batch sizes, and text caps now share a single source (`recordConstants.ts`), eliminating duplicate magic numbers across JSON and JSONL type files.
+- **Type safety**: search adapter batch types now flow through generics (`SearchOptions<TBatch>`), removing unsafe `any` casts in adapter flush logic.
+
 ### Fixed
 
-- Parquet: opening another file while a column scan or the profile was still answering could
-  paint the previous file's column statistics onto the new one, and left the profile panel open
-  on a column of the old file. Switching documents now drops every pending profile and scan
-  request and closes the panel. Closing the panel, or opening a column that has no statistics,
-  also stops waiting for a scan that was still running.
+- **Unicode search**: Turkish İ (U+0130) and similar characters whose lowercase form has a different UTF-16 length no longer shift snippet offsets in JSONL search, and queries containing İ now match İ in both JSON and JSONL records. The old implementation computed match offsets in a lowercased copy, causing every İ before the match to shift the snippet cut by one position.
+- **JSON search progress**: `scanned` now reports the actual character offset reached (the `end` of the last processed record) rather than a ratio of record counts, fixing NaN on empty arrays (`0 / 0`) and misreported progress when a few huge records dominated the file. The `step` option now limits records per turn (was ignored, fixed at 1000), and a 2M-character budget prevents huge records from blocking the event loop. Final batches set `scanned = text.length` exactly.
+- **Entry classification**: JSON record detail, summary, and root entry construction now route through a single `classifyEntry` call that parses each record exactly once. The old paths called `JSON.parse` independently after classification, or (in the summary path) encoded the text twice—once in `classifyEntry`'s size check and again when computing byte size from the raw slice. UTF-8 byte size is now counted without allocating a `TextEncoder` buffer, avoiding allocation cost on 8MB records and 100MB editor buffers.
+- **Duplicate code removal**: the `truncate` helper is now exported once from `entryClassifier`; `jsonlDocument`'s local copy has been removed. Dead code including unused `streamingSearch`, `RecordAddressableDocument` interface, and `RecordRange`/`SearchBatch` types has been deleted.
+
+### Internal
+
+- Add `shared-constants.test.ts` to guard against future constant duplication between JSON and JSONL type files.
+- Add `unicode-search-regression.test.ts` (10 tests) covering İ padding, snippet offset alignment, whole-line toLowerCase spy, and cross-format İ matching.
+- Add `json-progress-cancel.test.ts` (11 tests) verifying real character offset progress, empty-array NaN fix, `step` option behavior, character budget enforcement, and cancellation semantics.
+- Add `entry-single-parse.test.ts` (13 tests) spying on `JSON.parse` and `TextEncoder.prototype.encode` to verify each record is parsed exactly once and byte size is counted without encoding.
 
 ## [6.14.1] - 2026-11-15
 

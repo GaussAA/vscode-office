@@ -6,47 +6,7 @@
  * The search logic lives here, so the Unicode case-insensitive bug is fixed in one place.
  */
 
-/** Batch size for streaming search results. */
-export const SEARCH_BATCH = 200;
-
-/** Maximum matches before capping a search. */
-export const MAX_MATCHES = 10_000;
-
-/** Maximum bytes of a single record before showing as raw text instead of parsed tree. */
-export const RECORD_MAX_BYTES = 8 * 1024 * 1024;
-
-/** Maximum text characters kept for a record. */
-export const MAX_TEXT_CHARS = 1_000_000;
-
-export interface RecordRange {
-  /** Zero-based record index. */
-  index: number;
-  /** UTF-8 byte size of the record. */
-  size: number;
-  /** Truncated raw text preview. */
-  raw: string;
-  /** Search snippet around the match, if applicable. */
-  snippet?: string;
-}
-
-export interface SearchBatch<T extends RecordRange> {
-  requestId: number;
-  query: string;
-  /** Matches found in this batch. */
-  records: T[];
-  /** Bytes or characters scanned so far. */
-  scanned: number;
-  /** Total bytes or characters to scan. */
-  total: number;
-  /** Total matches found so far. */
-  matches: number;
-  /** True on the final batch. */
-  done: boolean;
-  /** True when stopped due to MAX_MATCHES. */
-  capped: boolean;
-}
-
-export interface SearchOptions<T extends RecordRange> {
+export interface SearchOptions<TBatch> {
   /** Records decoded per event-loop turn. */
   step?: number;
   /** Matches per batch message. */
@@ -54,7 +14,7 @@ export interface SearchOptions<T extends RecordRange> {
   /** Maximum matches before stopping. */
   maxMatches?: number;
   /** Called for every batch, including the final one. */
-  onBatch: (batch: SearchBatch<T>) => void;
+  onBatch: (batch: TBatch) => void;
   /** Injected scheduler for tests; defaults to setTimeout. */
   schedule?: (run: () => void) => void;
 }
@@ -80,215 +40,106 @@ export function createCancelToken(): CancelToken & { check(): boolean } {
 }
 
 /**
- * A document that can be addressed by record index, read in windows, and searched with
- * cancelable streaming.
+ * The one case-insensitive matcher for JSON and JSONL search.
+ *
+ * Lowercasing the haystack and searching that copy is wrong twice over: it allocates a copy of
+ * a record that can be megabytes, and `toLowerCase()` can change length ("İ".toLowerCase() is two
+ * UTF-16 units, "i" + U+0307), so an offset measured in the copy points somewhere else in the
+ * original. Here only the needle is lowercased; the haystack is folded one code point at a time
+ * while comparing, and the result is an offset into the ORIGINAL text.
  */
-export interface RecordAddressableDocument<T extends RecordRange> {
-  /** Total number of records. */
-  readonly recordCount: number;
 
-  /**
-   * Read a window of records from `start` (inclusive) to `end` (exclusive).
-   * Returns summaries with index, size, and preview text.
-   */
-  readRecords(start: number, end: number): Promise<T[]>;
-
-  /**
-   * Search the entire document for `query` (case-insensitive substring), streaming results
-   * in batches. Returns a cancel token to stop the scan early.
-   */
-  search(
-    requestId: number,
-    query: string,
-    options: SearchOptions<T>,
-    cancelToken: CancelToken,
-  ): void;
-
-  /** Clean up resources. */
-  dispose?(): void;
+/** Lowercase a query the way the matcher folds haystack characters (per code point). */
+export function foldNeedle(query: string): string {
+  const trimmed = query.trim();
+  let out = "";
+  for (const char of trimmed) out += char.toLowerCase();
+  return out;
 }
 
 /**
- * Case-insensitive substring search without creating a lowercase copy.
- *
- * This fixes the Unicode bug: `toLowerCase()` can change string length (e.g., Turkish İ
- * becomes two UTF-16 code units), causing match offsets to misalign with record boundaries.
- *
- * Instead, we compare character by character in a case-insensitive way.
+ * End offset (exclusive, in `haystack`) of a match of `needle` starting exactly at `start`,
+ * or -1. `needle` must come from `foldNeedle`. A haystack character whose lowercase form is
+ * longer than one unit may be consumed only partly at the end of the needle, so the query "i"
+ * still finds "İ" (as a whole-line `toLowerCase().includes` did).
  */
+function matchEndAt(haystack: string, start: number, needle: string): number {
+  let at = start;
+  let used = 0;
+  const length = haystack.length;
+  while (used < needle.length) {
+    if (at >= length) return -1;
+    const unit = haystack.charCodeAt(at);
+    if (unit < 0x80) {
+      const folded = unit >= 65 && unit <= 90 ? unit + 32 : unit;
+      if (folded !== needle.charCodeAt(used)) return -1;
+      used++;
+      at++;
+      continue;
+    }
+    const codePoint = haystack.codePointAt(at) as number;
+    const lower = String.fromCodePoint(codePoint).toLowerCase();
+    for (let k = 0; k < lower.length && used < needle.length; k++, used++) {
+      if (lower.charCodeAt(k) !== needle.charCodeAt(used)) return -1;
+    }
+    at += codePoint > 0xffff ? 2 : 1;
+  }
+  return at;
+}
+
+export interface TextMatch {
+  /** Offset of the first matched unit in the original text. */
+  start: number;
+  /** Offset just past the last matched unit in the original text. */
+  end: number;
+}
+
+/** First match of `needle` (from `foldNeedle`) in `haystack` at or after `fromIndex`. */
+export function findCaseInsensitive(
+  haystack: string,
+  needle: string,
+  fromIndex = 0,
+): TextMatch | null {
+  if (needle.length === 0) return null;
+  const first = needle.charCodeAt(0);
+  const firstAscii = first < 0x80;
+  const last = haystack.length - 1;
+  for (let i = fromIndex; i <= last; i++) {
+    if (firstAscii) {
+      const unit = haystack.charCodeAt(i);
+      if (unit < 0x80 && (unit >= 65 && unit <= 90 ? unit + 32 : unit) !== first) continue;
+    }
+    const end = matchEndAt(haystack, i, needle);
+    if (end >= 0) return { start: i, end };
+  }
+  return null;
+}
+
+/** Offset of the first match, or -1. `needle` must come from `foldNeedle`. */
 export function caseInsensitiveIndexOf(haystack: string, needle: string, fromIndex = 0): number {
   if (needle.length === 0) return fromIndex;
-  const haystackLen = haystack.length;
-  const needleLen = needle.length;
-  const searchLimit = haystackLen - needleLen;
+  return findCaseInsensitive(haystack, needle, fromIndex)?.start ?? -1;
+}
 
-  for (let i = fromIndex; i <= searchLimit; i++) {
-    let match = true;
-    for (let j = 0; j < needleLen; j++) {
-      const hChar = haystack.charCodeAt(i + j);
-      const nChar = needle.charCodeAt(j);
-      // Fast path: exact match
-      if (hChar === nChar) continue;
-      // Slow path: case-insensitive comparison using toLowerCase on single characters
-      if (haystack[i + j].toLowerCase() !== needle[j].toLowerCase()) {
-        match = false;
-        break;
-      }
-    }
-    if (match) return i;
-  }
-  return -1;
+/** A window of `text` around [start, end): `before`/`after` characters, "…" where cut. */
+export function snippetAround(
+  text: string,
+  start: number,
+  end: number,
+  before: number,
+  after: number,
+): string {
+  const from = Math.max(0, start - before);
+  const to = Math.min(text.length, end + after);
+  return `${from > 0 ? "…" : ""}${text.slice(from, to)}${to < text.length ? "…" : ""}`;
 }
 
 /**
- * Generic streaming search implementation that works on any text-based record sequence.
- *
- * @param getText - Returns the full text for a record index.
- * @param makeRecord - Constructs a search result record from index and snippet.
- * @param total - Total units to scan (for progress reporting).
- * @param recordCount - Total number of records.
- */
-export async function streamingSearch<T extends RecordRange>(
-  requestId: number,
-  query: string,
-  options: SearchOptions<T>,
-  cancelToken: CancelToken,
-  getText: (index: number) => Promise<string>,
-  makeRecord: (index: number, snippet: string, count: number) => T,
-  total: number,
-  recordCount: number,
-): Promise<void> {
-  const batchSize = options.batchSize ?? SEARCH_BATCH;
-  const maxMatches = options.maxMatches ?? MAX_MATCHES;
-  const schedule = options.schedule ?? ((run) => setTimeout(run, 0));
-  const needle = query.trim().toLowerCase();
-
-  if (!needle) {
-    options.onBatch({
-      requestId,
-      query,
-      records: [],
-      scanned: 0,
-      total,
-      matches: 0,
-      done: true,
-      capped: false,
-    });
-    return;
-  }
-
-  let scanned = 0;
-  let matches = 0;
-  let capped = false;
-  let pending: T[] = [];
-
-  // Track first match per record and total hit count in that record
-  const firstMatch = new Map<number, { record: T; count: number }>();
-
-  const flush = (done: boolean) => {
-    options.onBatch({
-      requestId,
-      query,
-      records: pending,
-      scanned,
-      total,
-      matches,
-      done,
-      capped,
-    });
-    pending = [];
-  };
-
-  const processRecord = async (index: number): Promise<boolean> => {
-    if (cancelToken.cancelled) return false;
-
-    const text = await getText(index);
-    let cursor = 0;
-    let recordMatches = 0;
-    let firstSnippet: string | null = null;
-
-    // Find all matches in this record
-    while (cursor < text.length) {
-      const at = caseInsensitiveIndexOf(text, needle, cursor);
-      if (at < 0) break;
-
-      if (recordMatches === 0) {
-        // Capture snippet from first match
-        const snippetStart = Math.max(0, at - 50);
-        const snippetEnd = Math.min(text.length, at + needle.length + 150);
-        firstSnippet = text.slice(snippetStart, snippetEnd);
-      }
-
-      recordMatches++;
-      matches++;
-      cursor = at + Math.max(1, needle.length);
-
-      if (matches >= maxMatches) {
-        capped = true;
-        break;
-      }
-    }
-
-    if (recordMatches > 0 && firstSnippet) {
-      const record = makeRecord(index, firstSnippet, recordMatches);
-      firstMatch.set(index, { record, count: recordMatches });
-      pending.push(record);
-
-      if (pending.length >= batchSize) {
-        flush(false);
-      }
-    }
-
-    return !capped;
-  };
-
-  // Process records in chunks to keep responsive
-  const CHUNK_SIZE = 1000;
-  for (let i = 0; i < recordCount && !cancelToken.cancelled && !capped; i += CHUNK_SIZE) {
-    const chunkEnd = Math.min(i + CHUNK_SIZE, recordCount);
-
-    for (let j = i; j < chunkEnd && !cancelToken.cancelled && !capped; j++) {
-      const shouldContinue = await processRecord(j);
-      if (!shouldContinue) break;
-    }
-
-    scanned = Math.min(total, Math.floor((chunkEnd / recordCount) * total));
-
-    // Yield control to avoid blocking
-    if (chunkEnd < recordCount && !cancelToken.cancelled && !capped) {
-      await new Promise<void>((resolve) => schedule(resolve));
-    }
-  }
-
-  if (!cancelToken.cancelled) {
-    scanned = total;
-    flush(true);
-  }
-}
-
-/**
- * Extract a snippet with context around the first match of `needle` in `text`.
- * Returns up to 200 characters centered on the match.
+ * Snippet around the first match of `needle` (from `foldNeedle`): 50 characters before and 150
+ * after. Without a match it is the head of the text.
  */
 export function matchSnippet(text: string, needle: string): string {
-  const at = caseInsensitiveIndexOf(text, needle);
-  if (at < 0) {
-    // No match; return head of text
-    return text.length <= 200 ? text : `${text.slice(0, 200)}…`;
-  }
-
-  // Center the snippet on the match with more context after than before
-  const contextBefore = 50;
-  const contextAfter = 150;
-  const start = Math.max(0, at - contextBefore);
-  const end = Math.min(text.length, at + needle.length + contextAfter);
-
-  // Extract the base snippet
-  let snippet = text.slice(start, end);
-
-  // Add ellipsis markers
-  const prefix = start > 0 ? "…" : "";
-  const suffix = end < text.length ? "…" : "";
-
-  return prefix + snippet + suffix;
+  const match = findCaseInsensitive(text, needle);
+  if (!match) return text.length <= 200 ? text : `${text.slice(0, 200)}…`;
+  return snippetAround(text, match.start, match.end, 50, 150);
 }

@@ -140,9 +140,8 @@ export class JsonlSession {
     });
     this.currentSettle = settle;
 
-    const onBatch = (batch: any) => {
-      // Adapter returns JsonlSearchBatch with 'entries' field
-      options.onBatch(batch as JsonlSearchBatch);
+    const onBatch = (batch: JsonlSearchBatch) => {
+      options.onBatch(batch);
       if (batch.done) {
         this.cancelToken = null;
         this.currentSettle = null;

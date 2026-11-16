@@ -3,7 +3,7 @@
  *
  * Records are line-delimited; the file's existing line index provides the boundaries.
  */
-import type { JsonlEntrySummary } from "@/common/jsonlTypes";
+import type { JsonlEntrySummary, JsonlSearchBatch } from "@/common/jsonlTypes";
 import {
   JSONL_SEARCH_BATCH,
   JSONL_SEARCH_BYTE_BUDGET,
@@ -16,7 +16,7 @@ import {
 } from "@/service/jsonlDocument";
 import type { JsonlFile } from "@/service/jsonlFile";
 import {
-  matchSnippet,
+  foldNeedle,
   type CancelToken,
   type SearchOptions,
 } from "@/service/recordAddressableDocument";
@@ -38,16 +38,16 @@ export class JsonlAdapter {
   search(
     requestId: number,
     query: string,
-    options: SearchOptions<JsonlEntrySummary>,
+    options: SearchOptions<JsonlSearchBatch>,
     cancelToken: CancelToken,
   ): void {
-    const needle = query.trim().toLowerCase();
+    const needle = foldNeedle(query);
 
     if (!needle) {
-      const emptyBatch: any = {
+      const emptyBatch: JsonlSearchBatch = {
         requestId,
         query,
-        entries: [], // Use 'entries' for JsonlSearchBatch
+        entries: [],
         scanned: 0,
         total: this.file.lineCount,
         matches: 0,
@@ -69,8 +69,7 @@ export class JsonlAdapter {
     let pending: JsonlEntrySummary[] = [];
 
     const flush = (done: boolean) => {
-      // Convert to the expected interface - JsonlSearchBatch uses 'entries', not 'records'
-      const batch: any = {
+      const batch: JsonlSearchBatch = {
         requestId,
         query,
         entries: pending,
@@ -113,14 +112,14 @@ export class JsonlAdapter {
 
       for (let offset = 0; offset < window.index.lineCount; offset++) {
         const rawText = readJsonlLineText(window.bytes, window.index, offset);
-        if (!rawText.toLowerCase().includes(needle)) continue;
+        // Case-insensitive match; needle is already lowercased by caller
+        // One pass decides the hit and yields the snippet; no lowercase copy of the line.
+        const snippet = jsonlMatchSnippet(rawText, needle);
+        if (snippet === undefined) continue;
 
         matches++;
         const summary = summarizeDecodedLine(scanned + offset, rawText, needle);
-        pending.push({
-          ...summary,
-          snippet: jsonlMatchSnippet(rawText, needle) ?? matchSnippet(rawText, needle),
-        });
+        pending.push({ ...summary, snippet });
 
         if (pending.length >= batchSize) {
           if (cancelToken.cancelled) return;

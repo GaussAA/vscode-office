@@ -2,7 +2,8 @@
  * Entry kind classification: the single source of truth for determining whether a text
  * fragment is empty, invalid JSON, too large to parse, or a valid JSON value.
  *
- * GLOSSARY: "Entry kind 判定只在一处做出" — this module is that one place.
+ * GLOSSARY: "Entry kind 判定只在一处做出" — this module is that one place. A JSONL line and a
+ * JSON array record both go through `classifyEntry`, which parses the text at most once.
  */
 import { JSONL_MAX_LINE_BYTES } from "@/common/jsonlTypes";
 
@@ -17,24 +18,53 @@ export interface EntryClassification {
   kind: EntryKind;
   /** Derived identity label, only present for "value" kind. */
   label?: string;
-  /** Trimmed text ready for rendering. */
+  /** Text with the BOM and trailing line terminators removed. */
   text: string;
-  /** UTF-8 byte size of the original text. */
+  /** UTF-8 byte size of `text`. */
   byteSize: number;
   /** Parsed value, only present for "value" kind. */
   value?: unknown;
   /** Parse error message, only present for "invalid" kind. */
   error?: string;
+  /** The thrown parse error itself (it carries the position), only for "invalid" kind. */
+  parseError?: unknown;
 }
 
-const encoder = new TextEncoder();
-
 /**
- * Calculate UTF-8 byte size for a string.
+ * UTF-8 byte size of a string, counted without encoding it.
+ *
+ * `new TextEncoder().encode(text).length` allocates a byte copy of the whole string, which for
+ * an 8 MB record or a 100 MB editor buffer is the cost of the answer itself. A lone surrogate
+ * counts as three bytes, the same as the encoder's U+FFFD replacement.
  * This is the single byte-size algorithm used across JSONL and JSON preview.
  */
 export function utf8ByteSize(text: string): number {
-  return encoder.encode(text).length;
+  const length = text.length;
+  let bytes = 0;
+  for (let i = 0; i < length; i++) {
+    const unit = text.charCodeAt(i);
+    if (unit < 0x80) {
+      bytes += 1;
+    } else if (unit < 0x800) {
+      bytes += 2;
+    } else if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < length) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4;
+        i++;
+      } else {
+        bytes += 3;
+      }
+    } else {
+      bytes += 3;
+    }
+  }
+  return bytes;
+}
+
+/** Truncate text for preview: keep the first `max` characters, append "…" if cut. */
+export function truncate(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
 
 /**
@@ -53,6 +83,7 @@ const LABEL_KEYS = [
   "title",
   "ts",
   "timestamp",
+  // Agent transcripts often carry the actual human query here instead of in `id`.
   "query_search",
 ] as const;
 
@@ -61,10 +92,6 @@ const NESTED_LABEL_KEYS = ["query", "name", "title", "label", "id", "key"] as co
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function truncate(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
 
 function scalarLabel(candidate: unknown): string | undefined {
@@ -107,27 +134,44 @@ function deriveLabel(value: unknown): string | undefined {
 }
 
 /**
+ * Remove a leading BOM and trailing line terminators. Returns the input itself when there is
+ * nothing to remove, so a multi-megabyte record is not copied for no reason.
+ */
+function stripEnds(raw: string): string {
+  const start = raw.charCodeAt(0) === 0xfeff ? 1 : 0;
+  let end = raw.length;
+  while (end > start) {
+    const unit = raw.charCodeAt(end - 1);
+    if (unit !== 10 && unit !== 13) break;
+    end--;
+  }
+  return start === 0 && end === raw.length ? raw : raw.slice(start, end);
+}
+
+/**
  * Classify a raw text fragment into one of four entry kinds.
  *
  * This is the single point where entry kind is determined. The decision order is:
  * 1. Empty (whitespace-only text)
- * 2. Too large (exceeds JSONL_MAX_LINE_BYTES before parsing)
+ * 2. Too large (more than `sizeLimit` bytes; the text is not parsed)
  * 3. Invalid (JSON parse fails)
  * 4. Value (valid JSON)
  *
- * @param rawText The original text to classify (may include line terminators)
- * @param sizeLimit Optional byte size limit (defaults to JSONL_MAX_LINE_BYTES)
+ * The text is parsed at most once, and its size is counted, never encoded.
+ *
+ * @param rawText The original text to classify (may include a BOM and line terminators)
+ * @param sizeLimit Byte limit for parsing. The default is the JSONL line limit; a caller that
+ *   classifies something else (a JSON record, an object root) passes its own limit.
  * @returns Complete classification with kind, label, text, and byte size
  */
 export function classifyEntry(
   rawText: string,
   sizeLimit = JSONL_MAX_LINE_BYTES,
 ): EntryClassification {
-  // Normalize text: remove BOM and line terminators
-  const text = rawText.replace(/^\uFEFF/, "").replace(/[\r\n]+$/, "");
+  const text = stripEnds(rawText);
 
-  // 1. Empty line (whitespace-only becomes empty string)
-  if (text.trim() === "") {
+  // 1. Empty line. `\S` stops at the first visible character; `trim()` would copy the text.
+  if (!/\S/.test(text)) {
     return { kind: "empty", text: "", byteSize: 0 };
   }
 
@@ -140,12 +184,12 @@ export function classifyEntry(
 
   // 3. Try to parse as JSON
   try {
-    const value = JSON.parse(text);
+    const value: unknown = JSON.parse(text);
     const label = deriveLabel(value);
     return { kind: "value", text, byteSize, value, ...(label ? { label } : {}) };
   } catch (error) {
     // 4. Invalid JSON
     const errorMessage = error instanceof Error ? error.message : "Invalid JSON";
-    return { kind: "invalid", text, byteSize, error: errorMessage };
+    return { kind: "invalid", text, byteSize, error: errorMessage, parseError: error };
   }
 }
