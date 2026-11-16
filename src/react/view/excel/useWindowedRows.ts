@@ -7,11 +7,17 @@ import {
   type RefObject,
   type UIEvent,
 } from "react";
-import { headerCells } from "./sheetView";
 import { createSheetWindowReader } from "./sheetWindowReader";
 import { scrollHeightFor, type VisibleRange } from "./sheetWindow";
 import type { SheetSource } from "./sheetSource";
-import { HEADER_HEIGHT, OVERSCAN, ROW_HEIGHT, toBodySource } from "./windowedSheetModel";
+import {
+  HEADER_HEIGHT,
+  HEADER_ROWS,
+  OVERSCAN,
+  ROW_HEIGHT,
+  headerCells,
+  toBodySource,
+} from "./windowedSheetModel";
 import { bodyScrollTopFor, rowScrollFor, scrollerTopForRow } from "./windowedSheetNavigation";
 
 export interface WindowedRows {
@@ -56,10 +62,10 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
   const [headerLabels, setHeaderLabels] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const dataRowCount = Math.max(0, source.rowCount - 1);
+  const bodySource = useMemo(() => toBodySource(source), [source]);
+  const reader = useMemo(() => createSheetWindowReader(bodySource), [bodySource]);
+  const dataRowCount = bodySource.rowCount;
   const columnCount = Math.max(1, source.columnCount);
-  const dataSource = useMemo(() => toBodySource(source), [source]);
-  const reader = useMemo(() => createSheetWindowReader(dataSource), [dataSource]);
   const bodyViewportHeight = Math.max(0, viewportHeight - HEADER_HEIGHT);
   const viewport = useMemo(
     () => ({
@@ -68,7 +74,7 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
       totalRows: dataRowCount,
       overscan: OVERSCAN,
     }),
-    [bodyViewportHeight, dataRowCount],
+    [dataRowCount, bodyViewportHeight],
   );
   const totalHeight = scrollHeightFor(viewport);
   const compressed = dataRowCount * ROW_HEIGHT > totalHeight;
@@ -80,9 +86,9 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
   useEffect(() => {
     let cancelled = false;
     void source
-      .readRows(0, 1)
-      .then(([first]) => {
-        if (!cancelled) setHeaderLabels(headerCells(first ? [first] : [], columnCount));
+      .readRows(0, HEADER_ROWS)
+      .then((first) => {
+        if (!cancelled) setHeaderLabels(headerCells(first, columnCount));
       })
       .catch(() => {
         if (!cancelled) setHeaderLabels([]);
@@ -90,7 +96,7 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
     return () => {
       cancelled = true;
     };
-  }, [columnCount, source]);
+  }, [source, columnCount]);
 
   // The viewport height decides how many rows to ask for; it changes with the panel, not the scroll.
   useEffect(() => {
@@ -166,7 +172,7 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
       if (scroll.kind === "seek") scrollToRow(row);
       else if (scroll.kind === "scroll") applyScrollTop(scroll.top);
     },
-    [applyScrollTop, bodyViewportHeight, compressed, dataRowCount, range, scrollToRow, scrollTop],
+    [applyScrollTop, compressed, dataRowCount, range, scrollToRow, scrollTop, bodyViewportHeight],
   );
 
   return {
@@ -178,7 +184,7 @@ export function useWindowedRows(source: SheetSource): WindowedRows {
     setError,
     dataRowCount,
     columnCount,
-    dataSource,
+    dataSource: bodySource,
     bodyScrollTop,
     bodyViewportHeight,
     viewportHeight,

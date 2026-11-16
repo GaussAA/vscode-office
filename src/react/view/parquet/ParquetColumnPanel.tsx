@@ -1,6 +1,6 @@
 import type { ParquetColumnProfile, ParquetColumnScan } from "@/common/parquetProfileTypes";
 import { $t } from "../../i18n/i18nConfig.ts";
-import type { ParquetColumnInfo } from "./parquetParser";
+import type { ParquetColumnInfo } from "@/common/parquetReader";
 
 interface ParquetColumnPanelProps {
   column: ParquetColumnInfo;

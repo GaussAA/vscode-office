@@ -6,35 +6,6 @@ const postMessage = (message: unknown) => {
   }
 };
 
-const DARK_MODE_KEY = "office-dark-mode";
-
-export function loadDarkMode(): boolean {
-  const state = vscode?.getState?.() as { darkMode?: boolean } | undefined;
-  if (state?.darkMode !== undefined) {
-    return state.darkMode;
-  }
-  try {
-    return localStorage.getItem(DARK_MODE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function saveDarkMode(dark: boolean) {
-  try {
-    localStorage.setItem(DARK_MODE_KEY, dark ? "1" : "0");
-  } catch {}
-  if (vscode?.setState) {
-    const prev = (vscode.getState?.() ?? {}) as Record<string, unknown>;
-    vscode.setState({ ...prev, darkMode: dark });
-  }
-}
-
-export function applyDarkMode(dark: boolean) {
-  document.body.classList.toggle("office-dark", dark);
-  saveDarkMode(dark);
-}
-
 const events: Record<string, (content: any) => void> = {};
 function receive({ data }: MessageEvent) {
   if (!data) return;
@@ -59,28 +30,9 @@ function handleGlobalKeyboard(e: KeyboardEvent) {
 }
 
 // Install global event listeners (called once at module load)
-let listenersInstalled = false;
-function installGlobalListeners() {
-  if (listenersInstalled) return;
-  listenersInstalled = true;
-
-  window.addEventListener("message", receive);
-  window.addEventListener("keydown", preventMacComposeConflict, isMac ? true : undefined);
-  window.addEventListener("keydown", handleGlobalKeyboard);
-}
-
-// Cleanup function for testing or hot-reload scenarios
-export function cleanupGlobalListeners() {
-  if (!listenersInstalled) return;
-  listenersInstalled = false;
-
-  window.removeEventListener("message", receive);
-  window.removeEventListener("keydown", preventMacComposeConflict);
-  window.removeEventListener("keydown", handleGlobalKeyboard);
-}
-
-// Install listeners immediately at module load
-installGlobalListeners();
+window.addEventListener("message", receive);
+window.addEventListener("keydown", preventMacComposeConflict, isMac ? true : undefined);
+window.addEventListener("keydown", handleGlobalKeyboard);
 
 const getVscodeEvent = () => {
   return {

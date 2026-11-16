@@ -139,6 +139,7 @@ export default {
     save: "儲存",
     saveAs: "另存新檔",
     ok: "確定",
+    copy: "複製",
   },
   sort: {
     desc: "遞減",
@@ -163,6 +164,8 @@ export default {
     matchesMany: "{} 個符合",
     sheet: "工作表",
     resizeColumn: "調整欄寬",
+    autoFitColumns: "自動調整欄寬",
+    autoFitDone: "已自動調整欄寬",
     copied: "已複製",
     copyFailed: "無法複製儲存格內容",
     goToRow: "跳轉到列",

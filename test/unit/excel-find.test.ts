@@ -136,3 +136,13 @@ test("replaceAllInSheets: rewrites every match, and wholeCell keeps the longer c
   assert.equal(replaced, 1, 'only the cell that is exactly "alpha"');
   assert.equal(exact[0].rows[1].cells[0].text, "alphabet");
 });
+
+test("findAllInSheets: whitespace is significant (unlike windowed sheetSearch)", () => {
+  // The grid's find treats whitespace as searchable, so " " is a valid query. The windowed
+  // view trims the query and treats blank as "no search". This is intentional: grid replace
+  // is destructive and whitespace cleanup is a legitimate use case.
+  const sheets = makeSheets();
+  sheets[0].rows[0].cells[1] = { text: "has space" };
+  assert.equal(findAllInSheets(asSheets(sheets), " ", options, 0).length, 1);
+  assert.equal(findAllInSheets(asSheets(sheets), "", options, 0).length, 0, "blank is no query");
+});

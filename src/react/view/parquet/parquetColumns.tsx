@@ -2,7 +2,7 @@ import type { ColumnsType } from "antd/es/table";
 import { DATA_COLUMN_WIDTH, INDEX_COLUMN_WIDTH } from "./parquetLayout";
 import type { ParquetColumnLayout } from "./parquetColumnLayout";
 import { ParquetCell, type TableRow } from "./parquetCell";
-import type { ParquetFileInfo } from "./parquetParser";
+import type { ParquetFileInfo } from "@/common/parquetReader";
 
 export interface ParquetColumnsOptions {
   fileInfo: ParquetFileInfo | null;

@@ -6,7 +6,7 @@
  * way to open its bytes, so a test can hand in memory sources instead of two files on disk.
  */
 import type { NamedParquetProfile, ParquetComparePayload } from "@/common/parquetCompareTypes";
-import type { ByteSource } from "@/service/jsonlFile";
+import type { ByteSource } from "@/common/byteSource";
 import { compareParquetProfiles } from "@/service/parquetCompare";
 import { readParquetProfile } from "@/service/parquetProfile";
 
