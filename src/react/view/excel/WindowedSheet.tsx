@@ -13,6 +13,7 @@ import { t } from "./excel_i18n";
 import { useWindowedRows } from "./useWindowedRows";
 import { useWindowedFind } from "./useWindowedFind";
 import { useColumnResize } from "./useColumnResize";
+import { CellLoadGuard } from "./cellLoadGuard";
 import WindowedSheetBanner from "./WindowedSheetBanner";
 import WindowedFindBar from "./WindowedFindBar";
 import WindowedSelectionBar from "./WindowedSelectionBar";
@@ -34,7 +35,6 @@ import {
   pageRows,
   resolveSelection,
   startingCell,
-  withLoadedValue,
   type CellSelection,
 } from "./windowedSheetNavigation";
 import "./WindowedSheet.less";
@@ -98,6 +98,7 @@ export default function WindowedSheet({
   const [selected, setSelected] = useState<CellSelection | null>(null);
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef<number | null>(null);
+  const cellLoadGuard = useRef(new CellLoadGuard());
   const resize = useColumnResize(columnCount);
 
   const columns = useMemo(
@@ -157,12 +158,18 @@ export default function WindowedSheet({
       );
       if (!resolved) return;
       const { selection, needsRead } = resolved;
+      const request = cellLoadGuard.current.issueLoad(selection.row, selection.col);
       setSelected(selection);
       if (needsRead) {
         void dataSource
           .readRows(selection.row, selection.row + 1)
           .then(([data]) => {
-            setSelected((current) => withLoadedValue(current, selection, data));
+            setSelected((current) => {
+              if (current && cellLoadGuard.current.shouldApply(request, current)) {
+                return { ...current, value: data?.[request.col] ?? "" };
+              }
+              return current;
+            });
           })
           .catch(() => {});
       }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { RequestGuard } from "../../util/requestGuard";
 import { searchSheetRows, stepMatch } from "./sheetSearch";
 import type { SheetSource } from "./sheetSource";
 import { t } from "./excel_i18n";
@@ -37,7 +38,7 @@ export function useWindowedFind({
   jumpToRow,
   onError,
 }: UseWindowedFindArgs): WindowedFind {
-  const searchSeq = useRef(0);
+  const searchGuard = useRef(new RequestGuard());
   /** Body row the find bar last jumped to; stepping is relative to this, not the viewport. */
   const activeMatch = useRef<number | null>(null);
   const [query, setQuery] = useState("");
@@ -51,7 +52,7 @@ export function useWindowedFind({
   const isSearchResult = needle !== "" && searchedQuery === needle;
 
   const runSearch = useCallback(async () => {
-    const ticket = ++searchSeq.current;
+    const ticket = searchGuard.current.issue();
     setQuery(needle);
     setCapped(false);
     if (!needle) {
@@ -66,12 +67,12 @@ export function useWindowedFind({
     setProgress({ scanned: 0, matches: 0 });
     try {
       const result = await searchSheetRows(source, needle, {
-        isCancelled: () => ticket !== searchSeq.current,
+        isCancelled: () => !searchGuard.current.isCurrent(ticket),
         onProgress: (scanned, found) => {
-          if (ticket === searchSeq.current) setProgress({ scanned, matches: found });
+          if (searchGuard.current.isCurrent(ticket)) setProgress({ scanned, matches: found });
         },
       });
-      if (ticket !== searchSeq.current || result.cancelled) return;
+      if (!searchGuard.current.isCurrent(ticket) || result.cancelled) return;
       setMatches(result.rows);
       setCapped(result.capped);
       setSearchedQuery(needle);
@@ -80,11 +81,11 @@ export function useWindowedFind({
         jumpToRow(result.rows[0]);
       }
     } catch (cause) {
-      if (ticket === searchSeq.current) {
+      if (searchGuard.current.isCurrent(ticket)) {
         onError(cause instanceof Error ? cause.message : String(cause));
       }
     } finally {
-      if (ticket === searchSeq.current) {
+      if (searchGuard.current.isCurrent(ticket)) {
         setSearching(false);
         setProgress(null);
       }
@@ -105,14 +106,14 @@ export function useWindowedFind({
 
   /** Invalidate a scan that outlives the component; its result must not touch a new sheet. */
   const cancelSearch = useCallback(() => {
-    searchSeq.current++;
+    searchGuard.current.cancel();
   }, []);
   useEffect(() => cancelSearch, [cancelSearch]);
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
     // A new query invalidates the old hit list; stale highlights are worse than an empty state.
-    searchSeq.current++;
+    searchGuard.current.cancel();
     activeMatch.current = null;
     setSearchedQuery("");
     setMatches([]);
