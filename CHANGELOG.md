@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.15.0] - 2026-11-17
+
 ### Changed
 
 - **JSON/JSONL search**: record limits, search batch sizes, and text caps now share a single source (`recordConstants.ts`), eliminating duplicate magic numbers across JSON and JSONL type files.
