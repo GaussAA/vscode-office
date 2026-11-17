@@ -24,7 +24,15 @@ const mocha = {
   timeout: 120000,
 };
 
+// The extension API cannot reach into a webview, and the host-side save rules
+// (test/smoke/saveHostSuite.ts) are only reachable through the webview's message channel.
+// Chromium's remote-debugging port is the one way in that needs no hook in `src/`: it lets
+// the test post the same messages the Excel viewer posts and record what the host posts
+// back. Keep this number in step with DEBUG_PORT in test/smoke/webviewBridge.ts. The port is
+// fixed, so smoke runs must be sequential (they already share one `.vscode-test` install).
+const launchArgs = ["--remote-debugging-port=9339"];
+
 export default defineConfig([
-  { label: "smoke-stable", files, version: "stable", workspaceFolder, mocha },
-  { label: "smoke-min", files, version: "1.125.0", workspaceFolder, mocha },
+  { label: "smoke-stable", files, version: "stable", workspaceFolder, mocha, launchArgs },
+  { label: "smoke-min", files, version: "1.125.0", workspaceFolder, mocha, launchArgs },
 ]);

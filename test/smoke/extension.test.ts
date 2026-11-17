@@ -17,6 +17,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { parquetWriteBuffer } from "hyparquet-writer";
+import { registerSaveHostSuite } from "./saveHostSuite";
 
 const EXTENSION_ID = "GaussAA.office-viewer-plus";
 
@@ -230,3 +231,6 @@ describe("JSON preview command", () => {
     );
   });
 });
+
+// Last on purpose: these open real Excel viewers, which the lazy-activation check above must not see.
+registerSaveHostSuite();
