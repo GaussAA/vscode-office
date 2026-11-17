@@ -123,15 +123,15 @@ viewer were the last two, and both were removed in 6.0.0.
 
 `scenarios/parquet-request-guard.mjs` 和 `scenarios/request-guard-search.mjs` 守护 RequestGuard（commit a141a101）的回归：
 
-| 场景                                         | 守护什么                              | 已验证的变异                                                                  |
-| -------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
-| `parquet-open-once`                          | 带窗口缩放后 `init` 只发一次          | M1: `paging.pageSize` 加入 `loadParquet` 依赖 → 失败 `range: 1–21 of 300`     |
-| `parquet-restore-first-measure-min-viewport` | 视口高 400、页大小 8 时恢复到 row 100 | M2: 去掉 `fitPageSize` 的 `this.restorePending` → 失败 `1–8 of 300`           |
-| `parquet-document-switch-stale-scan`         | 切换文档后旧扫描应答不渗入            | **未找到有效变异**（`openProfilePanel` 的 cancel 掩盖了影响）                 |
-| `parquet-document-switch-stale-profile`      | 切换文档时旧 profile 应答不渗入       | M3: 去掉 `profileRequest.cancel()` + 面板复位 → 失败 `["null 0%","null 77%"]` |
-| `jsonl-search-new-query-cancels-old`         | 新搜索取消旧搜索，旧批次不渲染        | M4: `isCurrent` 恒返回 true → 失败 `2 rows (stale batch)`                     |
-| `json-search-new-query-cancels-old`          | 同上                                  | M4: `isCurrent` 恒返回 true → 失败 `["[0]...","[2]..."]`                      |
-| `compare-reload-stale-reply-dropped`         | Compare 丢弃 requestId 不匹配的应答   | M4: `isCurrent` 恒返回 true → 失败 `accepted stale reply`                     |
+| 场景                                         | 守护什么                              | 已验证的变异                                                                                                                 |
+| -------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `parquet-open-once`                          | 带窗口缩放后 `init` 只发一次          | M1: `paging.pageSize` 加入 `loadParquet` 依赖 → 失败 `range: 1–21 of 300`                                                    |
+| `parquet-restore-first-measure-min-viewport` | 视口高 400、页大小 8 时恢复到 row 100 | M2: 去掉 `fitPageSize` 的 `this.restorePending` → 失败 `1–8 of 300`                                                          |
+| `parquet-document-switch-stale-scan`         | 切换文档后旧扫描应答不渗入            | **无单独可观测变异**：`loadParquet` 的 cancel 是纵深防御，`openProfilePanel` 也会 cancel；场景守护的是面板复位和旧应答不渗入 |
+| `parquet-document-switch-stale-profile`      | 切换文档时旧 profile 应答不渗入       | M3: 去掉 `profileRequest.cancel()` + 面板复位 → 失败 `["null 0%","null 77%"]`                                                |
+| `jsonl-search-new-query-cancels-old`         | 新搜索取消旧搜索，旧批次不渲染        | M4: `isCurrent` 恒返回 true → 失败 `2 rows (stale batch)`                                                                    |
+| `json-search-new-query-cancels-old`          | 同上                                  | M4: `isCurrent` 恒返回 true → 失败 `["[0]...","[2]..."]`                                                                     |
+| `compare-reload-stale-reply-dropped`         | Compare 丢弃 requestId 不匹配的应答   | M4: `isCurrent` 恒返回 true → 失败 `accepted stale reply`                                                                    |
 
 ### Bridge 录制器
 

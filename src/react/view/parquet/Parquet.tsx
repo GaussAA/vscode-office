@@ -282,9 +282,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setProfile(null);
       // Everything the previous document asked the host is now unwanted. The profile request
       // is only re-issued once this file has opened, so without this a late reply from the old
-      // file lands in the gap. The scan guard needs no cancel here: a scan reply is only
-      // rendered inside the column panel, which is closed below, and every panel open
-      // (openProfilePanel) cancels the guard and clears the scan state before showing anything.
+      // file lands in the gap. The scan guard is cancelled too: today openProfilePanel also
+      // cancels it before showing anything, so this is defence in depth, not observable alone.
       profileRequest.current.cancel();
       scanRequest.current.cancel();
       setProfilePanel(null);
