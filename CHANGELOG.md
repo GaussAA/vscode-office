@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Parquet: the selected-column tint is uniform across alternating rows. The zebra rule used to
+  repaint the active cells on alt rows, cutting the column into stripes.
+
 ## [6.16.0] - 2026-11-18
 
 ### Added

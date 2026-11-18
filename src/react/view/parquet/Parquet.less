@@ -726,8 +726,10 @@ body:has(.parquet-app) {
     transition: background var(--motion-fast) var(--motion-ease);
   }
 
-  .ant-table-tbody > tr.parquet-viewer__row--alt > td,
-  .ant-table-tbody-virtual .ant-table-row.parquet-viewer__row--alt .ant-table-cell {
+  .ant-table-tbody > tr.parquet-viewer__row--alt > td:not(.parquet-viewer__column--active),
+  .ant-table-tbody-virtual
+    .ant-table-row.parquet-viewer__row--alt
+    .ant-table-cell:not(.parquet-viewer__column--active) {
     background: var(--pv-row-alt) !important;
   }
 

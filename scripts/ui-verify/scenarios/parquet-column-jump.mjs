@@ -283,6 +283,12 @@ export default [
             };
             const wrap = document.querySelector('.parquet-viewer__table-wrap');
             const inner = wrap?.querySelector('.ant-table-tbody-virtual-holder-inner');
+            const cellColors = [...cells]
+                .map((cell) => {
+                    const color = rgb(cell);
+                    return color ? color.join(',') : null;
+                })
+                .filter((value) => value !== null);
             return {
                 activeName: list?.querySelector('.parquet-viewer__list-name')?.textContent ?? null,
                 headerCount: header ? 1 : 0,
@@ -292,6 +298,7 @@ export default [
                 activeRaw: activeCell ? getComputedStyle(activeCell).backgroundColor : null,
                 plainBg: rgb(plainCell),
                 plainRaw: plainCell ? getComputedStyle(plainCell).backgroundColor : null,
+                uniqueCellBgs: [...new Set(cellColors)],
                 offset: wrap && inner
                     ? wrap.getBoundingClientRect().left - inner.getBoundingClientRect().left
                     : null,
@@ -308,6 +315,12 @@ export default [
       expect(selected.headerCount === 1, "the active column header is not tinted");
       expect(selected.headerName === "field_12", `wrong header tinted: ${selected.headerName}`);
       expect(selected.cellCount > 0, "the active column cells are not tinted");
+      // Zebra rows must not cut the column into stripes: every active cell, on an alt row or
+      // not, has to resolve to the same background.
+      expect(
+        selected.uniqueCellBgs.length === 1,
+        `the active column is striped: ${JSON.stringify(selected.uniqueCellBgs)}`,
+      );
       // The tint has to read as a column, not as a rounding error: compare it against a plain
       // cell of the same row. Signal Blue is the documented hue source (DESIGN.md), so the
       // blue channel carries the lift; 7% (the old value) sits below this threshold.
