@@ -37,7 +37,8 @@ import {
   SIDER_MIN,
   pageSizeForBodyHeight,
 } from "./parquetLayout.ts";
-import { loadPersistedRow, savePersistedRow } from "./parquetPersistence.ts";
+import { loadPersistedRow } from "./parquetPersistence.ts";
+import { loadParquetUi, saveParquetUi } from "./parquetUiState.ts";
 import {
   loadParquetShares,
   saveParquetShares,
@@ -203,11 +204,22 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [loadedPage, setLoadedPage] = useState(0);
   const [loadedStart, setLoadedStart] = useState(0);
   const [pageLoading, setPageLoading] = useState(false);
+  /** Stable per-document UI key. The row/width/filter restore is keyed by this, not the path. */
+  const [documentKey, setDocumentKey] = useState<string | undefined>(undefined);
+  const [fieldFilter, setFieldFilter] = useState("");
   const {
     layout: columnLayout,
     setColumnWidth,
     resetColumnWidth,
-  } = useParquetColumnLayout(fileInfo?.columns ?? [], tableBodyWidth);
+  } = useParquetColumnLayout(fileInfo?.columns ?? [], tableBodyWidth, documentKey);
+
+  const changeFieldFilter = useCallback(
+    (value: string) => {
+      setFieldFilter(value);
+      if (documentKey) saveParquetUi(documentKey, { fieldFilter: value });
+    },
+    [documentKey],
+  );
 
   /** The virtual table owns scrolling; cursor moves and row jumps go through its ref. */
   const tableRef = useRef<TableRef>(null);
@@ -222,8 +234,6 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   /** Absolute row the footer jump aimed at, highlighted until the next navigation. */
   const [targetRow, setTargetRow] = useState<number | null>(null);
   const fileInfoRef = useRef<ParquetFileInfo | null>(null);
-  /** localStorage key of the open document; empty for inline (virtual) buffers. */
-  const documentKeyRef = useRef<string | undefined>(undefined);
 
   const { activeColumn, setActiveColumn, focusColumn } = useParquetColumnFocus({
     tableRef,
@@ -361,9 +371,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setActiveColumn(null);
       setTargetRow(null);
       resetSearch(true);
-      // Clear the key before resetting the page, otherwise the reset would be persisted
+      // Clear the UI scope before resetting the page, otherwise the reset would be persisted
       // against the document we are leaving.
-      documentKeyRef.current = undefined;
+      setDocumentKey(undefined);
+      setFieldFilter("");
       setPage(0);
       try {
         // Files arrive either as an inline base64 payload (virtual documents) or as a
@@ -375,6 +386,13 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
         fileInfoRef.current = info;
         setFileInfo(info);
+        // Per-file UI state uses the stable document identity, not the per-session webview
+        // path. A legacy path-keyed row is read once for migration; layout/shares keep their
+        // own stores.
+        const cacheId = payload.documentCacheId ?? payload.path;
+        setDocumentKey(cacheId);
+        const ui = loadParquetUi(cacheId);
+        setFieldFilter(ui?.fieldFilter ?? "");
         // Only load the cached shares once the document has opened: the fingerprint describes
         // this file. Inline bytes have no stable identity, so they never get a cache scope.
         const shareScope =
@@ -400,9 +418,8 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         handler.emit("parquetProfile", { requestId: profileRequest.current.issue() });
         // Come back to where this document was left. The page cannot be computed yet — a page
         // is a screenful, and this document has not been measured — so remember the row and let
-        // the measuring effect turn it into a page.
-        documentKeyRef.current = payload.path;
-
+        // the measuring effect turn it into a page. The new key is the per-file UI state; the
+        // old path-keyed row is read once so an existing session's position is not lost.
         const session = new ParquetSession(
           {
             rowCount: info.rowCount,
@@ -415,7 +432,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           // this callback changes identity.
           { pageSize: MIN_ROWS_PER_PAGE, chunkSize: PARQUET_CHUNK_SIZE },
         );
-        session.restoreToRow(loadPersistedRow(payload.path));
+        session.restoreToRow(ui?.row ?? loadPersistedRow(payload.path));
         sessionRef.current = session;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load parquet file");
@@ -495,9 +512,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     // Nothing to remember before the first page has actually arrived — and while a restore is
     // still pending, the page-0 load that wins the race must not write over the stored row.
     const session = sessionRef.current;
-    if (!fileInfo || pageRows.length === 0 || !session || session.isRestorePending) return;
-    savePersistedRow(documentKeyRef.current, loadedStart);
-  }, [documentKeyRef, fileInfo, loadedStart, pageRows.length, sessionRef]);
+    if (!documentKey || !fileInfo || pageRows.length === 0 || !session) return;
+    if (session.isRestorePending) return;
+    saveParquetUi(documentKey, { row: loadedStart });
+  }, [documentKey, fileInfo, loadedStart, pageRows.length, sessionRef]);
 
   useEffect(() => {
     const onFind = (event: KeyboardEvent) => {
@@ -973,12 +991,15 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           />
           <div className="parquet-viewer__body">
             <ParquetSchema
+              key={documentKey ?? "pending"}
               columns={fileInfo.columns}
               activeColumn={activeColumn}
               siderWidth={siderWidth}
               profile={profile}
               shares={shares}
               structuredScan={structuredScan}
+              fieldFilter={fieldFilter}
+              onFieldFilterChange={changeFieldFilter}
               onScanStructured={scanStructured}
               onFocusColumn={focusColumn}
               onInspectColumn={openProfilePanel}

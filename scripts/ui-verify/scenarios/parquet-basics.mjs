@@ -14,7 +14,7 @@ import {
   unexpected,
 } from "../helpers.mjs";
 
-/** 12 scenario(s); the runner concatenates these lists. */
+/** 17 scenario(s); the runner concatenates these lists. */
 export default [
   {
     name: "parquet-empty",
@@ -393,8 +393,9 @@ export default [
         `body cell width ${after.cellWidth} did not follow the header (${after.nameWidth})`,
       );
 
-      // It survives a reload: a column width is a reading decision, not a per-visit one.
-      await openParquet(page, base, "?preview=1");
+      // It survives a reload: a column width is a reading decision, not a per-visit one. The
+      // per-file UI entry is cleared by `openParquet` unless this path asks to keep it.
+      await openParquet(page, base, "?preview=1", { keepUiState: true });
       const reloaded = json(await page.evaluate(`JSON.stringify(${measure})`));
       expect(
         reloaded.nameWidth === after.nameWidth,
@@ -430,6 +431,74 @@ export default [
         `arrow key resize: ${before.nameWidth} -> ${keyed.nameWidth}`,
       );
       return "column widths: drag, persist, reset, keyboard";
+    },
+  },
+  {
+    name: "parquet-ui-state-per-file",
+    async run({ page, base }) {
+      // A filter and a page position are per document now. If either key were global (or the old
+      // webview-path key), the preview opened at the end would inherit the mixed filter/page.
+      await openParquet(page, base, "?mixed=1");
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__field-filter');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'name');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            })()`);
+      const filtered = await page.waitFor(
+        `document.querySelector('.parquet-viewer__field-filter')?.value === 'name'`,
+      );
+      expect(filtered, "the field filter did not accept the typed value");
+      const countAfter = json(
+        await page.evaluate(`JSON.stringify({
+                    count: document.querySelector('.parquet-viewer__sider-count')?.textContent ?? null,
+                    visible: document.querySelectorAll('.parquet-viewer__list-item').length,
+                })`),
+      );
+      expect(countAfter.count === "1/4", `filtered count is ${countAfter.count}`);
+      expect(countAfter.visible === 1, `filtered rows: ${countAfter.visible}`);
+
+      await clickNextPage(page);
+      const saved = await pagerState(page);
+      // The row save runs after the page rows land; give the effect a beat before reloading.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      await openParquet(page, base, "?mixed=1", { keepUiState: true });
+      const restored = await page.waitFor(
+        `document.querySelector('.parquet-viewer__field-filter')?.value === 'name'
+                    && document.querySelector('.parquet-viewer__pager-info')?.innerText === ${JSON.stringify(saved.range)}`,
+        8000,
+      );
+      const after = json(
+        await page.evaluate(`JSON.stringify({
+                    filter: document.querySelector('.parquet-viewer__field-filter')?.value ?? null,
+                    range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
+                    count: document.querySelector('.parquet-viewer__sider-count')?.textContent ?? null,
+                })`),
+      );
+      expect(restored, `filter/row did not restore: ${JSON.stringify(after)}`);
+      expect(after.count === "1/4", `restored count is ${after.count}`);
+
+      // A different document must not inherit the mixed state. Navigate without `openParquet`
+      // so the stored state is not cleared: the isolation is the assertion.
+      await page.navigate(`${base}/harness-parquet?preview=1`);
+      const previewReady = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__cell') && !!document.querySelector('.parquet-table .ant-table-row')`,
+      );
+      expect(previewReady, "the preview file did not render");
+      const isolated = json(
+        await page.evaluate(`JSON.stringify({
+                    filter: document.querySelector('.parquet-viewer__field-filter')?.value ?? null,
+                    range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
+                })`),
+      );
+      const previewSize = await pageSize(page);
+      expect(isolated.filter === "", `preview inherited the mixed filter: ${isolated.filter}`);
+      expect(
+        isolated.range === rangeOf(previewSize, 0, 6),
+        `preview inherited a page position: ${isolated.range}`,
+      );
+      return `filter 1/4 and ${saved.range} restored; preview stayed clean`;
     },
   },
   {

@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Documents without a stable mtime are not cached.
 - Parquet: clicking the selected schema field again clears the column highlight. The second
   click only dismisses the tint; it does not move the grid.
+- Parquet: column widths, the current row and the schema field filter are restored per document
+  across reloads and VS Code restarts (stable document cache id, 90-day TTL, LRU 20). The sidebar
+  width stays a global preference. Existing global column widths and path-keyed row positions are
+  read once as a fallback, so the upgrade does not reset an established layout.
+- Parquet: cached empty shares are now merged into the stored entry column by column instead of
+  overwriting the whole list. Two tabs that scan different structured columns no longer lose one
+  tab's result; the remaining read-merge-write race is documented in ADR-0025.
 
 ### Changed
 

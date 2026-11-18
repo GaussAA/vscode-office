@@ -88,6 +88,56 @@ test("share cache: a changed size, a new version and a corrupt blob all miss", (
   assert.equal(storage.getItem(storageKey), null, "the corrupt blob was left in storage");
 });
 
+test("share cache: sequential writes merge columns instead of replacing the table", () => {
+  storage.clear();
+  const meta: ParquetEmptyShare = {
+    ...share,
+    name: "meta",
+    nulls: 2,
+    empties: 0,
+    emptyRatio: 2 / 6,
+  };
+  saveParquetShares(scope, [share]);
+  saveParquetShares(scope, [meta]);
+
+  const loaded = new Map(loadParquetShares(scope).map((entry) => [entry.name, entry]));
+  assert.deepEqual(loaded.get("tags"), share);
+  assert.deepEqual(loaded.get("meta"), meta);
+
+  // A later scan of the same column wins for that column only.
+  const updated = { ...share, nulls: 0, empties: 6, emptyRatio: 1 };
+  saveParquetShares(scope, [updated]);
+  const after = new Map(loadParquetShares(scope).map((entry) => [entry.name, entry]));
+  assert.deepEqual(after.get("tags"), updated);
+  assert.deepEqual(after.get("meta"), meta);
+});
+
+test("share cache: a different fingerprint replaces instead of merging", () => {
+  storage.clear();
+  saveParquetShares(scope, [share]);
+  const newer = { ...scope, mtimeMs: scope.mtimeMs + 1 };
+  const meta: ParquetEmptyShare = {
+    ...share,
+    name: "meta",
+    nulls: 0,
+    empties: 0,
+    emptyRatio: 0,
+  };
+  saveParquetShares(newer, [meta]);
+
+  assert.deepEqual(loadParquetShares(newer), [meta]);
+  assert.deepEqual(loadParquetShares(scope), [], "the old fingerprint's entry was kept");
+});
+
+test("share cache: a corrupt current entry does not block a fresh write", () => {
+  storage.clear();
+  saveParquetShares(scope, [share]);
+  storage.setItem(storageKey, "{ not json");
+  saveParquetShares(scope, [share]);
+
+  assert.deepEqual(loadParquetShares(scope), [share]);
+});
+
 test("share cache: an entry older than a week is ignored", () => {
   storage.clear();
   saveParquetShares(scope, [share]);

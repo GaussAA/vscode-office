@@ -67,13 +67,12 @@ function isShare(value: unknown): value is ParquetEmptyShare {
   );
 }
 
-/** The stored shares for this document and fingerprint, or an empty list after a miss. */
-export function loadParquetShares(scope: ParquetShareScope | null): ParquetEmptyShare[] {
-  if (!scope || scope.mtimeMs === undefined) return [];
+/** The stored shares for this document and fingerprint, or null after a miss. */
+function readValidShares(scope: ParquetShareScope): ParquetEmptyShare[] | null {
   const storageKey = PARQUET_SHARES_PREFIX + scope.key;
   try {
     const raw = localStorage.getItem(storageKey);
-    if (!raw) return [];
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<StoredParquetShares>;
     const fresh = typeof parsed.ts === "number" && Date.now() - parsed.ts <= MAX_AGE_MS;
     const matches =
@@ -85,7 +84,7 @@ export function loadParquetShares(scope: ParquetShareScope | null): ParquetEmpty
       // A stale or corrupt entry is garbage the next scan would overwrite; drop it now so a
       // changed file does not keep a misleading blob in storage.
       localStorage.removeItem(storageKey);
-      return [];
+      return null;
     }
     return parsed.shares;
   } catch {
@@ -93,21 +92,37 @@ export function loadParquetShares(scope: ParquetShareScope | null): ParquetEmpty
     try {
       localStorage.removeItem(storageKey);
     } catch {}
-    return [];
+    return null;
   }
 }
 
-/** Persist the current shares for this document; a no-op without a fingerprint. */
+/** The stored shares for this document and fingerprint, or an empty list after a miss. */
+export function loadParquetShares(scope: ParquetShareScope | null): ParquetEmptyShare[] {
+  if (!scope || scope.mtimeMs === undefined) return [];
+  return readValidShares(scope) ?? [];
+}
+
+/**
+ * Persist the current shares for this document; a no-op without a fingerprint.
+ *
+ * This is a read-merge-write, not a whole-list overwrite: another tab may have scanned a
+ * different column since this tab's last read. The incoming share wins for its own column;
+ * every other cached column is kept. The write is still not atomic across tabs — the window is
+ * tiny, and a lost same-column update is the documented limit (ADR-0025).
+ */
 export function saveParquetShares(
   scope: ParquetShareScope | null,
   shares: ParquetEmptyShare[],
 ): void {
   if (!scope || scope.mtimeMs === undefined || shares.length === 0) return;
   if (!shares.every(isShare)) return;
+  const merged = new Map<string, ParquetEmptyShare>();
+  for (const share of readValidShares(scope) ?? []) merged.set(share.name, share);
+  for (const share of shares) merged.set(share.name, share);
   savePersistedState(PARQUET_SHARES_PREFIX, scope.key, {
     v: CACHE_VERSION,
     size: scope.size,
     mtimeMs: scope.mtimeMs,
-    shares,
+    shares: [...merged.values()],
   });
 }

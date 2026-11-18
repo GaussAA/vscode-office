@@ -15,6 +15,9 @@ interface ParquetSchemaProps {
   shares: ReadonlyMap<string, ParquetEmptyShare>;
   /** The rail-level batch scan's state; its action is rendered only when it has work to do. */
   structuredScan: { loading: boolean; scanned: number; total: number; error: string | null };
+  /** Controlled by the viewer so the filter can be part of the per-file UI state. */
+  fieldFilter: string;
+  onFieldFilterChange: (value: string) => void;
   onScanStructured: () => void;
   onFocusColumn: (position: number) => void;
   /** Open the profile panel for this column (mouse on the badge, or `i` on the focused row). */
@@ -22,8 +25,8 @@ interface ParquetSchemaProps {
 }
 
 /**
- * Schema list with its own filter and single-tab-stop cursor. Keeping this state here means the
- * viewer only has to know which field is active and how to bring it into view.
+ * Schema list with its filter input and single-tab-stop cursor. The filter is controlled by the
+ * viewer so it can persist with the rest of the per-file UI state; only the cursor is local.
  */
 export default function ParquetSchema({
   columns,
@@ -32,11 +35,12 @@ export default function ParquetSchema({
   profile,
   shares,
   structuredScan,
+  fieldFilter,
+  onFieldFilterChange,
   onScanStructured,
   onFocusColumn,
   onInspectColumn,
 }: ParquetSchemaProps) {
-  const [fieldFilter, setFieldFilter] = useState("");
   const [fieldCursor, setFieldCursor] = useState(0);
 
   // Keyed by column name: the profile carries names, not positions, because a nested schema
@@ -90,7 +94,7 @@ export default function ParquetSchema({
           aria-label={$t("parquet.filterFields")}
           spellCheck={false}
           onChange={(event) => {
-            setFieldFilter(event.target.value);
+            onFieldFilterChange(event.target.value);
             resetCursor();
           }}
         />
@@ -99,7 +103,7 @@ export default function ParquetSchema({
             type="button"
             className="parquet-viewer__field-filter-clear"
             onClick={() => {
-              setFieldFilter("");
+              onFieldFilterChange("");
               resetCursor();
             }}
             title={$t("common.close")}

@@ -73,15 +73,19 @@ export async function jumpJsonl(page, entry) {
 }
 
 export async function openParquet(page, base, query = "", options = {}) {
-  // The viewer remembers the page a document was left on (localStorage, keyed by path), and a
-  // scan result is cached under `parquet-shares:`. Scenarios share one browser profile, so
-  // without clearing them a scenario that ends on page 2 would leave the next one unable to
-  // find row 1, and a cached share could make the next scenario start already scanned.
-  // `keepShareCache` is for the scenario that deliberately exercises the reuse path.
+  // The viewer remembers the page a document was left on (localStorage, keyed by document), its
+  // per-file layout/filter under `parquet-ui:`, and a scan result under `parquet-shares:`.
+  // Scenarios share one browser profile, so without clearing them a scenario that ends on page 2
+  // would leave the next one unable to find row 1, a saved filter would hide fields, and a
+  // cached share could make the next scenario start already scanned. `keepShareCache` /
+  // `keepUiState` are for scenarios that deliberately exercise the reuse path.
   await page.navigate(`${base}/stats`);
   const shareFilter = options.keepShareCache ? "" : " || key.startsWith('parquet-shares:')";
+  const uiFilter = options.keepUiState
+    ? ""
+    : " || key.startsWith('parquet-ui:') || key === 'parquet-column-widths'";
   await page.evaluate(`Object.keys(localStorage)
-        .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width'${shareFilter})
+        .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width'${uiFilter}${shareFilter})
         .forEach(key => localStorage.removeItem(key))`);
   await page.navigate(`${base}/harness-parquet${query}`);
   // A real page has cells; an empty file renders antd's empty state; a broken one renders

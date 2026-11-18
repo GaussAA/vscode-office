@@ -1,65 +1,74 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ParquetColumnInfo } from "@/common/parquetReader";
-import {
-  COLUMN_MAX_WIDTH,
-  COLUMN_MIN_WIDTH,
-  COLUMN_WIDTH_STORAGE_KEY,
-  DATA_COLUMN_WIDTH,
-} from "./parquetLayout";
+import { DATA_COLUMN_WIDTH } from "./parquetLayout";
 import { computeParquetColumnLayout } from "./parquetColumnLayout";
+import { legacyColumnWidths, loadParquetUi, saveParquetUi } from "./parquetUiState";
 
-export function parseStoredColumnWidths(raw: string | null): Record<string, number> {
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
-    const clean: Record<string, number> = {};
-    for (const [name, width] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof width === "number" && width >= COLUMN_MIN_WIDTH && width <= COLUMN_MAX_WIDTH) {
-        clean[name] = width;
-      }
-    }
-    return clean;
-  } catch {
-    return {};
-  }
+interface EditedWidths {
+  key: string;
+  widths: Record<string, number>;
 }
 
 /**
- * Owns persisted per-column widths and the stretched layout derived from them. Columns are keyed
- * by name so a width survives page turns and a schema change keeps the columns it still has.
+ * Owns persisted per-column widths and the stretched layout derived from them.
+ *
+ * Widths are per document (ADR-0025), keyed by `documentCacheId`; the legacy global map is only
+ * a fallback when this document has no saved map. The saved map is *derived* during render and
+ * an edit is the only thing that starts a save, so switching documents cannot write the previous
+ * document's widths under the new key.
  */
-export function useParquetColumnLayout(columns: ParquetColumnInfo[], tableBodyWidth: number) {
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
-    try {
-      return parseStoredColumnWidths(localStorage.getItem(COLUMN_WIDTH_STORAGE_KEY));
-    } catch {
-      return {};
-    }
-  });
+export function useParquetColumnLayout(
+  columns: ParquetColumnInfo[],
+  tableBodyWidth: number,
+  documentKey: string | undefined,
+) {
+  /** The latest edit for one document; null until the user actually resizes something. */
+  const [edited, setEdited] = useState<EditedWidths | null>(null);
+
+  // A localStorage read per document, not an effect: the layout must be right on the first
+  // render after the key arrives. An explicit `{}` is a real answer (every width reset); only an
+  // absent field falls back to the pre-ADR-0025 global map.
+  const storedWidths = useMemo(() => {
+    if (!documentKey) return {};
+    return loadParquetUi(documentKey)?.columnWidths ?? legacyColumnWidths();
+  }, [documentKey]);
+
+  const columnWidths = edited && edited.key === documentKey ? edited.widths : storedWidths;
 
   useEffect(() => {
-    try {
-      localStorage.setItem(COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(columnWidths));
-    } catch {}
-  }, [columnWidths]);
+    // Only an edit is a write. Loading a document, or switching away from it, must not save.
+    if (!edited || edited.key !== documentKey) return;
+    saveParquetUi(edited.key, { columnWidths: edited.widths });
+  }, [edited, documentKey]);
 
   const layout = useMemo(() => {
     const widths = columns.map((column) => columnWidths[column.name] ?? DATA_COLUMN_WIDTH);
     return computeParquetColumnLayout(widths, tableBodyWidth);
   }, [columnWidths, columns, tableBodyWidth]);
 
-  const setColumnWidth = useCallback((name: string, width: number) => {
-    setColumnWidths((current) => ({ ...current, [name]: width }));
-  }, []);
+  const setColumnWidth = useCallback(
+    (name: string, width: number) => {
+      if (!documentKey) return;
+      setEdited((current) => {
+        const base = current?.key === documentKey ? current.widths : storedWidths;
+        return { key: documentKey, widths: { ...base, [name]: width } };
+      });
+    },
+    [documentKey, storedWidths],
+  );
 
-  const resetColumnWidth = useCallback((name: string) => {
-    setColumnWidths((current) => {
-      const next = { ...current };
-      delete next[name];
-      return next;
-    });
-  }, []);
+  const resetColumnWidth = useCallback(
+    (name: string) => {
+      if (!documentKey) return;
+      setEdited((current) => {
+        const base = current?.key === documentKey ? current.widths : storedWidths;
+        const next = { ...base };
+        delete next[name];
+        return { key: documentKey, widths: next };
+      });
+    },
+    [documentKey, storedWidths],
+  );
 
   return { layout, setColumnWidth, resetColumnWidth };
 }
