@@ -203,6 +203,10 @@ export default {
     rows: "{count} lignes",
     rowDelta: "{delta} lignes",
   },
+  jsonl: {
+    indexing: "Indexation… {percent}%",
+    indexingBytes: "{loaded} sur {total}",
+  },
   previewGuard: {
     title: "Fichier trop volumineux pour un aperçu automatique",
     body: "{file} fait {size}. Au-delà de {limit}, un fichier Parquet doit passer en un seul bloc par le pont de l'extension ; il n'est donc chargé qu'à la demande.",

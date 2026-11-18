@@ -7,6 +7,7 @@ import {
   type JsonlEntryDetail,
   type JsonlEntryPayload,
   type JsonlEntrySummary,
+  type JsonlIndexProgress,
   type JsonlInfoPayload,
   type JsonlSearchBatch,
 } from "../../../common/jsonlTypes.ts";
@@ -42,6 +43,7 @@ interface SearchMeta {
 
 function JsonlViewerContent() {
   const [info, setInfo] = useState<JsonlInfoPayload | null>(null);
+  const [indexProgress, setIndexProgress] = useState<JsonlIndexProgress | null>(null);
   /**
    * The directory window: one contiguous range and its rows, in a single value. The old
    * pair of a `Map` plus a `{start,end}` could disagree — a late reply extended the range
@@ -73,6 +75,8 @@ function JsonlViewerContent() {
   const entries = useRef(new RequestGuard());
   /** The search scan. `cancel()` says whether the host is still running one, so no mirror flag. */
   const search = useRef(new RequestGuard());
+  /** Guard for init/reload: filters stale progress from superseded indexing runs. */
+  const indexGuard = useRef(new RequestGuard());
   const searchTimer = useRef<number | undefined>(undefined);
   const searchAutoSelected = useRef(false);
   const pendingJump = useRef<number | null>(null);
@@ -137,7 +141,19 @@ function JsonlViewerContent() {
   }, []);
 
   useEffect(() => {
+    handler.on("jsonlIndexProgress", (payload: JsonlIndexProgress) => {
+      // Filter stale progress from superseded indexing runs
+      if (payload.requestId && !indexGuard.current.isCurrent(payload.requestId)) return;
+      setIndexProgress(payload);
+    });
+
     handler.on("jsonlInfo", (payload: JsonlInfoPayload) => {
+      // Accept info only if it's for the current index request (or no requestId, e.g. fileChange)
+      if (payload.requestId && !indexGuard.current.isCurrent(payload.requestId)) return;
+
+      setIndexProgress(null); // Clear progress once info arrives.
+      if (payload.requestId) indexGuard.current.settle(payload.requestId);
+
       const previous = infoRef.current;
       const isSameFile = previous?.cacheId === payload.cacheId;
       infoRef.current = payload;
@@ -222,7 +238,7 @@ function JsonlViewerContent() {
       }
     });
 
-    handler.emit("init");
+    handler.emit("init", { requestId: indexGuard.current.issue() });
   }, [recenter, requestEntry, selectEntry, startSearch]);
 
   const clearSearch = useCallback(() => {
@@ -376,7 +392,7 @@ function JsonlViewerContent() {
               size="small"
               icon={<ReloadOutlined />}
               title={$t("jsonl.reload")}
-              onClick={() => handler.emit("jsonlReload")}
+              onClick={() => handler.emit("jsonlReload", { requestId: indexGuard.current.issue() })}
             />
           </div>
         </div>
@@ -410,7 +426,11 @@ function JsonlViewerContent() {
                   highlight={searchActive ? query.trim() : undefined}
                   emptyText={
                     !info
-                      ? $t("jsonl.loading")
+                      ? indexProgress && indexProgress.total > 0
+                        ? $t("jsonl.indexing", {
+                            percent: Math.floor((indexProgress.loaded / indexProgress.total) * 100),
+                          })
+                        : $t("jsonl.loading")
                       : searchActive
                         ? searching
                           ? $t("jsonl.searchingShort")

@@ -229,6 +229,8 @@ export default {
     reload: "Reload from disk",
     searching: "Searching… {percent}% · {count} matches",
     searchingShort: "Searching…",
+    indexing: "Indexing… {percent}%",
+    indexingBytes: "{loaded} of {total}",
     noMatches: "No matches",
     matchCountOne: "{count} match",
     matchCountMany: "{count} matches",

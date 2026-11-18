@@ -71,6 +71,13 @@ export async function fileByteSource(fsPath: string): Promise<ByteSource> {
 /** Chunk size for the streaming index pass. Big enough to amortise, small enough to bound memory. */
 export const INDEX_CHUNK_BYTES = 1024 * 1024;
 
+export interface BuildIndexOptions {
+  /** Called after each chunk is processed. */
+  onProgress?: (loaded: number, total: number) => void;
+  /** Check `cancelled` between chunks; throw JsonlIndexCancelled if true. */
+  cancel?: { readonly cancelled: boolean };
+}
+
 /**
  * Build the line index without ever holding the file: read it in chunks and remember the
  * absolute offset of every `\n`.
@@ -78,17 +85,28 @@ export const INDEX_CHUNK_BYTES = 1024 * 1024;
 export async function buildJsonlIndexFrom(
   source: ByteSource,
   chunkSize = INDEX_CHUNK_BYTES,
+  options?: BuildIndexOptions,
 ): Promise<JsonlIndex> {
   if (source.size === 0) {
     return { offsets: [], lineCount: 0 };
   }
   const offsets: number[] = [0];
   for (let position = 0; position < source.size; position += chunkSize) {
+    // Check cancellation before each chunk.
+    if (options?.cancel?.cancelled) {
+      const { JsonlIndexCancelled } = await import("./jsonlIndexCancelled");
+      throw new JsonlIndexCancelled();
+    }
+
     const length = Math.min(chunkSize, source.size - position);
     const chunk = await source.read(position, length);
     for (let i = 0; i < chunk.length; i++) {
       if (chunk[i] === 0x0a) offsets.push(position + i + 1);
     }
+
+    // Report progress after chunk is scanned.
+    const loaded = position + length;
+    options?.onProgress?.(loaded, source.size);
   }
   // A trailing newline terminates the last line; it does not start an empty one.
   if (offsets.length > 1 && offsets[offsets.length - 1] >= source.size) {
@@ -104,8 +122,8 @@ export class JsonlFile {
   ) {}
 
   /** Read the size and build the index. Nothing else is retained. */
-  static async open(source: ByteSource): Promise<JsonlFile> {
-    return new JsonlFile(source, await buildJsonlIndexFrom(source));
+  static async open(source: ByteSource, options?: BuildIndexOptions): Promise<JsonlFile> {
+    return new JsonlFile(source, await buildJsonlIndexFrom(source, INDEX_CHUNK_BYTES, options));
   }
 
   get lineCount(): number {

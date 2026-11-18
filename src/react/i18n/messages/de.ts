@@ -202,6 +202,10 @@ export default {
     rows: "{count} Zeilen",
     rowDelta: "{delta} Zeilen",
   },
+  jsonl: {
+    indexing: "Indizierung… {percent}%",
+    indexingBytes: "{loaded} von {total}",
+  },
   previewGuard: {
     title: "Datei zu groß für die automatische Vorschau",
     body: "{file} ist {size} groß. Über {limit} muss eine Parquet-Datei in einem Stück über die Erweiterungs-Bridge laufen, deshalb wird sie erst auf Anfrage geladen.",

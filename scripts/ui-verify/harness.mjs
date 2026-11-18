@@ -234,7 +234,7 @@ function manyFixtures(count) {
   });
 }
 
-function jsonlStub(fixtures, limit = 0) {
+function jsonlStub(fixtures, limit = 0, indexing = false) {
   const summaries = fixtures.map(({ index, kind, raw, size, label, error }) => ({
     index,
     kind,
@@ -253,9 +253,28 @@ function jsonlStub(fixtures, limit = 0) {
     postMessage(msg) {
       if (!msg) return;
       if (msg.type === 'init') {
-        setTimeout(function () {
-          window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: byteSize } }, '*');
-        }, 60);
+        const requestId = msg.content && msg.content.requestId;
+        if (${JSON.stringify(indexing)}) {
+          // Simulate indexing with progress updates
+          const steps = [20, 40, 60, 80, 99];
+          const sendProgress = function(i) {
+            if (i >= steps.length) {
+              setTimeout(function() {
+                window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: byteSize, requestId: requestId } }, '*');
+              }, 60);
+              return;
+            }
+            setTimeout(function() {
+              window.postMessage({ type: 'jsonlIndexProgress', content: { requestId: requestId, loaded: Math.floor(byteSize * steps[i] / 100), total: byteSize } }, '*');
+              sendProgress(i + 1);
+            }, 80);
+          };
+          sendProgress(0);
+        } else {
+          setTimeout(function () {
+            window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: byteSize, requestId: requestId } }, '*');
+          }, 60);
+        }
       }
       if (msg.type === 'jsonlIndex') {
         const requestId = msg.content.requestId;
@@ -1222,7 +1241,11 @@ export function startHarness(fixtures, port = 0) {
                       ? smokeStub(url.searchParams.get("route") ?? "html")
                       : route === "parquet"
                         ? parquetStub(fixtures)
-                        : jsonlStub(url.searchParams.get("empty") === "1" ? [] : jsonl, limit);
+                        : jsonlStub(
+                            url.searchParams.get("empty") === "1" ? [] : jsonl,
+                            limit,
+                            url.searchParams.get("indexing") === "1",
+                          );
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;
