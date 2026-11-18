@@ -207,10 +207,7 @@ export default {
     rows: "{count} строк",
     rowDelta: "{delta} строк",
   },
-  jsonl: {
-    indexing: "Индексация… {percent}%",
-    indexingBytes: "{loaded} из {total}",
-  },
+  jsonl: {},
   previewGuard: {
     title: "Файл слишком велик для автоматического просмотра",
     body: "{file} занимает {size}. Свыше {limit} parquet передаётся через мост расширения целиком, поэтому не загружается автоматически.",

@@ -57,13 +57,6 @@ export interface JsonlInfoPayload {
   clearCache?: boolean;
 }
 
-/** Host-to-webview: indexing progress update. */
-export interface JsonlIndexProgress {
-  requestId: number;
-  loaded: number;
-  total: number;
-}
-
 export interface JsonlRangeRequest {
   /** Echoed back on the reply, so the webview can drop a stale window. */
   requestId: number;

@@ -53,7 +53,7 @@ const LOCALES = {
 const MAX_MISSING: Record<string, number> = {
   "zh-cn": 0,
   "zh-tw": 0,
-  ja: 70, // +2 from jsonl.indexing, jsonl.indexingBytes
+  ja: 68,
   de: 68,
   fr: 68,
   es: 68,

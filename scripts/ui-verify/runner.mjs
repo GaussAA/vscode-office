@@ -59,7 +59,6 @@ import { expect, unexpected } from "./helpers.mjs";
 
 import json from "./scenarios/json.mjs";
 import jsonl from "./scenarios/jsonl.mjs";
-import jsonlIndexing from "./scenarios/jsonl-indexing.mjs";
 import compare from "./scenarios/compare.mjs";
 import excelMotion from "./scenarios/excel-motion.mjs";
 import parquetA11y from "./scenarios/parquet-a11y.mjs";
@@ -77,7 +76,6 @@ import other from "./scenarios/other.mjs";
 const scenarios = [
   ...json,
   ...jsonl,
-  ...jsonlIndexing,
   ...parquetBasics,
   ...parquetGrid,
   ...parquetSurfaces,

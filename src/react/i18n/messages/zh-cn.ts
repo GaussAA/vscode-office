@@ -229,8 +229,6 @@ export default {
     reload: "从磁盘重新加载",
     searching: "搜索中… {percent}% · {count} 处匹配",
     searchingShort: "搜索中…",
-    indexing: "建立索引… {percent}%",
-    indexingBytes: "{loaded} / {total}",
     noMatches: "没有匹配",
     matchCountOne: "{count} 处匹配",
     matchCountMany: "{count} 处匹配",

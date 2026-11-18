@@ -228,8 +228,6 @@ export default {
     reload: "從磁碟重新載入",
     searching: "搜尋中… {percent}% · {count} 筆符合",
     searchingShort: "搜尋中…",
-    indexing: "建立索引… {percent}%",
-    indexingBytes: "{loaded} / {total}",
     noMatches: "沒有符合",
     matchCountOne: "{count} 筆符合",
     matchCountMany: "{count} 筆符合",

@@ -207,10 +207,7 @@ export default {
     rows: "{count} 行",
     rowDelta: "{delta} 行",
   },
-  jsonl: {
-    indexing: "インデックス作成中… {percent}%",
-    indexingBytes: "{loaded} / {total}",
-  },
+  jsonl: {},
   previewGuard: {
     title: "ファイルが大きいため自動プレビューしません",
     body: "{file} は {size} です。{limit} を超える parquet は拡張ブリッジ経由で一括転送が必要なため、自動では読み込みません。",
