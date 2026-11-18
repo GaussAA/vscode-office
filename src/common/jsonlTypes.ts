@@ -51,6 +51,15 @@ export interface JsonlInfoPayload {
   cacheId: string;
   lineCount: number;
   byteSize: number;
+  /** Optional: webview-issued request id for staleness guard (init/reload). */
+  requestId?: number;
+}
+
+/** Host-to-webview: indexing progress update. */
+export interface JsonlIndexProgress {
+  requestId: number;
+  loaded: number;
+  total: number;
 }
 
 export interface JsonlRangeRequest {
