@@ -11,6 +11,14 @@ import { createSaveTracker } from "./saveHandlers";
 import { buildDocumentCacheId } from "./handlers/officeContent";
 import { parquetScanCache } from "../service/parquetScanCache";
 import { registerDataViewerCacheClearer } from "../service/dataViewerCacheClear";
+import { ExcelWorkbookCache } from "../service/excelWorkbookCache";
+import { createExcelWorkbookHost } from "./excelWorkbookHost";
+
+const EXCEL_WORKBOOK_SUFFIXES = new Set([".xlsx", ".xlsm", ".xls", ".ods"]);
+
+function isWorkbookUri(uri: vscode.Uri): boolean {
+  return EXCEL_WORKBOOK_SUFFIXES.has(getFileSuffix(uri.fsPath));
+}
 
 /**
  * Spreadsheet and parquet viewers.
@@ -30,6 +38,8 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
   private parquetClearPending = false;
   /** Set by Clear cache when it ran with no spreadsheet panel to clear. */
   private excelClearPending = false;
+  /** Parsed windowed workbook rows, shared by every Excel tab in this session (ADR-0027). */
+  private readonly excelWorkbooks = new ExcelWorkbookCache();
 
   constructor(private context: vscode.ExtensionContext) {
     registerDataViewerCacheClearer(() => this.clearDataViewerCaches());
@@ -41,6 +51,7 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
    */
   public clearDataViewerCaches(): void {
     parquetScanCache.clear();
+    this.excelWorkbooks.clear();
     const parquetActive = [...this.parquetHandlers].filter((handler) => !handler.disposed);
     for (const handler of parquetActive) handler.emit("clearParquetCache");
     if (parquetActive.length === 0) this.parquetClearPending = true;
@@ -117,7 +128,10 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
         : route === "excel"
           ? this.consumeExcelClear()
           : false;
-    handleCommonEvent(uri, handler, this.saves, { clearCache });
+    handleCommonEvent(uri, handler, this.saves, {
+      clearCache,
+      hostWorkbook: route === "excel" && isWorkbookUri(uri),
+    });
 
     if (route === "parquet") {
       // The parquet messages the host answers: the profile comes from row-group metadata and
@@ -150,6 +164,23 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
     }
 
     if (route === "excel") {
+      const workbook = createExcelWorkbookHost({
+        documentCacheId: buildDocumentCacheId(uri),
+        cache: this.excelWorkbooks,
+        stat: async () => {
+          try {
+            const stat = await vscode.workspace.fs.stat(uri);
+            return { size: stat.size, mtimeMs: stat.mtime };
+          } catch {
+            return null;
+          }
+        },
+        emit: (type, payload) => handler.emit(type, payload),
+      });
+      handler
+        .on("excelWorkbookOpen", (request) => workbook.open(request))
+        .on("excelWorkbookRows", (request) => workbook.rows(request))
+        .on("excelWorkbookStore", (request) => workbook.store(request));
       this.excelPanels.add(handler);
       webviewPanel.onDidDispose(() => this.excelPanels.delete(handler));
     }

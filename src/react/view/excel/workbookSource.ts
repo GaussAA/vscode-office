@@ -7,7 +7,7 @@
  * exposes the same `readRows` contract the CSV source uses.
  */
 import type { SheetSource } from "./sheetSource";
-import type { WorkbookSheetRows } from "./workbookRows";
+import type { WorkbookSheetRows } from "@/common/workbookRows";
 
 export interface WorkbookSheetSource extends SheetSource {
   readonly kind: "workbook";

@@ -19,6 +19,8 @@ import { useExcelSave } from "./useExcelSave";
 import { mountExcelSpreadsheet } from "./excelSpreadsheetHost";
 import { clearExcelViewStorage } from "./excelViewState";
 import { clearWindowedFindMemo } from "./windowedFindMemo";
+import { createHostWorkbookTransport } from "./hostWorkbookTransport";
+import { createHostWorkbookSource } from "./hostWorkbookSource";
 
 export type { ExcelOpenPayload };
 
@@ -164,6 +166,25 @@ export function useExcelDocumentSession({
     const container = document.getElementById("container");
     if (!container) return;
     let activeHost: ReturnType<typeof mountExcelSpreadsheet> | null = null;
+    const workbookTransport = createHostWorkbookTransport(handler);
+    const loadDeps = {
+      ...LOAD_DEPS,
+      loadHostWorkbook: async () => {
+        const meta = await workbookTransport.open();
+        return meta
+          ? createHostWorkbookSource(meta, (key, sheetIndex, start, end) =>
+              workbookTransport.rows(key, sheetIndex, start, end),
+            )
+          : null;
+      },
+      storeHostWorkbook: (
+        _payload: ExcelOpenPayload,
+        sheets: Parameters<typeof workbookTransport.store>[0],
+      ) => {
+        // Let the local source paint first; the host copy is only needed by a later open.
+        setTimeout(() => workbookTransport.store(sheets), 0);
+      },
+    };
 
     const failLoad = (errorMessage: string, cause: unknown) => {
       console.error(`Failed to load Excel file: ${errorMessage}`, cause);
@@ -225,7 +246,7 @@ export function useExcelDocumentSession({
 
     const loadPayload = (payload: ExcelOpenPayload, seq: number) => {
       setWindowSource(null);
-      void session.load(payload, seq, LOAD_DEPS).then((outcome) => {
+      void session.load(payload, seq, loadDeps).then((outcome) => {
         switch (outcome.kind) {
           case "stale":
             return;
@@ -296,6 +317,8 @@ export function useExcelDocumentSession({
         clearWindowedFindMemo();
         onResetFind();
         spreadSheetRef.current?.scrollToCell(0, 0, 0);
+        // The host cache was cleared too; re-open so the current view re-parses and refills it.
+        handler.emit("init");
       })
       .on("saveDone", () => {
         const effect = session.markSaveDone();
@@ -316,6 +339,7 @@ export function useExcelDocumentSession({
     return () => {
       activeHost?.dispose();
       session.invalidate();
+      workbookTransport.dispose();
       gridReadyRef.current = false;
       spreadSheetRef.current = null;
       setActiveSpreadsheet(null);

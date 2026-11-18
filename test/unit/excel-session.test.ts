@@ -7,6 +7,7 @@ import {
   type ExcelLoadDeps,
   type ExcelLoadOutcome,
 } from "@/react/view/excel/excelSession";
+import { createWorkbookSheetSource } from "@/react/view/excel/workbookSource";
 
 const MB = 1024 * 1024;
 
@@ -194,6 +195,58 @@ test("load: a parser failure under the current generation becomes an error outco
   );
   assert.equal(outcome.kind, "error");
   assert.equal((outcome as Extract<ExcelLoadOutcome, { kind: "error" }>).message, "corrupt");
+});
+
+test("load: a host workbook hit skips the buffer and the parser", async () => {
+  const session = new ExcelSession();
+  const open = expectLoad(
+    session.open(payload({ ext: ".xlsx", fileName: "big.xlsx", size: 9 * MB, hostWorkbook: true })),
+  );
+  let bufferCalls = 0;
+  let parseCalls = 0;
+  const source = createWorkbookSheetSource([{ name: "Data", rows: [["id"], ["1"]] }]);
+  const outcome = await session.load(
+    open.payload,
+    open.seq,
+    makeDeps({
+      loadBuffer: async () => {
+        bufferCalls++;
+        return new ArrayBuffer(0);
+      },
+      loadWorkbookRows: async () => {
+        parseCalls++;
+        return [];
+      },
+      loadHostWorkbook: async () => source,
+    }),
+  );
+  assert.equal(outcome.kind, "workbook");
+  assert.equal((outcome as Extract<ExcelLoadOutcome, { kind: "workbook" }>).source, source);
+  assert.equal(bufferCalls, 0);
+  assert.equal(parseCalls, 0);
+});
+
+test("load: a host workbook miss falls back and stores the parsed rows", async () => {
+  const session = new ExcelSession();
+  const open = expectLoad(
+    session.open(payload({ ext: ".xlsx", fileName: "big.xlsx", size: 9 * MB, hostWorkbook: true })),
+  );
+  const parsed = [{ name: "Data", rows: [["id"], ["1"]] }];
+  let stored: unknown = null;
+  const outcome = await session.load(
+    open.payload,
+    open.seq,
+    makeDeps({
+      loadBuffer: async () => new ArrayBuffer(0),
+      loadWorkbookRows: async () => parsed,
+      loadHostWorkbook: async () => null,
+      storeHostWorkbook: (_payload, sheets) => {
+        stored = sheets;
+      },
+    }),
+  );
+  assert.equal(outcome.kind, "workbook");
+  assert.equal(stored, parsed);
 });
 
 test("loadErrorMessage: Error, empty message, string and nullish causes", () => {

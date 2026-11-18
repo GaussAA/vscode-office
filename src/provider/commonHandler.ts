@@ -28,7 +28,7 @@ export function handleCommonEvent(
   uri: Uri,
   handler: Handler,
   saves: SaveTracker,
-  options: { clearCache?: boolean } = {},
+  options: { clearCache?: boolean; hostWorkbook?: boolean } = {},
 ) {
   let readOnly = false;
   // One-shot: the first successful open may clear; a later fileChange must not clear again.
@@ -47,7 +47,10 @@ export function handleCommonEvent(
       void emitVirtualOfficeOpen(handler, uri, { clearCache: sendClear });
       return;
     }
-    await emitFileOfficeOpen(handler, uri, handler.panel.webview, { clearCache: sendClear });
+    await emitFileOfficeOpen(handler, uri, handler.panel.webview, {
+      clearCache: sendClear,
+      hostWorkbook: options.hostWorkbook,
+    });
   };
   const saveHandlers = createSaveHandlers<Uri>({
     document: uri,

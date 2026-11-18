@@ -19,7 +19,7 @@ import type { ExcelData } from "./excel_reader";
 import { excelWindowKind, planExcelOpen } from "./excelOpenPlan";
 import { createTextSheetSource, type SheetSource } from "./sheetSource";
 import { limitForView, sheetViewFor } from "./sheetView";
-import type { WorkbookSheetRows } from "./workbookRows";
+import type { WorkbookSheetRows } from "@/common/workbookRows";
 import { createWorkbookSheetSource, type WorkbookSheetSource } from "./workbookSource";
 
 export type ExcelOpenPayload = OfficeOpenMessage;
@@ -47,6 +47,14 @@ export interface ExcelLoadDeps {
   loadBuffer(payload: ExcelOpenPayload): Promise<ArrayBuffer>;
   loadWorkbookRows(buffer: ArrayBuffer): Promise<WorkbookSheetRows[]>;
   loadSheets(buffer: ArrayBuffer, ext: string): Promise<ExcelData>;
+  /**
+   * Ask the host for a cached workbook (ADR-0027). `null` means miss/unavailable; the caller
+   * then fetches and parses as before. Only called for file workbooks that advertise
+   * `hostWorkbook`.
+   */
+  loadHostWorkbook?(payload: ExcelOpenPayload): Promise<WorkbookSheetSource | null>;
+  /** Hand the freshly parsed rows to the host cache; the current view keeps its local source. */
+  storeHostWorkbook?(payload: ExcelOpenPayload, sheets: WorkbookSheetRows[]): void;
 }
 
 export type ExcelLoadOutcome =
@@ -267,14 +275,35 @@ export class ExcelSession {
     deps: ExcelLoadDeps,
   ): Promise<ExcelLoadOutcome> {
     try {
-      const buffer = await deps.loadBuffer(payload);
-      if (!this.isCurrent(seq)) return { kind: "stale" };
       const ext = payload.ext ?? "";
       const view = sheetViewFor(ext, payload.size, { virtual: isVirtual(payload) });
+
+      // The host cache is the only path that avoids the whole-workbook parse. A miss falls
+      // through to the existing fetch + parse, so a host problem can never block opening.
+      if (view === "window" && excelWindowKind(ext) === "workbook" && payload.hostWorkbook) {
+        let hostSource: WorkbookSheetSource | null = null;
+        try {
+          hostSource = (await deps.loadHostWorkbook?.(payload)) ?? null;
+        } catch {
+          hostSource = null;
+        }
+        if (!this.isCurrent(seq)) return { kind: "stale" };
+        if (hostSource) return { kind: "workbook", source: hostSource };
+      }
+
+      const buffer = await deps.loadBuffer(payload);
+      if (!this.isCurrent(seq)) return { kind: "stale" };
       if (view === "window") {
         if (excelWindowKind(ext) === "workbook") {
           const rows = await deps.loadWorkbookRows(buffer);
           if (!this.isCurrent(seq)) return { kind: "stale" };
+          if (payload.hostWorkbook) {
+            try {
+              deps.storeHostWorkbook?.(payload, rows);
+            } catch {
+              // Caching is a convenience; the local source already has the rows.
+            }
+          }
           return { kind: "workbook", source: createWorkbookSheetSource(rows) };
         }
         return { kind: "text", source: createTextSheetSource(buffer) };

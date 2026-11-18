@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import { parseCsv } from "./csvParser";
 import { decodeCsvBufferWithEncoding, type CsvEncoding } from "./csvEncoding";
 import type { CellData, SheetData } from "./x-spreadsheet/index";
-import { workbookRowsFromSheetJs, type WorkbookSheetRows } from "./workbookRows";
+import { workbookRowsFromSheetJs, type WorkbookSheetRows } from "@/common/workbookRows";
 
 type RowMap = NonNullable<SheetData["rows"]>;
 

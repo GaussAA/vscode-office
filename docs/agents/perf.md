@@ -172,8 +172,10 @@ just a verdict.
 - **Whole-workbook Excel parse** is measured by the `excel-workbook-parse-probe` UI scenario
   (300,001 rows x 8 columns, generated harness workbook): on 2026-11-18 it took **6,466 ms
   parse / 8,095 ms open (80%)**; the run is a measurement, not a budget. The ADR-0026
-  threshold (`>1.5 s` or `>50%` of open) is exceeded, so a host-parsed workbook cache is the
-  next follow-up slice; the probe itself stays ungated.
+  threshold (`>1.5 s` or `>50%` of open) is exceeded. ADR-0027 keeps the first open parsing in
+  the webview and caches the parsed rows in the extension host; a later open of the same file
+  asks for metadata/windows and skips both fetch and parse. The UI harness has no host bridge
+  for this, so the probe measures the first-open fallback, not the host hit.
 - **CSV record scan** is reported by `sheet-window-first-paint` (`excel-csv-scan`):
   126 ms of a 542 ms 21 MB open (2026-11-18), so offsets are not cached yet (ADR-0026).
 - **Open latency itself** (1-3 s for 1M rows x 5 columns, dominated by decoding the first data

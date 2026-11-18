@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   expires after 90 days; existing unversioned entries are migrated in place.
 - JSONL: the last three completed searches are memoized inside the window; repeating a query
   returns the same hits without another host scan. The memo is memory-only.
+- Excel/CSV: the parsed row text of a windowed workbook (`.xlsx/.xlsm/.xls/.ods`) is now cached
+  in the extension host for the current VS Code session (two files, memory only). Reopening an
+  unchanged workbook or opening it in a second tab asks the host for metadata and row windows
+  instead of fetching and parsing the whole file again; the first open still parses in the
+  webview. The cache is cleared by the unified Clear command and is not written to disk.
 - Excel/CSV: the per-document view state is versioned and expires after 90 days (old
   `-excel-view` entries migrate), and the windowed find remembers its last three completed
   queries. Cell values remain memory-only.
