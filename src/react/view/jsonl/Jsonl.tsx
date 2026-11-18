@@ -7,6 +7,7 @@ import {
   type JsonlEntryDetail,
   type JsonlEntryPayload,
   type JsonlEntrySummary,
+  type JsonlIndexError,
   type JsonlIndexProgress,
   type JsonlInfoPayload,
   type JsonlSearchBatch,
@@ -37,6 +38,7 @@ const SEARCH_DEBOUNCE_MS = 250;
 function JsonlViewerContent() {
   const [info, setInfo] = useState<JsonlInfoPayload | null>(null);
   const [indexProgress, setIndexProgress] = useState<JsonlIndexProgress | null>(null);
+  const [indexError, setIndexError] = useState<{ requestId: number; message: string } | null>(null);
   /**
    * The directory window: one contiguous range and its rows, in a single value. The old
    * pair of a `Map` plus a `{start,end}` could disagree — a late reply extended the range
@@ -158,6 +160,14 @@ function JsonlViewerContent() {
     handler.on("jsonlIndexProgress", (payload: JsonlIndexProgress) => {
       if (payload.requestId && !indexGuard.current.isCurrent(payload.requestId)) return;
       setIndexProgress(payload);
+      setIndexError(null); // Clear error when new indexing starts
+    });
+
+    handler.on("jsonlIndexError", (payload: JsonlIndexError) => {
+      if (payload.requestId && !indexGuard.current.isCurrent(payload.requestId)) return;
+      setIndexError(payload);
+      setIndexProgress(null); // Clear progress on error
+      if (payload.requestId) indexGuard.current.settle(payload.requestId);
     });
 
     handler.on("jsonlInfo", (payload: JsonlInfoPayload) => {
@@ -166,6 +176,7 @@ function JsonlViewerContent() {
 
       if (payload.requestId) indexGuard.current.settle(payload.requestId);
       setIndexProgress(null); // Clear progress once info arrives.
+      setIndexError(null); // Clear error once info arrives.
 
       const previous = infoRef.current;
       const isSameFile = previous?.cacheId === payload.cacheId;
@@ -477,19 +488,23 @@ function JsonlViewerContent() {
                   windowStart={directory.start}
                   highlight={searchActive ? query.trim() : undefined}
                   emptyText={
-                    !info
-                      ? indexProgress && indexProgress.total > 0
-                        ? $t("jsonl.indexing", {
-                            percent: Math.floor((indexProgress.loaded / indexProgress.total) * 100),
-                          })
-                        : $t("jsonl.loading")
-                      : searchActive
-                        ? searching
-                          ? $t("jsonl.searchingShort")
-                          : $t("jsonl.noMatches")
-                        : chunkLoading
-                          ? $t("jsonl.loading")
-                          : $t("jsonl.empty")
+                    indexError
+                      ? indexError.message
+                      : !info
+                        ? indexProgress && indexProgress.total > 0
+                          ? $t("jsonl.indexing", {
+                              percent: Math.floor(
+                                (indexProgress.loaded / indexProgress.total) * 100,
+                              ),
+                            })
+                          : $t("jsonl.loading")
+                        : searchActive
+                          ? searching
+                            ? $t("jsonl.searchingShort")
+                            : $t("jsonl.noMatches")
+                          : chunkLoading
+                            ? $t("jsonl.loading")
+                            : $t("jsonl.empty")
                   }
                 />
               </Splitter.Panel>

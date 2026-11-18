@@ -43,6 +43,14 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
   /** Open JSONL panels, for the unified Clear cache broadcast. */
   private readonly panels = new Set<Handler>();
   private clearPending = false;
+  /** Inflight openSession operations, to deduplicate concurrent opens of the same document. */
+  private readonly inflightSessions = new WeakMap<
+    JsonlDocument,
+    {
+      promise: Promise<JsonlSession>;
+      progressCallbacks: Array<(loaded: number, total: number) => void>;
+    }
+  >();
 
   constructor(private context: vscode.ExtensionContext) {
     this.indexCache = new JsonlIndexCache(
@@ -70,44 +78,79 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
       onProgress?: (loaded: number, total: number) => void;
     },
   ): Promise<JsonlSession> {
-    const fingerprint = await this.fingerprint(document.uri);
-    const source = document.pendingSource
-      ? await document.pendingSource
-      : await openDocumentSource(document.uri);
-    document.pendingSource = null;
-
-    // Try cache hit first.
-    let cachedIndex: Awaited<ReturnType<JsonlIndexCache["get"]>> = null;
-    if (fingerprint) {
-      try {
-        cachedIndex = await this.indexCache.get(fingerprint);
-      } catch {
-        cachedIndex = null;
+    // Check for inflight operation to deduplicate concurrent opens
+    const inflight = this.inflightSessions.get(document);
+    if (inflight) {
+      // Join the inflight operation: add progress callback and await result
+      if (options?.onProgress) {
+        inflight.progressCallbacks.push(options.onProgress);
       }
+      return await inflight.promise;
     }
 
-    if (cachedIndex) {
-      // Cache hit: skip progress, use cached index directly.
-      const file = await JsonlFile.open(source, cachedIndex);
+    // Start new operation
+    const progressCallbacks: Array<(loaded: number, total: number) => void> = [];
+    if (options?.onProgress) {
+      progressCallbacks.push(options.onProgress);
+    }
+
+    const promise = (async (): Promise<JsonlSession> => {
+      const fingerprint = await this.fingerprint(document.uri);
+      const source = document.pendingSource
+        ? await document.pendingSource
+        : await openDocumentSource(document.uri);
+      document.pendingSource = null;
+
+      // Try cache hit first.
+      let cachedIndex: Awaited<ReturnType<JsonlIndexCache["get"]>> = null;
+      if (fingerprint) {
+        try {
+          cachedIndex = await this.indexCache.get(fingerprint);
+        } catch {
+          cachedIndex = null;
+        }
+      }
+
+      if (cachedIndex) {
+        // Cache hit: skip progress, use cached index directly.
+        const file = await JsonlFile.open(source, cachedIndex);
+        return new JsonlSession(file);
+      }
+
+      // Cache miss: show progress and build index.
+      const file = await JsonlFile.open(source, undefined, {
+        onProgress: (loaded, total) => {
+          // Call all registered progress callbacks (errors are ignored to avoid breaking indexing)
+          for (const cb of progressCallbacks) {
+            try {
+              cb(loaded, total);
+            } catch {
+              // Ignore callback errors
+            }
+          }
+        },
+        cancel: document.cancelToken,
+      });
+
+      // Store the built index in cache.
+      if (fingerprint) {
+        try {
+          await this.indexCache.set(fingerprint, file.index);
+        } catch {
+          // A cache write failure must not fail the open; the index is already in memory.
+        }
+      }
+
       return new JsonlSession(file);
+    })();
+
+    this.inflightSessions.set(document, { promise, progressCallbacks });
+
+    try {
+      return await promise;
+    } finally {
+      this.inflightSessions.delete(document);
     }
-
-    // Cache miss: show progress and build index.
-    const file = await JsonlFile.open(source, undefined, {
-      onProgress: options?.onProgress,
-      cancel: document.cancelToken,
-    });
-
-    // Store the built index in cache.
-    if (fingerprint) {
-      try {
-        await this.indexCache.set(fingerprint, file.index);
-      } catch {
-        // A cache write failure must not fail the open; the index is already in memory.
-      }
-    }
-
-    return new JsonlSession(file);
   }
 
   private async fingerprint(uri: vscode.Uri): Promise<FileFingerprint | null> {

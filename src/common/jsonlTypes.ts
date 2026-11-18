@@ -64,6 +64,12 @@ export interface JsonlIndexProgress {
   total: number;
 }
 
+/** Host-to-webview: indexing or load error. */
+export interface JsonlIndexError {
+  requestId: number;
+  message: string;
+}
+
 export interface JsonlRangeRequest {
   /** Echoed back on the reply, so the webview can drop a stale window. */
   requestId: number;

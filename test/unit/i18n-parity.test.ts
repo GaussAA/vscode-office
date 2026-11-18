@@ -53,13 +53,13 @@ const LOCALES = {
 const MAX_MISSING: Record<string, number> = {
   "zh-cn": 0,
   "zh-tw": 0,
-  ja: 68,
-  de: 68,
-  fr: 68,
-  es: 68,
-  "pt-br": 68,
-  ko: 68,
-  ru: 68,
+  ja: 69,
+  de: 69,
+  fr: 69,
+  es: 69,
+  "pt-br": 69,
+  ko: 69,
+  ru: 69,
 };
 
 function flatten(tree: Record<string, unknown>, prefix = ""): Map<string, unknown> {

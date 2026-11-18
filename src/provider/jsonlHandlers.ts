@@ -12,6 +12,7 @@ import {
   type JsonlEntriesPayload,
   type JsonlEntryPayload,
   type JsonlEntryRequest,
+  type JsonlIndexError,
   type JsonlIndexProgress,
   type JsonlInfoPayload,
   type JsonlRangeRequest,
@@ -50,6 +51,40 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
         emit("jsonlInfo", { ...info(), requestId: request?.requestId });
       } else {
         // Not loaded yet: trigger load with progress reporting.
+        try {
+          await reopen({
+            requestId: request?.requestId,
+            onProgress: (loaded, total) => {
+              if (request?.requestId != null) {
+                emit("jsonlIndexProgress", {
+                  requestId: request.requestId,
+                  loaded,
+                  total,
+                } satisfies JsonlIndexProgress);
+              }
+            },
+          });
+          // Reopen installs the session; emit info once ready.
+          emit("jsonlInfo", { ...info(), requestId: request?.requestId });
+        } catch (error) {
+          // JsonlIndexCancelled: user closed panel, silently ignore
+          if (error instanceof Error && error.name === "JsonlIndexCancelled") {
+            return;
+          }
+          // Other errors: notify webview
+          if (request?.requestId != null) {
+            emit("jsonlIndexError", {
+              requestId: request.requestId,
+              message: error instanceof Error ? error.message : String(error),
+            } satisfies JsonlIndexError);
+          }
+        }
+      }
+    },
+
+    /** The file changed on disk, or the user asked for a reload. */
+    async reload(request?: { requestId?: number }) {
+      try {
         await reopen({
           requestId: request?.requestId,
           onProgress: (loaded, total) => {
@@ -62,26 +97,20 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
             }
           },
         });
-        // Reopen installs the session; emit info once ready.
         emit("jsonlInfo", { ...info(), requestId: request?.requestId });
+      } catch (error) {
+        // JsonlIndexCancelled: user closed panel, silently ignore
+        if (error instanceof Error && error.name === "JsonlIndexCancelled") {
+          return;
+        }
+        // Other errors: notify webview
+        if (request?.requestId != null) {
+          emit("jsonlIndexError", {
+            requestId: request.requestId,
+            message: error instanceof Error ? error.message : String(error),
+          } satisfies JsonlIndexError);
+        }
       }
-    },
-
-    /** The file changed on disk, or the user asked for a reload. */
-    async reload(request?: { requestId?: number }) {
-      await reopen({
-        requestId: request?.requestId,
-        onProgress: (loaded, total) => {
-          if (request?.requestId != null) {
-            emit("jsonlIndexProgress", {
-              requestId: request.requestId,
-              loaded,
-              total,
-            } satisfies JsonlIndexProgress);
-          }
-        },
-      });
-      emit("jsonlInfo", { ...info(), requestId: request?.requestId });
     },
 
     async index(request?: Partial<JsonlRangeRequest>) {
