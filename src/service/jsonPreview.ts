@@ -13,6 +13,7 @@ import {
   JSON_RAW_PREVIEW_CHARS,
   JSON_RECORD_MAX_BYTES,
   JSON_RECORD_WINDOW,
+  isUsableRecordRanges,
   type JsonInfoPayload,
   type JsonRecordSummary,
   type JsonRootKind,
@@ -269,6 +270,7 @@ export class JsonPreviewSession {
     fileName: string,
     cacheId: string,
     fromBuffer: boolean,
+    cachedRecords?: JsonRecordRange[] | null,
   ) {
     let rootKind: JsonRootKind = "invalid";
     let recordCount = 0;
@@ -281,7 +283,10 @@ export class JsonPreviewSession {
       error = { message: "Empty JSON document", line: 1, column: 1 };
     } else if (text[first] === "[") {
       try {
-        this.records = indexJsonArray(text, first);
+        this.records =
+          cachedRecords && isUsableRecordRanges(cachedRecords, text.length)
+            ? cachedRecords
+            : indexJsonArray(text, first);
         rootKind = "array";
         recordCount = this.records.length;
         // Create the document adapter for search
@@ -323,6 +328,11 @@ export class JsonPreviewSession {
       fromBuffer,
       ...(error ? { error } : {}),
     };
+  }
+
+  /** The indexed top-level ranges, or null for invalid/object/scalar roots. */
+  get recordRanges(): JsonRecordRange[] | null {
+    return this.records;
   }
 
   recordsInWindow(start: number, end: number): JsonRecordSummary[] {

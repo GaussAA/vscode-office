@@ -35,6 +35,42 @@ export const JSON_SEARCH_CHAR_BUDGET = 2_000_000;
 
 export type JsonRootKind = "array" | "object" | "scalar" | "too-large" | "invalid";
 
+export interface JsonRecordRangeLike {
+  start: number;
+  end: number;
+}
+
+/**
+ * A cached range list must be ordered, non-overlapping, inside the text and fit the 32-bit
+ * disk format. Shared by the session (which trusts it before skipping the scan) and the disk
+ * cache (which writes it).
+ */
+export function isUsableRecordRanges(
+  ranges: unknown,
+  textLength: number,
+): ranges is JsonRecordRangeLike[] {
+  if (!Array.isArray(ranges)) return false;
+  let previousEnd = -1;
+  for (const value of ranges) {
+    if (!value || typeof value !== "object") return false;
+    const { start, end } = value as Partial<JsonRecordRangeLike>;
+    if (
+      typeof start !== "number" ||
+      typeof end !== "number" ||
+      !Number.isInteger(start) ||
+      !Number.isInteger(end) ||
+      start < previousEnd ||
+      end <= start ||
+      end > textLength ||
+      end > 0xffff_ffff
+    ) {
+      return false;
+    }
+    previousEnd = end;
+  }
+  return true;
+}
+
 export interface JsonSyntaxErrorInfo {
   message: string;
   /** 1-based. */

@@ -1,16 +1,25 @@
 import * as vscode from "vscode";
+import path from "node:path";
 import { ReactApp } from "@/common/reactApp";
 import { Handler } from "@/common/handler";
 import { getExtensionResourceRoots } from "@/common/extensionResource";
+import { registerDataViewerCacheClearer } from "@/service/dataViewerCacheClear";
+import { JsonPreviewRangeCache } from "@/service/jsonPreviewRangeCache";
 import { buildDocumentCacheId } from "@/provider/handlers/officeContent";
 import {
   createJsonPreviewHandlers,
   readJsonSource,
   type JsonSource,
+  type JsonSourceFingerprint,
   type JsonSourceReader,
 } from "./jsonPreviewHandlers";
 
 const panels = new Map<string, JsonPreviewPanel>();
+
+/** Created in `activateJsonPreview`; the command never runs before activation. */
+let rangeCache: JsonPreviewRangeCache | null = null;
+/** Set by the unified Clear command when it ran with no JSON panel to message. */
+let clearPending = false;
 
 function fileNameOf(uri: vscode.Uri): string {
   return uri.path.split("/").pop() || uri.fsPath;
@@ -31,6 +40,42 @@ function readerFor(uri: vscode.Uri): JsonSourceReader {
 }
 
 /**
+ * Read the text and, for a disk source, attach the cached top-level ranges. The cache is only
+ * a shortcut for `indexJsonArray`; the text path (buffer/file) is unchanged.
+ */
+async function readWithCache(uri: vscode.Uri, reader: JsonSourceReader): Promise<JsonSource> {
+  const source = await readJsonSource(reader);
+  if (source.fromBuffer || !rangeCache) return source;
+  try {
+    const stat = await reader.stat();
+    if (typeof stat.mtime !== "number") return source;
+    const fingerprint: JsonSourceFingerprint = {
+      key: buildDocumentCacheId(uri),
+      size: stat.size,
+      mtimeMs: stat.mtime,
+    };
+    const records = await rangeCache.get(fingerprint);
+    return { ...source, records, fingerprint };
+  } catch {
+    return source;
+  }
+}
+
+function consumeClear(): boolean {
+  if (!clearPending) return false;
+  clearPending = false;
+  return true;
+}
+
+/** Called by the unified Clear command; open panels reload after the cache is gone. */
+export async function clearJsonPreviewCaches(): Promise<void> {
+  await rangeCache?.clear().catch(() => undefined);
+  const active = [...panels.values()];
+  for (const panel of active) panel.clearCaches();
+  if (active.length === 0) clearPending = true;
+}
+
+/**
  * One command-opened read-only JSON panel. It is not a custom editor: no file selector, no
  * restart default, no editing path. The host owns the text and the top-level array index;
  * the webview asks for record windows and one record at a time. Which bytes it shows and how
@@ -38,6 +83,7 @@ function readerFor(uri: vscode.Uri): JsonSourceReader {
  */
 class JsonPreviewPanel {
   private readonly handlers: ReturnType<typeof createJsonPreviewHandlers>;
+  private readonly handler: Handler;
 
   static async open(context: vscode.ExtensionContext, uri: vscode.Uri) {
     const key = uri.toString();
@@ -48,7 +94,8 @@ class JsonPreviewPanel {
       return;
     }
 
-    const source = await readJsonSource(readerFor(uri));
+    const reader = readerFor(uri);
+    const source = await readWithCache(uri, reader);
     const panel = vscode.window.createWebviewPanel(
       "GaussAA.jsonPreview",
       fileNameOf(uri),
@@ -59,7 +106,7 @@ class JsonPreviewPanel {
         retainContextWhenHidden: true,
       },
     );
-    const instance = new JsonPreviewPanel(panel, uri, source);
+    const instance = new JsonPreviewPanel(panel, uri, source, reader);
     panels.set(key, instance);
   }
 
@@ -67,16 +114,20 @@ class JsonPreviewPanel {
     readonly panel: vscode.WebviewPanel,
     private readonly uri: vscode.Uri,
     source: JsonSource,
+    reader: JsonSourceReader,
   ) {
     const handler = Handler.bind(panel, uri);
-    const reader = readerFor(uri);
+    this.handler = handler;
     const handlers = createJsonPreviewHandlers(
       {
         fileName: fileNameOf(uri),
         cacheId: buildDocumentCacheId(uri),
-        read: () => readJsonSource(reader),
+        read: () => readWithCache(uri, reader),
         emit: (type, payload) => handler.emit(type, payload),
         reportError: (message) => void vscode.window.showErrorMessage(message),
+        storeRanges: (fingerprint, ranges) => {
+          void rangeCache?.set(fingerprint, ranges);
+        },
       },
       source,
     );
@@ -87,7 +138,10 @@ class JsonPreviewPanel {
     });
 
     handler
-      .on("init", () => handlers.init())
+      .on("init", () => {
+        if (consumeClear()) handler.emit("clearJsonPreviewCache");
+        handlers.init();
+      })
       .on("jsonRecords", (request) => handlers.records(request))
       .on("jsonRecord", (request) => handlers.record(request))
       .on("jsonSearch", (request) => handlers.search(request))
@@ -107,9 +161,18 @@ class JsonPreviewPanel {
 
     void ReactApp.view(panel.webview, { route: "json" });
   }
+
+  clearCaches(): void {
+    this.handler.emit("clearJsonPreviewCache");
+  }
 }
+
 /** Register the command; package.json contributes the three entry points, not a custom editor. */
 export function activateJsonPreview(context: vscode.ExtensionContext): void {
+  rangeCache = new JsonPreviewRangeCache(
+    path.join(context.globalStorageUri.fsPath, "json-preview-index"),
+  );
+  context.subscriptions.push(registerDataViewerCacheClearer(() => clearJsonPreviewCaches()));
   const command = vscode.commands.registerCommand(
     "GaussAA.office.previewJson",
     async (resource?: vscode.Uri) => {

@@ -72,14 +72,20 @@ export async function jumpJsonl(page, entry) {
   expect(loaded, `entry L${entry} never finished rendering`);
 }
 
-export async function openParquet(page, base, query = "") {
-  // The viewer remembers the page a document was left on (localStorage, keyed by path).
-  // Scenarios share one browser profile, so without this a scenario that ends on page 2
-  // would leave the next one unable to find row 1. Start every scenario from a clean slate;
-  // `parquet-restore-page` proves the restoring half deliberately.
+export async function openParquet(page, base, query = "", options = {}) {
+  // The viewer remembers the page a document was left on (localStorage, keyed by document), its
+  // per-file layout/filter under `parquet-ui:`, and a scan result under `parquet-shares:`.
+  // Scenarios share one browser profile, so without clearing them a scenario that ends on page 2
+  // would leave the next one unable to find row 1, a saved filter would hide fields, and a
+  // cached share could make the next scenario start already scanned. `keepShareCache` /
+  // `keepUiState` are for scenarios that deliberately exercise the reuse path.
   await page.navigate(`${base}/stats`);
+  const shareFilter = options.keepShareCache ? "" : " || key.startsWith('parquet-shares:')";
+  const uiFilter = options.keepUiState
+    ? ""
+    : " || key.startsWith('parquet-ui:') || key === 'parquet-column-widths'";
   await page.evaluate(`Object.keys(localStorage)
-        .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width')
+        .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width'${uiFilter}${shareFilter})
         .forEach(key => localStorage.removeItem(key))`);
   await page.navigate(`${base}/harness-parquet${query}`);
   // A real page has cells; an empty file renders antd's empty state; a broken one renders
@@ -152,7 +158,14 @@ export const contrastRatio = (page, selector) =>
     if (!element) return null;
     const parse = (value) => {
       const match = value.match(/rgba?\\(\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)(?:\\s*,\\s*([\\d.]+))?/i);
-      return match ? [Number(match[1]), Number(match[2]), Number(match[3]), match[4] === undefined ? 1 : Number(match[4])] : null;
+      if (match) {
+        return [Number(match[1]), Number(match[2]), Number(match[3]), match[4] === undefined ? 1 : Number(match[4])];
+      }
+      // Chrome resolves color-mix() to CSS Color 4: color(srgb 0..1 0..1 0..1 [/ alpha]).
+      const modern = value.match(/color\\(\\s*srgb\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)(?:\\s*\\/\\s*([\\d.]+))?\\s*\\)/i);
+      return modern
+        ? [Number(modern[1]) * 255, Number(modern[2]) * 255, Number(modern[3]) * 255, modern[4] === undefined ? 1 : Number(modern[4])]
+        : null;
     };
     const luminance = ([r, g, b]) => {
       const channel = (value) => {

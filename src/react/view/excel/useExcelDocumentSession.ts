@@ -17,6 +17,11 @@ import {
 } from "./excelSession";
 import { useExcelSave } from "./useExcelSave";
 import { mountExcelSpreadsheet } from "./excelSpreadsheetHost";
+import { clearExcelViewStorage } from "./excelViewState";
+import { clearWindowedFindMemo } from "./windowedFindMemo";
+import { createHostWorkbookTransport } from "./hostWorkbookTransport";
+import { createHostWorkbookSource } from "./hostWorkbookSource";
+import { createCsvIndexTransport } from "./csvIndexTransport";
 
 export type { ExcelOpenPayload };
 
@@ -162,6 +167,37 @@ export function useExcelDocumentSession({
     const container = document.getElementById("container");
     if (!container) return;
     let activeHost: ReturnType<typeof mountExcelSpreadsheet> | null = null;
+    const workbookTransport = createHostWorkbookTransport(handler);
+    const csvIndexTransport = createCsvIndexTransport(handler);
+    const loadDeps = {
+      ...LOAD_DEPS,
+      loadHostWorkbook: async () => {
+        const meta = await workbookTransport.open();
+        return meta
+          ? createHostWorkbookSource(meta, (key, sheetIndex, start, end) =>
+              workbookTransport.rows(key, sheetIndex, start, end),
+            )
+          : null;
+      },
+      storeHostWorkbook: (
+        _payload: ExcelOpenPayload,
+        sheets: Parameters<typeof workbookTransport.store>[0],
+      ) => {
+        // Let the local source paint first; the host copy is only needed by a later open.
+        setTimeout(() => workbookTransport.store(sheets), 0);
+      },
+      loadCsvIndex: async () => {
+        const index = await csvIndexTransport.open();
+        return index ? { starts: index.starts, maxFields: index.maxFields } : null;
+      },
+      storeCsvIndex: (
+        _payload: ExcelOpenPayload,
+        index: Parameters<typeof csvIndexTransport.store>[0],
+      ) => {
+        // The scan already produced the source; the host copy is for the next open.
+        setTimeout(() => csvIndexTransport.store(index), 0);
+      },
+    };
 
     const failLoad = (errorMessage: string, cause: unknown) => {
       console.error(`Failed to load Excel file: ${errorMessage}`, cause);
@@ -223,7 +259,7 @@ export function useExcelDocumentSession({
 
     const loadPayload = (payload: ExcelOpenPayload, seq: number) => {
       setWindowSource(null);
-      void session.load(payload, seq, LOAD_DEPS).then((outcome) => {
+      void session.load(payload, seq, loadDeps).then((outcome) => {
         switch (outcome.kind) {
           case "stale":
             return;
@@ -259,6 +295,10 @@ export function useExcelDocumentSession({
 
     handler
       .on("open", (payload: ExcelOpenPayload) => {
+        if (payload.clearCache) {
+          clearExcelViewStorage();
+          clearWindowedFindMemo();
+        }
         activeHost?.dispose();
         activeHost = null;
         const result = session.open(payload);
@@ -285,6 +325,14 @@ export function useExcelDocumentSession({
         }
         loadPayload(result.payload, result.seq);
       })
+      .on("clearExcelCache", () => {
+        clearExcelViewStorage();
+        clearWindowedFindMemo();
+        onResetFind();
+        spreadSheetRef.current?.scrollToCell(0, 0, 0);
+        // The host cache was cleared too; re-open so the current view re-parses and refills it.
+        handler.emit("init");
+      })
       .on("saveDone", () => {
         const effect = session.markSaveDone();
         applyDirtyEffect(effect);
@@ -304,6 +352,8 @@ export function useExcelDocumentSession({
     return () => {
       activeHost?.dispose();
       session.invalidate();
+      workbookTransport.dispose();
+      csvIndexTransport.dispose();
       gridReadyRef.current = false;
       spreadSheetRef.current = null;
       setActiveSpreadsheet(null);

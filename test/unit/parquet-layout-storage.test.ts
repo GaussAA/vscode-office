@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseStoredColumnWidths } from "../../src/react/view/parquet/useParquetColumnLayout";
+import { parseColumnWidths as parseStoredColumnWidths } from "../../src/react/view/parquet/parquetUiState";
 import { parseStoredSiderWidth } from "../../src/react/view/parquet/useParquetSiderResize";
 
 test("parquet sider storage: out-of-range and malformed values fall back to the default", () => {

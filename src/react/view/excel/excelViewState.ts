@@ -1,9 +1,14 @@
-import { savePersistedState } from "../../common/persistedState.ts";
+import {
+  clearPersistedPrefix,
+  isPersistedEntryFresh,
+  loadVersionedState,
+  saveVersionedState,
+} from "../../common/versionedState.ts";
 import { vscodeApi } from "../../util/vscode.ts";
 import type Spreadsheet from "./x-spreadsheet/index";
 import {
   parseExcelColorMode,
-  parseExcelViewState,
+  parseExcelViewStateValue,
   type ExcelColorMode,
   type ExcelViewState,
 } from "./excelViewStateModel";
@@ -11,6 +16,8 @@ import {
 const EXCEL_COLOR_MODE_KEY = "office-excel-color-mode";
 const EXCEL_VIEW_PREFIX = "excel-view:";
 const LEGACY_VIEW_SUFFIX = "-excel-view";
+const STATE_VERSION = 1;
+const STATE_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 
 export type { ExcelColorMode, ExcelViewState } from "./excelViewStateModel";
 
@@ -43,11 +50,32 @@ export function getViewStateKey(documentCacheId: string): string {
 
 export function loadViewState(documentCacheId: string): ExcelViewState | null {
   if (!documentCacheId) return null;
+  const current = loadVersionedState(EXCEL_VIEW_PREFIX, documentCacheId, {
+    version: STATE_VERSION,
+    maxAgeMs: STATE_MAX_AGE_MS,
+    parse: parseExcelViewStateValue,
+    parseLegacy: parseExcelViewStateValue,
+  });
+  if (current) return current;
+
+  // Pre-version entries lived under `<cacheId>-excel-view`; read one once and migrate it.
+  const legacyKey = `${documentCacheId}${LEGACY_VIEW_SUFFIX}`;
   try {
-    const raw =
-      localStorage.getItem(getViewStateKey(documentCacheId)) ??
-      localStorage.getItem(`${documentCacheId}${LEGACY_VIEW_SUFFIX}`);
-    return parseExcelViewState(raw);
+    const raw = localStorage.getItem(legacyKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isPersistedEntryFresh(parsed, STATE_MAX_AGE_MS)) {
+      localStorage.removeItem(legacyKey);
+      return null;
+    }
+    const legacy = parseExcelViewStateValue(parsed);
+    if (!legacy) {
+      localStorage.removeItem(legacyKey);
+      return null;
+    }
+    saveViewState(documentCacheId, legacy);
+    localStorage.removeItem(legacyKey);
+    return legacy;
   } catch {
     return null;
   }
@@ -56,7 +84,20 @@ export function loadViewState(documentCacheId: string): ExcelViewState | null {
 export function saveViewState(documentCacheId: string, view: ExcelViewState) {
   if (!documentCacheId) return;
   // Bounded storage: one key per document, evicted by the shared helper.
-  savePersistedState(EXCEL_VIEW_PREFIX, documentCacheId, view);
+  saveVersionedState(EXCEL_VIEW_PREFIX, documentCacheId, STATE_VERSION, view);
+}
+
+/** Remove every per-document Excel view entry (current prefix and the old suffix keys). */
+export function clearExcelViewStorage(): void {
+  clearPersistedPrefix(EXCEL_VIEW_PREFIX);
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (key?.endsWith(LEGACY_VIEW_SUFFIX)) keys.push(key);
+    }
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {}
 }
 
 export function restoreViewState(spreadSheet: Spreadsheet, saved: ExcelViewState) {

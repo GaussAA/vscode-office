@@ -14,7 +14,7 @@ import {
   unexpected,
 } from "../helpers.mjs";
 
-/** 12 scenario(s); the runner concatenates these lists. */
+/** 20 scenario(s); the runner concatenates these lists. */
 export default [
   {
     name: "parquet-empty",
@@ -393,8 +393,9 @@ export default [
         `body cell width ${after.cellWidth} did not follow the header (${after.nameWidth})`,
       );
 
-      // It survives a reload: a column width is a reading decision, not a per-visit one.
-      await openParquet(page, base, "?preview=1");
+      // It survives a reload: a column width is a reading decision, not a per-visit one. The
+      // per-file UI entry is cleared by `openParquet` unless this path asks to keep it.
+      await openParquet(page, base, "?preview=1", { keepUiState: true });
       const reloaded = json(await page.evaluate(`JSON.stringify(${measure})`));
       expect(
         reloaded.nameWidth === after.nameWidth,
@@ -430,6 +431,74 @@ export default [
         `arrow key resize: ${before.nameWidth} -> ${keyed.nameWidth}`,
       );
       return "column widths: drag, persist, reset, keyboard";
+    },
+  },
+  {
+    name: "parquet-ui-state-per-file",
+    async run({ page, base }) {
+      // A filter and a page position are per document now. If either key were global (or the old
+      // webview-path key), the preview opened at the end would inherit the mixed filter/page.
+      await openParquet(page, base, "?mixed=1");
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__field-filter');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'name');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            })()`);
+      const filtered = await page.waitFor(
+        `document.querySelector('.parquet-viewer__field-filter')?.value === 'name'`,
+      );
+      expect(filtered, "the field filter did not accept the typed value");
+      const countAfter = json(
+        await page.evaluate(`JSON.stringify({
+                    count: document.querySelector('.parquet-viewer__sider-count')?.textContent ?? null,
+                    visible: document.querySelectorAll('.parquet-viewer__list-item').length,
+                })`),
+      );
+      expect(countAfter.count === "1/4", `filtered count is ${countAfter.count}`);
+      expect(countAfter.visible === 1, `filtered rows: ${countAfter.visible}`);
+
+      await clickNextPage(page);
+      const saved = await pagerState(page);
+      // The row save runs after the page rows land; give the effect a beat before reloading.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      await openParquet(page, base, "?mixed=1", { keepUiState: true });
+      const restored = await page.waitFor(
+        `document.querySelector('.parquet-viewer__field-filter')?.value === 'name'
+                    && document.querySelector('.parquet-viewer__pager-info')?.innerText === ${JSON.stringify(saved.range)}`,
+        8000,
+      );
+      const after = json(
+        await page.evaluate(`JSON.stringify({
+                    filter: document.querySelector('.parquet-viewer__field-filter')?.value ?? null,
+                    range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
+                    count: document.querySelector('.parquet-viewer__sider-count')?.textContent ?? null,
+                })`),
+      );
+      expect(restored, `filter/row did not restore: ${JSON.stringify(after)}`);
+      expect(after.count === "1/4", `restored count is ${after.count}`);
+
+      // A different document must not inherit the mixed state. Navigate without `openParquet`
+      // so the stored state is not cleared: the isolation is the assertion.
+      await page.navigate(`${base}/harness-parquet?preview=1`);
+      const previewReady = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__cell') && !!document.querySelector('.parquet-table .ant-table-row')`,
+      );
+      expect(previewReady, "the preview file did not render");
+      const isolated = json(
+        await page.evaluate(`JSON.stringify({
+                    filter: document.querySelector('.parquet-viewer__field-filter')?.value ?? null,
+                    range: document.querySelector('.parquet-viewer__pager-info')?.innerText ?? null,
+                })`),
+      );
+      const previewSize = await pageSize(page);
+      expect(isolated.filter === "", `preview inherited the mixed filter: ${isolated.filter}`);
+      expect(
+        isolated.range === rangeOf(previewSize, 0, 6),
+        `preview inherited a page position: ${isolated.range}`,
+      );
+      return `filter 1/4 and ${saved.range} restored; preview stayed clean`;
     },
   },
   {
@@ -554,6 +623,176 @@ export default [
     },
   },
   {
+    name: "parquet-profile-list-empty",
+    async run({ page, base }) {
+      await openParquet(page, base, "?nested=1&profile=1");
+      const ready = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-null').length === 3`,
+      );
+      expect(ready, "the nested profile badges never rendered");
+      const before = json(
+        await page.evaluate(`JSON.stringify([...document.querySelectorAll('.parquet-viewer__list-item')].map(row => ({
+            name: row.dataset.column,
+            badge: row.querySelector('.parquet-viewer__list-null')?.textContent ?? null,
+            label: row.getAttribute('aria-label'),
+        })))`),
+      );
+      const tags = before.find((row) => row.name === "tags");
+      const meta = before.find((row) => row.name === "meta");
+      // LIST and STRUCT values have no row-level statistics: the rail must say "ask", not
+      // stay silent, and the aria sentence must explain the question mark.
+      expect(tags?.badge === "null ?", `LIST badge is ${tags?.badge}`);
+      expect(meta?.badge === "null ?", `STRUCT badge is ${meta?.badge}`);
+      expect(
+        tags?.label.includes("statistics") && tags?.label.includes("scan"),
+        `the LIST badge is unexplained: ${tags?.label}`,
+      );
+
+      // Opening the profile scans the column; one click is the whole price of the answer.
+      await page.evaluate(`(() => {
+          const row = [...document.querySelectorAll('.parquet-viewer__list-item')]
+              .find(item => item.dataset.column === 'tags');
+          row?.querySelector('.parquet-viewer__list-null')?.click();
+      })()`);
+      await page.waitFor(`!!document.querySelector('.parquet-viewer__profile')`);
+      const scanned = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__profile-empty')`,
+      );
+      expect(scanned, "the LIST scan never reported an empty share");
+      const panel = json(
+        await page.evaluate(`JSON.stringify({
+            empty: document.querySelector('.parquet-viewer__profile-empty')?.textContent ?? null,
+            values: [...document.querySelectorAll('.parquet-viewer__profile-value')].map(n => n.textContent),
+            note: document.querySelector('.parquet-viewer__profile-note')?.textContent ?? null,
+        })`),
+      );
+      // 2 null lists + 2 empty lists of 6 rows.
+      expect(panel.empty === "empty 67%", `empty share is ${panel.empty}`);
+      expect(panel.values.length === 2, `top-N has ${panel.values.length} rows`);
+      expect(
+        panel.values.includes('["ko","en"]') && panel.values.includes('["ja"]'),
+        `top-N lost the populated lists: ${JSON.stringify(panel.values)}`,
+      );
+      expect(panel.note.includes("6 of 6"), `the note does not admit coverage: ${panel.note}`);
+
+      await page.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+      await page.waitFor(`!document.querySelector('.parquet-viewer__profile')`);
+      const after = json(
+        await page.evaluate(`JSON.stringify((() => {
+            const row = [...document.querySelectorAll('.parquet-viewer__list-item')]
+                .find(item => item.dataset.column === 'tags');
+            return {
+                badge: row?.querySelector('.parquet-viewer__list-null')?.textContent ?? null,
+                label: row?.getAttribute('aria-label') ?? null,
+            };
+        })())`),
+      );
+      expect(after.badge === "empty 67%", `the rail still shows ${after.badge}`);
+      expect(
+        after.label.includes("67% of the scanned rows are null or empty"),
+        `the scanned share is unexplained: ${after.label}`,
+      );
+      return "LIST null ? → empty 67% after one scan, top-N excludes null/empty rows";
+    },
+  },
+  {
+    name: "parquet-profile-scan-structured",
+    async run({ page, base }) {
+      await openParquet(page, base, "?nested=1&profile=1");
+      const ready = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-null').length === 3`,
+      );
+      expect(ready, "the nested profile badges never rendered");
+      const button = await page.waitFor(`!!document.querySelector('.parquet-viewer__sider-scan')`);
+      expect(button, "the structured-scan action never appeared in the rail");
+      const before = json(
+        await page.evaluate(`JSON.stringify({
+                button: document.querySelector('.parquet-viewer__sider-scan')?.textContent?.trim() ?? null,
+                tags: [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(row => row.dataset.column === 'tags')?.querySelector('.parquet-viewer__list-null')?.textContent ?? null,
+                meta: [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(row => row.dataset.column === 'meta')?.querySelector('.parquet-viewer__list-null')?.textContent ?? null,
+            })`),
+      );
+      expect(before.tags === "null ?" && before.meta === "null ?", JSON.stringify(before));
+      expect(before.button.includes("Scan LIST/STRUCT"), `the action is labelled ${before.button}`);
+
+      // One click resolves every structured column in a single host scan.
+      await page.evaluate(`document.querySelector('.parquet-viewer__sider-scan')?.click()`);
+      const filled = await page.waitFor(
+        `(() => {
+            const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+                .find(row => row.dataset.column === name)
+                ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+            return badge('tags') === 'empty 67%' && badge('meta') === 'empty 33%';
+        })()`,
+        4000,
+      );
+      expect(filled, "the batch scan did not fill both structured badges");
+      const hidden = await page.waitFor(`!document.querySelector('.parquet-viewer__sider-scan')`);
+      expect(hidden, "the batch action stayed after every structured column was answered");
+      const after = json(
+        await page.evaluate(`JSON.stringify({
+                tags: [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(row => row.dataset.column === 'tags')?.getAttribute('aria-label') ?? null,
+                meta: [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(row => row.dataset.column === 'meta')?.getAttribute('aria-label') ?? null,
+            })`),
+      );
+      expect(after.tags.includes("67% of the scanned rows are null or empty"), after.tags);
+      expect(after.meta.includes("33% of the scanned rows are null or empty"), after.meta);
+      return "one click fills every structured badge and the action disappears";
+    },
+  },
+  {
+    name: "parquet-profile-share-cache",
+    async run({ page, base }) {
+      await openParquet(page, base, "?nested=1&profile=1");
+      await page.waitFor(`document.querySelectorAll('.parquet-viewer__list-null').length === 3`);
+      await page.evaluate(`document.querySelector('.parquet-viewer__sider-scan')?.click()`);
+      const scanned = await page.waitFor(
+        `(() => {
+        const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+            .find(row => row.dataset.column === name)
+            ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+        return badge('tags') === 'empty 67%' && badge('meta') === 'empty 33%';
+      })()`,
+        4000,
+      );
+      expect(scanned, "the first open did not produce the shares to cache");
+
+      // The same document and fingerprint: the rail is answered from storage, no scan, no
+      // action. The page is a fresh webview, so this is the persistence path, not React state.
+      await openParquet(page, base, "?nested=1&profile=1", { keepShareCache: true });
+      const cached = await page.waitFor(
+        `(() => {
+        const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+            .find(row => row.dataset.column === name)
+            ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+        return badge('tags') === 'empty 67%' && badge('meta') === 'empty 33%';
+      })()`,
+        2000,
+      );
+      expect(cached, "reopening the same file lost its cached shares");
+      const noAction = await page.waitFor(`!document.querySelector('.parquet-viewer__sider-scan')`);
+      expect(noAction, "the rail offered a scan although every share was cached");
+
+      // A changed mtime means different bytes; the entry must not be reused.
+      await openParquet(page, base, "?nested=1&profile=1&mtime=2", { keepShareCache: true });
+      const invalidated = await page.waitFor(
+        `(() => {
+        const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+            .find(row => row.dataset.column === name)
+            ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+        return badge('tags') === 'null ?' && !!document.querySelector('.parquet-viewer__sider-scan');
+      })()`,
+        2000,
+      );
+      expect(invalidated, "a changed mtime reused a stale empty share");
+      return "same fingerprint reuses the cache; changed mtime rescans";
+    },
+  },
+  {
     name: "parquet-profile-silent-host",
     async run({ page, base }) {
       // No `profile=1`: the fake host never answers, so the rail must stay bare. A viewer that
@@ -571,7 +810,27 @@ export default [
         state.firstLabel && !state.firstLabel.includes("null"),
         `a silent host still claimed something about nulls: ${state.firstLabel}`,
       );
-      return "no host answer, no number";
+      // The same rule for the new nested hint: `null ?` is an answer too, so it may only appear
+      // after the host has actually said the column is nested.
+      await openParquet(page, base, "?nested=1");
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const nested = json(
+        await page.evaluate(`JSON.stringify({
+                badges: document.querySelectorAll('.parquet-viewer__list-null').length,
+                scans: document.querySelectorAll('.parquet-viewer__sider-scan').length,
+                tags: document.querySelector('.parquet-viewer__list-item[data-column="tags"]')?.getAttribute('aria-label') ?? null,
+            })`),
+      );
+      expect(nested.badges === 0, `a silent host still produced ${nested.badges} nested badge(s)`);
+      expect(
+        nested.scans === 0,
+        `a silent host still offered ${nested.scans} structured-scan action(s)`,
+      );
+      expect(
+        nested.tags && !nested.tags.includes("scan"),
+        `a silent host still offered a scan for tags: ${nested.tags}`,
+      );
+      return "no host answer, no number (scalar or nested)";
     },
   },
   {
@@ -670,6 +929,194 @@ export default [
       );
       expect(scanned, "the explicit scan never produced a top-N");
       return "no statistics: explicit scan, then top-N";
+    },
+  },
+  {
+    name: "parquet-clear-cache",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1&profile=1");
+      const measure = `(() => {
+                const head = [...document.querySelectorAll('.parquet-table thead th')]
+                    .find(th => (th.textContent ?? '').trim() === 'name');
+                return { width: head ? Math.round(head.getBoundingClientRect().width) : null };
+            })()`;
+      const before = json(await page.evaluate(`JSON.stringify(${measure})`));
+      expect(before.width !== null, "no NAME header");
+
+      await page.evaluate(`(() => {
+                const input = document.querySelector('.parquet-viewer__field-filter');
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(input, 'name');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            })()`);
+      const filtered = await page.waitFor(
+        `document.querySelector('.parquet-viewer__field-filter')?.value === 'name'`,
+      );
+      expect(filtered, "the filter did not accept the typed value");
+      await clickNextPage(page);
+
+      const dragged = await page.evaluate(`(() => {
+                const head = [...document.querySelectorAll('.parquet-table thead th')]
+                    .find(th => (th.textContent ?? '').trim() === 'name');
+                const handle = head?.querySelector('.parquet-viewer__column-resizer');
+                if (!handle) return false;
+                const box = handle.getBoundingClientRect();
+                const x = box.left + box.width / 2;
+                const y = box.top + box.height / 2;
+                const at = (px) => ({ clientX: px, clientY: y, bubbles: true, pointerId: 1, button: 0, buttons: 1 });
+                handle.dispatchEvent(new PointerEvent('pointerdown', at(x)));
+                handle.dispatchEvent(new PointerEvent('pointermove', at(x + 80)));
+                handle.dispatchEvent(new PointerEvent('pointerup', at(x + 80)));
+                return true;
+            })()`);
+      expect(dragged, "no resize handle on NAME");
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Seed the legacy keys the clear must also remove; this file has no shares of its own.
+      await page.evaluate(`(() => {
+                localStorage.setItem('parquet-state:/mixed.parquet', JSON.stringify({ row: 100 }));
+                localStorage.setItem('parquet-column-widths', JSON.stringify({ name: 140 }));
+                localStorage.setItem('parquet-shares:demo:/mixed.parquet', JSON.stringify({
+                    v: 1, size: 12345, mtimeMs: 1, ts: Date.now(),
+                    shares: [{ name: 'name', scanned: 300, rowCount: 300, complete: true, nulls: 12, empties: 0, emptyRatio: 0.04 }],
+                }));
+            })()`);
+
+      await page.evaluate(`window.postMessage({ type: 'clearParquetCache', content: {} }, '*')`);
+      const expectedRange = rangeOf(await pageSize(page), 0, 300);
+      const reset = await page.waitFor(
+        `document.querySelector('.parquet-viewer__field-filter')?.value === ''
+                    && document.querySelector('.parquet-viewer__sider-count')?.textContent === '4'
+                    && document.querySelector('.parquet-viewer__pager-info')?.innerText === ${JSON.stringify(expectedRange)}`,
+        4000,
+      );
+      expect(reset, "the open view did not reset");
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const after = json(await page.evaluate(`JSON.stringify(${measure})`));
+      expect(
+        after.width === before.width,
+        `column width did not reset: ${after.width} vs ${before.width}`,
+      );
+      const storage = json(
+        await page.evaluate(`JSON.stringify({
+                    keys: Object.keys(localStorage).filter(k =>
+                        k.startsWith('parquet-shares:') || k.startsWith('parquet-state:') || k === 'parquet-column-widths'),
+                    ui: Object.keys(localStorage).filter(k => k.startsWith('parquet-ui:'))
+                        .map(k => JSON.parse(localStorage.getItem(k))),
+                })`),
+      );
+      expect(storage.keys.length === 0, `leftover parquet keys: ${storage.keys.join(",")}`);
+      expect(
+        storage.ui.every(
+          (entry) => entry.fieldFilter === undefined && entry.columnWidths === undefined,
+        ),
+        `UI state survived the clear: ${JSON.stringify(storage.ui)}`,
+      );
+      return "clear resets filter/page/width and removes the stored keys";
+    },
+  },
+  {
+    name: "parquet-clear-cache-open",
+    async run({ page, base }) {
+      // Clear cache with no parquet view open sets a one-shot flag on the next open. Seed every
+      // parquet key (and one JSONL key that must survive) before that open.
+      await page.navigate(`${base}/stats`);
+      await page.evaluate(`(() => {
+                const now = Date.now();
+                localStorage.setItem('parquet-ui:demo:/mixed.parquet', JSON.stringify({
+                    v: 1, ts: now, fieldFilter: 'name', row: 60, columnWidths: { name: 300 },
+                }));
+                localStorage.setItem('parquet-shares:demo:/mixed.parquet', JSON.stringify({
+                    v: 1, size: 12345, mtimeMs: 1, ts: now,
+                    shares: [{ name: 'name', scanned: 300, rowCount: 300, complete: true, nulls: 12, empties: 0, emptyRatio: 0.04 }],
+                }));
+                localStorage.setItem('parquet-state:/mixed.parquet', JSON.stringify({ row: 60 }));
+                localStorage.setItem('parquet-column-widths', JSON.stringify({ name: 300 }));
+                localStorage.setItem('parquet-sider-width', '300');
+                localStorage.setItem('jsonl-state:keep', '{"left":0}');
+            })()`);
+      await page.navigate(`${base}/harness-parquet?mixed=1&clearCache=1`);
+      const ready = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__cell') && !!document.querySelector('.parquet-table .ant-table-row')`,
+      );
+      expect(ready, "the viewer did not mount");
+      const filterCleared = await page.waitFor(
+        `document.querySelector('.parquet-viewer__field-filter')?.value === ''`,
+      );
+      expect(filterCleared, "the seeded filter survived the open-time clear");
+      const siderDefault = await page.waitFor(
+        `Math.round(document.querySelector('.parquet-viewer__sider')?.getBoundingClientRect().width ?? 0) === 260`,
+      );
+      expect(siderDefault, "the seeded sider width survived the open-time clear");
+      const expectedRange = rangeOf(await pageSize(page), 0, 300);
+      const pageReset = await page.waitFor(
+        `document.querySelector('.parquet-viewer__pager-info')?.innerText === ${JSON.stringify(expectedRange)}`,
+      );
+      expect(pageReset, "the seeded row survived the open-time clear");
+
+      const storage = json(
+        await page.evaluate(`JSON.stringify({
+                    objects: Object.keys(localStorage).filter(k =>
+                        k.startsWith('parquet-shares:') || k.startsWith('parquet-state:') || k === 'parquet-column-widths'),
+                    ui: Object.keys(localStorage).filter(k => k.startsWith('parquet-ui:'))
+                        .map(k => JSON.parse(localStorage.getItem(k))),
+                    sider: localStorage.getItem('parquet-sider-width'),
+                    jsonl: localStorage.getItem('jsonl-state:keep'),
+                })`),
+      );
+      expect(storage.objects.length === 0, `leftover parquet keys: ${storage.objects.join(",")}`);
+      expect(
+        storage.ui.every(
+          (entry) => entry.fieldFilter === undefined && entry.columnWidths === undefined,
+        ),
+        `seeded UI state survived: ${JSON.stringify(storage.ui)}`,
+      );
+      expect(storage.sider === "260", `sider width is ${storage.sider}`);
+      expect(storage.jsonl !== null, "Clear cache removed a JSONL key");
+      return "open-time clear drops filter/page/width, keeps JSONL state";
+    },
+  },
+  {
+    name: "parquet-clear-cache-shares",
+    async run({ page, base }) {
+      await openParquet(page, base, "?nested=1&profile=1");
+      const profiled = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-null').length === 3`,
+      );
+      expect(profiled, "the nested profile badges never rendered");
+      await page.evaluate(`document.querySelector('.parquet-viewer__sider-scan')?.click()`);
+      const scanned = await page.waitFor(
+        `(() => {
+                    const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+                        .find(row => row.dataset.column === name)
+                        ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+                    return badge('tags') === 'empty 67%' && badge('meta') === 'empty 33%';
+                })()`,
+        4000,
+      );
+      expect(scanned, "the batch scan did not produce shares to clear");
+      const stored = await page.evaluate(
+        `localStorage.getItem('parquet-shares:demo:/nested.parquet')`,
+      );
+      expect(stored !== null, "the shares were not cached before the clear");
+
+      await page.evaluate(`window.postMessage({ type: 'clearParquetCache', content: {} }, '*')`);
+      const cleared = await page.waitFor(
+        `(() => {
+                    const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+                        .find(row => row.dataset.column === name)
+                        ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+                    return badge('tags') === 'null ?' && badge('meta') === 'null ?'
+                        && !!document.querySelector('.parquet-viewer__sider-scan');
+                })()`,
+        4000,
+      );
+      expect(cleared, "the shares survived the clear");
+      const left = await page.evaluate(
+        `localStorage.getItem('parquet-shares:demo:/nested.parquet')`,
+      );
+      expect(left === null, "the share cache key survived the clear");
+      return "clear removes shares and brings back the structured scan action";
     },
   },
 ];

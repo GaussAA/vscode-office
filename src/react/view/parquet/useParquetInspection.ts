@@ -3,7 +3,7 @@ import { $t } from "../../i18n/i18nConfig.ts";
 import { formatCellValue } from "@/common/parquetCellFormat";
 import type { ParquetColumnInfo } from "@/common/parquetReader";
 import { ANNOUNCE_DELAY_MS } from "./parquetLayout";
-import { jsonPreviewText } from "./parquetPreview";
+import { jsonPrettyText, jsonPreviewText, tokenizeJson, type JsonToken } from "./parquetPreview";
 
 /**
  * How much of a value the expanded panel renders. A LIST column can hold thousands of elements;
@@ -24,6 +24,8 @@ export interface ParquetInspection {
   body: string;
   key: string;
   size: { chars: number; bytes: number; shown: string; truncated: boolean };
+  /** Colourisable syntax tokens for the expanded body; null when it is not JSON. */
+  tokens: JsonToken[] | null;
   expanded: boolean;
   raw: boolean;
   announcement: string;
@@ -53,28 +55,27 @@ export function useParquetInspection(
       ? $t("parquet.nullLabel")
       : formatCellValue(inspected.value, type)
     : "";
-  const text =
-    inspected && inspected.value !== null && typeof inspected.value === "object"
-      ? (jsonPreviewText(inspected.value) ?? full)
-      : full;
+  // The grid already treats a JSON *string* as a container; the bar and panel must agree.
+  const jsonCompact = inspected ? jsonPreviewText(inspected.value) : null;
+  const jsonPretty = inspected ? jsonPrettyText(inspected.value) : null;
+  const text = inspected ? (jsonCompact ?? full) : "";
 
   const body = useMemo(() => {
     if (!inspected) return "";
-    // `raw` means two different things, both "as the file stores it": a container becomes compact
-    // JSON instead of indented, and a string becomes escaped instead of literal.
+    if (jsonPretty !== null) {
+      // A JSON string's raw form is the file's string (quoted and escaped), not the pretty
+      // object; a real container's raw form is compact JSON.
+      if (typeof inspected.value === "string") {
+        return raw ? JSON.stringify(inspected.value) : jsonPretty;
+      }
+      return raw ? (jsonCompact ?? full) : jsonPretty;
+    }
     if (typeof inspected.value === "string") {
       return raw ? JSON.stringify(inspected.value) : inspected.value;
     }
     if (inspected.value === null || inspected.value === undefined) return full;
-    if (typeof inspected.value === "object") {
-      try {
-        return JSON.stringify(inspected.value, null, raw ? 0 : 2);
-      } catch {
-        return full;
-      }
-    }
     return full;
-  }, [full, inspected, raw]);
+  }, [full, inspected, jsonCompact, jsonPretty, raw]);
 
   const size = useMemo(() => {
     const capped = body.slice(0, INSPECT_PREVIEW_LIMIT);
@@ -85,6 +86,17 @@ export function useParquetInspection(
       truncated: body.length > capped.length,
     };
   }, [body, full]);
+
+  const tokens = useMemo(() => {
+    if (jsonPretty === null) return null;
+    // No grid caps here: `shown` is already bounded by INSPECT_PREVIEW_LIMIT, and the body must
+    // keep its newlines/indentation for the expanded reader.
+    return tokenizeJson(size.shown, {
+      preserveWhitespace: true,
+      maxTokens: Number.POSITIVE_INFINITY,
+      maxChars: Number.POSITIVE_INFINITY,
+    });
+  }, [jsonPretty, size.shown]);
 
   /**
    * Expansion is derived from the selection's identity, not reset by an effect: a new cell is a
@@ -114,6 +126,7 @@ export function useParquetInspection(
     body,
     key,
     size,
+    tokens,
     expanded,
     raw,
     announcement,

@@ -138,6 +138,24 @@ export function createFixtures(cacheDir) {
     });
   });
 
+  // A wide page for the schema jump's glide. The 12-column preview only overflows the default
+  // viewport by ~265 px, which is not enough range to tell a real animation from a teleport or
+  // to land a middle column centred; this one keeps several screens of travel on both sides.
+  const wide = writeIfMissing(join(cacheDir, "wide.parquet"), () => {
+    const n = 80;
+    const columnData = [
+      { name: "id", data: Int32Array.from({ length: n }, (_, row) => row + 1), type: "INT32" },
+    ];
+    for (let column = 1; column <= 47; column++) {
+      columnData.push({
+        name: `field_${column}`,
+        data: Array.from({ length: n }, (_, row) => `value-${column}-${row}`),
+        type: "STRING",
+      });
+    }
+    return parquetWriteBuffer({ statistics: false, columnData });
+  });
+
   const bad = writeIfMissing(join(cacheDir, "bad.parquet"), () => {
     const text = new TextEncoder().encode("this is not a parquet file\n");
     return text.buffer.slice(text.byteOffset, text.byteOffset + text.byteLength);
@@ -167,6 +185,7 @@ export function createFixtures(cacheDir) {
     empty,
     types,
     preview,
+    wide,
     bad,
     big,
     bigRows: BIG_ROWS,

@@ -10,7 +10,11 @@ import {
   type JsonSearchBatch,
   type JsonSearchRecord,
 } from "../../../common/jsonPreviewTypes.ts";
-import { savePersistedState } from "../../common/persistedState.ts";
+import {
+  clearPersistedPrefix,
+  loadVersionedState,
+  saveVersionedState,
+} from "../../common/versionedState.ts";
 import { jsonViewerThemeTokens } from "../../common/jsonViewerTheme.ts";
 import { PendingRequests, RequestGuard } from "../../util/requestGuard.ts";
 import { handler } from "../../util/vscode.ts";
@@ -26,6 +30,8 @@ import "./JsonPreview.less";
 
 const DEFAULT_LEFT_WIDTH = 340;
 const LEFT_PREFIX = "json-preview:left:";
+const LEFT_VERSION = 1;
+const LEFT_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 const SEARCH_DEBOUNCE_MS = 250;
 
 interface SearchMeta {
@@ -36,24 +42,41 @@ function clampLeft(value: number): number {
   return value >= 220 && value <= 560 ? value : DEFAULT_LEFT_WIDTH;
 }
 
+function parseLeft(value: unknown): number | null {
+  if (!value || typeof value !== "object") return null;
+  const left = (value as { left?: unknown }).left;
+  return typeof left === "number" ? clampLeft(left) : null;
+}
+
 function loadLeft(cacheId: string): number {
   try {
     const raw = localStorage.getItem(LEFT_PREFIX + cacheId);
-    if (!raw) return DEFAULT_LEFT_WIDTH;
-    try {
-      const parsed = JSON.parse(raw) as { left?: unknown };
-      if (parsed && typeof parsed.left === "number") return clampLeft(parsed.left);
-    } catch {
-      // Legacy entries were a bare number.
-      return clampLeft(Number(raw));
+    // Legacy entries were a bare number, which the versioned wrapper cannot parse.
+    if (raw && !raw.trim().startsWith("{")) {
+      const value = Number(raw);
+      if (Number.isFinite(value)) {
+        const clamped = clampLeft(value);
+        saveLeft(cacheId, clamped);
+        return clamped;
+      }
     }
   } catch {}
-  return DEFAULT_LEFT_WIDTH;
+  return (
+    loadVersionedState(LEFT_PREFIX, cacheId, {
+      version: LEFT_VERSION,
+      maxAgeMs: LEFT_MAX_AGE_MS,
+      parse: parseLeft,
+      parseLegacy: parseLeft,
+    }) ?? DEFAULT_LEFT_WIDTH
+  );
 }
 
 function saveLeft(cacheId: string, value: number): void {
-  // Bounded storage: one key per document, evicted by the shared helper.
-  savePersistedState(LEFT_PREFIX, cacheId, { left: clampLeft(value) });
+  saveVersionedState(LEFT_PREFIX, cacheId, LEFT_VERSION, { left: clampLeft(value) });
+}
+
+function clearJsonPreviewLeft(): void {
+  clearPersistedPrefix(LEFT_PREFIX);
 }
 
 /** A command-opened, read-only JSON inspection surface. It is not a custom editor. */
@@ -208,6 +231,11 @@ export default function JsonPreview() {
           setSearching(false);
         }
       });
+
+    handler.on("clearJsonPreviewCache", () => {
+      clearJsonPreviewLeft();
+      handler.emit("jsonReload");
+    });
 
     handler.emit("init");
   }, [labels, requestWindows, revealAt]);

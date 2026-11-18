@@ -114,6 +114,7 @@ const readTiming = (page) =>
         heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
         cells: document.querySelectorAll('.parquet-viewer__cell').length,
         sheetRows: document.querySelectorAll('.windowed-sheet__row').length,
+        csvScanMs: performance.getEntriesByName('excel-csv-scan').at(-1)?.duration ?? null,
       })`,
     )
     .then(JSON.parse);
@@ -220,7 +221,7 @@ const scenarios = [
         served.bytes <= fixtures.flatCsvBytes * 1.05,
         `downloaded ${served.bytes} bytes for a ${fixtures.flatCsvBytes} byte file`,
       );
-      return `${ms} ms, ${timing.sheetRows} rows in the DOM of ${state.total.toLocaleString()}, heap ${timing.heapMB} MB`;
+      return `${ms} ms, ${timing.sheetRows} rows in the DOM of ${state.total.toLocaleString()}, heap ${timing.heapMB} MB, CSV scan ${timing.csvScanMs === null ? "n/a" : `${Math.round(timing.csvScanMs)} ms`}`;
     },
   },
 

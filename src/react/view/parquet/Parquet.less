@@ -75,6 +75,16 @@ body:has(.parquet-app) {
   --pv-icon-structure: var(--pv-chart-teal);
   --pv-icon-field: var(--pv-chart-orange);
 
+  /* The selected column's tint (Signal Blue is the documented hue source). These are mix
+     percentages so the light theme can cap the body wash: at the dark theme's 14% the green
+     STRING text falls under the 4.5:1 floor, so light uses 8% and lets the header and the
+     schema row carry the emphasis. */
+  --pv-column-tint: 14%;
+  --pv-column-tint-hover: 20%;
+  --pv-column-tint-header: 20%;
+  --pv-field-tint: 16%;
+  --pv-field-tint-hover: 20%;
+
   position: relative;
   display: flex;
   flex-direction: column;
@@ -92,8 +102,10 @@ body:has(.parquet-app) {
    against white. These overrides keep the same hue families with normal-text contrast. */
 .parquet-viewer--light {
   --pv-cell-numeric: #0451a5;
-  --pv-cell-string: #2e7d32;
-  --pv-cell-bool: #9a5b00;
+  /* One step darker than the shared light palette: these two are the colours whose 12px
+     text sits on the 14% selected-column tint, where #2e7d32/#9a5b00 measured 4.17/4.41:1. */
+  --pv-cell-string: #276f2b;
+  --pv-cell-bool: #915400;
   --pv-cell-datetime: #6f2d8a;
   --pv-link: #006ab1;
   --pv-json-key: #6f2d8a;
@@ -102,6 +114,13 @@ body:has(.parquet-app) {
      light theme's descriptionForeground, which is tuned for 13px body text. Labels are the
      smallest type in the surface and carry the most semantics, so they get their own value. */
   --pv-muted: #5c5c5c;
+  /* Same 14% as the dark theme now that the string/bool text is one step darker. Hover
+     does not darken further: link text on a 20% mix would fall to 4.2:1. */
+  --pv-column-tint: 14%;
+  --pv-column-tint-hover: 14%;
+  /* The field row's link text on its own tint is 4.63:1 at 14%. */
+  --pv-field-tint: 14%;
+  --pv-field-tint-hover: 14%;
 }
 
 .parquet-viewer *,
@@ -432,6 +451,50 @@ body:has(.parquet-app) {
   }
 }
 
+/* The rail's one batch action. It only exists while a structured column still has no answer. */
+.parquet-viewer__sider-scan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin: 0 10px 6px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
+  color: var(--pv-muted);
+  background: var(--pv-control);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+
+  .codicon {
+    font-size: 12px;
+  }
+
+  &:hover {
+    color: var(--pv-fg);
+    background: var(--pv-control-hover);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--pv-focus);
+    outline-offset: -1px;
+  }
+
+  &:disabled {
+    cursor: progress;
+  }
+}
+
+.parquet-viewer__sider-scan-error {
+  flex: 0 0 auto;
+  margin: 0 10px 6px;
+  color: var(--pv-error);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .parquet-viewer__list {
   flex: 1;
   min-height: 0;
@@ -467,7 +530,7 @@ body:has(.parquet-app) {
   }
 
   &--active {
-    background: color-mix(in srgb, var(--pv-link) 12%, transparent);
+    background: color-mix(in srgb, var(--pv-link) var(--pv-field-tint), transparent);
   }
 
   &--active .parquet-viewer__list-name {
@@ -475,7 +538,7 @@ body:has(.parquet-app) {
   }
 
   &--active:hover {
-    background: color-mix(in srgb, var(--pv-link) 16%, transparent);
+    background: color-mix(in srgb, var(--pv-link) var(--pv-field-tint-hover), transparent);
   }
 }
 
@@ -663,8 +726,10 @@ body:has(.parquet-app) {
     transition: background var(--motion-fast) var(--motion-ease);
   }
 
-  .ant-table-tbody > tr.parquet-viewer__row--alt > td,
-  .ant-table-tbody-virtual .ant-table-row.parquet-viewer__row--alt .ant-table-cell {
+  .ant-table-tbody > tr.parquet-viewer__row--alt > td:not(.parquet-viewer__column--active),
+  .ant-table-tbody-virtual
+    .ant-table-row.parquet-viewer__row--alt
+    .ant-table-cell:not(.parquet-viewer__column--active) {
     background: var(--pv-row-alt) !important;
   }
 
@@ -685,21 +750,33 @@ body:has(.parquet-app) {
     background: var(--pv-row-target) !important;
   }
 
-  /* The schema click leaves a quiet column tint behind, not a second selection state. */
+  /* The schema click leaves a column tint behind; clicking the same field again removes it. */
   .ant-table-thead > tr > th.parquet-viewer__column--active {
     color: var(--pv-fg) !important;
-    background: color-mix(in srgb, var(--pv-link) 10%, var(--pv-surface)) !important;
+    background: color-mix(
+      in srgb,
+      var(--pv-link) var(--pv-column-tint-header),
+      var(--pv-surface)
+    ) !important;
   }
 
   .ant-table-tbody > tr > td.parquet-viewer__column--active,
   .ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--active {
-    background: color-mix(in srgb, var(--pv-link) 7%, var(--pv-canvas)) !important;
+    background: color-mix(
+      in srgb,
+      var(--pv-link) var(--pv-column-tint),
+      var(--pv-canvas)
+    ) !important;
   }
 
   .ant-table-tbody > tr:hover > td.parquet-viewer__column--active,
   .ant-table-tbody > tr.ant-table-row-hover > td.parquet-viewer__column--active,
   .ant-table-tbody-virtual .ant-table-row:hover .ant-table-cell.parquet-viewer__column--active {
-    background: color-mix(in srgb, var(--pv-link) 11%, var(--pv-canvas)) !important;
+    background: color-mix(
+      in srgb,
+      var(--pv-link) var(--pv-column-tint-hover),
+      var(--pv-canvas)
+    ) !important;
   }
 
   .ant-table-cell-fix-left,
@@ -791,6 +868,10 @@ body:has(.parquet-app) {
 
 .parquet-viewer__json-token--punct {
   color: var(--pv-muted);
+}
+
+.parquet-viewer__json-token--space {
+  color: inherit;
 }
 
 .parquet-viewer__json-token--key {
@@ -1328,6 +1409,7 @@ body:has(.parquet-app) {
 
 .parquet-viewer__profile-type,
 .parquet-viewer__profile-null,
+.parquet-viewer__profile-empty,
 .parquet-viewer__profile-range {
   flex-shrink: 0;
   color: var(--pv-muted);

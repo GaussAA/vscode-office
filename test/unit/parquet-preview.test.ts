@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { jsonPreviewText, tokenizeJson } from "@/react/view/parquet/parquetPreview";
+import { jsonPrettyText, jsonPreviewText, tokenizeJson } from "@/react/view/parquet/parquetPreview";
 
 test("parquet preview: JSON list strings become canonical JSON", () => {
   assert.equal(jsonPreviewText('["alpha", "beta"]'), '["alpha","beta"]');
@@ -23,6 +23,37 @@ test("parquet preview: scalars and malformed JSON stay plain text", () => {
   assert.equal(jsonPreviewText("a [bracketed] phrase"), null);
   assert.equal(jsonPreviewText(3), null);
   assert.equal(jsonPreviewText(null), null);
+});
+
+test("parquet preview: the inspector pretty-prints real containers and JSON strings", () => {
+  assert.equal(
+    jsonPrettyText('{"source":"hf","index":0,"ok":true}'),
+    '{\n  "source": "hf",\n  "index": 0,\n  "ok": true\n}',
+  );
+  assert.equal(jsonPrettyText(["alpha"]), '[\n  "alpha"\n]');
+  assert.equal(jsonPrettyText({ a: 1, b: [true] }), '{\n  "a": 1,\n  "b": [\n    true\n  ]\n}');
+  assert.equal(jsonPrettyText("alpha"), null);
+  assert.equal(jsonPrettyText("[not json"), null);
+  assert.equal(jsonPrettyText(null), null);
+  assert.equal(jsonPrettyText('"quoted"'), null);
+});
+
+test("parquet preview: the inspector tokenizer keeps whitespace for indentation", () => {
+  const text = '{\n  "source": "hf",\n  "index": 0\n}';
+  const tokens = tokenizeJson(text, {
+    preserveWhitespace: true,
+    maxTokens: Number.POSITIVE_INFINITY,
+    maxChars: Number.POSITIVE_INFINITY,
+  });
+  assert.equal(tokens.map((token) => token.text).join(""), text);
+  assert.deepEqual(
+    tokens.filter((token) => token.type === "space").map((token) => token.text),
+    ["\n  ", " ", "\n  ", " ", "\n"],
+  );
+  // Keys are still labelled across the whitespace gap.
+  assert.ok(tokens.some((token) => token.type === "key" && token.text === '"source"'));
+  assert.ok(tokens.some((token) => token.type === "string" && token.text === '"hf"'));
+  assert.ok(tokens.some((token) => token.type === "number" && token.text === "0"));
 });
 
 test("parquet preview: tokenizer labels syntax so the cell can colour it", () => {

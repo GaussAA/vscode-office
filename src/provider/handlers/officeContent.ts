@@ -20,24 +20,28 @@ export function buildDocumentCacheId(uri: Uri): string {
 }
 
 /**
- * Byte size of the document, or undefined when the scheme cannot answer.
+ * Byte size and last-modified time of the document, or no answer when the scheme cannot say.
  *
- * The webview needs it to decide whether to parse, and the host needs it to decide whether to
- * read a virtual document at all — a 100 MB file that has to travel through a `postMessage`
- * as `number[]` is worse than an extra stat.
+ * The webview needs the size to decide whether to parse, the host needs it to decide whether
+ * to read a virtual document at all — a 100 MB file that has to travel through a `postMessage`
+ * as `number[]` is worse than an extra stat. The mtime is the second half of the parquet share
+ * cache fingerprint: without it a cached scan cannot be validated, so it is only reported when
+ * the stat really succeeded.
  */
-async function statSize(uri: Uri): Promise<number | undefined> {
+async function statDocument(uri: Uri): Promise<{ size?: number; mtimeMs?: number }> {
   try {
     const stat = await workspace.fs.stat(uri);
-    return stat.size;
+    return { size: stat.size, mtimeMs: stat.mtime };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
 export interface VirtualOpenOptions {
   /** The user answered "open anyway": skip the size guard and read the bytes. */
   force?: boolean;
+  /** Clear parquet-derived caches in the webview before it renders this document. */
+  clearCache?: boolean;
 }
 
 export async function emitVirtualOfficeOpen(
@@ -48,7 +52,7 @@ export async function emitVirtualOfficeOpen(
   const now = Date.now();
   const ext = extname(uri.fsPath);
   const readOnly = await isUriReadOnly(uri);
-  const size = await statSize(uri);
+  const { size, mtimeMs } = await statDocument(uri);
   const payload: OfficeOpenMessage = {
     ext,
     path: getPayloadPath(uri),
@@ -57,7 +61,9 @@ export async function emitVirtualOfficeOpen(
     documentCacheId: buildDocumentCacheId(uri),
     readOnly,
     size,
+    mtimeMs,
     nonce: now,
+    ...(options.clearCache ? { clearCache: true } : {}),
   };
   // A virtual document has to be read whole and shipped as `number[]`, so this is the one
   // place where refusing early saves the expensive part of the work rather than a parse.
@@ -80,7 +86,12 @@ export async function emitFileOfficeOpen(
   handler: Handler,
   uri: Uri,
   webview: Webview,
+  options: { clearCache?: boolean; hostWorkbook?: boolean; hostCsv?: boolean } = {},
 ): Promise<void> {
+  // The webview fetches the bytes itself for this scheme, so the size only informs its size
+  // guard and the two stat fields are the share cache's fingerprint; the host never reads the
+  // file here.
+  const { size, mtimeMs } = await statDocument(uri);
   const payload: OfficeOpenMessage = {
     ext: extname(uri.fsPath),
     path: webview.asWebviewUri(uri).toString(),
@@ -88,9 +99,11 @@ export async function emitFileOfficeOpen(
     scheme: uri.scheme,
     documentCacheId: buildDocumentCacheId(uri),
     readOnly: await isUriReadOnly(uri),
-    // The webview fetches the bytes itself for this scheme, so the size only informs its
-    // size guard; the host never reads the file.
-    size: await statSize(uri),
+    size,
+    mtimeMs,
+    ...(options.clearCache ? { clearCache: true } : {}),
+    ...(options.hostWorkbook ? { hostWorkbook: true } : {}),
+    ...(options.hostCsv ? { hostCsv: true } : {}),
   };
   handler.emit("open", payload);
 }

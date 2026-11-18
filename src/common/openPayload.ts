@@ -18,8 +18,34 @@ export interface OfficeOpenMessage {
   readOnly: boolean;
   /** Byte size when the scheme can answer; undefined means "unknown", never "small". */
   size?: number;
+  /**
+   * Last-modified time in milliseconds when the host could stat the document. Together with
+   * `size` it is the fingerprint the parquet share cache uses; absent means "cannot validate",
+   * so a cached scan is not reused.
+   */
+  mtimeMs?: number;
   /** Set when the host refused to read an oversized virtual document. */
   tooLarge?: boolean;
+  /**
+   * Clear parquet-derived caches before rendering this document.
+   *
+   * Set by the Clear cache command when it ran with no parquet view open; the next parquet
+   * open then removes the stored shares/UI state before it can paint the old ones. Other
+   * viewers ignore it.
+   */
+  clearCache?: boolean;
+  /**
+   * The host has a workbook row cache for this document (ADR-0027). The webview asks for the
+   * cached metadata before fetching/parsing; absent means the path is unavailable (virtual
+   * documents, harness stubs, CSV/TSV) and the viewer fetches and parses as before.
+   */
+  hostWorkbook?: boolean;
+  /**
+   * The host has a cached CSV record index for this document (ADR-0028). The webview asks for
+   * it before scanning; absent means scan as before (virtual documents, harness stubs, TSV is
+   * included only when the provider sets it).
+   */
+  hostCsv?: boolean;
   /**
    * Inline bytes for a virtual document, base64-encoded.
    *

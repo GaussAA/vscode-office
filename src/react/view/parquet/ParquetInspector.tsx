@@ -88,7 +88,16 @@ const ParquetInspector = memo(function ParquetInspector({
             </span>
           </header>
           <pre className="parquet-viewer__inspector-body">
-            {inspection.size.shown}
+            {inspection.tokens
+              ? inspection.tokens.map((token, index) => (
+                  <span
+                    key={index}
+                    className={`parquet-viewer__json-token parquet-viewer__json-token--${token.type}`}
+                  >
+                    {token.text}
+                  </span>
+                ))
+              : inspection.size.shown}
             {inspection.size.truncated
               ? $t("parquet.cappedSuffix", { max: INSPECT_PREVIEW_LIMIT.toLocaleString() })
               : ""}

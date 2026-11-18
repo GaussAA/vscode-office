@@ -16,9 +16,9 @@ colors:
   numeric-cyan: "#4ea1ff"
   numeric-cyan-on-light: "#0451a5"
   string-moss: "#89d185"
-  string-moss-on-light: "#2e7d32"
+  string-moss-on-light: "#276f2b"
   boolean-amber: "#f0a45e"
-  boolean-amber-on-light: "#9a5b00"
+  boolean-amber-on-light: "#915400"
   datetime-mauve: "#c586c0"
   datetime-mauve-on-light: "#6f2d8a"
   danger-coral: "#f48771"
@@ -154,7 +154,7 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 
 ### Primary
 
-- **Signal Blue** (#3794ff): 链接单元格、激活的字段行文字、列高亮底纹的色相来源（以 7%–12% 混入底色）。它是这套界面里唯一「可以点」的颜色。
+- **Signal Blue** (#3794ff): 链接单元格、激活的字段行文字、列高亮底纹的色相来源（列底纹 14%、表头 20%；浅色主题同步把绿色/橙色文本调深一档，以守住 4.5:1）。它是这套界面里唯一「可以点」的颜色。
 - **Instrument Navy** (#0e639c): 按钮与文本选区的底色来源（`--vscode-button-background` 的兜底）。用于实心控件，不用于文字。
 
 ### Secondary
@@ -192,7 +192,7 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 
 **The Chart-Colour Is Not Text Rule.** `--vscode-charts-*` 是为图形调过的色。12px 文本需要更高的对比度，所以浅色主题下这六个色被显式覆盖为同色相的更深值（`-on-light` 系列），并由 `verify:ui` 的 ≥4.5:1 断言守住。新增数据色必须同时给出浅色值，否则只能在图标上用。
 
-**The Thin Mix Rule.** 层次只允许用 3.5%–22% 的前景混入表达：隔行底纹 3.5%、控件底 8%（hover 13%、按下 18%）、列高亮 7%（hover 11%）、激活行底 12%（hover 16%）、目标行 18%、搜索命中 22%。超过 22% 就不再是层次，而是第二个界面。
+**The Thin Mix Rule.** 层次只允许用 3.5%–22% 的前景混入表达：隔行底纹 3.5%、控件底 8%（hover 13%、按下 18%）、列高亮 14%（hover 20%，浅色主题不加深）、激活行底 16%（浅色 14%）、目标行 18%、搜索命中 22%。超过 22% 就不再是层次，而是第二个界面。
 
 命中行原本是 18%，但它混进的 `editor.findMatchHighlightBackground` 自带 33% alpha，二次混合后只剩约 6% 的有效不透明度 —— 数值在规则内，观感在规则外。规则因此改成两条：**百分比按「最终不透明度」算，不按混入比例算**；混入源本身带 alpha 时，先换成不透明 token（`editor.findMatchBackground`）或改用实色兜底。22% 就是这条规则的边界值，不再上调。
 
@@ -374,8 +374,8 @@ Tab 的顺序是：命令栏 → 侧栏（过滤框、字段、侧栏拖拽把�
 
 - **Shape:** 6px 圆角、`6px 8px` 内距、最小高度 32px、行间 1px 空隙。
 - **Contents:** 类型图标（14px，按类型取色）+ 字段名（12px/500，单行省略）+ 空值率徽标（有统计时）+ 类型徽标（右对齐）。
-- **Null share:** `null 12%`（9.5px 等宽、muted、无底色、`tabular-nums`）。它是视觉徽标，无统计时退成 `—`；整句走字段行的 `aria-label`（"Jump to column name — 12% of rows are null"），所以读者不需要猜这个百分数是什么。低于 1% 且非零显示 `null <1%`，不四舍五入成 0。
-- **States:** hover 用 `list-hoverBackground`；激活行用 Signal Blue 12% 混入底色、字段名转 Signal Blue；`focus-visible` 用 `outline-offset: -1px`（贴内边，避免与相邻行粘连）。
+- **Null / empty share:** `null 12%` 来自 row-group statistics：精确、只数 null。结构列没有行级统计时显示 `null ?`；打开画像扫描后变成 `empty 12%`（`~` 前缀表示只扫描了前 20 万行），它把 null、空字符串、空 list、空二进制与空 map 都算作「没有数据」。两者都是 9.5px 等宽、muted、无底色、`tabular-nums`；整句走字段行的 `aria-label`（"Jump to column name — 12% of rows are null" / "… — 12% of the scanned rows are null or empty"），低于 1% 且非零显示 `<1%`，不四舍五入成 0。
+- **States:** hover 用 `list-hoverBackground`；激活行用 Signal Blue 16% 混入底色（浅色主题 14%）、字段名转 Signal Blue；再次点击当前行取消高亮；`focus-visible` 用 `outline-offset: -1px`（贴内边，避免与相邻行粘连）。
 
 ### Type badges
 
@@ -425,8 +425,11 @@ Tab 的顺序是：命令栏 → 侧栏（过滤框、字段、侧栏拖拽把�
 停靠在底栏正上方，与值面板共用同一个槽位（`bottom: 100%`），所以打开它不会让表格重新分页。
 一次只开一个：选中单元格会收起画像面板，打开画像面板会收起值面板。
 
-- **打开方式**：字段行聚焦时按 `i`，或用鼠标点该行的 `null N%` 徽标。徽标不是独立焦点（行内嵌套可交互元素是无效 HTML），键盘路径就是 `i`。
-- **头部**：字段名、类型、`null N%` 与 `min … max`（都有统计时才出现）；关闭按钮贴右。
+- **打开方式**：字段行聚焦时按 `i`，或用鼠标点该行的 `null N%` / `empty N%` / `null ?` / `—` 徽标。徽标不是独立焦点（行内嵌套可交互元素是无效 HTML），键盘路径就是 `i`。
+- **头部**：字段名、类型、`null N%`（statistics）、`empty N%`（scan，前缀为 `~`）与 `min … max`（都有统计时才出现）；关闭按钮贴右。
+- **结构列**：LIST/STRUCT 没有行级统计，`null ?` 是「可以问」的徽标；打开面板会按需扫描单列（有统计的列也自动扫描），扫描结果同时回填侧栏徽标。`empty` 把 null、空字符串、空 list、空二进制与空 map 合并为「没有数据」，前缀扫描必须带 `~`。
+- **批量入口**：只要还有结构列没有值级答案，过滤框下出现 `Scan LIST/STRUCT`。一次请求、footer 只打开一次，逐列分块解码这些列的前 20 万行：跳过 top-N/直方图、按新请求中止；结果回填徽标后按钮消失。扫描中按钮显示**扫描进度**百分比（不是空值率，结果落地前不出现任何列占比），失败时在按钮下说明；关闭文件标签页会中止扫描，不把宿主留在无主的解码里。
+- **缓存**：扫描结果按文档指纹（`documentCacheId` + size + mtime + 算法版本）写入 localStorage，LRU 20 条、7 天；重开同一文件直接恢复，不再扫描。文件变化、过期、损坏或版本不符都会删除并重新扫描；内联/无 mtime 的文档不缓存。
 - **正文**：top-N 每行 `值  次数`（等宽、`tabular-nums`）；底部一行 `Scanned N of M rows · K distinct values`，N 必须是真实扫描行数，不能写总数。
 - **没有统计的文件**：不自动扫描，正文是一个「Scan this column」按钮——扫描要解码，得先问。
 - **键盘**：`Esc` 关闭并把焦点还给打开它的字段行；焦点环沿用 1px `focusBorder`。

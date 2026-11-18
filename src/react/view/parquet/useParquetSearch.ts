@@ -4,6 +4,7 @@ import type { ParquetSession } from "./parquetSession";
 import { searchParquetValues } from "./parquetSearch";
 import { SEARCH_MAX_ROWS } from "./parquetLayout";
 import { ParquetHitSet, normalizeSearchQuery } from "./parquetHitSet";
+import { ParquetSearchMemo } from "./parquetSearchMemo";
 
 interface UseParquetSearchArgs {
   fileInfoRef: RefObject<ParquetFileInfo | null>;
@@ -67,6 +68,8 @@ export function useParquetSearch({
   const [searchedQuery, setSearchedQuery] = useState("");
   const searchSeq = useRef(0);
   const hitSetRef = useRef<ParquetHitSet | null>(null);
+  /** Per-document, session-only: a full search is one pass over every value (ADR-0025). */
+  const searchMemo = useRef(new ParquetSearchMemo());
 
   const resetSearch = useCallback((clearQuery = false) => {
     searchSeq.current++;
@@ -78,12 +81,38 @@ export function useParquetSearch({
     setSearchedEmpty(false);
     setActiveMatch(null);
     hitSetRef.current = null;
+    // A document change (or Clear cache) invalidates the hits; an edited query does not.
+    if (clearQuery) searchMemo.current.clear();
     if (clearQuery) setQuery("");
   }, []);
 
+  /** Show a finished result: the same path for a fresh scan and a memo hit. */
+  const applyHitSet = useCallback(
+    (hitSet: ParquetHitSet, capped: boolean) => {
+      hitSetRef.current = hitSet;
+      setMatchRows(hitSet.rowSet);
+      setCapped(capped);
+      setSearchedEmpty(hitSet.isEmpty);
+      onSearchedRef.current?.(hitSet.size);
+      if (hitSet.isEmpty) {
+        setActiveMatch(null);
+        return;
+      }
+      setActiveMatch(0);
+      const first = hitSet.at(0);
+      if (!first) return;
+      const target = sessionRef.current?.rowToPage(first.row);
+      if (target !== undefined) goToPage((current) => (current === target ? current : target));
+      // A hit is a cell, not a row: bring its column into view too. `mark` stays false so
+      // the tint keeps meaning "you clicked a schema field", not "a search ran".
+      focusColumn(first.column, false);
+    },
+    [focusColumn, goToPage, sessionRef],
+  );
+
   const runSearch = useCallback(async () => {
     const info = fileInfoRef.current;
-    const needle = query.trim().toLowerCase();
+    const needle = normalizeSearchQuery(query);
     const seq = ++searchSeq.current;
     setMatchRows(new Set());
     setCapped(false);
@@ -95,8 +124,15 @@ export function useParquetSearch({
     // The results belong to this text. Remembering it is what lets Enter tell "walk the hits I
     // already have" from "this is a new needle, search it".
     setSearchedQuery(needle);
-    setSearching(true);
     setSearchedEmpty(false);
+    const memo = searchMemo.current.get(needle);
+    if (memo) {
+      setSearching(false);
+      setProgress(null);
+      applyHitSet(memo.hitSet, memo.capped);
+      return;
+    }
+    setSearching(true);
     setProgress({ scanned: 0, total: info.rowCount, matches: 0 });
     try {
       // One page-aligned pass over the file, column by column, instead of a read per
@@ -113,25 +149,14 @@ export function useParquetSearch({
       });
       if (seq !== searchSeq.current || result.cancelled) return;
       const hitSet = new ParquetHitSet(result.rows, result.columns, needle);
-      hitSetRef.current = hitSet;
-      setMatchRows(hitSet.rowSet);
-      setCapped(result.capped);
-      setSearchedEmpty(hitSet.isEmpty);
-      onSearchedRef.current?.(hitSet.size);
-      if (!hitSet.isEmpty) {
-        setActiveMatch(0);
-        const target = sessionRef.current?.rowToPage(result.rows[0]);
-        if (target !== undefined) goToPage((current) => (current === target ? current : target));
-        // A hit is a cell, not a row: bring its column into view too. `mark` stays false so
-        // the tint keeps meaning "you clicked a schema field", not "a search ran".
-        focusColumn(result.columns[0] ?? 0, false);
-      }
+      searchMemo.current.set(needle, { hitSet, capped: result.capped });
+      applyHitSet(hitSet, result.capped);
     } catch (e) {
       if (seq === searchSeq.current) onError(e instanceof Error ? e.message : "Search failed");
     } finally {
       if (seq === searchSeq.current) setSearching(false);
     }
-  }, [fileInfoRef, focusColumn, goToPage, onError, query, sessionRef]);
+  }, [applyHitSet, fileInfoRef, onError, query]);
 
   const jumpMatch = useCallback(
     (direction: 1 | -1) => {

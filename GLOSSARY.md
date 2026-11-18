@@ -101,14 +101,18 @@ _Avoid_: match, span
 _Avoid_: 链接列、hyperlink column（列没有被重新类型化）
 
 **Field jump（字段跳转）**:
-点击 parquet schema 字段后，把表格水平滚动到该列并留下淡色列高亮。它不改变筛选、分页或行选择，只是导航。
+点击 parquet schema 字段后，把表格水平滚动到该列并留下列高亮；再次点击同一字段取消高亮，导航本身是幂等的。它不改变筛选、分页或行选择，只是导航。
 _Avoid_: 筛选、定位行（那是 jump-to-row）
 
 **Column profile（列画像）**:
 一份 parquet 文件里每一列的统计摘要：空值数与占比、取值范围、基数与 top-N。它先用 row-group
 statistics 回答，不为了显示一行摘要去解码整列；它不是筛选，也不改变当前页或行选择。
 答案有四种状态且不可互相替代：完整（available）、只有部分行组带统计（partial）、writer
-没写统计（missing）、结构列不做画像（nested，叶子统计不是一行的值）。
+没写统计（missing）、结构列没有行级统计（nested，叶子统计不是一行的值）。nested 的
+`null ?` 是可扫描的入口：按需扫描单列后，侧栏显示 `empty N%`（把 null、空字符串、空
+list、空二进制、空 map 都算作「没有数据」；只扫描前缀时标 `~`）。侧栏还有一个显式批量
+入口，一次请求、逐列分块扫描所有尚无答案的结构列（跳过 top-N、受 20 万行上限约束）。
+扫描结果按文档指纹缓存，重开同一文件不再扫描；这仍然不是整文件解码，也不改变分页。
 口径见 [ADR-0020](./docs/adr/0020-column-profile-direction.md)。
 _Avoid_: 概览、统计报告、profiling（太泛，且暗示要整份扫）
 

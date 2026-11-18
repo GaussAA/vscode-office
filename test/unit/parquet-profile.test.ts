@@ -5,10 +5,13 @@ import type { ParquetColumnProfile, ParquetProfile } from "@/common/parquetProfi
 import { createParquetHandlers } from "@/provider/parquetHandlers";
 import { openParquetFile } from "@/common/parquetReader";
 import type { ByteSource } from "@/common/byteSource";
+import { formatShare } from "@/react/view/parquet/formatShare";
 import { memoryByteSource } from "@/service/jsonlFile";
+import { ParquetScanCache, type ParquetScanFingerprint } from "@/service/parquetScanCache";
 import {
   profileFromParquet,
   readParquetProfile,
+  scanEmptyShares,
   scanParquetColumn,
 } from "@/service/parquetProfile";
 
@@ -138,11 +141,18 @@ test("profile: reading a profile asks for the footer, not for the file", async (
 
 // ---------------------------------------------------------------- the glue
 
-function harness(source: () => Promise<ByteSource>) {
+function harness(
+  source: () => Promise<ByteSource>,
+  options: {
+    fingerprint?: () => Promise<ParquetScanFingerprint | null>;
+    cache?: ParquetScanCache;
+  } = {},
+) {
   const emitted: Array<{ type: string; payload: any }> = [];
   const handlers = createParquetHandlers({
     openSource: source,
     emit: (type, payload) => emitted.push({ type, payload }),
+    ...options,
   });
   return { handlers, emitted };
 }
@@ -226,11 +236,36 @@ test("scan: top-N counts values and skips nulls the profile already reports", as
   assert.ok(topSum <= 3000 - 429, `counts exceed rows: ${topSum}`);
 });
 
-test("scan: empty arrays are treated as null for list columns", async () => {
-  // Create a test to verify empty arrays are counted as nulls
-  // This would need a fixture with a LIST column containing empty arrays
-  // For now, we document the expected behavior
-  assert.ok(true, "Empty arrays should be counted as nulls in scanParquetColumn");
+test("scan: empty lists are no data, and the empty share combines nulls and empties", async () => {
+  const scan = await scanParquetColumn(memoryByteSource(await bytesOf("nested")), "tags");
+
+  assert.equal(scan.rowCount, 6);
+  assert.equal(scan.scanned, 6);
+  assert.equal(scan.complete, true);
+  // Rows 2 and 6 have no list at all; rows 3 and 5 carry an empty list. Both are "no data",
+  // but they are different facts and the panel has to be able to say which is which.
+  assert.equal(scan.nulls, 2);
+  assert.equal(scan.empties, 2);
+  assert.equal(scan.emptyRatio, 4 / 6);
+  assert.equal(scan.distinct, 2);
+  assert.deepEqual(scan.top.map((entry) => entry.value).sort(), ['["ja"]', '["ko","en"]']);
+  assert.ok(
+    scan.top.every((entry) => entry.value !== "[]"),
+    `an empty list leaked into top-N: ${JSON.stringify(scan.top)}`,
+  );
+});
+
+test("scan: an empty string is empty, not a top-N value", async () => {
+  const scan = await scanParquetColumn(memoryByteSource(await bytesOf("nested")), "id");
+
+  assert.equal(scan.nulls, 0);
+  assert.equal(scan.empties, 1);
+  assert.equal(scan.emptyRatio, 1 / 6);
+  assert.equal(scan.distinct, 5);
+  assert.ok(
+    scan.top.every((entry) => entry.value !== ""),
+    `an empty string leaked into top-N: ${JSON.stringify(scan.top)}`,
+  );
 });
 
 test("scan: a row cap is reported as a prefix, not as the file", async () => {
@@ -247,6 +282,79 @@ test("scan: an unknown column is an error, not an empty histogram", async () => 
   await assert.rejects(
     scanParquetColumn(memoryByteSource(await bytesOf("multigroup")), "nope"),
     /no column named nope/,
+  );
+});
+
+test("formatShare: <1% stays visible and a scanned prefix is marked with ~", () => {
+  assert.deepEqual(formatShare("null", 0), {
+    badge: "null 0%",
+    percent: "0",
+    marked: "0%",
+  });
+  assert.deepEqual(formatShare("null", 0.004), {
+    badge: "null <1%",
+    percent: "<1",
+    marked: "<1%",
+  });
+  assert.deepEqual(formatShare("empty", 4 / 6), {
+    badge: "empty 67%",
+    percent: "67",
+    marked: "67%",
+  });
+  assert.deepEqual(formatShare("empty", 1 / 3, true), {
+    badge: "empty ~33%",
+    percent: "33",
+    marked: "~33%",
+  });
+});
+
+test("scanEmptyShares: one pass answers every structured column without a histogram", async () => {
+  const shares = await scanEmptyShares(memoryByteSource(await bytesOf("nested")), ["tags", "meta"]);
+
+  const tags = shares.find((share) => share.name === "tags");
+  assert.ok(tags, "tags is missing from the batch answer");
+  assert.equal(tags.scanned, 6);
+  assert.equal(tags.complete, true);
+  assert.equal(tags.nulls, 2);
+  assert.equal(tags.empties, 2);
+  assert.equal(tags.emptyRatio, 4 / 6);
+
+  const meta = shares.find((share) => share.name === "meta");
+  assert.ok(meta, "meta is missing from the batch answer");
+  assert.equal(meta.nulls, 2);
+  assert.equal(meta.empties, 0);
+  assert.equal(meta.emptyRatio, 2 / 6);
+});
+
+test("scanEmptyShares: a prefix is labelled and progress never reports a later row first", async () => {
+  const progress: Array<[number, number]> = [];
+  const shares = await scanEmptyShares(memoryByteSource(await bytesOf("nested")), ["tags"], {
+    maxRows: 3,
+    onProgress: (scanned, total) => progress.push([scanned, total]),
+  });
+
+  assert.equal(shares[0].scanned, 3);
+  assert.equal(shares[0].complete, false);
+  // Rows 1–3: one populated list, one missing list and one empty list.
+  assert.equal(shares[0].nulls, 1);
+  assert.equal(shares[0].empties, 1);
+  assert.equal(shares[0].emptyRatio, 2 / 3);
+  assert.ok(progress.length > 0, "the rail never received a progress number");
+  assert.deepEqual(progress[progress.length - 1], [3, 3]);
+});
+
+test("scanEmptyShares: an aborted batch stops before decoding, and no names is an error", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    scanEmptyShares(memoryByteSource(await bytesOf("nested")), ["tags"], {
+      signal: controller.signal,
+    }),
+    /scan cancelled/,
+  );
+  await assert.rejects(
+    scanEmptyShares(memoryByteSource(await bytesOf("nested")), ["nope"]),
+    /no columns to scan/,
   );
 });
 
@@ -288,4 +396,101 @@ test("handlers: a failed scan still answers with the error attached", async () =
   assert.ok(message, "expected exactly one reply");
   assert.equal(message.payload.scan, null);
   assert.match(message.payload.error, /no column named nope/);
+});
+
+// ------------------------------------------------------- the session scan cache
+
+const fingerprint = {
+  key: "file:///multigroup.parquet",
+  size: 1024,
+  mtimeMs: 1,
+} satisfies ParquetScanFingerprint;
+
+test("handlers: a repeated column scan hits the host cache instead of decoding again", async () => {
+  let opens = 0;
+  const cache = new ParquetScanCache();
+  const { handlers, emitted } = harness(
+    async () => {
+      opens += 1;
+      return memoryByteSource(await bytesOf("multigroup"));
+    },
+    { cache, fingerprint: async () => fingerprint },
+  );
+
+  await handlers.columnScan({ requestId: 1, name: "name" });
+  await handlers.columnScan({ requestId: 2, name: "name" });
+
+  const replies = emitted.filter((message) => message.type === "parquetColumnScanData");
+  assert.equal(opens, 1, "the second scan must not open the source");
+  assert.equal(replies.length, 2);
+  assert.deepEqual(replies[1]?.payload.scan, replies[0]?.payload.scan);
+  assert.equal(cache.get(fingerprint, "name")?.nulls, 429);
+});
+
+test("handlers: cacheable:false and a missing fingerprint both bypass the cache", async () => {
+  let opens = 0;
+  const cache = new ParquetScanCache();
+  const source = async () => {
+    opens += 1;
+    return memoryByteSource(await bytesOf("multigroup"));
+  };
+  const direct = harness(source, { cache, fingerprint: async () => fingerprint });
+  await direct.handlers.columnScan({ requestId: 1, name: "name", cacheable: false });
+  await direct.handlers.columnScan({ requestId: 2, name: "name", cacheable: false });
+  assert.equal(opens, 2, "inline requests must not share the cache");
+  assert.equal(cache.fileCount, 0);
+
+  opens = 0;
+  const noFingerprint = harness(source, { cache, fingerprint: async () => null });
+  await noFingerprint.handlers.columnScan({ requestId: 1, name: "name" });
+  await noFingerprint.handlers.columnScan({ requestId: 2, name: "name" });
+  assert.equal(opens, 2, "an unstatable document must not be cached");
+  assert.equal(cache.fileCount, 0);
+});
+
+test("handlers: the batch scan reuses a cached column and decodes only the misses", async () => {
+  let opens = 0;
+  const cache = new ParquetScanCache();
+  const { handlers, emitted } = harness(
+    async () => {
+      opens += 1;
+      return memoryByteSource(await bytesOf("multigroup"));
+    },
+    { cache, fingerprint: async () => fingerprint },
+  );
+
+  await handlers.columnScan({ requestId: 1, name: "name" });
+  const beforeBatch = opens;
+  await handlers.emptyShareScan({ requestId: 2, names: ["name", "id"] });
+
+  const batch = emitted.filter((message) => message.type === "parquetEmptyShareScanData").at(-1);
+  assert.equal(opens, beforeBatch + 1, "only the uncached column may decode");
+  assert.deepEqual(
+    batch?.payload.shares.map((share: { name: string }) => share.name),
+    ["name", "id"],
+  );
+  const nameShare = batch?.payload.shares[0];
+  assert.equal(nameShare.nulls, 429, "the name share came from the full scan cache");
+  assert.equal(nameShare.scanned, 3000);
+});
+
+test("handlers: an all-cached batch does not open a source at all", async () => {
+  let opens = 0;
+  const cache = new ParquetScanCache();
+  const { handlers, emitted } = harness(
+    async () => {
+      opens += 1;
+      return memoryByteSource(await bytesOf("multigroup"));
+    },
+    { cache, fingerprint: async () => fingerprint },
+  );
+
+  await handlers.columnScan({ requestId: 1, name: "name" });
+  const beforeBatch = opens;
+  await handlers.emptyShareScan({ requestId: 2, names: ["name"] });
+
+  const batch = emitted.filter((message) => message.type === "parquetEmptyShareScanData").at(-1);
+  assert.equal(opens, beforeBatch);
+  assert.equal(batch?.payload.shares.length, 1);
+  assert.equal(batch?.payload.shares[0].name, "name");
 });

@@ -54,7 +54,7 @@ export default [
       await page.navigate(`${base}/stats`);
       await page.evaluate(`(() => {
         Object.keys(localStorage)
-          .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width')
+          .filter(key => key.startsWith('parquet-state:') || key.startsWith('parquet-ui:') || key === 'parquet-sider-width')
           .forEach(key => localStorage.removeItem(key));
         localStorage.setItem('parquet-state:/mixed.parquet', JSON.stringify({ row: 100 }));
       })()`);
@@ -94,7 +94,7 @@ export default [
       await page.navigate(`${base}/stats`);
       await page.evaluate(`(() => {
         Object.keys(localStorage)
-          .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width')
+          .filter(key => key.startsWith('parquet-state:') || key.startsWith('parquet-ui:') || key === 'parquet-sider-width')
           .forEach(key => localStorage.removeItem(key));
         localStorage.setItem('parquet-state:/mixed.parquet', JSON.stringify({ row: 100 }));
       })()`);

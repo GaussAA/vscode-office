@@ -560,6 +560,27 @@ function parquetStub(fixtures) {
       { name: "score", type: "DOUBLE", state: "partial", groupsWithStatistics: 1 },
     ],
   };
+  /**
+   * The answer for the nested fixture (`/nested.parquet`): LIST and STRUCT columns have no
+   * row-level statistics, so they are state `nested` and the rail offers a scan instead.
+   */
+  const nestedProfile = {
+    rowCount: 6,
+    rowGroupCount: 1,
+    hasAnyStatistics: true,
+    columns: [
+      {
+        name: "id",
+        type: "STRING",
+        state: "available",
+        groupsWithStatistics: 1,
+        nullCount: 0,
+        nullRatio: 0,
+      },
+      { name: "tags", type: "LIST", state: "nested", groupsWithStatistics: 0 },
+      { name: "meta", type: "STRUCT", state: "nested", groupsWithStatistics: 0 },
+    ],
+  };
   return `<script>
 (function () {
   window.__openExternalCalls = [];
@@ -571,31 +592,61 @@ function parquetStub(fixtures) {
         return;
       }
       const params = new URLSearchParams(location.search);
+      if (msg.type === 'parquetEmptyShareScan') {
+        if (params.get('profile') !== '1') return;
+        const requestId = msg.content && msg.content.requestId;
+        const names = Array.isArray(msg.content && msg.content.names) ? msg.content.names : [];
+        const shares = params.get('nested') === '1'
+          ? names.map(function (name) {
+              if (name === 'tags') return { name: name, scanned: 6, rowCount: 6, complete: true, nulls: 2, empties: 2, emptyRatio: 4 / 6 };
+              if (name === 'meta') return { name: name, scanned: 6, rowCount: 6, complete: true, nulls: 2, empties: 0, emptyRatio: 2 / 6 };
+              return { name: name, scanned: 6, rowCount: 6, complete: true, nulls: 0, empties: 0, emptyRatio: 0 };
+            })
+          : [];
+        setTimeout(function () {
+          window.postMessage({ type: 'parquetEmptyShareScanProgress', content: { requestId: requestId, scanned: 3, total: 6 } }, '*');
+        }, 30);
+        setTimeout(function () {
+          window.postMessage({ type: 'parquetEmptyShareScanData', content: { requestId: requestId, shares: shares } }, '*');
+        }, 120);
+        return;
+      }
       if (msg.type === 'parquetColumnScan') {
         if (params.get('profile') !== '1') return;
         const requestId = msg.content && msg.content.requestId;
         const name = String(msg.content && msg.content.name);
+        const scan = params.get('nested') === '1'
+          ? name === 'tags'
+            ? { name: name, scanned: 6, rowCount: 6, complete: true, distinct: 2, nulls: 2, empties: 2, emptyRatio: 4 / 6, top: [
+                { value: '["ko","en"]', count: 1 },
+                { value: '["ja"]', count: 1 },
+              ] }
+            : name === 'id'
+              ? { name: name, scanned: 6, rowCount: 6, complete: true, distinct: 5, nulls: 0, empties: 1, emptyRatio: 1 / 6, top: [
+                  { value: 'row-1', count: 1 },
+                ] }
+              : { name: name, scanned: 6, rowCount: 6, complete: true, distinct: 2, nulls: 2, empties: 0, emptyRatio: 2 / 6, top: [] }
+          : { name: name, scanned: 300, rowCount: 300, complete: true, distinct: 98,
+              nulls: name === 'name' ? 12 : 0,
+              empties: 0,
+              emptyRatio: name === 'name' ? 12 / 300 : 0,
+              top: [
+                { value: 'service-a-0', count: 40 },
+                { value: 'service-b-1', count: 31 },
+              ] };
         setTimeout(function () {
-          window.postMessage({ type: 'parquetColumnScanData', content: { requestId: requestId, scan: {
-            name: name,
-            scanned: 300,
-            rowCount: 300,
-            complete: true,
-            distinct: 98,
-            nulls: 12,
-            top: [
-              { value: 'service-a-0', count: 40 },
-              { value: 'service-b-1', count: 31 },
-            ],
-          } } }, '*');
+          window.postMessage({ type: 'parquetColumnScanData', content: { requestId: requestId, scan: scan } }, '*');
         }, 40);
         return;
       }
       if (msg.type === 'parquetProfile') {
         if (params.get('profile') !== '1') return;
         const requestId = msg.content && msg.content.requestId;
+        const answer = params.get('nested') === '1'
+          ? ${JSON.stringify(nestedProfile)}
+          : ${JSON.stringify(profile)};
         setTimeout(function () {
-          window.postMessage({ type: 'parquetProfileData', content: { requestId: requestId, profile: ${JSON.stringify(profile)} } }, '*');
+          window.postMessage({ type: 'parquetProfileData', content: { requestId: requestId, profile: answer } }, '*');
         }, 40);
         return;
       }
@@ -614,13 +665,15 @@ function parquetStub(fixtures) {
         : params.get('empty') === '1' ? '/empty.parquet'
         : params.get('types') === '1' ? '/types.parquet'
         : params.get('preview') === '1' ? '/preview.parquet'
+        : params.get('wide') === '1' ? '/wide.parquet'
         : params.get('bad') === '1' ? '/bad.parquet'
         : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
       const inline = params.get('inline') === '1';
+      const clearCache = params.get('clearCache') === '1';
       const payload = inline
-        ? { path: '', fileName: 'inline-mixed.parquet', documentCacheId: 'demo-inline', bufferBase64: ${JSON.stringify(inlineBase64)} }
-        : { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo' };
+        ? { path: '', fileName: 'inline-mixed.parquet', documentCacheId: 'demo-inline', bufferBase64: ${JSON.stringify(inlineBase64)}, clearCache }
+        : { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo:' + file, size: 12345, mtimeMs: Number(params.get('mtime') ?? 1), clearCache };
       if (guard) {
         setTimeout(function () {
           window.postMessage({ type: 'open', content: { path: '', fileName: 'big-virtual.parquet', documentCacheId: 'demo-guard', size: 80 * 1024 * 1024, tooLarge: true } }, '*');
@@ -992,6 +1045,36 @@ function windowXlsx() {
 
 const WINDOW_XLSX = windowXlsx();
 
+const LARGE_XLSX = new Map();
+
+/**
+ * A workbook large enough to measure the whole-workbook parse. It is generated on demand and
+ * cached so the UI probe can warm the server and time a second, parse-only open.
+ */
+function largeXlsx(rows) {
+  const cached = LARGE_XLSX.get(rows);
+  if (cached) return cached;
+  const data = [["id", "name", "score", "ok", "note", "tag", "value", "text"]];
+  const filler = "measurement ".repeat(3).trim();
+  for (let row = 0; row < rows; row++) {
+    data.push([
+      String(row),
+      `row-${row}`,
+      String(row / 2),
+      String(row % 2 === 0),
+      `note-${row}`,
+      "probe",
+      String(row * 3),
+      `${filler}-${row}`,
+    ]);
+  }
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Data");
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  LARGE_XLSX.set(rows, buffer);
+  return buffer;
+}
+
 /** The same idea for a legacy workbook: `.xls` is decoded by SheetJS, not ExcelJS. */
 function windowXls() {
   const data = [["id", "name"]];
@@ -1021,7 +1104,7 @@ const EDIT_XLS = editXls();
  * Bridge for a workbook that must open in the windowed view: 12 MB claimed, just under the
  * 15 MB workbook guard and over the 8 MB window threshold.
  */
-function excelWorkbookStub() {
+function excelWorkbookStub(rows = 0) {
   return `<script>
 (function () {
   const api = {
@@ -1031,7 +1114,7 @@ function excelWorkbookStub() {
         window.postMessage({ type: 'open', content: {
           ext: '.xlsx',
           fileName: 'window.xlsx',
-          path: '/window.xlsx',
+          path: ${JSON.stringify(rows > 200 ? `/window.xlsx?rows=${rows}` : "/window.xlsx")},
           scheme: 'file',
           size: 12 * 1024 * 1024,
           readOnly: true,
@@ -1212,6 +1295,10 @@ export function startHarness(fixtures, port = 0) {
         2_000_000,
       );
       const workbookView = path === "/harness-route" && url.searchParams.get("workbook") === "1";
+      const workbookRows = Math.min(
+        Math.max(Number(url.searchParams.get("workbookRows") ?? 0) || 0, 0),
+        1_000_000,
+      );
       const legacyView = path === "/harness-route" && url.searchParams.get("legacy") === "1";
       const many = Math.min(Math.max(Number(url.searchParams.get("many") ?? 0) || 0, 0), 5000);
       const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 0) || 0, 0), 500);
@@ -1223,7 +1310,7 @@ export function startHarness(fixtures, port = 0) {
           : legacyView
             ? excelLegacyStub()
             : workbookView
-              ? excelWorkbookStub()
+              ? excelWorkbookStub(workbookRows)
               : windowed
                 ? excelWindowStub(windowRows)
                 : path === "/harness-json"
@@ -1357,13 +1444,14 @@ export function startHarness(fixtures, port = 0) {
     }
 
     if (path === "/window.xlsx") {
+      const rows = Number(url.searchParams.get("rows") ?? 0) || 0;
       res.writeHead(
         200,
         addCrossOriginHeaders({
           "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         }),
       );
-      res.end(WINDOW_XLSX);
+      res.end(rows > 200 ? largeXlsx(rows) : WINDOW_XLSX);
       return;
     }
 
@@ -1391,6 +1479,7 @@ export function startHarness(fixtures, port = 0) {
       path === "/empty.parquet" ||
       path === "/types.parquet" ||
       path === "/preview.parquet" ||
+      path === "/wide.parquet" ||
       path === "/bad.parquet"
     ) {
       const file =
@@ -1406,9 +1495,11 @@ export function startHarness(fixtures, port = 0) {
                   ? fixtures.types
                   : path === "/preview.parquet"
                     ? fixtures.preview
-                    : path === "/bad.parquet"
-                      ? fixtures.bad
-                      : fixtures.big;
+                    : path === "/wide.parquet"
+                      ? fixtures.wide
+                      : path === "/bad.parquet"
+                        ? fixtures.bad
+                        : fixtures.big;
       // `?delay=ms` slows every response for that URL. A scenario that needs "a document is
       // still opening" (a stale reply arriving mid-load) cannot get that window from a local
       // fixture that answers in a millisecond.

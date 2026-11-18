@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import type { ParquetProfile } from "@/common/parquetProfileTypes";
+import type { ParquetEmptyShare, ParquetProfile } from "@/common/parquetProfileTypes";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { COLUMN_ICONS } from "./parquetCell";
+import { formatShare } from "./formatShare";
 import type { ParquetColumnInfo } from "@/common/parquetReader";
 
 interface ParquetSchemaProps {
@@ -10,35 +11,36 @@ interface ParquetSchemaProps {
   siderWidth: number;
   /** Null while the host has not answered; every row then simply has no badge. */
   profile?: ParquetProfile | null;
+  /** Per-column empty-share answers, keyed by name; a scanned structured column can show a number. */
+  shares: ReadonlyMap<string, ParquetEmptyShare>;
+  /** The rail-level batch scan's state; its action is rendered only when it has work to do. */
+  structuredScan: { loading: boolean; scanned: number; total: number; error: string | null };
+  /** Controlled by the viewer so the filter can be part of the per-file UI state. */
+  fieldFilter: string;
+  onFieldFilterChange: (value: string) => void;
+  onScanStructured: () => void;
   onFocusColumn: (position: number) => void;
   /** Open the profile panel for this column (mouse on the badge, or `i` on the focused row). */
   onInspectColumn: (column: ParquetColumnInfo) => void;
 }
 
 /**
- * `0.4%` must not render as `0%`: the number is the answer, so it rounds only when the
- * difference stays visible.
- */
-function formatNullShare(ratio: number): { badge: string; percent: string } {
-  if (ratio <= 0) return { badge: "null 0%", percent: "0" };
-  if (ratio < 0.01) return { badge: "null <1%", percent: "<1" };
-  const percent = String(Math.round(ratio * 100));
-  return { badge: `null ${percent}%`, percent };
-}
-
-/**
- * Schema list with its own filter and single-tab-stop cursor. Keeping this state here means the
- * viewer only has to know which field is active and how to bring it into view.
+ * Schema list with its filter input and single-tab-stop cursor. The filter is controlled by the
+ * viewer so it can persist with the rest of the per-file UI state; only the cursor is local.
  */
 export default function ParquetSchema({
   columns,
   activeColumn,
   siderWidth,
   profile,
+  shares,
+  structuredScan,
+  fieldFilter,
+  onFieldFilterChange,
+  onScanStructured,
   onFocusColumn,
   onInspectColumn,
 }: ParquetSchemaProps) {
-  const [fieldFilter, setFieldFilter] = useState("");
   const [fieldCursor, setFieldCursor] = useState(0);
 
   // Keyed by column name: the profile carries names, not positions, because a nested schema
@@ -54,6 +56,19 @@ export default function ParquetSchema({
     if (!needle) return all;
     return all.filter(({ column }) => column.name.toLowerCase().includes(needle));
   }, [columns, fieldFilter]);
+
+  // The batch action is about the structured columns that have no value-level answer yet.
+  // A silent host shows neither the button nor a badge: no answer, no action.
+  const unscannedStructured = useMemo(
+    () => columns.filter((column) => column.nested && !shares.has(column.name)),
+    [columns, shares],
+  );
+  const structuredPercent =
+    structuredScan.total > 0
+      ? Math.round((structuredScan.scanned / structuredScan.total) * 100)
+      : 0;
+  const showStructuredScan =
+    !!profile && (unscannedStructured.length > 0 || structuredScan.loading);
 
   const resetCursor = () => setFieldCursor(0);
 
@@ -79,7 +94,7 @@ export default function ParquetSchema({
           aria-label={$t("parquet.filterFields")}
           spellCheck={false}
           onChange={(event) => {
-            setFieldFilter(event.target.value);
+            onFieldFilterChange(event.target.value);
             resetCursor();
           }}
         />
@@ -88,7 +103,7 @@ export default function ParquetSchema({
             type="button"
             className="parquet-viewer__field-filter-clear"
             onClick={() => {
-              setFieldFilter("");
+              onFieldFilterChange("");
               resetCursor();
             }}
             title={$t("common.close")}
@@ -98,6 +113,25 @@ export default function ParquetSchema({
           </button>
         )}
       </div>
+      {showStructuredScan && (
+        <button
+          type="button"
+          className="parquet-viewer__sider-scan"
+          onClick={onScanStructured}
+          disabled={structuredScan.loading}
+          title={$t("parquet.scanStructured")}
+        >
+          <span className="codicon codicon-checklist" />
+          {structuredScan.loading
+            ? $t("parquet.scanningStructured", { percent: String(structuredPercent) })
+            : $t("parquet.scanStructured")}
+        </button>
+      )}
+      {structuredScan.error && (
+        <p className="parquet-viewer__sider-scan-error" role="alert">
+          {structuredScan.error}
+        </p>
+      )}
       <div
         className="parquet-viewer__list"
         role="listbox"
@@ -146,13 +180,26 @@ export default function ParquetSchema({
           const kind = column.category;
           const active = activeColumn === position;
           const stats = statsByName.get(column.name);
+          const share = shares.get(column.name);
           // The badge is visual only; the row's accessible name carries the same sentence, so
           // a screen reader hears "Jump to column name — 12% of rows are null" rather than a
           // bare percentage the surrounding UI cannot explain.
           let badge: string | null = null;
           let summary: string | null = null;
-          if (stats?.state === "available" && stats.nullRatio !== undefined) {
-            const share = formatNullShare(stats.nullRatio);
+          if (share && share.scanned > 0) {
+            // A scan is value-level, so it is the only source that can count empty lists and
+            // empty strings; `empty` in the badge keeps it distinct from the metadata `null`.
+            const formatted = formatShare("empty", share.emptyRatio, !share.complete);
+            badge = formatted.badge;
+            summary = $t("parquet.emptyShare", { percent: formatted.percent });
+            if (!share.complete) {
+              summary += ` · ${$t("parquet.profileScanned", {
+                scanned: share.scanned.toLocaleString(),
+                total: share.rowCount.toLocaleString(),
+              })}`;
+            }
+          } else if (stats?.state === "available" && stats.nullRatio !== undefined) {
+            const share = formatShare("null", stats.nullRatio);
             badge = share.badge;
             summary = $t("parquet.nullShare", { percent: share.percent });
           } else if (stats?.state === "partial") {
@@ -161,6 +208,11 @@ export default function ParquetSchema({
           } else if (stats?.state === "missing") {
             badge = "—";
             summary = $t("parquet.noStatistics");
+          } else if (stats?.state === "nested") {
+            // Leaf statistics are not row values, so there is no metadata number. This is the
+            // mouse path to the scan; `i` on the focused row is the keyboard path.
+            badge = "null ?";
+            summary = $t("parquet.nestedScanHint");
           }
           const label = $t("parquet.jumpToColumn", { name: column.name });
           return (
@@ -187,6 +239,7 @@ export default function ParquetSchema({
                 <span
                   className="parquet-viewer__list-null"
                   aria-hidden="true"
+                  title={summary ?? undefined}
                   onClick={(event) => {
                     // Mouse convenience only: an interactive element inside the row button
                     // would be invalid HTML, so the keyboard path is `i` on the focused row.

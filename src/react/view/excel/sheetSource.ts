@@ -9,6 +9,7 @@
  * This file implements the text half (CSV/TSV). Workbooks are phase 4: a zip's deflate stream
  * cannot be seeked, so they are parsed whole into a compact column store rather than streamed.
  */
+import { type CsvRecordIndex, isUsableCsvIndex } from "@/common/csvIndex";
 import { parseCsv, parseCsvRecords } from "./csvParser";
 import { decodeCsvBufferWithEncoding, type CsvEncoding } from "./csvEncoding";
 
@@ -24,6 +25,8 @@ export interface TextSheetSource extends SheetSource {
   readonly kind: "text";
   readonly delimiter: string;
   readonly encoding: CsvEncoding;
+  /** The scanned or cached record index; stored in the host for the next open. */
+  readonly recordIndex: CsvRecordIndex;
 }
 
 const QUOTE = 0x22;
@@ -108,7 +111,11 @@ export function indexRecordStarts(bytes: Uint8Array, delimiter: number): number[
  * Keeps the bytes and one offset per record (8 bytes per row: 1M rows ≈ 8 MB) instead of a
  * cell object per value. Encoding and delimiter are decided once, from a prefix.
  */
-export function createTextSheetSource(buffer: ArrayBuffer): TextSheetSource {
+export function createTextSheetSource(
+  buffer: ArrayBuffer,
+  cachedIndex?: CsvRecordIndex,
+): TextSheetSource {
+  const scanStarted = performance.now();
   const bytes = new Uint8Array(buffer);
   // A view shares the file's buffer; `slice()` copies just the bytes being decoded.
   const prefix = bytes.subarray(0, Math.min(bytes.length, DETECT_BYTES));
@@ -120,7 +127,19 @@ export function createTextSheetSource(buffer: ArrayBuffer): TextSheetSource {
   } catch {
     delimiter = ",";
   }
-  const { starts, maxFields } = indexRecordStartsAndFields(bytes, delimiter.charCodeAt(0));
+  const recordIndex = isUsableCsvIndex(cachedIndex, bytes.length)
+    ? cachedIndex
+    : indexRecordStartsAndFields(bytes, delimiter.charCodeAt(0));
+  const { starts, maxFields } = recordIndex;
+  if (recordIndex === cachedIndex) {
+    try {
+      performance.measure("excel-csv-index-hit", { start: scanStarted, end: performance.now() });
+    } catch {}
+  } else {
+    try {
+      performance.measure("excel-csv-scan", { start: scanStarted, end: performance.now() });
+    } catch {}
+  }
 
   const decode = (slice: Uint8Array): string =>
     decodeCsvBufferWithEncoding(slice.slice().buffer as ArrayBuffer).text;
@@ -131,6 +150,7 @@ export function createTextSheetSource(buffer: ArrayBuffer): TextSheetSource {
     kind: "text",
     delimiter,
     encoding: detected.encoding,
+    recordIndex,
     rowCount: starts.length,
     columnCount,
     async readRows(start: number, end: number): Promise<string[][]> {

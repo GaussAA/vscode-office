@@ -61,6 +61,8 @@ export interface ParquetProfilePayload {
 export interface ParquetColumnScanRequest {
   requestId: number;
   name: string;
+  /** False for inline bytes: the webview's bytes have no host fingerprint to validate. */
+  cacheable?: boolean;
 }
 
 export interface ParquetColumnScanValue {
@@ -78,8 +80,20 @@ export interface ParquetColumnScan {
   complete: boolean;
   /** Distinct non-null values in the scanned prefix. */
   distinct: number;
-  /** Nulls seen and skipped — the profile already reports their share. */
+  /** Null/undefined values seen and skipped — the profile already reports their share. */
   nulls: number;
+  /**
+   * Empty values seen and skipped: `""`, an empty list, an empty binary, an empty map. They
+   * carry no data, so they are not top-N candidates; a LIST written by a writer that stores
+   * `[]` instead of NULL shows up here rather than in `nulls`.
+   */
+  empties: number;
+  /**
+   * `(nulls + empties) / scanned`: the share of scanned rows with no data. This is the number
+   * the rail shows once a column has been scanned, because metadata statistics only know nulls
+   * (and say nothing row-level about a LIST).
+   */
+  emptyRatio: number;
   top: ParquetColumnScanValue[];
 }
 
@@ -87,4 +101,56 @@ export interface ParquetColumnScanPayload {
   requestId: number;
   scan: ParquetColumnScan | null;
   error?: string;
+}
+
+/**
+ * The rail-level answer for a structured column: just the "no data" share.
+ *
+ * This is deliberately narrower than `ParquetColumnScan`: the batch action exists to fill the
+ * schema rail, so it does not build a histogram or top-N for every column. The panel still
+ * requests the full scan of the one column it shows.
+ */
+export interface ParquetEmptyShare {
+  name: string;
+  scanned: number;
+  rowCount: number;
+  complete: boolean;
+  nulls: number;
+  empties: number;
+  emptyRatio: number;
+}
+
+export interface ParquetEmptyShareScanRequest {
+  requestId: number;
+  /** Top-level column names to cover. The rail sends its unscanned LIST/STRUCT columns. */
+  names: string[];
+  /** False for inline bytes: the webview's bytes have no host fingerprint to validate. */
+  cacheable?: boolean;
+}
+
+export interface ParquetEmptyShareScanPayload {
+  requestId: number;
+  shares: ParquetEmptyShare[] | null;
+  error?: string;
+}
+
+export interface ParquetEmptyShareScanProgress {
+  requestId: number;
+  /** Work units completed: rows read across all requested columns. */
+  scanned: number;
+  /** Work units this batch will read: `rowCap × names.length`. */
+  total: number;
+}
+
+/** The rail only needs the "no data" half of a full column scan. */
+export function emptyShareOf(scan: ParquetColumnScan): ParquetEmptyShare {
+  return {
+    name: scan.name,
+    scanned: scan.scanned,
+    rowCount: scan.rowCount,
+    complete: scan.complete,
+    nulls: scan.nulls,
+    empties: scan.empties,
+    emptyRatio: scan.emptyRatio,
+  };
 }

@@ -13,9 +13,13 @@ import type { OfficeOpenMessage } from "@/common/openPayload";
 import type {
   ParquetColumnScan,
   ParquetColumnScanPayload,
+  ParquetEmptyShare,
+  ParquetEmptyShareScanPayload,
+  ParquetEmptyShareScanProgress,
   ParquetProfile,
   ParquetProfilePayload,
 } from "@/common/parquetProfileTypes";
+import { emptyShareOf } from "@/common/parquetProfileTypes";
 import { ParquetSession, type PagingSnapshot } from "./parquetSession.ts";
 import { describeParquetFailure } from "./parquetError.ts";
 import {
@@ -34,7 +38,14 @@ import {
   SIDER_MIN,
   pageSizeForBodyHeight,
 } from "./parquetLayout.ts";
-import { loadPersistedRow, savePersistedRow } from "./parquetPersistence.ts";
+import { loadPersistedRow } from "./parquetPersistence.ts";
+import { loadParquetUi, saveParquetUi } from "./parquetUiState.ts";
+import { clearParquetLocalCaches } from "./parquetCacheStorage.ts";
+import {
+  loadParquetShares,
+  saveParquetShares,
+  type ParquetShareScope,
+} from "./parquetShareCache.ts";
 import { type CellCursor, type TableRow } from "./parquetCell.tsx";
 
 import ParquetTopBar from "./ParquetTopBar.tsx";
@@ -48,6 +59,9 @@ import { useParquetInspection } from "./useParquetInspection.ts";
 import { useParquetColumnLayout } from "./useParquetColumnLayout.ts";
 import { useParquetSiderResize } from "./useParquetSiderResize.ts";
 import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
+
+/** Bound one batch request; a schema with hundreds of structured columns scans in clicks. */
+const STRUCTURED_SCAN_BATCH = 32;
 import { useParquetSearch } from "./useParquetSearch.ts";
 import ParquetTable from "./ParquetTable.tsx";
 import { buildParquetColumns } from "./parquetColumns.tsx";
@@ -76,7 +90,11 @@ type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBas
   fileName?: string;
   ext?: string;
   size?: number;
+  documentCacheId?: string;
+  mtimeMs?: number;
   tooLarge?: boolean;
+  /** Clear parquet-derived caches before this document loads (Clear cache with no view open). */
+  clearCache?: boolean;
 };
 function ParquetViewer({ dark }: { dark: boolean }) {
   const { message } = App.useApp();
@@ -98,9 +116,38 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    */
   const [profilePanel, setProfilePanel] = useState<{ column: ParquetColumnInfo } | null>(null);
   const [columnScan, setColumnScan] = useState<ParquetColumnScan | null>(null);
+  /**
+   * Empty-share answers by column name. They outlive the panel: a scanned LIST keeps its share
+   * in the rail after the panel closes, and scanning another column must not erase it.
+   */
+  const [shares, setShares] = useState<Map<string, ParquetEmptyShare>>(() => new Map());
+  /** The ref is what the async handlers and the batch action read; state is for rendering. */
+  const sharesRef = useRef<Map<string, ParquetEmptyShare>>(new Map());
+  /** The document whose fingerprint the shares belong to; null means "do not cache". */
+  const shareScopeRef = useRef<ParquetShareScope | null>(null);
+  /** The rail-level batch scan: one request, bounded progress, cancel on close/document swap. */
+  const [structuredScan, setStructuredScan] = useState<{
+    loading: boolean;
+    scanned: number;
+    total: number;
+    error: string | null;
+  }>({ loading: false, scanned: 0, total: 0, error: null });
+  const emptyShareRequest = useRef(new RequestGuard());
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanRequest = useRef(new RequestGuard());
+
+  /**
+   * Merge scan answers into the rail and the persisted cache. The async message handlers are
+   * registered once, so they read `sharesRef` instead of closing over a stale map.
+   */
+  const commitShares = useCallback((incoming: Iterable<ParquetEmptyShare>) => {
+    const next = new Map(sharesRef.current);
+    for (const share of incoming) next.set(share.name, share);
+    sharesRef.current = next;
+    setShares(next);
+    saveParquetShares(shareScopeRef.current, [...next.values()]);
+  }, []);
   const [rowJump, setRowJump] = useState<number | null>(null);
   const [inspected, setInspected] = useState<{
     row: number;
@@ -148,11 +195,24 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [loadedPage, setLoadedPage] = useState(0);
   const [loadedStart, setLoadedStart] = useState(0);
   const [pageLoading, setPageLoading] = useState(false);
+  /** Stable per-document UI key. The row/width/filter restore is keyed by this, not the path. */
+  const [documentKey, setDocumentKey] = useState<string | undefined>(undefined);
+  const [fieldFilter, setFieldFilter] = useState("");
+  /** Bumped by Clear cache so the width hook drops edits made before the clear. */
+  const [cacheEpoch, setCacheEpoch] = useState(0);
   const {
     layout: columnLayout,
     setColumnWidth,
     resetColumnWidth,
-  } = useParquetColumnLayout(fileInfo?.columns ?? [], tableBodyWidth);
+  } = useParquetColumnLayout(fileInfo?.columns ?? [], tableBodyWidth, documentKey, cacheEpoch);
+
+  const changeFieldFilter = useCallback(
+    (value: string) => {
+      setFieldFilter(value);
+      if (documentKey) saveParquetUi(documentKey, { fieldFilter: value });
+    },
+    [documentKey],
+  );
 
   /** The virtual table owns scrolling; cursor moves and row jumps go through its ref. */
   const tableRef = useRef<TableRef>(null);
@@ -167,11 +227,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   /** Absolute row the footer jump aimed at, highlighted until the next navigation. */
   const [targetRow, setTargetRow] = useState<number | null>(null);
   const fileInfoRef = useRef<ParquetFileInfo | null>(null);
-  /** localStorage key of the open document; empty for inline (virtual) buffers. */
-  const documentKeyRef = useRef<string | undefined>(undefined);
 
   const { activeColumn, setActiveColumn, focusColumn } = useParquetColumnFocus({
-    fileInfoRef,
+    tableRef,
     tableWrapRef,
   });
 
@@ -276,16 +334,29 @@ function ParquetViewer({ dark }: { dark: boolean }) {
 
   const loadParquet = useCallback(
     async (payload: ParquetOpenPayload) => {
+      if (payload.clearCache) {
+        // The command ran while no parquet view was open; this is the first chance to reach
+        // localStorage. Clear before the reset below so no old share/layout can be painted.
+        clearParquetLocalCaches();
+        setSiderWidth(SIDER_DEFAULT);
+      }
       setLoading(true);
       setError(null);
       setFileInfo(null);
       setProfile(null);
+      // The shares belong to the document being left; drop them before the async open. A late
+      // reply from it is already rejected by the request guards.
+      sharesRef.current = new Map();
+      shareScopeRef.current = null;
+      setShares(new Map());
+      setStructuredScan({ loading: false, scanned: 0, total: 0, error: null });
       // Everything the previous document asked the host is now unwanted. The profile request
       // is only re-issued once this file has opened, so without this a late reply from the old
       // file lands in the gap. The scan guard is cancelled too: today openProfilePanel also
       // cancels it before showing anything, so this is defence in depth, not observable alone.
       profileRequest.current.cancel();
       scanRequest.current.cancel();
+      emptyShareRequest.current.cancel();
       setProfilePanel(null);
       setColumnScan(null);
       setScanError(null);
@@ -299,9 +370,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setActiveColumn(null);
       setTargetRow(null);
       resetSearch(true);
-      // Clear the key before resetting the page, otherwise the reset would be persisted
+      // Clear the UI scope before resetting the page, otherwise the reset would be persisted
       // against the document we are leaving.
-      documentKeyRef.current = undefined;
+      setDocumentKey(undefined);
+      setFieldFilter("");
       setPage(0);
       try {
         // Files arrive either as an inline base64 payload (virtual documents) or as a
@@ -313,15 +385,40 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
         fileInfoRef.current = info;
         setFileInfo(info);
+        // Per-file UI state uses the stable document identity, not the per-session webview
+        // path. A legacy path-keyed row is read once for migration; layout/shares keep their
+        // own stores.
+        const cacheId = payload.documentCacheId ?? payload.path;
+        setDocumentKey(cacheId);
+        const ui = loadParquetUi(cacheId);
+        setFieldFilter(ui?.fieldFilter ?? "");
+        // Only load the cached shares once the document has opened: the fingerprint describes
+        // this file. Inline bytes have no stable identity, so they never get a cache scope.
+        const shareScope =
+          payload.mtimeMs !== undefined &&
+          !payload.bufferBase64 &&
+          !payload.buffer &&
+          payload.documentCacheId
+            ? {
+                key: payload.documentCacheId,
+                size: payload.size,
+                mtimeMs: payload.mtimeMs,
+              }
+            : null;
+        shareScopeRef.current = shareScope;
+        const cachedShares = new Map(
+          loadParquetShares(shareScope).map((share) => [share.name, share]),
+        );
+        sharesRef.current = cachedShares;
+        setShares(cachedShares);
         // Ask the host for the profile in the same turn the file opens. Request ids are
         // monotonic, so a reply that belongs to the previous document is ignored instead of
         // painting another file's null rates.
         handler.emit("parquetProfile", { requestId: profileRequest.current.issue() });
         // Come back to where this document was left. The page cannot be computed yet — a page
         // is a screenful, and this document has not been measured — so remember the row and let
-        // the measuring effect turn it into a page.
-        documentKeyRef.current = payload.path;
-
+        // the measuring effect turn it into a page. The new key is the per-file UI state; the
+        // old path-keyed row is read once so an existing session's position is not lost.
         const session = new ParquetSession(
           {
             rowCount: info.rowCount,
@@ -334,7 +431,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           // this callback changes identity.
           { pageSize: MIN_ROWS_PER_PAGE, chunkSize: PARQUET_CHUNK_SIZE },
         );
-        session.restoreToRow(loadPersistedRow(payload.path));
+        session.restoreToRow(ui?.row ?? loadPersistedRow(payload.path));
         sessionRef.current = session;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load parquet file");
@@ -342,7 +439,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         setLoading(false);
       }
     },
-    [resetPage, resetSearch, selectCell, setActiveColumn],
+    [resetPage, resetSearch, selectCell, setActiveColumn, setSiderWidth],
   );
 
   // Resize observer: measure the table body and update page size
@@ -414,9 +511,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     // Nothing to remember before the first page has actually arrived — and while a restore is
     // still pending, the page-0 load that wins the race must not write over the stored row.
     const session = sessionRef.current;
-    if (!fileInfo || pageRows.length === 0 || !session || session.isRestorePending) return;
-    savePersistedRow(documentKeyRef.current, loadedStart);
-  }, [documentKeyRef, fileInfo, loadedStart, pageRows.length, sessionRef]);
+    if (!documentKey || !fileInfo || pageRows.length === 0 || !session) return;
+    if (session.isRestorePending) return;
+    saveParquetUi(documentKey, { row: loadedStart });
+  }, [documentKey, fileInfo, loadedStart, pageRows.length, sessionRef]);
 
   useEffect(() => {
     const onFind = (event: KeyboardEvent) => {
@@ -444,10 +542,78 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (!payload || !scanRequest.current.isCurrent(payload.requestId)) return;
       scanRequest.current.settle(payload.requestId);
       setScanLoading(false);
-      if (payload.scan) setColumnScan(payload.scan);
-      else setScanError(payload.error ?? "The scan failed.");
+      const scan = payload.scan;
+      if (scan) {
+        setColumnScan(scan);
+        // Keep the answer behind the panel: the rail shows the empty share from now on.
+        commitShares([emptyShareOf(scan)]);
+      } else {
+        setScanError(payload.error ?? "The scan failed.");
+      }
     });
-  }, []);
+  }, [commitShares]);
+
+  useEffect(() => {
+    handler.on(
+      "parquetEmptyShareScanProgress",
+      (payload: ParquetEmptyShareScanProgress | undefined) => {
+        if (!payload || !emptyShareRequest.current.isCurrent(payload.requestId)) return;
+        setStructuredScan((previous) => ({
+          ...previous,
+          loading: true,
+          scanned: payload.scanned,
+          total: payload.total,
+        }));
+      },
+    );
+    handler.on("parquetEmptyShareScanData", (payload: ParquetEmptyShareScanPayload | undefined) => {
+      if (!payload || !emptyShareRequest.current.isCurrent(payload.requestId)) return;
+      emptyShareRequest.current.settle(payload.requestId);
+      const shares = payload.shares;
+      if (!shares) {
+        setStructuredScan({
+          loading: false,
+          scanned: 0,
+          total: 0,
+          error: payload.error ?? "The scan failed.",
+        });
+        return;
+      }
+      commitShares(shares);
+      setStructuredScan({ loading: false, scanned: 0, total: 0, error: null });
+    });
+  }, [commitShares]);
+
+  // Clear cache from the host: forget every disk-derived answer and go back to a clean top of
+  // the file. The profile stays — it is footer metadata, not a cache, and re-asking would only
+  // blank the rail until the reply.
+  useEffect(() => {
+    handler.on("clearParquetCache", () => {
+      clearParquetLocalCaches();
+      sharesRef.current = new Map();
+      setShares(new Map());
+      setStructuredScan({ loading: false, scanned: 0, total: 0, error: null });
+      emptyShareRequest.current.cancel();
+      scanRequest.current.cancel();
+      setProfilePanel(null);
+      setColumnScan(null);
+      setScanError(null);
+      setScanLoading(false);
+      setFieldFilter("");
+      setActiveColumn(null);
+      setInspected(null);
+      selectCell(null);
+      setTargetRow(null);
+      resetSearch(true);
+      resetPage();
+      setPage(0);
+      // Page 0 may already be the current page; the token forces its rows to load again after
+      // `resetPage` cleared them.
+      setReloadToken((token) => token + 1);
+      setSiderWidth(SIDER_DEFAULT);
+      setCacheEpoch((value) => value + 1);
+    });
+  }, [resetPage, resetSearch, selectCell, setActiveColumn, setSiderWidth]);
 
   /**
    * Esc closes the panel and puts focus back on the field row that opened it.
@@ -476,7 +642,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     setScanLoading(true);
     setScanError(null);
     setColumnScan(null);
-    handler.emit("parquetColumnScan", { requestId, name: column.name });
+    handler.emit("parquetColumnScan", {
+      requestId,
+      name: column.name,
+      // Inline bytes have no host fingerprint to validate; the host scans but does not cache.
+      cacheable: shareScopeRef.current !== null,
+    });
   }, []);
 
   const openProfilePanel = useCallback(
@@ -511,6 +682,28 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     window.addEventListener("keydown", onEscape);
     return () => window.removeEventListener("keydown", onEscape);
   }, [profilePanel, closeProfilePanel]);
+
+  /**
+   * The rail's batch action: every structured column that has no share yet, in one request.
+   * The host keeps it to a bounded prefix and aborts the previous batch when this starts.
+   */
+  const scanStructured = useCallback(() => {
+    const info = fileInfoRef.current;
+    if (!info) return;
+    const names = info.columns
+      .filter((column) => column.nested && !sharesRef.current.has(column.name))
+      .slice(0, STRUCTURED_SCAN_BATCH)
+      .map((column) => column.name);
+    if (names.length === 0) return;
+    emptyShareRequest.current.cancel();
+    const requestId = emptyShareRequest.current.issue();
+    setStructuredScan({ loading: true, scanned: 0, total: 0, error: null });
+    handler.emit("parquetEmptyShareScan", {
+      requestId,
+      names,
+      cacheable: shareScopeRef.current !== null,
+    });
+  }, []);
 
   const jumpToRow = useCallback(
     (warnWhenEmpty = true) => {
@@ -837,10 +1030,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
           />
           <div className="parquet-viewer__body">
             <ParquetSchema
+              key={documentKey ?? "pending"}
               columns={fileInfo.columns}
               activeColumn={activeColumn}
               siderWidth={siderWidth}
               profile={profile}
+              shares={shares}
+              structuredScan={structuredScan}
+              fieldFilter={fieldFilter}
+              onFieldFilterChange={changeFieldFilter}
+              onScanStructured={scanStructured}
               onFocusColumn={focusColumn}
               onInspectColumn={openProfilePanel}
             />

@@ -24,8 +24,15 @@ function setDirty(handler: Handler, uri: Uri, dirty: boolean) {
  * @param saves who wrote what and when. The provider owns it and shares one instance between
  * its panels; the save rules themselves are in `saveHandlers`.
  */
-export function handleCommonEvent(uri: Uri, handler: Handler, saves: SaveTracker) {
+export function handleCommonEvent(
+  uri: Uri,
+  handler: Handler,
+  saves: SaveTracker,
+  options: { clearCache?: boolean; hostWorkbook?: boolean; hostCsv?: boolean } = {},
+) {
   let readOnly = false;
+  // One-shot: the first successful open may clear; a later fileChange must not clear again.
+  let clearCache = options.clearCache === true;
 
   const send = async () => {
     if (saves.shouldSkip(uri.toString())) {
@@ -34,11 +41,17 @@ export function handleCommonEvent(uri: Uri, handler: Handler, saves: SaveTracker
     readOnly = await isUriReadOnly(uri);
     // The webview is about to replace its document, dropping unsaved edits.
     saveHandlers.opened();
+    const sendClear = clearCache;
+    clearCache = false;
     if (isVirtualUri(uri)) {
-      void emitVirtualOfficeOpen(handler, uri);
+      void emitVirtualOfficeOpen(handler, uri, { clearCache: sendClear });
       return;
     }
-    await emitFileOfficeOpen(handler, uri, handler.panel.webview);
+    await emitFileOfficeOpen(handler, uri, handler.panel.webview, {
+      clearCache: sendClear,
+      hostWorkbook: options.hostWorkbook,
+      hostCsv: options.hostCsv,
+    });
   };
   const saveHandlers = createSaveHandlers<Uri>({
     document: uri,

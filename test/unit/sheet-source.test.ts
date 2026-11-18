@@ -116,3 +116,23 @@ test("record index: quoted delimiters and newlines do not inflate the field coun
   assert.equal(indexed.maxFields, 2);
   assert.equal(indexed.starts.length, 3);
 });
+
+test("source: a cached index is used and exposed for re-store", () => {
+  const buffer = toBuffer("a,b\n1,2\n3,4\n");
+  const index = indexRecordStartsAndFields(new Uint8Array(buffer), 0x2c);
+  const source = createTextSheetSource(buffer, index);
+
+  assert.equal(source.recordIndex, index);
+  assert.equal(source.rowCount, index.starts.length);
+  assert.equal(source.columnCount, index.maxFields);
+});
+
+test("source: an invalid cached index falls back to a scan", () => {
+  const buffer = toBuffer("a,b\n1,2\n");
+  const index = createTextSheetSource(buffer).recordIndex;
+  const bad = { starts: [5, 10], maxFields: 2 };
+  const source = createTextSheetSource(buffer, bad);
+
+  assert.notEqual(source.recordIndex, bad);
+  assert.deepEqual(source.recordIndex, index);
+});

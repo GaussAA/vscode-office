@@ -173,6 +173,11 @@ export default {
     nullShare: "{percent} % der Zeilen sind null",
     partialStatistics: "Teilweise Statistiken",
     noStatistics: "Keine Row-Group-Statistiken",
+    emptyShare: "{percent} % der gescannten Zeilen sind null oder leer",
+    nestedScanHint:
+      "Für LIST/STRUCT gibt es keine Statistiken auf Zeilenebene; zum Zählen von null oder leer scannen",
+    scanStructured: "LIST/STRUCT scannen",
+    scanningStructured: "Scannen… {percent}%",
     profileTitle: "Spaltenprofil",
     profileScanning: "Spalte wird geprüft…",
     profileScan: "Spalte prüfen",

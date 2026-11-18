@@ -15,7 +15,7 @@ import {
   unexpected,
 } from "../helpers.mjs";
 
-/** 12 scenario(s); the runner concatenates these lists. */
+/** 14 scenario(s); the runner concatenates these lists. */
 export default [
   {
     name: "parquet-grid-semantics",
@@ -803,7 +803,104 @@ export default [
       );
       expect(closed, "Escape did not collapse the panel");
 
+      // Reopen and leave the formatted body visible: this scenario supplies the documentation
+      // screenshot, and a collapsed panel documents nothing.
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__selection-value')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const reopened = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__inspector')`,
+        4000,
+      );
+      expect(reopened, "the value panel did not reopen");
+      // The raw toggle from above is still on; switch back to Formatted.
+      await page.evaluate(
+        `[...document.querySelectorAll('.parquet-viewer__inspector-actions button')][0].dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const formattedAgain = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__inspector-body')?.innerText ?? '').includes('\\n')`,
+        4000,
+      );
+      expect(formattedAgain, "the formatted body did not come back");
+
       return `panel ${panel.text.length} chars over ${panel.height}px, raw toggle, Escape closes`;
+    },
+  },
+  {
+    name: "parquet-inspector-json-string",
+    async run({ page, base }) {
+      // Hugging Face stores a whole object as a STRING; "Formatted" used to leave it as one
+      // escaped line. It must parse it like the grid does, indent it, and colour the syntax.
+      await openParquet(page, base, "?preview=1");
+      const metaIndex = await page.evaluate(`(() => {
+                const cells = [...(${ROWS}[0])?.children ?? []];
+                return cells.findIndex((cell) => (cell.innerText ?? "").includes('"source"'));
+            })()`);
+      expect(metaIndex >= 0, `no meta_json cell found (index ${metaIndex})`);
+      await page.evaluate(`(() => {
+                const cell = ${firstRowCell(metaIndex)}.querySelector('.parquet-viewer__cell');
+                cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            })()`);
+      const selected = await page.waitFor(
+        `/meta_json · row 1/.test(document.querySelector('.parquet-viewer__selection-label')?.innerText ?? '')`,
+        4000,
+      );
+      expect(selected, "the JSON string cell never reached the inspector");
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__selection-value')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const opened = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__inspector')`,
+        4000,
+      );
+      expect(opened, "the value panel never opened");
+
+      const formatted = json(
+        await page.evaluate(`JSON.stringify((() => {
+                    const body = document.querySelector('.parquet-viewer__inspector-body');
+                    const tokens = (type) => body?.querySelectorAll('.parquet-viewer__json-token--' + type).length ?? 0;
+                    return {
+                        text: body?.innerText ?? '',
+                        keys: tokens('key'),
+                        strings: tokens('string'),
+                        numbers: tokens('number'),
+                        booleans: tokens('boolean'),
+                        spaces: tokens('space'),
+                    };
+                })())`),
+      );
+      expect(
+        formatted.text.includes('{\n  "source": "hf"'),
+        `the JSON string is not pretty-printed: ${JSON.stringify(formatted.text)}`,
+      );
+      expect(
+        formatted.text.includes('"index": 0') && formatted.text.includes('"ok": true'),
+        `the formatted body lost fields: ${JSON.stringify(formatted.text)}`,
+      );
+      expect(formatted.keys >= 3, `only ${formatted.keys} key tokens`);
+      expect(
+        formatted.strings >= 1 && formatted.numbers >= 1 && formatted.booleans >= 1,
+        `missing syntax classes: ${JSON.stringify(formatted)}`,
+      );
+      expect(formatted.spaces >= 1, "indentation was not tokenized as whitespace");
+
+      // Raw is the file's string (one escaped line), the opposite of the formatted view.
+      await page.evaluate(
+        `[...document.querySelectorAll('.parquet-viewer__inspector-actions button')][0].dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const raw = await page.waitFor(
+        `!(document.querySelector('.parquet-viewer__inspector-body')?.innerText ?? '').includes('\\n')`,
+        4000,
+      );
+      expect(raw, "the raw toggle still rendered a multi-line body");
+      const rawText = await page.evaluate(
+        `document.querySelector('.parquet-viewer__inspector-body')?.innerText ?? ''`,
+      );
+      expect(
+        rawText.startsWith('"') && rawText.includes('\\"source\\"'),
+        `the raw string form is not escaped: ${JSON.stringify(rawText)}`,
+      );
+      return "a JSON string is parsed, indented and syntax-coloured in Formatted";
     },
   },
   {

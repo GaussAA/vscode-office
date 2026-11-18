@@ -53,6 +53,8 @@ export interface JsonlInfoPayload {
   byteSize: number;
   /** Optional: webview-issued request id for staleness guard (init/reload). */
   requestId?: number;
+  /** One-shot after the unified Clear command found no open JSONL panel to message. */
+  clearCache?: boolean;
 }
 
 /** Host-to-webview: indexing progress update. */

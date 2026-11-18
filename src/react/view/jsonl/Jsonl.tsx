@@ -19,7 +19,8 @@ import { useVscodeDarkTheme } from "../../util/vscodeTheme.ts";
 import EntryDetail, { type DetailMode } from "../entry/EntryDetail.tsx";
 import JsonlIndex from "./JsonlIndex.tsx";
 import { DEFAULT_LEFT_WIDTH, LEFT_MAX, LEFT_MIN } from "./jsonlLayout";
-import { loadJsonlPersisted, saveJsonlPersisted } from "./jsonlPersistence";
+import { clearJsonlPersisted, loadJsonlPersisted, saveJsonlPersisted } from "./jsonlPersistence";
+import { JsonlSearchMemo, type JsonlSearchMeta } from "./jsonlSearchMemo";
 import {
   applyWindowReply,
   emptyDirectoryWindow,
@@ -32,14 +33,6 @@ import { ErrorBoundary } from "../../components/ErrorBoundary.tsx";
 import "./Jsonl.less";
 
 const SEARCH_DEBOUNCE_MS = 250;
-
-interface SearchMeta {
-  matches: number;
-  scanned: number;
-  total: number;
-  done: boolean;
-  capped: boolean;
-}
 
 function JsonlViewerContent() {
   const [info, setInfo] = useState<JsonlInfoPayload | null>(null);
@@ -65,7 +58,7 @@ function JsonlViewerContent() {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchEntries, setSearchEntries] = useState<JsonlEntrySummary[]>([]);
-  const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
+  const [searchMeta, setSearchMeta] = useState<JsonlSearchMeta | null>(null);
 
   const infoRef = useRef<JsonlInfoPayload | null>(null);
   const selectedRef = useRef(0);
@@ -79,6 +72,9 @@ function JsonlViewerContent() {
   const indexGuard = useRef(new RequestGuard());
   const searchTimer = useRef<number | undefined>(undefined);
   const searchAutoSelected = useRef(false);
+  const searchMemo = useRef(new JsonlSearchMemo());
+  const searchEntriesRef = useRef<JsonlEntrySummary[]>([]);
+  const searchQueryRef = useRef("");
   const pendingJump = useRef<number | null>(null);
 
   useEffect(() => {
@@ -126,19 +122,37 @@ function JsonlViewerContent() {
     [requestRange],
   );
 
-  const startSearch = useCallback((text: string) => {
-    const trimmed = text.trim();
-    // Tell the host to stop the old scan; ignoring its output would leave it running.
-    const stale = search.current.cancel();
-    if (stale !== null) handler.emit("jsonlSearchCancel", { requestId: stale });
-    searchAutoSelected.current = false;
-    setSearchEntries([]);
-    setSearchMeta(null);
-    if (!trimmed) return;
-    const requestId = search.current.issue();
-    setSearching(true);
-    handler.emit("jsonlSearch", { requestId, query: trimmed });
-  }, []);
+  const startSearch = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      // Tell the host to stop the old scan; ignoring its output would leave it running.
+      const stale = search.current.cancel();
+      if (stale !== null) handler.emit("jsonlSearchCancel", { requestId: stale });
+      searchAutoSelected.current = false;
+      setSearching(false);
+      searchEntriesRef.current = [];
+      setSearchEntries([]);
+      setSearchMeta(null);
+      if (!trimmed) return;
+
+      const cached = searchMemo.current.get(trimmed);
+      if (cached) {
+        searchEntriesRef.current = cached.entries;
+        setSearchEntries(cached.entries);
+        setSearchMeta(cached.meta);
+        searchAutoSelected.current = cached.entries.length > 0;
+        const first = cached.entries[0];
+        if (first) selectEntry(first.index);
+        return;
+      }
+
+      searchQueryRef.current = trimmed;
+      const requestId = search.current.issue();
+      setSearching(true);
+      handler.emit("jsonlSearch", { requestId, query: trimmed });
+    },
+    [selectEntry],
+  );
 
   useEffect(() => {
     handler.on("jsonlIndexProgress", (payload: JsonlIndexProgress) => {
@@ -156,12 +170,19 @@ function JsonlViewerContent() {
 
       const previous = infoRef.current;
       const isSameFile = previous?.cacheId === payload.cacheId;
+      if (payload.clearCache) {
+        clearJsonlPersisted();
+        searchMemo.current.clear();
+        setLeftWidth(DEFAULT_LEFT_WIDTH);
+        setMode("tree");
+        selectedRef.current = 0;
+      }
       infoRef.current = payload;
       setInfo(payload);
 
       let target = selectedRef.current;
-      if (!isSameFile) {
-        const restored = loadJsonlPersisted(payload.cacheId);
+      if (!isSameFile || payload.clearCache) {
+        const restored = payload.clearCache ? null : loadJsonlPersisted(payload.cacheId);
         if (restored) {
           setLeftWidth(restored.left);
           setMode(restored.mode);
@@ -170,10 +191,15 @@ function JsonlViewerContent() {
         setQuery("");
         queryRef.current = "";
         setSearching(false);
+        searchEntriesRef.current = [];
         setSearchEntries([]);
         setSearchMeta(null);
+        searchMemo.current.clear();
         const stale = search.current.cancel();
         if (stale !== null) handler.emit("jsonlSearchCancel", { requestId: stale });
+      } else {
+        // A same-file reload means the bytes changed: cached results for any query are stale.
+        searchMemo.current.clear();
       }
       target = Math.max(0, Math.min(payload.lineCount - 1, target));
 
@@ -217,25 +243,51 @@ function JsonlViewerContent() {
 
     handler.on("jsonlSearchBatch", (batch: JsonlSearchBatch) => {
       if (!search.current.isCurrent(batch.requestId)) return;
+      let nextEntries = searchEntriesRef.current;
       if (batch.entries.length) {
-        setSearchEntries((prev) => [...prev, ...batch.entries]);
+        nextEntries = [...nextEntries, ...batch.entries];
+        searchEntriesRef.current = nextEntries;
+        setSearchEntries(nextEntries);
         if (!searchAutoSelected.current) {
           searchAutoSelected.current = true;
           const first = batch.entries[0];
           if (first) selectEntry(first.index);
         }
       }
-      setSearchMeta({
+      const meta: JsonlSearchMeta = {
         matches: batch.matches,
         scanned: batch.scanned,
         total: batch.total,
         done: batch.done,
         capped: batch.capped,
-      });
+      };
+      setSearchMeta(meta);
       if (batch.done) {
         search.current.settle(batch.requestId);
         setSearching(false);
+        if (searchQueryRef.current) {
+          searchMemo.current.set(searchQueryRef.current, { entries: nextEntries, meta });
+        }
       }
+    });
+
+    handler.on("clearJsonlCache", () => {
+      clearJsonlPersisted();
+      searchMemo.current.clear();
+      const stale = search.current.cancel();
+      if (stale !== null) handler.emit("jsonlSearchCancel", { requestId: stale });
+      searchAutoSelected.current = false;
+      searchEntriesRef.current = [];
+      setLeftWidth(DEFAULT_LEFT_WIDTH);
+      setMode("tree");
+      selectedRef.current = 0;
+      setSelected(0);
+      setQuery("");
+      queryRef.current = "";
+      setSearchEntries([]);
+      setSearchMeta(null);
+      setSearching(false);
+      handler.emit("jsonlReload");
     });
 
     handler.emit("init", { requestId: indexGuard.current.issue() });
@@ -249,6 +301,7 @@ function JsonlViewerContent() {
     if (stale !== null) handler.emit("jsonlSearchCancel", { requestId: stale });
     searchAutoSelected.current = false;
     setSearching(false);
+    searchEntriesRef.current = [];
     setSearchEntries([]);
     setSearchMeta(null);
     if (info) {

@@ -9,7 +9,116 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **JSONL viewer: indexing progress indicator** — Large JSONL files (e.g. 1 GB, ~5M rows) now show "Indexing… X%" during the initial scan instead of a blank screen. Progress updates stream via `JsonlIndexProgress` messages with `RequestGuard` filtering stale updates. The viewer defers indexing until `resolveCustomEditor` to keep `openCustomDocument` fast (error-fast-fail preserved). 821 unit tests + 2 UI scenarios verified. Commits: 70984b67 (infrastructure), 418055e0 (application), ce28c102 (RequestGuard), 91203b13 (fixes), 6efe2a80 (scenarios).
+- **JSONL viewer: 5x faster search** — Byte-level ASCII prefilter with Horspool algorithm accelerates full-text search from ~12.5s to ~3s for 1 GB / 5M rows (5.1x for single-hit, 4.5x for no-hit, 1.7x for capped-10k-hit scenarios). Non-ASCII needles or Unicode folding requirements (İ, Kelvin sign) fall back to the full decode path. Differential tests verify result parity across 5000+ comparisons including İstanbul edge cases. Commit: 25de4156.
+- JSONL: the whole-file line index is cached in the extension host's global storage. Reopening
+  an unchanged JSONL file no longer scans every byte to rebuild it; the cache is keyed by
+  `size + mtime + version`, capped at 16 MB per file / 64 MB total / 5 files / 7 days, and
+  stores offsets only.
+- JSONL: the per-document layout (left width, selected line, tree/raw mode) is now versioned and
+  expires after 90 days; existing unversioned entries are migrated in place.
+- JSONL: the last three completed searches are memoized inside the window; repeating a query
+  returns the same hits without another host scan. The memo is memory-only.
+- Excel/CSV: the parsed row text of a windowed workbook (`.xlsx/.xlsm/.xls/.ods`) is now cached
+  in the extension host for the current VS Code session (two files, memory only). Reopening an
+  unchanged workbook or opening it in a second tab asks the host for metadata and row windows
+  instead of fetching and parsing the whole file again; the first open still parses in the
+  webview. The cache is cleared by the unified Clear command and is not written to disk.
+- Excel/CSV: the per-document view state is versioned and expires after 90 days (old
+  `-excel-view` entries migrate), and the windowed find remembers its last three completed
+  queries. Cell values remain memory-only.
+- CSV: the windowed record index (record starts and the widest field count, no cell values) is
+  cached in the extension host's global storage. Reopening an unchanged CSV skips the
+  border scan while still fetching the bytes; the cache is capped at 16 MB/file, 64 MB total,
+  5 files and 7 days, and reused by every tab in the session.
+- JSON Preview: the top-level record ranges are cached in the extension host's global storage.
+  Reopening an unchanged JSON document skips `indexJsonArray` while the text is still read into
+  memory; the cache stores offsets only, capped at 16 MB/file, 64 MB total, 5 files and 7 days.
+  The `json-preview:left` layout state is now versioned and expires after 90 days.
+- All viewers: the command palette has **Clear Data Viewer Caches**. It clears the parquet scan
+  cache, the JSONL index, the Excel workbook/CSV indexes, and the per-file layouts/find and
+  search memos of parquet, JSONL, Excel and JSON Preview; open views reset. The old
+  `GaussAA.office.clearParquetCache` id remains registered as an alias for existing keybindings.
+
+### Changed
+
+- The Clear command no longer only covers parquet; the old id is an alias and is no longer
+  shown in the command palette.
+
+### Fixed
+
+- Parquet: the selected-column tint is uniform across alternating rows. The zebra rule used to
+  repaint the active cells on alt rows, cutting the column into stripes.
+
+## [6.16.0] - 2026-11-18
+
+### Added
+
+- Parquet: LIST/STRUCT fields now show an empty share. Their leaf statistics do not describe a
+  row, so the rail shows `null ?`; opening the column profile scans the column and the badge
+  becomes `empty 67%` (or `empty ~33%` when the scan stopped at its row cap). The scan counts
+  null, empty string, empty list, empty binary and empty map as no data, and the profile header
+  shows both the metadata null share and the scanned empty share.
+- Parquet: the schema rail has a `Scan LIST/STRUCT` action. One click fills the empty share for
+  every structured column that has no answer yet. It scans a bounded prefix column by column in
+  one request, skips the top-N histogram, reports progress, and aborts when a newer scan starts
+  or the viewer closes; the action disappears once every structured column has a share.
+- Parquet: empty-share scan results are cached per document (stable cache id + file size + mtime,
+  7-day TTL, LRU 20). Reopening the same file restores the `empty` badges without scanning; a
+  changed file, a cache-version bump, an expired or corrupt entry all miss and are removed.
+  Documents without a stable mtime are not cached.
+- Parquet: clicking the selected schema field again clears the column highlight. The second
+  click only dismisses the tint; it does not move the grid.
+- Parquet: column widths, the current row and the schema field filter are restored per document
+  across reloads and VS Code restarts (stable document cache id, 90-day TTL, LRU 20). The sidebar
+  width stays a global preference. Existing global column widths and path-keyed row positions are
+  read once as a fallback, so the upgrade does not reset an established layout.
+- Parquet: cached empty shares are now merged into the stored entry column by column instead of
+  overwriting the whole list. Two tabs that scan different structured columns no longer lose one
+  tab's result; the remaining read-merge-write race is documented in ADR-0025.
+- Parquet: single-column top-N scans are cached in the extension host by document and stat
+  fingerprint (size + mtime, VS Code session only, LRU 3 files). Reopening a column panel or
+  opening the same file in a second tab returns the scan without decoding; inline documents and
+  files that cannot be statted are never cached.
+- Parquet: the `Scan LIST/STRUCT` batch reuses those cached full scans and decodes only the
+  columns without one; when every requested column is cached it opens no source at all.
+- Parquet: the command palette has `Data File Viewer: Clear Parquet Cache`. After a confirmation
+  it clears the host scan cache and every stored share/UI entry, and resets open parquet views
+  (row, filter, widths, shares). With no parquet view open the next open clears; JSONL and Excel
+  state are untouched.
+- Parquet: whole-file search results are memoized for the current document (last three normalized
+  queries, VS Code session only). Re-running a query returns the same hits without another pass;
+  the memo is dropped when the document changes or Clear Parquet Cache runs.
+
+### Changed
+
+- Parquet: the selected column tint is now clearly visible (Signal Blue 14% on cells, 20% on
+  the header, 16% on the active field row). The light theme keeps the same 14%: its green
+  (STRING) and amber (BOOLEAN) text is one step darker so both stay above 4.5:1 on the tinted
+  column.
+- Parquet: the column scan reports nulls and empties separately with a combined `emptyRatio`,
+  instead of folding empty lists into the null count.
+
+### Fixed
+
+- Parquet: the expanded value panel now parses a JSON string (not only real LIST/STRUCT values)
+  and pretty-prints it, with the same key/string/number/boolean colours the grid's JSON cells
+  use. A JSON object stored as a STRING used to stay one escaped line in Formatted mode.
+- JSONL/JSON: the light theme's muted label text measured 4.0:1 on the value panel's surface;
+  it now uses the same darker muted value as the parquet surface (≥5.1:1). The UI contrast
+  gate now resolves `color-mix()` backgrounds instead of measuring against a higher layer.
+
+## [6.15.1] - 2026-11-18
+
+### Fixed
+
+- **Parquet column jump**: clicking several schema fields in a row now always lands on the last
+  one. The previous jump animated a synthetic scrollbar drag per click, so a second click while
+  the first drag (or its retry chain) was still alive could rebound, apply an older target, or
+  leave the requested column outside the viewport. The jump now owns the horizontal offset: it
+  measures the column from the header, eases to it with the motion token (zeroed under
+  `prefers-reduced-motion`), retargets on every click, keeps the header in step, and clamps at
+  both ends of the table. Tables wider than 120 columns place the column immediately instead of
+  turning the easing into long, blocking frames.
 
 ## [6.15.0] - 2026-11-17
 
