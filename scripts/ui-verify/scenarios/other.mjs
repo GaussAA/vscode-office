@@ -37,6 +37,30 @@ export default [
       ]) {
         parquet[key] = await contrastRatio(page, selector);
       }
+      // The selected column is a reading surface too: its tint sits behind the same green
+      // STRING / orange BOOL / blue NUMERIC text. Measure each while its column is active;
+      // the light-theme mix is capped so those cells stay at 4.5:1.
+      for (const [key, field, selector] of [
+        ["activeString", "name", ".parquet-viewer__column--active .parquet-viewer__cell--string"],
+        [
+          "activeBool",
+          "active",
+          ".parquet-viewer__column--active .parquet-viewer__cell--bool-true",
+        ],
+        [
+          "activeNumeric",
+          "score",
+          ".parquet-viewer__column--active .parquet-viewer__cell--numeric",
+        ],
+      ]) {
+        await page.evaluate(`(() => {
+            const item = [...document.querySelectorAll('.parquet-viewer__list-item')]
+                .find(button => button.querySelector('.parquet-viewer__list-name')?.textContent === ${JSON.stringify(field)});
+            item?.click();
+        })()`);
+        await page.sleep(250);
+        parquet[key] = await contrastRatio(page, selector);
+      }
       for (const [kind, ratio] of Object.entries(parquet)) {
         expect(ratio !== null && ratio >= 4.5, `parquet ${kind} contrast is ${ratio}:1`);
       }
@@ -50,6 +74,18 @@ export default [
       ]) {
         parquet[key] = await contrastRatio(page, selector);
       }
+      // The URL column is the widest use of the selected tint: a link cell keeps its Signal
+      // Blue on the 14% wash, so measure it with the column active too.
+      await page.evaluate(`(() => {
+          const item = [...document.querySelectorAll('.parquet-viewer__list-item')]
+              .find(button => button.querySelector('.parquet-viewer__list-name')?.textContent === 'url');
+          item?.click();
+      })()`);
+      await page.sleep(350);
+      parquet.activeLink = await contrastRatio(
+        page,
+        ".parquet-viewer__column--active .parquet-viewer__cell--link a",
+      );
       for (const [kind, ratio] of Object.entries(parquet)) {
         expect(ratio !== null && ratio >= 4.5, `parquet ${kind} contrast is ${ratio}:1`);
       }

@@ -101,7 +101,7 @@ _Avoid_: match, span
 _Avoid_: 链接列、hyperlink column（列没有被重新类型化）
 
 **Field jump（字段跳转）**:
-点击 parquet schema 字段后，把表格水平滚动到该列并留下淡色列高亮。它不改变筛选、分页或行选择，只是导航。
+点击 parquet schema 字段后，把表格水平滚动到该列并留下列高亮；再次点击同一字段取消高亮，导航本身是幂等的。它不改变筛选、分页或行选择，只是导航。
 _Avoid_: 筛选、定位行（那是 jump-to-row）
 
 **Column profile（列画像）**:

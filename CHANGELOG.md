@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Parquet: clicking the selected schema field again clears the column highlight. The second
+  click only dismisses the tint; it does not move the grid.
+
+### Changed
+
+- Parquet: the selected column tint is now clearly visible (Signal Blue 14% on cells, 20% on
+  the header, 16% on the active field row). The light theme keeps the same 14%: its green
+  (STRING) and amber (BOOLEAN) text is one step darker so both stay above 4.5:1 on the tinted
+  column.
+
 ### Fixed
 
 - JSONL/JSON: the light theme's muted label text measured 4.0:1 on the value panel's surface;

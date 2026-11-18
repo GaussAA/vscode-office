@@ -243,6 +243,111 @@ export default [
   },
 
   {
+    name: "parquet-column-jump-toggles-the-highlight",
+    async run({ page, base, setReducedMotion }) {
+      await setReducedMotion(false);
+      await openParquet(page, base, "?wide=1");
+      await page.sleep(250);
+      const clickField = async (field) => {
+        const found = await page.evaluate(`(() => {
+          const item = [...document.querySelectorAll('.parquet-viewer__list-item')]
+              .find(button => button.querySelector('.parquet-viewer__list-name')?.textContent === ${JSON.stringify(field)});
+          item?.click();
+          return !!item;
+        })()`);
+        expect(found, `the ${field} field is missing from the schema sidebar`);
+        // Long enough for the 180 ms glide to settle before the next click.
+        await page.sleep(350);
+      };
+      const readState = () =>
+        page
+          .evaluate(`JSON.stringify((() => {
+            const list = document.querySelector('.parquet-viewer__list-item--active');
+            const header = document.querySelector('.parquet-table th.parquet-viewer__column--active');
+            const cells = document.querySelectorAll(
+                '.ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--active');
+            const activeCell = cells[0];
+            const row = activeCell?.parentElement;
+            const plainCell = row && [...row.querySelectorAll('.ant-table-cell:not(.parquet-viewer__column--active)')][1];
+            const rgb = (element) => {
+                if (!element) return null;
+                const value = getComputedStyle(element).backgroundColor;
+                // Chrome resolves color-mix() to CSS Color 4 color(srgb 0..1 ...);
+                // plain backgrounds stay rgb(0..255, ...). Compare them in 0..255.
+                const modern = value.match(/color\\(srgb\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)/);
+                if (modern) {
+                    return [1, 2, 3].map((index) => Math.round(Number(modern[index]) * 255));
+                }
+                const match = value.match(/\\d+/g);
+                return match ? match.slice(0, 3).map(Number) : null;
+            };
+            const wrap = document.querySelector('.parquet-viewer__table-wrap');
+            const inner = wrap?.querySelector('.ant-table-tbody-virtual-holder-inner');
+            return {
+                activeName: list?.querySelector('.parquet-viewer__list-name')?.textContent ?? null,
+                headerCount: header ? 1 : 0,
+                headerName: header?.textContent ?? null,
+                cellCount: cells.length,
+                activeBg: rgb(activeCell),
+                activeRaw: activeCell ? getComputedStyle(activeCell).backgroundColor : null,
+                plainBg: rgb(plainCell),
+                plainRaw: plainCell ? getComputedStyle(plainCell).backgroundColor : null,
+                offset: wrap && inner
+                    ? wrap.getBoundingClientRect().left - inner.getBoundingClientRect().left
+                    : null,
+            };
+        })())`)
+          .then(json);
+
+      await clickField("field_12");
+      const selected = await readState();
+      expect(
+        selected.activeName === "field_12",
+        `the clicked field is not active: ${selected.activeName}`,
+      );
+      expect(selected.headerCount === 1, "the active column header is not tinted");
+      expect(selected.headerName === "field_12", `wrong header tinted: ${selected.headerName}`);
+      expect(selected.cellCount > 0, "the active column cells are not tinted");
+      // The tint has to read as a column, not as a rounding error: compare it against a plain
+      // cell of the same row. Signal Blue is the documented hue source (DESIGN.md), so the
+      // blue channel carries the lift; 7% (the old value) sits below this threshold.
+      expect(
+        selected.activeBg && selected.plainBg,
+        `cannot read the active/plain cell backgrounds: ${JSON.stringify(selected)}`,
+      );
+      const blueLift = selected.activeBg[2] - selected.plainBg[2];
+      expect(blueLift >= 20, `the active column tint is too faint: ${JSON.stringify(selected)}`);
+
+      // A second click on the same field is the dismissal: no tint, and no navigation.
+      await clickField("field_12");
+      const dismissed = await readState();
+      expect(dismissed.activeName === null, `the field stayed active: ${dismissed.activeName}`);
+      expect(
+        dismissed.headerCount === 0 && dismissed.cellCount === 0,
+        `the tint survived the dismissal (${dismissed.headerCount} header, ${dismissed.cellCount} cells)`,
+      );
+      expect(
+        dismissed.offset !== null &&
+          selected.offset !== null &&
+          Math.abs(dismissed.offset - selected.offset) <= 0.5,
+        `dismissing the highlight moved the grid (${selected.offset} → ${dismissed.offset})`,
+      );
+
+      // Clicking it again restores the highlight, and clicking another field moves the tint
+      // instead of accumulating a second one.
+      await clickField("field_12");
+      const restored = await readState();
+      expect(restored.activeName === "field_12", "the field could not be selected again");
+      await clickField("field_30");
+      const moved = await readState();
+      expect(moved.activeName === "field_30", `the highlight did not move: ${moved.activeName}`);
+      expect(moved.headerCount === 1, "more than one header carries the tint");
+      expect(moved.headerName === "field_30", `wrong header after moving: ${moved.headerName}`);
+      return `toggle on/off/re-on works, ${blueLift} blue lift, tint moved to field_30`;
+    },
+  },
+
+  {
     name: "parquet-column-jump-clamps-at-the-ends",
     async run({ page, base, setReducedMotion }) {
       await setReducedMotion(false);

@@ -165,7 +165,17 @@ export function useParquetColumnFocus({ tableRef, tableWrapRef }: UseParquetColu
 
   const focusColumn = useCallback(
     (position: number, mark = true) => {
-      setActiveColumn(mark ? position : null);
+      if (!mark) {
+        // A search jump must not leave (or inherit) a "you picked this field" tint.
+        setActiveColumn(null);
+      } else if (activeColumn === position) {
+        // The field is already highlighted: the second click dismisses it. That is a
+        // selection toggle, not another navigation, so the grid stays where the reader is.
+        setActiveColumn(null);
+        return;
+      } else {
+        setActiveColumn(position);
+      }
       // Measure after the click has committed: on a cold start the holder's width can still be
       // zero, and an offset computed from half-measured columns would land somewhere else.
       stopGlide();
@@ -180,7 +190,7 @@ export function useParquetColumnFocus({ tableRef, tableWrapRef }: UseParquetColu
         glideTo(target.offset);
       });
     },
-    [apply, glideTo, stopGlide, targetFor],
+    [activeColumn, apply, glideTo, stopGlide, targetFor],
   );
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);

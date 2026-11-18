@@ -16,9 +16,9 @@ colors:
   numeric-cyan: "#4ea1ff"
   numeric-cyan-on-light: "#0451a5"
   string-moss: "#89d185"
-  string-moss-on-light: "#2e7d32"
+  string-moss-on-light: "#276f2b"
   boolean-amber: "#f0a45e"
-  boolean-amber-on-light: "#9a5b00"
+  boolean-amber-on-light: "#915400"
   datetime-mauve: "#c586c0"
   datetime-mauve-on-light: "#6f2d8a"
   danger-coral: "#f48771"
@@ -154,7 +154,7 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 
 ### Primary
 
-- **Signal Blue** (#3794ff): 链接单元格、激活的字段行文字、列高亮底纹的色相来源（以 7%–12% 混入底色）。它是这套界面里唯一「可以点」的颜色。
+- **Signal Blue** (#3794ff): 链接单元格、激活的字段行文字、列高亮底纹的色相来源（列底纹 14%、表头 20%；浅色主题同步把绿色/橙色文本调深一档，以守住 4.5:1）。它是这套界面里唯一「可以点」的颜色。
 - **Instrument Navy** (#0e639c): 按钮与文本选区的底色来源（`--vscode-button-background` 的兜底）。用于实心控件，不用于文字。
 
 ### Secondary
@@ -192,7 +192,7 @@ JSON 预览不是第四个 viewer，它是同一机身上的检查探头：命�
 
 **The Chart-Colour Is Not Text Rule.** `--vscode-charts-*` 是为图形调过的色。12px 文本需要更高的对比度，所以浅色主题下这六个色被显式覆盖为同色相的更深值（`-on-light` 系列），并由 `verify:ui` 的 ≥4.5:1 断言守住。新增数据色必须同时给出浅色值，否则只能在图标上用。
 
-**The Thin Mix Rule.** 层次只允许用 3.5%–22% 的前景混入表达：隔行底纹 3.5%、控件底 8%（hover 13%、按下 18%）、列高亮 7%（hover 11%）、激活行底 12%（hover 16%）、目标行 18%、搜索命中 22%。超过 22% 就不再是层次，而是第二个界面。
+**The Thin Mix Rule.** 层次只允许用 3.5%–22% 的前景混入表达：隔行底纹 3.5%、控件底 8%（hover 13%、按下 18%）、列高亮 14%（hover 20%，浅色主题不加深）、激活行底 16%（浅色 14%）、目标行 18%、搜索命中 22%。超过 22% 就不再是层次，而是第二个界面。
 
 命中行原本是 18%，但它混进的 `editor.findMatchHighlightBackground` 自带 33% alpha，二次混合后只剩约 6% 的有效不透明度 —— 数值在规则内，观感在规则外。规则因此改成两条：**百分比按「最终不透明度」算，不按混入比例算**；混入源本身带 alpha 时，先换成不透明 token（`editor.findMatchBackground`）或改用实色兜底。22% 就是这条规则的边界值，不再上调。
 
@@ -375,7 +375,7 @@ Tab 的顺序是：命令栏 → 侧栏（过滤框、字段、侧栏拖拽把�
 - **Shape:** 6px 圆角、`6px 8px` 内距、最小高度 32px、行间 1px 空隙。
 - **Contents:** 类型图标（14px，按类型取色）+ 字段名（12px/500，单行省略）+ 空值率徽标（有统计时）+ 类型徽标（右对齐）。
 - **Null share:** `null 12%`（9.5px 等宽、muted、无底色、`tabular-nums`）。它是视觉徽标，无统计时退成 `—`；整句走字段行的 `aria-label`（"Jump to column name — 12% of rows are null"），所以读者不需要猜这个百分数是什么。低于 1% 且非零显示 `null <1%`，不四舍五入成 0。
-- **States:** hover 用 `list-hoverBackground`；激活行用 Signal Blue 12% 混入底色、字段名转 Signal Blue；`focus-visible` 用 `outline-offset: -1px`（贴内边，避免与相邻行粘连）。
+- **States:** hover 用 `list-hoverBackground`；激活行用 Signal Blue 16% 混入底色（浅色主题 14%）、字段名转 Signal Blue；再次点击当前行取消高亮；`focus-visible` 用 `outline-offset: -1px`（贴内边，避免与相邻行粘连）。
 
 ### Type badges
 
