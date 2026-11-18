@@ -5,20 +5,27 @@ export default [
   {
     name: "jsonl-indexing-basic",
     async run({ page, base }) {
-      await page.navigate(`${base}/harness-jsonl?indexing=1`);
+      // Clear state and navigate with indexing parameter
+      await page.navigate(`${base}/stats`);
+      await page.evaluate(`Object.keys(localStorage)
+        .filter(key => key.startsWith('jsonl-state:'))
+        .forEach(key => localStorage.removeItem(key))`);
+      await page.navigate(`${base}/harness?indexing=1`);
 
-      // Wait for viewer to mount
-      await page.waitFor(`!!document.querySelector('.jsonl-viewer')`);
-
-      // Directory should eventually show rows after indexing completes
-      await page.waitFor(`!!document.querySelector('.jsonl-directory-row')`, 5000);
-
-      const rows = await page.evaluate(
-        () => document.querySelectorAll(".jsonl-directory-row").length,
+      // Wait for directory to render after indexing
+      await page.waitFor(
+        `!!document.querySelector('.jsonl-index__tree .ant-tree-treenode')`,
+        10000,
       );
 
-      expect(rows > 0, `Expected rows after indexing, got ${rows}`);
-      return `Indexing completed, ${rows} rows displayed`;
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+          rows: document.querySelectorAll('.jsonl-index__tree .ant-tree-treenode').length
+        })`),
+      );
+
+      expect(state.rows > 0, `Expected rows after indexing, got ${state.rows}`);
+      return `Indexing completed, ${state.rows} rows displayed`;
     },
   },
   {
@@ -26,15 +33,14 @@ export default [
     async run({ page, base }) {
       await openJsonl(page, base);
 
-      // Directory should load quickly without indexing indicator
-      await page.waitFor(`!!document.querySelector('.jsonl-directory-row')`, 2000);
-
-      const rows = await page.evaluate(
-        () => document.querySelectorAll(".jsonl-directory-row").length,
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+          rows: document.querySelectorAll('.jsonl-index__tree .ant-tree-treenode').length
+        })`),
       );
 
-      expect(rows > 0, `Expected immediate load, got ${rows} rows`);
-      return `Small file loaded ${rows} rows without progress`;
+      expect(state.rows > 0, `Expected immediate load, got ${state.rows} rows`);
+      return `Small file loaded ${state.rows} rows without progress`;
     },
   },
 ];
