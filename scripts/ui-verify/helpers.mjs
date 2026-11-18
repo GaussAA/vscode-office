@@ -152,7 +152,14 @@ export const contrastRatio = (page, selector) =>
     if (!element) return null;
     const parse = (value) => {
       const match = value.match(/rgba?\\(\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*,\\s*([\\d.]+)(?:\\s*,\\s*([\\d.]+))?/i);
-      return match ? [Number(match[1]), Number(match[2]), Number(match[3]), match[4] === undefined ? 1 : Number(match[4])] : null;
+      if (match) {
+        return [Number(match[1]), Number(match[2]), Number(match[3]), match[4] === undefined ? 1 : Number(match[4])];
+      }
+      // Chrome resolves color-mix() to CSS Color 4: color(srgb 0..1 0..1 0..1 [/ alpha]).
+      const modern = value.match(/color\\(\\s*srgb\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)(?:\\s*\\/\\s*([\\d.]+))?\\s*\\)/i);
+      return modern
+        ? [Number(modern[1]) * 255, Number(modern[2]) * 255, Number(modern[3]) * 255, modern[4] === undefined ? 1 : Number(modern[4])]
+        : null;
     };
     const luminance = ([r, g, b]) => {
       const channel = (value) => {

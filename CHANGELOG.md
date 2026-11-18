@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- JSONL/JSON: the light theme's muted label text measured 4.0:1 on the value panel's surface;
+  it now uses the same darker muted value as the parquet surface (≥5.1:1). The UI contrast
+  gate now resolves `color-mix()` backgrounds instead of measuring against a higher layer.
+
 ## [6.15.1] - 2026-11-18
 
 ### Fixed

@@ -71,6 +71,10 @@ body:has(.jsonl-viewer) {
   --jl-null: #9a5b00;
   --jl-error: #b00000;
   --jl-warn: #7a5200;
+  /* The host's light descriptionForeground (#717171) is tuned for the editor canvas; on the
+     value panel's slightly darker surface the 11px count measured 4.0:1. The muted layer is
+     label text, so it gets the same darker value as the parquet surface. */
+  --jl-muted: #5c5c5c;
 }
 
 .jsonl-viewer *,
