@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.16.0] - 2026-11-18
+
 ### Added
 
 - Parquet: LIST/STRUCT fields now show an empty share. Their leaf statistics do not describe a
