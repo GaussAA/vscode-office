@@ -798,6 +798,33 @@ export default [
     },
   },
   {
+    name: "excel-workbook-parse-probe",
+    async run({ page, base }) {
+      // ADR-0026's Excel go/no-go measurement: a workbook large enough that the whole-book
+      // parse is visible. Warm the server-side fixture first, then time a second open so the
+      // one-off workbook generation is not counted as open cost.
+      const url = `${base}/harness-route?route=excel&workbook=1&workbookRows=300000`;
+      await page.navigate(url);
+      const warm = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 60000);
+      expect(warm, "the large workbook did not render on the warm-up open");
+
+      const started = Date.now();
+      await page.navigate(url);
+      const ready = await page.waitFor(`!!document.querySelector('.windowed-sheet__row')`, 60000);
+      const openMs = Date.now() - started;
+      expect(ready, "the large workbook did not render on the measured open");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                total: Number(document.querySelector('.windowed-sheet')?.dataset.rows ?? 0),
+                parseMs: performance.getEntriesByName('excel-workbook-parse').at(-1)?.duration ?? null,
+            })`),
+      );
+      expect(state.total === 300001, `unexpected row count: ${state.total}`);
+      expect(typeof state.parseMs === "number", "the workbook parse measure is missing");
+      return `${state.total} rows, parse ${Math.round(state.parseMs)} ms, open ${openMs} ms`;
+    },
+  },
+  {
     name: "excel-windowed-legacy",
     async run({ page, base }) {
       // `.xls` is decoded by SheetJS rather than ExcelJS; the window contract must be the same.

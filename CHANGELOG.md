@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- JSONL: the whole-file line index is cached in the extension host's global storage. Reopening
+  an unchanged JSONL file no longer scans every byte to rebuild it; the cache is keyed by
+  `size + mtime + version`, capped at 16 MB per file / 64 MB total / 5 files / 7 days, and
+  stores offsets only.
+- JSONL: the per-document layout (left width, selected line, tree/raw mode) is now versioned and
+  expires after 90 days; existing unversioned entries are migrated in place.
+- JSONL: the last three completed searches are memoized inside the window; repeating a query
+  returns the same hits without another host scan. The memo is memory-only.
+- Excel/CSV: the per-document view state is versioned and expires after 90 days (old
+  `-excel-view` entries migrate), and the windowed find remembers its last three completed
+  queries. Cell values remain memory-only.
+- All viewers: the command palette has **Clear Data Viewer Caches**. It clears the parquet scan
+  cache, the JSONL index, and the per-file layouts/find and search memos of parquet, JSONL and
+  Excel; open views reset, and JSON Preview is not affected. The old
+  `GaussAA.office.clearParquetCache` id remains registered as an alias for existing keybindings.
+
+### Changed
+
+- The Clear command no longer only covers parquet; the old id is an alias and is no longer
+  shown in the command palette.
+
 ### Fixed
 
 - Parquet: the selected-column tint is uniform across alternating rows. The zebra rule used to

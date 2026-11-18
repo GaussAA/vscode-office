@@ -1,6 +1,6 @@
 # ADR-0026 跨 viewer 缓存：JSONL 索引落盘、Excel 先测量
 
-- 状态：已接受（2026-11-18，方向；实现待做）
+- 状态：已接受（2026-11-18，方向；第一片已落地。Excel 测量触发 host 解析阈值，host 解析是下一个独立切片，尚未实现）
 - 日期：2026-11-18
 
 ## 背景
@@ -151,6 +151,51 @@ host 内存；只在指纹/TTL/状态包装/Clear 注册这些边界上复用。
 5. 与列高亮修复一起积累发布；本 ADR 不承诺版本号。
 
 首个里程碑 = 1 + 2 + 3 的测量部分；Excel host 解析与 CSV 偏移按测量结果决定。
+
+## 实施记录（2026-11-18）
+
+第一片已落地，验证：`pnpm check` 878 tests / 0 fail，`verify:ui` 110/110，`verify:perf`
+13/13。
+
+- **共享小件**：`HostDiskCache`（全局存储、原子写、TTL/LRU/总量/损坏清理）、
+  `FileFingerprint`、webview `versionedState` 包装、`dataViewerCacheClear` registry；
+  单测覆盖指纹、TTL、LRU、总量、截断、版本、迁移、损坏、注册表。
+- **JSONL 索引**：`JsonlIndexCache` + provider stat/载入/保存；缓存命中时用计数 ByteSource
+  断言 **0 次 source read**；指纹不符/版本/截断/损坏删除；16 MB/文件、64 MB 总量、LRU 5、7 天。
+- **JSONL UI/搜索**：`jsonl-state` 90 天/versioned，旧对象原地迁移；搜索 memo 最近 3 条，
+  只在 webview 内存；文件变化/清除清空。
+- **Excel UI/find**：`excel-view` 90 天/versioned，旧前缀与 `-excel-view` 后缀迁移；windowed
+  find memo 最近 3 条；值仍只在 webview 内存。
+- **统一 Clear**：`GaussAA.office.clearDataViewerCaches` 注册与旧
+  `GaussAA.office.clearParquetCache` 别名都调用 registry；parquet/Excel 的打开视图重置、
+  JSONL 清 UI/搜索并 reload、无视图 one-shot；JSON Preview 不动。
+
+### Excel 测量：触发 host 解析
+
+UI probe `excel-workbook-parse-probe` 在 **300,001 行 × 8 列**的生成工作簿上，先预热服务端
+fixture，再计第二次打开：
+
+| 指标         | 数值         |
+| ------------ | ------------ |
+| 整本 parse   | **6,466 ms** |
+| 打开到首屏   | **8,095 ms** |
+| parse 占打开 | **80%**      |
+
+**判据 `parse >1.5 s 或 >50%` 两项都触发**。按本 ADR，host 解析缓存不能在测量切片里偷偷
+实现；下一步另开 ADR/切片（host 读文件、SheetJS 解析一次、按指纹在 host 内存按文件 LRU，
+跨标签/会话，值不落盘，webview 通过 IPC 取窗口/表）。本片只交付测量与结论。
+
+### CSV 测量：偏移缓存暂缓
+
+21 MB CSV 的 `sheet-window-first-paint`：打开 542 ms、堆 32 MB、**CSV scan 126 ms**（约占
+打开 23%）。scan 不是主导成本，暂不把 8 B/行偏移单独落盘；保持现状，等更大的文件或更明确的
+需求再议。
+
+### 仍待
+
+- Excel host 解析缓存（测量已触发，下一片）。
+- CSV 偏移缓存（未触发）。
+- 版本号与发布：与列高亮修复一起积累，未发。
 
 ## Considered Options
 

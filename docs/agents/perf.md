@@ -167,6 +167,15 @@ just a verdict.
   the decode path is covered; nothing measures the message size itself.
 - **JSONL open latency** (the 80 MB index scan, ~0.3 s here) is not gated; the window and
   search checks above catch the shape regressions, and the index scan is linear by design.
+  Since ADR-0026 the host disk cache skips the scan on a fingerprint hit; the invariant is
+  asserted with a counting ByteSource (zero source reads on a hit), not with a wall clock.
+- **Whole-workbook Excel parse** is measured by the `excel-workbook-parse-probe` UI scenario
+  (300,001 rows x 8 columns, generated harness workbook): on 2026-11-18 it took **6,466 ms
+  parse / 8,095 ms open (80%)**; the run is a measurement, not a budget. The ADR-0026
+  threshold (`>1.5 s` or `>50%` of open) is exceeded, so a host-parsed workbook cache is the
+  next follow-up slice; the probe itself stays ungated.
+- **CSV record scan** is reported by `sheet-window-first-paint` (`excel-csv-scan`):
+  126 ms of a 542 ms 21 MB open (2026-11-18), so offsets are not cached yet (ADR-0026).
 - **Open latency itself** (1-3 s for 1M rows x 5 columns, dominated by decoding the first data
   page per column plus loading the ~430 KB parquet bundle) is not asserted either: it moves
   with bundle size, and the byte budget above already catches the failure mode that mattered.

@@ -109,6 +109,7 @@ export function indexRecordStarts(bytes: Uint8Array, delimiter: number): number[
  * cell object per value. Encoding and delimiter are decided once, from a prefix.
  */
 export function createTextSheetSource(buffer: ArrayBuffer): TextSheetSource {
+  const scanStarted = performance.now();
   const bytes = new Uint8Array(buffer);
   // A view shares the file's buffer; `slice()` copies just the bytes being decoded.
   const prefix = bytes.subarray(0, Math.min(bytes.length, DETECT_BYTES));
@@ -121,6 +122,9 @@ export function createTextSheetSource(buffer: ArrayBuffer): TextSheetSource {
     delimiter = ",";
   }
   const { starts, maxFields } = indexRecordStartsAndFields(bytes, delimiter.charCodeAt(0));
+  try {
+    performance.measure("excel-csv-scan", { start: scanStarted, end: performance.now() });
+  } catch {}
 
   const decode = (slice: Uint8Array): string =>
     decodeCsvBufferWithEncoding(slice.slice().buffer as ArrayBuffer).text;

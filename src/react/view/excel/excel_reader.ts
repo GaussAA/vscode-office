@@ -62,7 +62,12 @@ const buildCsvCols = (rows: any[][], colCount: number) => {
  * Uses SheetJS for all workbook formats.
  */
 export async function loadWorkbookRows(buffer: ArrayBuffer): Promise<WorkbookSheetRows[]> {
-  return workbookRowsFromSheetJs(XLSX.read(buffer, { type: "array" }));
+  const started = performance.now();
+  const rows = workbookRowsFromSheetJs(XLSX.read(buffer, { type: "array" }));
+  try {
+    performance.measure("excel-workbook-parse", { start: started, end: performance.now() });
+  } catch {}
+  return rows;
 }
 
 const sheetJsColWidthToPx = (col?: XLSX.ColInfo) => {
