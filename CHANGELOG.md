@@ -31,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parquet: cached empty shares are now merged into the stored entry column by column instead of
   overwriting the whole list. Two tabs that scan different structured columns no longer lose one
   tab's result; the remaining read-merge-write race is documented in ADR-0025.
+- Parquet: single-column top-N scans are cached in the extension host by document and stat
+  fingerprint (size + mtime, VS Code session only, LRU 3 files). Reopening a column panel or
+  opening the same file in a second tab returns the scan without decoding; inline documents and
+  files that cannot be statted are never cached.
+- Parquet: the `Scan LIST/STRUCT` batch reuses those cached full scans and decodes only the
+  columns without one; when every requested column is cached it opens no source at all.
+- Parquet: the command palette has `Data File Viewer: Clear Parquet Cache`. After a confirmation
+  it clears the host scan cache and every stored share/UI entry, and resets open parquet views
+  (row, filter, widths, shares). With no parquet view open the next open clears; JSONL and Excel
+  state are untouched.
 
 ### Changed
 

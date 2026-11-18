@@ -28,6 +28,14 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("GaussAA.office.csv.switch", (uri) => {
       switchCsvEditor(uri);
     }),
+    vscode.commands.registerCommand("GaussAA.office.clearParquetCache", async () => {
+      const answer = await vscode.window.showWarningMessage(
+        "Clear all cached parquet scans and per-file layout? Open parquet views will reset.",
+        { modal: true },
+        "Clear",
+      );
+      if (answer === "Clear") viewerInstance.clearParquetCaches();
+    }),
     jsonlViewerInstance.bindCustomEditor(viewOption),
     ...viewerInstance.bindCustomEditors(viewOption),
   );

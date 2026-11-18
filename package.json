@@ -64,6 +64,11 @@
         "command": "GaussAA.office.compareParquet",
         "title": "Compare Parquet Files",
         "category": "Data File Viewer"
+      },
+      {
+        "command": "GaussAA.office.clearParquetCache",
+        "title": "Clear Parquet Cache",
+        "category": "Data File Viewer"
       }
     ],
     "menus": {

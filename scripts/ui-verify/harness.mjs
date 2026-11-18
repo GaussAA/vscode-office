@@ -651,9 +651,10 @@ function parquetStub(fixtures) {
         : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
       const inline = params.get('inline') === '1';
+      const clearCache = params.get('clearCache') === '1';
       const payload = inline
-        ? { path: '', fileName: 'inline-mixed.parquet', documentCacheId: 'demo-inline', bufferBase64: ${JSON.stringify(inlineBase64)} }
-        : { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo:' + file, size: 12345, mtimeMs: Number(params.get('mtime') ?? 1) };
+        ? { path: '', fileName: 'inline-mixed.parquet', documentCacheId: 'demo-inline', bufferBase64: ${JSON.stringify(inlineBase64)}, clearCache }
+        : { path: file + suffix, fileName: 'parquet-sample', documentCacheId: 'demo:' + file, size: 12345, mtimeMs: Number(params.get('mtime') ?? 1), clearCache };
       if (guard) {
         setTimeout(function () {
           window.postMessage({ type: 'open', content: { path: '', fileName: 'big-virtual.parquet', documentCacheId: 'demo-guard', size: 80 * 1024 * 1024, tooLarge: true } }, '*');

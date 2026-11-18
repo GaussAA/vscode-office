@@ -27,6 +27,14 @@ export interface OfficeOpenMessage {
   /** Set when the host refused to read an oversized virtual document. */
   tooLarge?: boolean;
   /**
+   * Clear parquet-derived caches before rendering this document.
+   *
+   * Set by the Clear cache command when it ran with no parquet view open; the next parquet
+   * open then removes the stored shares/UI state before it can paint the old ones. Other
+   * viewers ignore it.
+   */
+  clearCache?: boolean;
+  /**
    * Inline bytes for a virtual document, base64-encoded.
    *
    * A `number[]` costs 5-8x the file on the JSON bridge; base64 costs 4/3.

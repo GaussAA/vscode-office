@@ -40,6 +40,8 @@ async function statDocument(uri: Uri): Promise<{ size?: number; mtimeMs?: number
 export interface VirtualOpenOptions {
   /** The user answered "open anyway": skip the size guard and read the bytes. */
   force?: boolean;
+  /** Clear parquet-derived caches in the webview before it renders this document. */
+  clearCache?: boolean;
 }
 
 export async function emitVirtualOfficeOpen(
@@ -61,6 +63,7 @@ export async function emitVirtualOfficeOpen(
     size,
     mtimeMs,
     nonce: now,
+    ...(options.clearCache ? { clearCache: true } : {}),
   };
   // A virtual document has to be read whole and shipped as `number[]`, so this is the one
   // place where refusing early saves the expensive part of the work rather than a parse.
@@ -83,6 +86,7 @@ export async function emitFileOfficeOpen(
   handler: Handler,
   uri: Uri,
   webview: Webview,
+  options: { clearCache?: boolean } = {},
 ): Promise<void> {
   // The webview fetches the bytes itself for this scheme, so the size only informs its size
   // guard and the two stat fields are the share cache's fingerprint; the host never reads the
@@ -97,6 +101,7 @@ export async function emitFileOfficeOpen(
     readOnly: await isUriReadOnly(uri),
     size,
     mtimeMs,
+    ...(options.clearCache ? { clearCache: true } : {}),
   };
   handler.emit("open", payload);
 }

@@ -19,6 +19,7 @@ import type {
   ParquetProfile,
   ParquetProfilePayload,
 } from "@/common/parquetProfileTypes";
+import { emptyShareOf } from "@/common/parquetProfileTypes";
 import { ParquetSession, type PagingSnapshot } from "./parquetSession.ts";
 import { describeParquetFailure } from "./parquetError.ts";
 import {
@@ -39,6 +40,7 @@ import {
 } from "./parquetLayout.ts";
 import { loadPersistedRow } from "./parquetPersistence.ts";
 import { loadParquetUi, saveParquetUi } from "./parquetUiState.ts";
+import { clearParquetLocalCaches } from "./parquetCacheStorage.ts";
 import {
   loadParquetShares,
   saveParquetShares,
@@ -57,19 +59,6 @@ import { useParquetInspection } from "./useParquetInspection.ts";
 import { useParquetColumnLayout } from "./useParquetColumnLayout.ts";
 import { useParquetSiderResize } from "./useParquetSiderResize.ts";
 import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
-
-/** The rail only needs the "no data" half of a full column scan. */
-function emptyShareOf(scan: ParquetColumnScan): ParquetEmptyShare {
-  return {
-    name: scan.name,
-    scanned: scan.scanned,
-    rowCount: scan.rowCount,
-    complete: scan.complete,
-    nulls: scan.nulls,
-    empties: scan.empties,
-    emptyRatio: scan.emptyRatio,
-  };
-}
 
 /** Bound one batch request; a schema with hundreds of structured columns scans in clicks. */
 const STRUCTURED_SCAN_BATCH = 32;
@@ -104,6 +93,8 @@ type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBas
   documentCacheId?: string;
   mtimeMs?: number;
   tooLarge?: boolean;
+  /** Clear parquet-derived caches before this document loads (Clear cache with no view open). */
+  clearCache?: boolean;
 };
 function ParquetViewer({ dark }: { dark: boolean }) {
   const { message } = App.useApp();
@@ -207,11 +198,13 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   /** Stable per-document UI key. The row/width/filter restore is keyed by this, not the path. */
   const [documentKey, setDocumentKey] = useState<string | undefined>(undefined);
   const [fieldFilter, setFieldFilter] = useState("");
+  /** Bumped by Clear cache so the width hook drops edits made before the clear. */
+  const [cacheEpoch, setCacheEpoch] = useState(0);
   const {
     layout: columnLayout,
     setColumnWidth,
     resetColumnWidth,
-  } = useParquetColumnLayout(fileInfo?.columns ?? [], tableBodyWidth, documentKey);
+  } = useParquetColumnLayout(fileInfo?.columns ?? [], tableBodyWidth, documentKey, cacheEpoch);
 
   const changeFieldFilter = useCallback(
     (value: string) => {
@@ -341,6 +334,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
 
   const loadParquet = useCallback(
     async (payload: ParquetOpenPayload) => {
+      if (payload.clearCache) {
+        // The command ran while no parquet view was open; this is the first chance to reach
+        // localStorage. Clear before the reset below so no old share/layout can be painted.
+        clearParquetLocalCaches();
+        setSiderWidth(SIDER_DEFAULT);
+      }
       setLoading(true);
       setError(null);
       setFileInfo(null);
@@ -440,7 +439,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         setLoading(false);
       }
     },
-    [resetPage, resetSearch, selectCell, setActiveColumn],
+    [resetPage, resetSearch, selectCell, setActiveColumn, setSiderWidth],
   );
 
   // Resize observer: measure the table body and update page size
@@ -585,6 +584,37 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     });
   }, [commitShares]);
 
+  // Clear cache from the host: forget every disk-derived answer and go back to a clean top of
+  // the file. The profile stays — it is footer metadata, not a cache, and re-asking would only
+  // blank the rail until the reply.
+  useEffect(() => {
+    handler.on("clearParquetCache", () => {
+      clearParquetLocalCaches();
+      sharesRef.current = new Map();
+      setShares(new Map());
+      setStructuredScan({ loading: false, scanned: 0, total: 0, error: null });
+      emptyShareRequest.current.cancel();
+      scanRequest.current.cancel();
+      setProfilePanel(null);
+      setColumnScan(null);
+      setScanError(null);
+      setScanLoading(false);
+      setFieldFilter("");
+      setActiveColumn(null);
+      setInspected(null);
+      selectCell(null);
+      setTargetRow(null);
+      resetSearch(true);
+      resetPage();
+      setPage(0);
+      // Page 0 may already be the current page; the token forces its rows to load again after
+      // `resetPage` cleared them.
+      setReloadToken((token) => token + 1);
+      setSiderWidth(SIDER_DEFAULT);
+      setCacheEpoch((value) => value + 1);
+    });
+  }, [resetPage, resetSearch, selectCell, setActiveColumn, setSiderWidth]);
+
   /**
    * Esc closes the panel and puts focus back on the field row that opened it.
    *
@@ -612,7 +642,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     setScanLoading(true);
     setScanError(null);
     setColumnScan(null);
-    handler.emit("parquetColumnScan", { requestId, name: column.name });
+    handler.emit("parquetColumnScan", {
+      requestId,
+      name: column.name,
+      // Inline bytes have no host fingerprint to validate; the host scans but does not cache.
+      cacheable: shareScopeRef.current !== null,
+    });
   }, []);
 
   const openProfilePanel = useCallback(
@@ -663,7 +698,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     emptyShareRequest.current.cancel();
     const requestId = emptyShareRequest.current.issue();
     setStructuredScan({ loading: true, scanned: 0, total: 0, error: null });
-    handler.emit("parquetEmptyShareScan", { requestId, names });
+    handler.emit("parquetEmptyShareScan", {
+      requestId,
+      names,
+      cacheable: shareScopeRef.current !== null,
+    });
   }, []);
 
   const jumpToRow = useCallback(

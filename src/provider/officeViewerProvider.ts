@@ -8,6 +8,8 @@ import { handleCommonEvent } from "./commonHandler";
 import { openDocumentSource } from "./documentSource";
 import { createParquetHandlers } from "./parquetHandlers";
 import { createSaveTracker } from "./saveHandlers";
+import { buildDocumentCacheId } from "./handlers/officeContent";
+import { parquetScanCache } from "../service/parquetScanCache";
 
 /**
  * Spreadsheet and parquet viewers.
@@ -19,8 +21,29 @@ import { createSaveTracker } from "./saveHandlers";
 export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider {
   /** Shared by every panel: "save as" stamps another file's change event, not just our own. */
   private readonly saves = createSaveTracker();
+  /** Open parquet panels, for the Clear cache broadcast. */
+  private readonly parquetHandlers = new Set<Handler>();
+  /** Set by Clear cache when it ran with no parquet panel to clear; consumed by the next open. */
+  private parquetClearPending = false;
 
   constructor(private context: vscode.ExtensionContext) {}
+
+  /**
+   * Clear the host scan cache and every open parquet view. When none is open the disk caches
+   * cannot be reached from the host, so the next parquet open carries a one-shot clear flag.
+   */
+  public clearParquetCaches(): void {
+    parquetScanCache.clear();
+    const active = [...this.parquetHandlers].filter((handler) => !handler.disposed);
+    for (const handler of active) handler.emit("clearParquetCache");
+    if (active.length === 0) this.parquetClearPending = true;
+  }
+
+  private consumeParquetClear(): boolean {
+    if (!this.parquetClearPending) return false;
+    this.parquetClearPending = false;
+    return true;
+  }
 
   bindCustomEditors(viewOption: CustomEditorOptions) {
     return [
@@ -50,10 +73,7 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
       localResourceRoots: [...getExtensionResourceRoots(this.context), folderPath],
     };
 
-    const handler = Handler.bind(webviewPanel, uri);
-    handleCommonEvent(uri, handler, this.saves);
-
-    let route: string;
+    let route: "excel" | "parquet";
     switch (getFileSuffix(uri.fsPath)) {
       case ".xlsx":
       case ".xlsm":
@@ -71,20 +91,40 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
         return;
     }
 
+    const handler = Handler.bind(webviewPanel, uri);
+    // The flag is parquet-only; another viewer must not clear parquet state just because a
+    // command ran earlier.
+    const clearCache = route === "parquet" ? this.consumeParquetClear() : false;
+    handleCommonEvent(uri, handler, this.saves, { clearCache });
+
     if (route === "parquet") {
-      // The one message the host answers for parquet today: the profile is read from row-group
-      // metadata, so it never pulls a data page through `openByteSource`.
+      // The parquet messages the host answers: the profile comes from row-group metadata and
+      // never reads a data page; the two scans decode a bounded prefix and are cached in the
+      // host by document + stat fingerprint (ADR-0025).
       const parquet = createParquetHandlers({
         openSource: () => openDocumentSource(uri),
         emit: (type, payload) => handler.emit(type, payload),
+        fingerprint: async () => {
+          try {
+            const stat = await vscode.workspace.fs.stat(uri);
+            return { key: buildDocumentCacheId(uri), size: stat.size, mtimeMs: stat.mtime };
+          } catch {
+            // A virtual or unsupported scheme cannot validate bytes; scan, but do not cache.
+            return null;
+          }
+        },
       });
+      this.parquetHandlers.add(handler);
       handler
         .on("parquetProfile", (request) => parquet.profile(request))
         .on("parquetColumnScan", (request) => parquet.columnScan(request))
         .on("parquetEmptyShareScan", (request) => parquet.emptyShareScan(request));
       // A batch scan can run for seconds on a wide nested schema; closing the tab aborts it
       // instead of letting the host decode to the row cap for nobody.
-      webviewPanel.onDidDispose(() => parquet.dispose());
+      webviewPanel.onDidDispose(() => {
+        this.parquetHandlers.delete(handler);
+        parquet.dispose();
+      });
     }
 
     return ReactApp.view(webview, { route });

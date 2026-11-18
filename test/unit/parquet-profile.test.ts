@@ -7,6 +7,7 @@ import { openParquetFile } from "@/common/parquetReader";
 import type { ByteSource } from "@/common/byteSource";
 import { formatShare } from "@/react/view/parquet/formatShare";
 import { memoryByteSource } from "@/service/jsonlFile";
+import { ParquetScanCache, type ParquetScanFingerprint } from "@/service/parquetScanCache";
 import {
   profileFromParquet,
   readParquetProfile,
@@ -140,11 +141,18 @@ test("profile: reading a profile asks for the footer, not for the file", async (
 
 // ---------------------------------------------------------------- the glue
 
-function harness(source: () => Promise<ByteSource>) {
+function harness(
+  source: () => Promise<ByteSource>,
+  options: {
+    fingerprint?: () => Promise<ParquetScanFingerprint | null>;
+    cache?: ParquetScanCache;
+  } = {},
+) {
   const emitted: Array<{ type: string; payload: any }> = [];
   const handlers = createParquetHandlers({
     openSource: source,
     emit: (type, payload) => emitted.push({ type, payload }),
+    ...options,
   });
   return { handlers, emitted };
 }
@@ -388,4 +396,101 @@ test("handlers: a failed scan still answers with the error attached", async () =
   assert.ok(message, "expected exactly one reply");
   assert.equal(message.payload.scan, null);
   assert.match(message.payload.error, /no column named nope/);
+});
+
+// ------------------------------------------------------- the session scan cache
+
+const fingerprint = {
+  key: "file:///multigroup.parquet",
+  size: 1024,
+  mtimeMs: 1,
+} satisfies ParquetScanFingerprint;
+
+test("handlers: a repeated column scan hits the host cache instead of decoding again", async () => {
+  let opens = 0;
+  const cache = new ParquetScanCache();
+  const { handlers, emitted } = harness(
+    async () => {
+      opens += 1;
+      return memoryByteSource(await bytesOf("multigroup"));
+    },
+    { cache, fingerprint: async () => fingerprint },
+  );
+
+  await handlers.columnScan({ requestId: 1, name: "name" });
+  await handlers.columnScan({ requestId: 2, name: "name" });
+
+  const replies = emitted.filter((message) => message.type === "parquetColumnScanData");
+  assert.equal(opens, 1, "the second scan must not open the source");
+  assert.equal(replies.length, 2);
+  assert.deepEqual(replies[1]?.payload.scan, replies[0]?.payload.scan);
+  assert.equal(cache.get(fingerprint, "name")?.nulls, 429);
+});
+
+test("handlers: cacheable:false and a missing fingerprint both bypass the cache", async () => {
+  let opens = 0;
+  const cache = new ParquetScanCache();
+  const source = async () => {
+    opens += 1;
+    return memoryByteSource(await bytesOf("multigroup"));
+  };
+  const direct = harness(source, { cache, fingerprint: async () => fingerprint });
+  await direct.handlers.columnScan({ requestId: 1, name: "name", cacheable: false });
+  await direct.handlers.columnScan({ requestId: 2, name: "name", cacheable: false });
+  assert.equal(opens, 2, "inline requests must not share the cache");
+  assert.equal(cache.fileCount, 0);
+
+  opens = 0;
+  const noFingerprint = harness(source, { cache, fingerprint: async () => null });
+  await noFingerprint.handlers.columnScan({ requestId: 1, name: "name" });
+  await noFingerprint.handlers.columnScan({ requestId: 2, name: "name" });
+  assert.equal(opens, 2, "an unstatable document must not be cached");
+  assert.equal(cache.fileCount, 0);
+});
+
+test("handlers: the batch scan reuses a cached column and decodes only the misses", async () => {
+  let opens = 0;
+  const cache = new ParquetScanCache();
+  const { handlers, emitted } = harness(
+    async () => {
+      opens += 1;
+      return memoryByteSource(await bytesOf("multigroup"));
+    },
+    { cache, fingerprint: async () => fingerprint },
+  );
+
+  await handlers.columnScan({ requestId: 1, name: "name" });
+  const beforeBatch = opens;
+  await handlers.emptyShareScan({ requestId: 2, names: ["name", "id"] });
+
+  const batch = emitted.filter((message) => message.type === "parquetEmptyShareScanData").at(-1);
+  assert.equal(opens, beforeBatch + 1, "only the uncached column may decode");
+  assert.deepEqual(
+    batch?.payload.shares.map((share: { name: string }) => share.name),
+    ["name", "id"],
+  );
+  const nameShare = batch?.payload.shares[0];
+  assert.equal(nameShare.nulls, 429, "the name share came from the full scan cache");
+  assert.equal(nameShare.scanned, 3000);
+});
+
+test("handlers: an all-cached batch does not open a source at all", async () => {
+  let opens = 0;
+  const cache = new ParquetScanCache();
+  const { handlers, emitted } = harness(
+    async () => {
+      opens += 1;
+      return memoryByteSource(await bytesOf("multigroup"));
+    },
+    { cache, fingerprint: async () => fingerprint },
+  );
+
+  await handlers.columnScan({ requestId: 1, name: "name" });
+  const beforeBatch = opens;
+  await handlers.emptyShareScan({ requestId: 2, names: ["name"] });
+
+  const batch = emitted.filter((message) => message.type === "parquetEmptyShareScanData").at(-1);
+  assert.equal(opens, beforeBatch);
+  assert.equal(batch?.payload.shares.length, 1);
+  assert.equal(batch?.payload.shares[0].name, "name");
 });

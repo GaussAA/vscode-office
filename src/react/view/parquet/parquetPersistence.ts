@@ -7,6 +7,8 @@
  * adopt the old position instead of jumping to the top. Writes go through `parquetUiState`.
  */
 const PERSIST_PREFIX = "parquet-state:";
+/** Exported for Clear cache: the legacy rows are parquet state too. */
+export const PARQUET_ROW_PREFIX = PERSIST_PREFIX;
 
 export function loadPersistedRow(key: string | undefined): number {
   if (!key) return 0;

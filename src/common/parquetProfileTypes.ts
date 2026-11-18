@@ -61,6 +61,8 @@ export interface ParquetProfilePayload {
 export interface ParquetColumnScanRequest {
   requestId: number;
   name: string;
+  /** False for inline bytes: the webview's bytes have no host fingerprint to validate. */
+  cacheable?: boolean;
 }
 
 export interface ParquetColumnScanValue {
@@ -122,6 +124,8 @@ export interface ParquetEmptyShareScanRequest {
   requestId: number;
   /** Top-level column names to cover. The rail sends its unscanned LIST/STRUCT columns. */
   names: string[];
+  /** False for inline bytes: the webview's bytes have no host fingerprint to validate. */
+  cacheable?: boolean;
 }
 
 export interface ParquetEmptyShareScanPayload {
@@ -136,4 +140,17 @@ export interface ParquetEmptyShareScanProgress {
   scanned: number;
   /** Work units this batch will read: `rowCap × names.length`. */
   total: number;
+}
+
+/** The rail only needs the "no data" half of a full column scan. */
+export function emptyShareOf(scan: ParquetColumnScan): ParquetEmptyShare {
+  return {
+    name: scan.name,
+    scanned: scan.scanned,
+    rowCount: scan.rowCount,
+    complete: scan.complete,
+    nulls: scan.nulls,
+    empties: scan.empties,
+    emptyRatio: scan.emptyRatio,
+  };
 }

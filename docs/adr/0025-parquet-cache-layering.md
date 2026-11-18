@@ -1,6 +1,6 @@
 # ADR-0025 parquet 缓存分层：聚合落盘、样本进 host 内存
 
-- 状态：已接受（2026-11-18，方向；第一块已落地，其余待做）
+- 状态：已接受（2026-11-18，方向；第一、二块已落地，其余待做）
 - 日期：2026-11-18
 
 ## 背景
@@ -121,11 +121,11 @@ Clear cache 在没有 parquet 视图打开时由 host 记一个 one-shot 标记�
 - **实施顺序**：
   1. UI 状态恢复（列宽/行/字段过滤，侧栏全局，90 天，旧键 fallback）+ share 合并写入 + 单测
      （已完成）。
-  2. host 单列扫描缓存 + 批量复用 + Clear cache 命令（此时才真正“全清”）。
+  2. host 单列扫描缓存 + 批量复用 + Clear cache 命令（此时才真正“全清”）（已完成）。
   3. 搜索 query memo。
   4. 页面 chunk/预取调优（按 perf 结果取舍）。
 - **默认值**（可调）：host LRU 3 个文件；search memo 3 条 / 8 MB；页面 4 chunk + 一页预取；
-  数据 7 天 / UI 90 天；每前缀 LRU 20；命令名 `GaussAA.clearParquetCache`。
+  数据 7 天 / UI 90 天；每前缀 LRU 20；命令名 `GaussAA.office.clearParquetCache`。
 
 ## 审计附录（2026-11-18，HEAD `75838e96`）
 
