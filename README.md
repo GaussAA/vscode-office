@@ -180,7 +180,7 @@ CI runs all three on every push, together with `pnpm build` and `pnpm run packag
 - Spreadsheets above 8 MB open in a read-only windowed view (viewport rows only), and every
   workbook format — `.xlsx`, `.xlsm`, `.xls`, `.ods` — is windowed as row text. Workbooks
   above 15 MB, and CSV/TSV from a virtual workspace above 25 MB, ask before loading at all;
-  a local CSV/TSV may be windowed up to 200 MB.
+  a local CSV/TSV may be windowed up to 350 MB.
 - A JSONL line above 8 MB is shown as raw text instead of a parsed tree, and the raw view
   ships the first 1,000,000 characters (with a notice) rather than the whole line.
 - The JSONL tree is bounded: 20,000 nodes, 200 children per level, 12 levels. The tree says

@@ -148,7 +148,7 @@ export default [
       );
       expect(/huge\.csv/.test(state.text), `panel does not name the file: ${state.text}`);
       expect(/900\.0 MB/.test(state.text), `panel does not show the file size: ${state.text}`);
-      expect(/200\.0 MB/.test(state.text), `panel does not show the limit: ${state.text}`);
+      expect(/350\.0 MB/.test(state.text), `panel does not show the limit: ${state.text}`);
       expect(state.role === "dialog", `guard is not a dialog: ${state.role}`);
       expect(state.modal === "true", "guard is not modal");
       expect(state.active === "Open in VS Code", `safe action does not own focus: ${state.active}`);
@@ -201,7 +201,7 @@ export default [
       );
       expect(/huge\.csv/.test(state.text), `panel does not name the file: ${state.text}`);
       expect(/900\.0 MB/.test(state.text), `panel does not show the file size: ${state.text}`);
-      expect(/200\.0 MB/.test(state.text), `panel does not show the limit: ${state.text}`);
+      expect(/350\.0 MB/.test(state.text), `panel does not show the limit: ${state.text}`);
       expect(!state.grid, "the grid rendered anyway — the guard must not parse the file");
       expect(
         state.buttons.includes("Open anyway"),

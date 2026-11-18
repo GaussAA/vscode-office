@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CSV/TSV: 350 MB file size limit** (up from 200 MB, 1.75× increase). The windowed view can now open files up to 350 MB. This limit is chosen to stay within the CSV index cache cap (16 MB per file): a 350 MB file produces ~14.5 MB of index data, which fits in the cache and avoids re-scanning on every open. Larger files would require async chunked indexing with progress reporting (deferred to future work).
+
 ### Added
 
 - **JSONL viewer: 5x faster search** — Byte-level ASCII prefilter with Horspool algorithm accelerates full-text search from ~12.5s to ~3s for 1 GB / 5M rows (5.1x for single-hit, 4.5x for no-hit, 1.7x for capped-10k-hit scenarios). Non-ASCII needles or Unicode folding requirements (İ, Kelvin sign) fall back to the full decode path. Differential tests verify result parity across 5000+ comparisons including İstanbul edge cases. Commit: 25de4156.

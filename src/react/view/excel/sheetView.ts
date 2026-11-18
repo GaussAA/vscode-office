@@ -16,8 +16,14 @@ export const WINDOW_THRESHOLD_BYTES = 8 * 1024 * 1024;
  * Sanity bound for the windowed text path. The windowed view cannot die on a *parse* — it reads
  * one block — so the only remaining cost is the file bytes plus 8 bytes of offset per row. This
  * is where that stops being reasonable, not where a performance cliff is.
+ *
+ * 350 MB is chosen to stay within the CSV index cache limit (16 MB per file): a 350 MB CSV
+ * produces ~14.5 MB of index data (record starts array), which fits in the cache and avoids
+ * re-scanning on every open. Larger files would exceed the cache cap and trigger a 3+ second
+ * synchronous scan every time. Going beyond 350 MB requires async chunked indexing with progress
+ * reporting (similar to ADR-0024's approach for JSONL), which is deferred to future work.
  */
-export const TEXT_WINDOW_MAX_BYTES = 200 * 1024 * 1024;
+export const TEXT_WINDOW_MAX_BYTES = 350 * 1024 * 1024;
 
 /** Text formats windowed when large. */
 const WINDOW_EXTENSIONS = new Set([".csv", ".tsv"]);

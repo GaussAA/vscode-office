@@ -144,7 +144,7 @@ just a verdict.
 - **The editable spreadsheet path below 8 MB** is still all-at-once, so it has no budget: the
   numbers move with the grid implementation, not with us. Above 8 MB the windowed view is
   gated (row above). The size guard asks before loading a workbook above 15 MB, or a CSV/TSV
-  above 25 MB **from a virtual workspace**; a local CSV/TSV is windowed up to 200 MB
+  above 25 MB **from a virtual workspace**; a local CSV/TSV is windowed up to 350 MB
   ([ADR-0016](../adr/0016-preview-size-guard.md)).
 - **Parquet row virtualisation: shipped, after moving the suite with it.** antd's `virtual`
   table renders the ~22 rows the viewport holds instead of all 50, which halved the warm page

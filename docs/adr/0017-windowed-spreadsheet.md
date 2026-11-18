@@ -61,7 +61,7 @@ interface SheetSource {
      链接/校验字段的对象），`workbookSource` 提供同样的 `readRows` 契约与 sheet 切换；
      四种工作簿格式（`.xlsx`/`.xlsm`/`.xls`/`.ods`）都经 SheetJS（`workbookRowsFromSheetJs`）取行文本，
      四种工作簿格式超过 8 MB 都走窗口视图。
-  5. ✅ 阈值调整：本地 CSV/TSV 的上限从 25 MB 提到 200 MB 的兜底值，虚拟文档保留 25 MB
+  5. ✅ 阈值调整：本地 CSV/TSV 的上限从 25 MB 提到 350 MB 的兜底值，虚拟文档保留 25 MB
      （跨桥内联）；工作簿上限仍是 15 MB —— 窗口化只解决内存与渲染，SheetJS 的解析时间不变。
      ADR-0016 已记修订。
 - 性能闸门需要一条新检查：窗口路径的首屏耗时与堆不随文件大小线性增长（用一个 50 MB CSV 验，
