@@ -10,6 +10,7 @@ import { createParquetHandlers } from "./parquetHandlers";
 import { createSaveTracker } from "./saveHandlers";
 import { buildDocumentCacheId } from "./handlers/officeContent";
 import { parquetScanCache } from "../service/parquetScanCache";
+import { registerDataViewerCacheClearer } from "../service/dataViewerCacheClear";
 
 /**
  * Spreadsheet and parquet viewers.
@@ -23,25 +24,41 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
   private readonly saves = createSaveTracker();
   /** Open parquet panels, for the Clear cache broadcast. */
   private readonly parquetHandlers = new Set<Handler>();
+  /** Open spreadsheet panels, for the Clear cache broadcast. */
+  private readonly excelPanels = new Set<Handler>();
   /** Set by Clear cache when it ran with no parquet panel to clear; consumed by the next open. */
   private parquetClearPending = false;
+  /** Set by Clear cache when it ran with no spreadsheet panel to clear. */
+  private excelClearPending = false;
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(private context: vscode.ExtensionContext) {
+    registerDataViewerCacheClearer(() => this.clearDataViewerCaches());
+  }
 
   /**
-   * Clear the host scan cache and every open parquet view. When none is open the disk caches
-   * cannot be reached from the host, so the next parquet open carries a one-shot clear flag.
+   * Clear the host scan cache and every open parquet/spreadsheet view. When none is open the
+   * webview caches cannot be reached from the host, so the next open carries a one-shot flag.
    */
-  public clearParquetCaches(): void {
+  public clearDataViewerCaches(): void {
     parquetScanCache.clear();
-    const active = [...this.parquetHandlers].filter((handler) => !handler.disposed);
-    for (const handler of active) handler.emit("clearParquetCache");
-    if (active.length === 0) this.parquetClearPending = true;
+    const parquetActive = [...this.parquetHandlers].filter((handler) => !handler.disposed);
+    for (const handler of parquetActive) handler.emit("clearParquetCache");
+    if (parquetActive.length === 0) this.parquetClearPending = true;
+
+    const excelActive = [...this.excelPanels].filter((handler) => !handler.disposed);
+    for (const handler of excelActive) handler.emit("clearExcelCache");
+    if (excelActive.length === 0) this.excelClearPending = true;
   }
 
   private consumeParquetClear(): boolean {
     if (!this.parquetClearPending) return false;
     this.parquetClearPending = false;
+    return true;
+  }
+
+  private consumeExcelClear(): boolean {
+    if (!this.excelClearPending) return false;
+    this.excelClearPending = false;
     return true;
   }
 
@@ -92,9 +109,14 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
     }
 
     const handler = Handler.bind(webviewPanel, uri);
-    // The flag is parquet-only; another viewer must not clear parquet state just because a
+    // The flag is per viewer; another viewer must not clear this one's state just because a
     // command ran earlier.
-    const clearCache = route === "parquet" ? this.consumeParquetClear() : false;
+    const clearCache =
+      route === "parquet"
+        ? this.consumeParquetClear()
+        : route === "excel"
+          ? this.consumeExcelClear()
+          : false;
     handleCommonEvent(uri, handler, this.saves, { clearCache });
 
     if (route === "parquet") {
@@ -125,6 +147,11 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
         this.parquetHandlers.delete(handler);
         parquet.dispose();
       });
+    }
+
+    if (route === "excel") {
+      this.excelPanels.add(handler);
+      webviewPanel.onDidDispose(() => this.excelPanels.delete(handler));
     }
 
     return ReactApp.view(webview, { route });

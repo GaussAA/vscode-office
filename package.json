@@ -66,8 +66,8 @@
         "category": "Data File Viewer"
       },
       {
-        "command": "GaussAA.office.clearParquetCache",
-        "title": "Clear Parquet Cache",
+        "command": "GaussAA.office.clearDataViewerCaches",
+        "title": "Clear Data Viewer Caches",
         "category": "Data File Viewer"
       }
     ],
