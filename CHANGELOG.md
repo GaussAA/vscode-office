@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Parquet: the expanded value panel now parses a JSON string (not only real LIST/STRUCT values)
+  and pretty-prints it, with the same key/string/number/boolean colours the grid's JSON cells
+  use. A JSON object stored as a STRING used to stay one escaped line in Formatted mode.
 - JSONL/JSON: the light theme's muted label text measured 4.0:1 on the value panel's surface;
   it now uses the same darker muted value as the parquet surface (≥5.1:1). The UI contrast
   gate now resolves `color-mix()` backgrounds instead of measuring against a higher layer.

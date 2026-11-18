@@ -7,11 +7,30 @@
  * what counts as a JSON container and how much of a long one is rendered.
  */
 
-export type JsonTokenType = "key" | "string" | "number" | "boolean" | "null" | "punct" | "ellipsis";
+export type JsonTokenType =
+  | "key"
+  | "string"
+  | "number"
+  | "boolean"
+  | "null"
+  | "punct"
+  | "ellipsis"
+  /** Whitespace between tokens; only emitted when `preserveWhitespace` is on (the inspector). */
+  | "space";
 
 export interface JsonToken {
   type: JsonTokenType;
   text: string;
+}
+
+export interface JsonTokenizeOptions {
+  /**
+   * Emit the text between tokens as `space` tokens. The grid's one-line preview does not need
+   * it; the expanded inspector renders indented JSON and must preserve newlines/indentation.
+   */
+  preserveWhitespace?: boolean;
+  maxTokens?: number;
+  maxChars?: number;
 }
 
 /** Enough tokens to explain a nested row at a glance; the title still has the full value. */
@@ -25,31 +44,30 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   );
 }
 
-function stringifyJsonContainer(value: unknown): string | null {
+function stringifyJsonContainer(value: unknown, space: number): string | null {
   try {
     return (
-      JSON.stringify(value, (_key, item: unknown) => {
-        if (item instanceof Uint8Array)
-          return `0x${Array.from(item, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-        if (item instanceof ArrayBuffer) {
-          return `0x${Array.from(new Uint8Array(item), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-        }
-        if (typeof item === "bigint") return item.toString();
-        return item;
-      }) ?? null
+      JSON.stringify(
+        value,
+        (_key, item: unknown) => {
+          if (item instanceof Uint8Array)
+            return `0x${Array.from(item, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+          if (item instanceof ArrayBuffer) {
+            return `0x${Array.from(new Uint8Array(item), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+          }
+          if (typeof item === "bigint") return item.toString();
+          return item;
+        },
+        space,
+      ) ?? null
     );
   } catch {
     return null;
   }
 }
 
-/**
- * Canonical JSON text for a container, or null when the cell is a scalar.
- *
- * A string is only parsed when its first non-space character is `[` or `{`: a description
- * that merely contains a bracketed phrase must stay plain text.
- */
-export function jsonPreviewText(value: unknown): string | null {
+/** The parsed container behind a cell, or null when the cell is a scalar/plain string. */
+function parseJsonContainer(value: unknown): unknown {
   let parsed: unknown = value;
   if (typeof value === "string") {
     const text = value.trim();
@@ -61,7 +79,28 @@ export function jsonPreviewText(value: unknown): string | null {
     }
   }
   if (!Array.isArray(parsed) && !isPlainRecord(parsed)) return null;
-  return stringifyJsonContainer(parsed);
+  return parsed;
+}
+
+/**
+ * Canonical one-line JSON text for a container, or null when the cell is a scalar.
+ *
+ * A string is only parsed when its first non-space character is `[` or `{`: a description
+ * that merely contains a bracketed phrase must stay plain text.
+ */
+export function jsonPreviewText(value: unknown): string | null {
+  const parsed = parseJsonContainer(value);
+  return parsed === null ? null : stringifyJsonContainer(parsed, 0);
+}
+
+/**
+ * Indented JSON for the expanded inspector. A STRING containing a JSON object is parsed too:
+ * Hugging Face/Polars files often store a whole object as a string, and "Formatted" must not
+ * leave it as one escaped line (the grid already treats it as a container).
+ */
+export function jsonPrettyText(value: unknown): string | null {
+  const parsed = parseJsonContainer(value);
+  return parsed === null ? null : stringifyJsonContainer(parsed, 2);
 }
 
 /**
@@ -69,27 +108,39 @@ export function jsonPreviewText(value: unknown): string | null {
  * only labels syntax. Keys are strings followed by `:`, which is the one piece of context a
  * flat token list needs to distinguish `"name"` from `"alpha"`.
  */
-export function tokenizeJson(text: string): JsonToken[] {
+export function tokenizeJson(text: string, options: JsonTokenizeOptions = {}): JsonToken[] {
   const tokenPattern =
     /("(?:\\.|[^"\\])*")|([{}[\],:])|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)/g;
   const tokens: JsonToken[] = [];
+  const maxTokens = options.maxTokens ?? MAX_PREVIEW_TOKENS;
+  const maxChars = options.maxChars ?? MAX_PREVIEW_CHARS;
   let usedChars = 0;
+  let lastEnd = 0;
   let match: RegExpExecArray | null;
 
   const appendEllipsis = () => {
     tokens.push({ type: "ellipsis", text: "…" });
   };
+  /** Preserve the gap before the next token when the caller renders indented JSON. */
+  const pushGap = (end: number) => {
+    if (!options.preserveWhitespace || end <= lastEnd) return;
+    tokens.push({ type: "space", text: text.slice(lastEnd, end) });
+    lastEnd = end;
+  };
 
   while ((match = tokenPattern.exec(text))) {
+    pushGap(match.index);
     const raw = match[0];
-    if (tokens.length >= MAX_PREVIEW_TOKENS) {
+    const end = match.index + raw.length;
+    lastEnd = end;
+    if (tokens.length >= maxTokens) {
       appendEllipsis();
       return tokens;
     }
 
     let type: JsonTokenType = "punct";
     if (match[1]) {
-      const after = text.slice(tokenPattern.lastIndex);
+      const after = text.slice(end);
       type = /^\s*:/.test(after) ? "key" : "string";
     } else if (match[3]) {
       type = "number";
@@ -97,7 +148,7 @@ export function tokenizeJson(text: string): JsonToken[] {
       type = match[4] === "null" ? "null" : "boolean";
     }
 
-    const remaining = MAX_PREVIEW_CHARS - usedChars;
+    const remaining = maxChars - usedChars;
     if (raw.length > remaining) {
       tokens.push({ type, text: `${raw.slice(0, Math.max(1, remaining - 1))}…` });
       return tokens;
@@ -106,5 +157,6 @@ export function tokenizeJson(text: string): JsonToken[] {
     usedChars += raw.length;
   }
 
+  pushGap(text.length);
   return tokens;
 }
