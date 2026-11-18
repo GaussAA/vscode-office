@@ -233,6 +233,7 @@ export default {
     matchCountMany: "{count} 筆符合",
     cappedSuffix: " · 已停在 10,000",
     loading: "載入中…",
+    indexing: "建立索引… {percent}%",
     loadMore: "載入更多項目",
     empty: "沒有項目",
     chipEmpty: "空行",

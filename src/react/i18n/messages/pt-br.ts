@@ -208,7 +208,9 @@ export default {
     rows: "{count} linhas",
     rowDelta: "{delta} linhas",
   },
-  jsonl: {},
+  jsonl: {
+    indexing: "Indexando… {percent}%",
+  },
   previewGuard: {
     title: "Arquivo grande demais para pré-visualização automática",
     body: "{file} tem {size}. Acima de {limit}, um parquet precisa trafegar de uma vez pelo bridge da extensão, então não é carregado até você pedir.",

@@ -14,13 +14,21 @@ import { openDocumentSource } from "./documentSource";
 import { createJsonlHandlers } from "./jsonlHandlers";
 
 class JsonlDocument implements vscode.CustomDocument {
-  constructor(
-    public readonly uri: vscode.Uri,
-    public session: JsonlSession,
-  ) {}
+  /** Source opened but not yet indexed; consumed by the first openSession call. */
+  public pendingSource: ReturnType<typeof openDocumentSource> | null = null;
+  /** Signals to the indexing task that the document was closed. */
+  public cancelToken = { cancelled: false };
+  public session: JsonlSession | null = null;
+
+  constructor(public readonly uri: vscode.Uri) {}
 
   dispose(): void {
-    this.session.dispose();
+    this.cancelToken.cancelled = true;
+    if (this.pendingSource) {
+      void this.pendingSource.then((source) => source.close?.());
+      this.pendingSource = null;
+    }
+    this.session?.dispose();
   }
 }
 
@@ -48,28 +56,57 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
   }
 
   async openCustomDocument(uri: vscode.Uri): Promise<JsonlDocument> {
-    return new JsonlDocument(uri, await this.openSession(uri));
+    const document = new JsonlDocument(uri);
+    // Only open the source; indexing happens lazily in resolveCustomEditor.
+    document.pendingSource = openDocumentSource(uri);
+    return document;
   }
 
   /** Load the cached line index when the file identity matches; build and store on a miss. */
-  private async openSession(uri: vscode.Uri): Promise<JsonlSession> {
-    const fingerprint = await this.fingerprint(uri);
-    let cached: Awaited<ReturnType<JsonlIndexCache["get"]>> = null;
+  private async openSession(
+    document: JsonlDocument,
+    options?: {
+      requestId?: number;
+      onProgress?: (loaded: number, total: number) => void;
+    },
+  ): Promise<JsonlSession> {
+    const fingerprint = await this.fingerprint(document.uri);
+    const source = document.pendingSource
+      ? await document.pendingSource
+      : await openDocumentSource(document.uri);
+    document.pendingSource = null;
+
+    // Try cache hit first.
+    let cachedIndex: Awaited<ReturnType<JsonlIndexCache["get"]>> = null;
     if (fingerprint) {
       try {
-        cached = await this.indexCache.get(fingerprint);
+        cachedIndex = await this.indexCache.get(fingerprint);
       } catch {
-        cached = null;
+        cachedIndex = null;
       }
     }
-    const file = await JsonlFile.open(await openDocumentSource(uri), cached ?? undefined);
-    if (fingerprint && !cached) {
+
+    if (cachedIndex) {
+      // Cache hit: skip progress, use cached index directly.
+      const file = await JsonlFile.open(source, cachedIndex);
+      return new JsonlSession(file);
+    }
+
+    // Cache miss: show progress and build index.
+    const file = await JsonlFile.open(source, undefined, {
+      onProgress: options?.onProgress,
+      cancel: document.cancelToken,
+    });
+
+    // Store the built index in cache.
+    if (fingerprint) {
       try {
         await this.indexCache.set(fingerprint, file.index);
       } catch {
         // A cache write failure must not fail the open; the index is already in memory.
       }
     }
+
     return new JsonlSession(file);
   }
 
@@ -114,17 +151,17 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
 
     const handlers = createJsonlHandlers({
       session: current,
-      reopen: async () => {
+      reopen: async (options) => {
         const previous = current();
-        document.session = await this.openSession(document.uri);
-        previous.dispose();
+        document.session = await this.openSession(document, options);
+        previous?.dispose();
       },
       emit: (type, payload) => handler.emit(type, payload),
       info: () => ({
         fileName: document.uri.path.split("/").pop() ?? document.uri.fsPath,
         cacheId: buildDocumentCacheId(document.uri),
-        lineCount: current().lineCount,
-        byteSize: current().byteSize,
+        lineCount: current()?.lineCount ?? 0,
+        byteSize: current()?.byteSize ?? 0,
         ...(this.consumeClear() ? { clearCache: true } : {}),
       }),
     });
@@ -133,8 +170,8 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
     webviewPanel.onDidDispose(() => this.panels.delete(handler));
 
     handler
-      .on("init", () => handlers.init())
-      .on("jsonlReload", () => handlers.reload())
+      .on("init", (request) => handlers.init(request))
+      .on("jsonlReload", (request) => handlers.reload(request))
       .on("fileChange", () => handlers.reload())
       .on("jsonlIndex", (request) => handlers.index(request))
       .on("jsonlEntry", (request) => handlers.entry(request))

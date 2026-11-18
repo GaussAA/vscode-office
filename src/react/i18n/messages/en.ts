@@ -238,6 +238,7 @@ export default {
     matchCountMany: "{count} matches",
     cappedSuffix: " · stopped at 10,000",
     loading: "Loading…",
+    indexing: "Indexing… {percent}%",
     loadMore: "Load more entries",
     empty: "No entries",
     chipEmpty: "empty",

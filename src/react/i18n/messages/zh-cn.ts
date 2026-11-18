@@ -234,6 +234,7 @@ export default {
     matchCountMany: "{count} 处匹配",
     cappedSuffix: " · 已停在 10,000",
     loading: "加载中…",
+    indexing: "建立索引… {percent}%",
     loadMore: "加载更多条目",
     empty: "没有条目",
     chipEmpty: "空行",

@@ -234,7 +234,7 @@ function manyFixtures(count) {
   });
 }
 
-function jsonlStub(fixtures, limit = 0) {
+function jsonlStub(fixtures, limit = 0, indexing = false) {
   const summaries = fixtures.map(({ index, kind, raw, size, label, error }) => ({
     index,
     kind,
@@ -254,9 +254,27 @@ function jsonlStub(fixtures, limit = 0) {
       if (!msg) return;
       if (msg.type === 'init') {
         const requestId = msg.content && msg.content.requestId;
-        setTimeout(function () {
-          window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: byteSize, requestId: requestId } }, '*');
-        }, 60);
+        if (${JSON.stringify(indexing)}) {
+          // Simulate indexing with progress updates
+          const steps = [20, 40, 60, 80, 99];
+          const sendProgress = function(i) {
+            if (i >= steps.length) {
+              setTimeout(function() {
+                window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: byteSize, requestId: requestId } }, '*');
+              }, 60);
+              return;
+            }
+            setTimeout(function() {
+              window.postMessage({ type: 'jsonlIndexProgress', content: { requestId: requestId, loaded: Math.floor(byteSize * steps[i] / 100), total: byteSize } }, '*');
+              sendProgress(i + 1);
+            }, 80);
+          };
+          sendProgress(0);
+        } else {
+          setTimeout(function () {
+            window.postMessage({ type: 'jsonlInfo', content: { fileName: 'events.jsonl', cacheId: 'demo:file', lineCount: summaries.length, byteSize: byteSize, requestId: requestId } }, '*');
+          }, 60);
+        }
       }
       if (msg.type === 'jsonlIndex') {
         const requestId = msg.content.requestId;
