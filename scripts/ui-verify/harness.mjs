@@ -573,6 +573,25 @@ function parquetStub(fixtures) {
         return;
       }
       const params = new URLSearchParams(location.search);
+      if (msg.type === 'parquetEmptyShareScan') {
+        if (params.get('profile') !== '1') return;
+        const requestId = msg.content && msg.content.requestId;
+        const names = Array.isArray(msg.content && msg.content.names) ? msg.content.names : [];
+        const shares = params.get('nested') === '1'
+          ? names.map(function (name) {
+              if (name === 'tags') return { name: name, scanned: 6, rowCount: 6, complete: true, nulls: 2, empties: 2, emptyRatio: 4 / 6 };
+              if (name === 'meta') return { name: name, scanned: 6, rowCount: 6, complete: true, nulls: 2, empties: 0, emptyRatio: 2 / 6 };
+              return { name: name, scanned: 6, rowCount: 6, complete: true, nulls: 0, empties: 0, emptyRatio: 0 };
+            })
+          : [];
+        setTimeout(function () {
+          window.postMessage({ type: 'parquetEmptyShareScanProgress', content: { requestId: requestId, scanned: 3, total: 6 } }, '*');
+        }, 30);
+        setTimeout(function () {
+          window.postMessage({ type: 'parquetEmptyShareScanData', content: { requestId: requestId, shares: shares } }, '*');
+        }, 120);
+        return;
+      }
       if (msg.type === 'parquetColumnScan') {
         if (params.get('profile') !== '1') return;
         const requestId = msg.content && msg.content.requestId;

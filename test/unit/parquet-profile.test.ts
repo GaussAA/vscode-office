@@ -10,6 +10,7 @@ import { memoryByteSource } from "@/service/jsonlFile";
 import {
   profileFromParquet,
   readParquetProfile,
+  scanEmptyShares,
   scanParquetColumn,
 } from "@/service/parquetProfile";
 
@@ -297,6 +298,56 @@ test("formatShare: <1% stays visible and a scanned prefix is marked with ~", () 
     percent: "33",
     marked: "~33%",
   });
+});
+
+test("scanEmptyShares: one pass answers every structured column without a histogram", async () => {
+  const shares = await scanEmptyShares(memoryByteSource(await bytesOf("nested")), ["tags", "meta"]);
+
+  const tags = shares.find((share) => share.name === "tags");
+  assert.ok(tags, "tags is missing from the batch answer");
+  assert.equal(tags.scanned, 6);
+  assert.equal(tags.complete, true);
+  assert.equal(tags.nulls, 2);
+  assert.equal(tags.empties, 2);
+  assert.equal(tags.emptyRatio, 4 / 6);
+
+  const meta = shares.find((share) => share.name === "meta");
+  assert.ok(meta, "meta is missing from the batch answer");
+  assert.equal(meta.nulls, 2);
+  assert.equal(meta.empties, 0);
+  assert.equal(meta.emptyRatio, 2 / 6);
+});
+
+test("scanEmptyShares: a prefix is labelled and progress never reports a later row first", async () => {
+  const progress: Array<[number, number]> = [];
+  const shares = await scanEmptyShares(memoryByteSource(await bytesOf("nested")), ["tags"], {
+    maxRows: 3,
+    onProgress: (scanned, total) => progress.push([scanned, total]),
+  });
+
+  assert.equal(shares[0].scanned, 3);
+  assert.equal(shares[0].complete, false);
+  // Rows 1–3: one populated list, one missing list and one empty list.
+  assert.equal(shares[0].nulls, 1);
+  assert.equal(shares[0].empties, 1);
+  assert.equal(shares[0].emptyRatio, 2 / 3);
+  assert.ok(progress.length > 0, "the rail never received a progress number");
+  assert.deepEqual(progress[progress.length - 1], [3, 3]);
+});
+
+test("scanEmptyShares: an aborted batch stops before decoding, and no names is an error", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    scanEmptyShares(memoryByteSource(await bytesOf("nested")), ["tags"], {
+      signal: controller.signal,
+    }),
+    /scan cancelled/,
+  );
+  await assert.rejects(
+    scanEmptyShares(memoryByteSource(await bytesOf("nested")), ["nope"]),
+    /no columns to scan/,
+  );
 });
 
 test("handlers: a column scan is answered with its requestId and a close", async () => {

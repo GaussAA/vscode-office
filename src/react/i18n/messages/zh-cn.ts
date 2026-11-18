@@ -190,6 +190,8 @@ export default {
     noStatistics: "未写 row-group statistics",
     emptyShare: "已扫描的行中有 {percent}% 为空或不存在",
     nestedScanHint: "LIST/STRUCT 值没有行级统计；扫描后可统计空值或缺失",
+    scanStructured: "扫描 LIST/STRUCT",
+    scanningStructured: "扫描中 {percent}%…",
     profileTitle: "列画像",
     profileScanning: "正在扫描这一列…",
     profileScan: "扫描这一列",

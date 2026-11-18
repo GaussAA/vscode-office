@@ -13,6 +13,9 @@ import type { OfficeOpenMessage } from "@/common/openPayload";
 import type {
   ParquetColumnScan,
   ParquetColumnScanPayload,
+  ParquetEmptyShare,
+  ParquetEmptyShareScanPayload,
+  ParquetEmptyShareScanProgress,
   ParquetProfile,
   ParquetProfilePayload,
 } from "@/common/parquetProfileTypes";
@@ -48,6 +51,22 @@ import { useParquetInspection } from "./useParquetInspection.ts";
 import { useParquetColumnLayout } from "./useParquetColumnLayout.ts";
 import { useParquetSiderResize } from "./useParquetSiderResize.ts";
 import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
+
+/** The rail only needs the "no data" half of a full column scan. */
+function emptyShareOf(scan: ParquetColumnScan): ParquetEmptyShare {
+  return {
+    name: scan.name,
+    scanned: scan.scanned,
+    rowCount: scan.rowCount,
+    complete: scan.complete,
+    nulls: scan.nulls,
+    empties: scan.empties,
+    emptyRatio: scan.emptyRatio,
+  };
+}
+
+/** Bound one batch request; a schema with hundreds of structured columns scans in clicks. */
+const STRUCTURED_SCAN_BATCH = 32;
 import { useParquetSearch } from "./useParquetSearch.ts";
 import ParquetTable from "./ParquetTable.tsx";
 import { buildParquetColumns } from "./parquetColumns.tsx";
@@ -99,10 +118,18 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [profilePanel, setProfilePanel] = useState<{ column: ParquetColumnInfo } | null>(null);
   const [columnScan, setColumnScan] = useState<ParquetColumnScan | null>(null);
   /**
-   * Scan answers by column name. They outlive the panel: a scanned LIST keeps its empty share
+   * Empty-share answers by column name. They outlive the panel: a scanned LIST keeps its share
    * in the rail after the panel closes, and scanning another column must not erase it.
    */
-  const [scans, setScans] = useState<Map<string, ParquetColumnScan>>(() => new Map());
+  const [shares, setShares] = useState<Map<string, ParquetEmptyShare>>(() => new Map());
+  /** The rail-level batch scan: one request, bounded progress, cancel on close/document swap. */
+  const [structuredScan, setStructuredScan] = useState<{
+    loading: boolean;
+    scanned: number;
+    total: number;
+    error: string | null;
+  }>({ loading: false, scanned: 0, total: 0, error: null });
+  const emptyShareRequest = useRef(new RequestGuard());
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanRequest = useRef(new RequestGuard());
@@ -285,13 +312,15 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setError(null);
       setFileInfo(null);
       setProfile(null);
-      setScans(new Map());
+      setShares(new Map());
+      setStructuredScan({ loading: false, scanned: 0, total: 0, error: null });
       // Everything the previous document asked the host is now unwanted. The profile request
       // is only re-issued once this file has opened, so without this a late reply from the old
       // file lands in the gap. The scan guard is cancelled too: today openProfilePanel also
       // cancels it before showing anything, so this is defence in depth, not observable alone.
       profileRequest.current.cancel();
       scanRequest.current.cancel();
+      emptyShareRequest.current.cancel();
       setProfilePanel(null);
       setColumnScan(null);
       setScanError(null);
@@ -454,10 +483,45 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (scan) {
         setColumnScan(scan);
         // Keep the answer behind the panel: the rail shows the empty share from now on.
-        setScans((previous) => new Map(previous).set(scan.name, scan));
+        setShares((previous) => new Map(previous).set(scan.name, emptyShareOf(scan)));
       } else {
         setScanError(payload.error ?? "The scan failed.");
       }
+    });
+  }, []);
+
+  useEffect(() => {
+    handler.on(
+      "parquetEmptyShareScanProgress",
+      (payload: ParquetEmptyShareScanProgress | undefined) => {
+        if (!payload || !emptyShareRequest.current.isCurrent(payload.requestId)) return;
+        setStructuredScan((previous) => ({
+          ...previous,
+          loading: true,
+          scanned: payload.scanned,
+          total: payload.total,
+        }));
+      },
+    );
+    handler.on("parquetEmptyShareScanData", (payload: ParquetEmptyShareScanPayload | undefined) => {
+      if (!payload || !emptyShareRequest.current.isCurrent(payload.requestId)) return;
+      emptyShareRequest.current.settle(payload.requestId);
+      const shares = payload.shares;
+      if (!shares) {
+        setStructuredScan({
+          loading: false,
+          scanned: 0,
+          total: 0,
+          error: payload.error ?? "The scan failed.",
+        });
+        return;
+      }
+      setShares((previous) => {
+        const next = new Map(previous);
+        for (const share of shares) next.set(share.name, share);
+        return next;
+      });
+      setStructuredScan({ loading: false, scanned: 0, total: 0, error: null });
     });
   }, []);
 
@@ -523,6 +587,24 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     window.addEventListener("keydown", onEscape);
     return () => window.removeEventListener("keydown", onEscape);
   }, [profilePanel, closeProfilePanel]);
+
+  /**
+   * The rail's batch action: every structured column that has no share yet, in one request.
+   * The host keeps it to a bounded prefix and aborts the previous batch when this starts.
+   */
+  const scanStructured = useCallback(() => {
+    const info = fileInfoRef.current;
+    if (!info) return;
+    const names = info.columns
+      .filter((column) => column.nested && !shares.has(column.name))
+      .slice(0, STRUCTURED_SCAN_BATCH)
+      .map((column) => column.name);
+    if (names.length === 0) return;
+    emptyShareRequest.current.cancel();
+    const requestId = emptyShareRequest.current.issue();
+    setStructuredScan({ loading: true, scanned: 0, total: 0, error: null });
+    handler.emit("parquetEmptyShareScan", { requestId, names });
+  }, [shares]);
 
   const jumpToRow = useCallback(
     (warnWhenEmpty = true) => {
@@ -853,7 +935,9 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               activeColumn={activeColumn}
               siderWidth={siderWidth}
               profile={profile}
-              scans={scans}
+              shares={shares}
+              structuredScan={structuredScan}
+              onScanStructured={scanStructured}
               onFocusColumn={focusColumn}
               onInspectColumn={openProfilePanel}
             />

@@ -80,7 +80,11 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
       });
       handler
         .on("parquetProfile", (request) => parquet.profile(request))
-        .on("parquetColumnScan", (request) => parquet.columnScan(request));
+        .on("parquetColumnScan", (request) => parquet.columnScan(request))
+        .on("parquetEmptyShareScan", (request) => parquet.emptyShareScan(request));
+      // A batch scan can run for seconds on a wide nested schema; closing the tab aborts it
+      // instead of letting the host decode to the row cap for nobody.
+      webviewPanel.onDidDispose(() => parquet.dispose());
     }
 
     return ReactApp.view(webview, { route });

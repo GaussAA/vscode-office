@@ -177,6 +177,8 @@ export default {
     emptyShare: "{percent}% das linhas verificadas são nulas ou vazias",
     nestedScanHint:
       "LIST/STRUCT não tem estatísticas por linha; verifique para contar nulos ou vazios",
+    scanStructured: "Verificar LIST/STRUCT",
+    scanningStructured: "Verificando {percent}%…",
     profileTitle: "Perfil da coluna",
     profileScanning: "Analisando a coluna…",
     profileScan: "Analisar a coluna",

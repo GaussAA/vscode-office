@@ -176,6 +176,8 @@ export default {
     emptyShare: "{percent}% просканированных строк — null или пустые",
     nestedScanHint:
       "Для LIST/STRUCT нет статистики на уровне строк; просканируйте, чтобы посчитать null или пустые",
+    scanStructured: "Сканировать LIST/STRUCT",
+    scanningStructured: "Сканирование {percent}%…",
     profileTitle: "Профиль столбца",
     profileScanning: "Сканирование столбца…",
     profileScan: "Сканировать столбец",

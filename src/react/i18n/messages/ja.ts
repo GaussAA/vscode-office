@@ -176,6 +176,8 @@ export default {
     emptyShare: "スキャンした行の {percent}% が null または空です",
     nestedScanHint:
       "LIST/STRUCT の値には行レベルの統計がありません。スキャンして null または空を数えます",
+    scanStructured: "LIST/STRUCT をスキャン",
+    scanningStructured: "スキャン中 {percent}%…",
     profileTitle: "列プロファイル",
     profileScanning: "この列をスキャン中…",
     profileScan: "この列をスキャン",

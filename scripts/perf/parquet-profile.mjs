@@ -48,6 +48,7 @@ export async function loadProfileHost() {
   return {
     readParquetProfile: module.readParquetProfile,
     scanParquetColumn: module.scanParquetColumn,
+    scanEmptyShares: module.scanEmptyShares,
     compareParquetProfiles: compare.compareParquetProfiles,
     cleanup: () => rmSync(outdir, { recursive: true, force: true }),
   };
@@ -175,6 +176,62 @@ export const profileScenarios = [
       return (
         `${elapsed} ms / ${counter.bytesRead} bytes for ${scan.scanned.toLocaleString()} rows ` +
         `of \`name\` (${scan.distinct} distinct, ${scan.nulls} nulls, top "${scan.top[0]?.value}")`
+      );
+    },
+  },
+  {
+    name: "parquet-empty-share-scan",
+    async run({ fixtures, profileHost }) {
+      const bytes = new Uint8Array(readFileSync(fixtures.profile));
+      // Measure the two singles too: the batch must read the union of its columns, not the row.
+      const singleName = countingSource(bytes);
+      await profileHost.scanParquetColumn(singleName.source, "name");
+      const singleScore = countingSource(bytes);
+      await profileHost.scanParquetColumn(singleScore.source, "score");
+
+      const counter = countingSource(bytes);
+      const started = performance.now();
+      const shares = await profileHost.scanEmptyShares(counter.source, ["name", "score"]);
+      const elapsed = Math.round(performance.now() - started);
+
+      expect(shares.length === 2, `the batch answered ${shares.length} of 2 columns`);
+      for (const share of shares) {
+        expect(
+          share.scanned === 200_000,
+          `\`${share.name}\` covered ${share.scanned} rows instead of the 200,000-row cap`,
+        );
+        expect(
+          share.complete === false,
+          `\`${share.name}\` claims to cover the whole 1M-row column within the cap`,
+        );
+        expect(
+          typeof share.emptyRatio === "number" && share.emptyRatio >= 0 && share.emptyRatio <= 1,
+          `\`${share.name}\` has no usable empty ratio (${share.emptyRatio})`,
+        );
+        // The rail answer is a count, not a histogram: the batch type has no top-N at all.
+        expect(
+          !("top" in share) && !("distinct" in share),
+          `\`${share.name}\` grew a histogram the rail does not need`,
+        );
+      }
+
+      expect(
+        elapsed <= 2500,
+        `the batch took ${elapsed} ms (budget 2500 ms); it should read columns, not the row`,
+      );
+      // The footer is read once instead of twice; the pages are exactly the two columns. A
+      // whole-row scan would add the other five columns and blow this comparison.
+      const singlesBytes = singleName.bytesRead + singleScore.bytesRead;
+      expect(
+        counter.bytesRead <= singlesBytes + 64 * 1024,
+        `the batch read ${counter.bytesRead} bytes; the two single-column scans read ` +
+          `${singlesBytes}. The batch read the row, not the requested columns.`,
+      );
+
+      return (
+        `${elapsed} ms / ${counter.bytesRead} bytes for 2 × ${shares[0].scanned.toLocaleString()} rows ` +
+        `(${shares.map((share) => `${share.name} null+empty ${(share.emptyRatio * 100).toFixed(1)}%`).join(", ")}; ` +
+        `singles ${singlesBytes} bytes)`
       );
     },
   },

@@ -189,6 +189,8 @@ export default {
     noStatistics: "未寫 row-group statistics",
     emptyShare: "已掃描的資料列中有 {percent}% 為空或不存在",
     nestedScanHint: "LIST/STRUCT 值沒有資料列層級統計；掃描後可統計空值或缺失",
+    scanStructured: "掃描 LIST/STRUCT",
+    scanningStructured: "掃描中 {percent}%…",
     profileTitle: "欄位畫像",
     profileScanning: "正在掃描這一欄…",
     profileScan: "掃描這一欄",

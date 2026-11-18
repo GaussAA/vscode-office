@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { ParquetColumnScan, ParquetProfile } from "@/common/parquetProfileTypes";
+import type { ParquetEmptyShare, ParquetProfile } from "@/common/parquetProfileTypes";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { COLUMN_ICONS } from "./parquetCell";
 import { formatShare } from "./formatShare";
@@ -11,8 +11,11 @@ interface ParquetSchemaProps {
   siderWidth: number;
   /** Null while the host has not answered; every row then simply has no badge. */
   profile?: ParquetProfile | null;
-  /** Per-column scan answers, keyed by name; a scanned nested column can show a number. */
-  scans: ReadonlyMap<string, ParquetColumnScan>;
+  /** Per-column empty-share answers, keyed by name; a scanned structured column can show a number. */
+  shares: ReadonlyMap<string, ParquetEmptyShare>;
+  /** The rail-level batch scan's state; its action is rendered only when it has work to do. */
+  structuredScan: { loading: boolean; scanned: number; total: number; error: string | null };
+  onScanStructured: () => void;
   onFocusColumn: (position: number) => void;
   /** Open the profile panel for this column (mouse on the badge, or `i` on the focused row). */
   onInspectColumn: (column: ParquetColumnInfo) => void;
@@ -27,7 +30,9 @@ export default function ParquetSchema({
   activeColumn,
   siderWidth,
   profile,
-  scans,
+  shares,
+  structuredScan,
+  onScanStructured,
   onFocusColumn,
   onInspectColumn,
 }: ParquetSchemaProps) {
@@ -47,6 +52,19 @@ export default function ParquetSchema({
     if (!needle) return all;
     return all.filter(({ column }) => column.name.toLowerCase().includes(needle));
   }, [columns, fieldFilter]);
+
+  // The batch action is about the structured columns that have no value-level answer yet.
+  // A silent host shows neither the button nor a badge: no answer, no action.
+  const unscannedStructured = useMemo(
+    () => columns.filter((column) => column.nested && !shares.has(column.name)),
+    [columns, shares],
+  );
+  const structuredPercent =
+    structuredScan.total > 0
+      ? Math.round((structuredScan.scanned / structuredScan.total) * 100)
+      : 0;
+  const showStructuredScan =
+    !!profile && (unscannedStructured.length > 0 || structuredScan.loading);
 
   const resetCursor = () => setFieldCursor(0);
 
@@ -91,6 +109,25 @@ export default function ParquetSchema({
           </button>
         )}
       </div>
+      {showStructuredScan && (
+        <button
+          type="button"
+          className="parquet-viewer__sider-scan"
+          onClick={onScanStructured}
+          disabled={structuredScan.loading}
+          title={$t("parquet.scanStructured")}
+        >
+          <span className="codicon codicon-checklist" />
+          {structuredScan.loading
+            ? $t("parquet.scanningStructured", { percent: String(structuredPercent) })
+            : $t("parquet.scanStructured")}
+        </button>
+      )}
+      {structuredScan.error && (
+        <p className="parquet-viewer__sider-scan-error" role="alert">
+          {structuredScan.error}
+        </p>
+      )}
       <div
         className="parquet-viewer__list"
         role="listbox"
@@ -139,22 +176,22 @@ export default function ParquetSchema({
           const kind = column.category;
           const active = activeColumn === position;
           const stats = statsByName.get(column.name);
-          const scan = scans.get(column.name);
+          const share = shares.get(column.name);
           // The badge is visual only; the row's accessible name carries the same sentence, so
           // a screen reader hears "Jump to column name — 12% of rows are null" rather than a
           // bare percentage the surrounding UI cannot explain.
           let badge: string | null = null;
           let summary: string | null = null;
-          if (scan && scan.emptyRatio !== undefined && scan.scanned > 0) {
+          if (share && share.scanned > 0) {
             // A scan is value-level, so it is the only source that can count empty lists and
             // empty strings; `empty` in the badge keeps it distinct from the metadata `null`.
-            const share = formatShare("empty", scan.emptyRatio, !scan.complete);
-            badge = share.badge;
-            summary = $t("parquet.emptyShare", { percent: share.percent });
-            if (!scan.complete) {
+            const formatted = formatShare("empty", share.emptyRatio, !share.complete);
+            badge = formatted.badge;
+            summary = $t("parquet.emptyShare", { percent: formatted.percent });
+            if (!share.complete) {
               summary += ` · ${$t("parquet.profileScanned", {
-                scanned: scan.scanned.toLocaleString(),
-                total: scan.rowCount.toLocaleString(),
+                scanned: share.scanned.toLocaleString(),
+                total: share.rowCount.toLocaleString(),
               })}`;
             }
           } else if (stats?.state === "available" && stats.nullRatio !== undefined) {

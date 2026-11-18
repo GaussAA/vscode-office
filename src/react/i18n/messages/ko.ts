@@ -174,6 +174,8 @@ export default {
     noStatistics: "행 그룹 통계 없음",
     emptyShare: "스캔한 행의 {percent}%가 null 또는 비어 있습니다",
     nestedScanHint: "LIST/STRUCT 값에는 행 수준 통계가 없습니다. 스캔하여 null 또는 빈 값을 세세요",
+    scanStructured: "LIST/STRUCT 스캔",
+    scanningStructured: "스캔 중 {percent}%…",
     profileTitle: "열 프로필",
     profileScanning: "이 열을 스캔하는 중…",
     profileScan: "이 열 스캔",

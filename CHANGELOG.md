@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   becomes `empty 67%` (or `empty ~33%` when the scan stopped at its row cap). The scan counts
   null, empty string, empty list, empty binary and empty map as no data, and the profile header
   shows both the metadata null share and the scanned empty share.
+- Parquet: the schema rail has a `Scan LIST/STRUCT` action. One click fills the empty share for
+  every structured column that has no answer yet. It scans a bounded prefix column by column in
+  one request, skips the top-N histogram, reports progress, and aborts when a newer scan starts
+  or the viewer closes; the action disappears once every structured column has a share.
 - Parquet: clicking the selected schema field again clears the column highlight. The second
   click only dismisses the tint; it does not move the grid.
 

@@ -14,6 +14,7 @@ import { openParquetFile, type ParquetColumnInfo } from "@/common/parquetReader"
 import type {
   ParquetColumnProfile,
   ParquetColumnScan,
+  ParquetEmptyShare,
   ParquetProfile,
   ParquetProfileState,
 } from "@/common/parquetProfileTypes";
@@ -272,6 +273,88 @@ export async function scanParquetColumn(
     emptyRatio: scanned > 0 ? (nulls + empties) / scanned : 0,
     top: ranked,
   };
+}
+
+/**
+ * The rail-level batch scan: null-or-empty shares for several structured columns.
+ *
+ * The single-column scan above builds a histogram and a top-N because the panel needs them.
+ * The rail only needs a count, so this path skips `toDisplayText`, the histogram and the sort;
+ * it opens the footer once for every requested column and reads one column per chunk. A
+ * multi-column `parquetReadObjects` call was measured slower than column-at-a-time on the
+ * 1M-row fixture: the small per-chunk row count costs more than the saved round trips.
+ * It is still bounded by `PARQUET_SCAN_ROWS`.
+ */
+export interface EmptyShareScanOptions {
+  maxRows?: number;
+  /** Aborted by a newer batch request or by the viewer closing. Checked between chunks. */
+  signal?: AbortSignal;
+  /** Called a handful of times, not per chunk: the rail only needs a progress number. */
+  onProgress?: (scanned: number, total: number) => void;
+}
+
+export async function scanEmptyShares(
+  source: ByteSource,
+  names: string[],
+  options: EmptyShareScanOptions = {},
+): Promise<ParquetEmptyShare[]> {
+  const info = await openParquetFile(asyncBufferFrom(source), {
+    initialFetchSize: PROFILE_TAIL_PROBE_BYTES,
+  });
+  const requested = [...new Set(names)].filter((name) =>
+    info.columns.some((column) => column.name === name),
+  );
+  if (requested.length === 0) throw new Error("no columns to scan");
+
+  const rowCount = info.rowCount;
+  const maxRows = Math.min(options.maxRows ?? PARQUET_SCAN_ROWS, rowCount);
+  const totalSteps = maxRows * requested.length;
+  const progressStep = Math.max(1, Math.floor(totalSteps / 10));
+  const shares: ParquetEmptyShare[] = [];
+  let completed = 0;
+  let reported = 0;
+
+  for (const name of requested) {
+    let scanned = 0;
+    let nulls = 0;
+    let empties = 0;
+    while (scanned < maxRows) {
+      if (options.signal?.aborted) throw new Error("scan cancelled");
+      const end = Math.min(scanned + PARQUET_SCAN_CHUNK, maxRows);
+      const rows = await parquetReadObjects({
+        file: info.file,
+        metadata: info.metadata,
+        // One column per chunk: the same shape as the single-column scan, without its
+        // histogram. The footer is already open, so this is one source for the whole batch.
+        columns: [name],
+        rowStart: scanned,
+        rowEnd: end,
+        compressors,
+      });
+      for (const row of rows) {
+        const value = row[name];
+        if (value === null || value === undefined) nulls += 1;
+        else if (isEmptyScanValue(value)) empties += 1;
+      }
+      scanned = end;
+      completed += rows.length;
+      if (completed === totalSteps || completed - reported >= progressStep) {
+        reported = completed;
+        options.onProgress?.(completed, totalSteps);
+      }
+    }
+    shares.push({
+      name,
+      scanned,
+      rowCount,
+      complete: scanned >= rowCount,
+      nulls,
+      empties,
+      emptyRatio: scanned > 0 ? (nulls + empties) / scanned : 0,
+    });
+  }
+
+  return shares;
 }
 
 /**

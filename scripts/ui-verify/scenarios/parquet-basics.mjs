@@ -627,6 +627,55 @@ export default [
     },
   },
   {
+    name: "parquet-profile-scan-structured",
+    async run({ page, base }) {
+      await openParquet(page, base, "?nested=1&profile=1");
+      const ready = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-null').length === 3`,
+      );
+      expect(ready, "the nested profile badges never rendered");
+      const button = await page.waitFor(`!!document.querySelector('.parquet-viewer__sider-scan')`);
+      expect(button, "the structured-scan action never appeared in the rail");
+      const before = json(
+        await page.evaluate(`JSON.stringify({
+                button: document.querySelector('.parquet-viewer__sider-scan')?.textContent?.trim() ?? null,
+                tags: [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(row => row.dataset.column === 'tags')?.querySelector('.parquet-viewer__list-null')?.textContent ?? null,
+                meta: [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(row => row.dataset.column === 'meta')?.querySelector('.parquet-viewer__list-null')?.textContent ?? null,
+            })`),
+      );
+      expect(before.tags === "null ?" && before.meta === "null ?", JSON.stringify(before));
+      expect(before.button.includes("Scan LIST/STRUCT"), `the action is labelled ${before.button}`);
+
+      // One click resolves every structured column in a single host scan.
+      await page.evaluate(`document.querySelector('.parquet-viewer__sider-scan')?.click()`);
+      const filled = await page.waitFor(
+        `(() => {
+            const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+                .find(row => row.dataset.column === name)
+                ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+            return badge('tags') === 'empty 67%' && badge('meta') === 'empty 33%';
+        })()`,
+        4000,
+      );
+      expect(filled, "the batch scan did not fill both structured badges");
+      const hidden = await page.waitFor(`!document.querySelector('.parquet-viewer__sider-scan')`);
+      expect(hidden, "the batch action stayed after every structured column was answered");
+      const after = json(
+        await page.evaluate(`JSON.stringify({
+                tags: [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(row => row.dataset.column === 'tags')?.getAttribute('aria-label') ?? null,
+                meta: [...document.querySelectorAll('.parquet-viewer__list-item')]
+                    .find(row => row.dataset.column === 'meta')?.getAttribute('aria-label') ?? null,
+            })`),
+      );
+      expect(after.tags.includes("67% of the scanned rows are null or empty"), after.tags);
+      expect(after.meta.includes("33% of the scanned rows are null or empty"), after.meta);
+      return "one click fills every structured badge and the action disappears";
+    },
+  },
+  {
     name: "parquet-profile-silent-host",
     async run({ page, base }) {
       // No `profile=1`: the fake host never answers, so the rail must stay bare. A viewer that
@@ -651,10 +700,15 @@ export default [
       const nested = json(
         await page.evaluate(`JSON.stringify({
                 badges: document.querySelectorAll('.parquet-viewer__list-null').length,
+                scans: document.querySelectorAll('.parquet-viewer__sider-scan').length,
                 tags: document.querySelector('.parquet-viewer__list-item[data-column="tags"]')?.getAttribute('aria-label') ?? null,
             })`),
       );
       expect(nested.badges === 0, `a silent host still produced ${nested.badges} nested badge(s)`);
+      expect(
+        nested.scans === 0,
+        `a silent host still offered ${nested.scans} structured-scan action(s)`,
+      );
       expect(
         nested.tags && !nested.tags.includes("scan"),
         `a silent host still offered a scan for tags: ${nested.tags}`,

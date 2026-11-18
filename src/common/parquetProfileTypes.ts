@@ -100,3 +100,40 @@ export interface ParquetColumnScanPayload {
   scan: ParquetColumnScan | null;
   error?: string;
 }
+
+/**
+ * The rail-level answer for a structured column: just the "no data" share.
+ *
+ * This is deliberately narrower than `ParquetColumnScan`: the batch action exists to fill the
+ * schema rail, so it does not build a histogram or top-N for every column. The panel still
+ * requests the full scan of the one column it shows.
+ */
+export interface ParquetEmptyShare {
+  name: string;
+  scanned: number;
+  rowCount: number;
+  complete: boolean;
+  nulls: number;
+  empties: number;
+  emptyRatio: number;
+}
+
+export interface ParquetEmptyShareScanRequest {
+  requestId: number;
+  /** Top-level column names to cover. The rail sends its unscanned LIST/STRUCT columns. */
+  names: string[];
+}
+
+export interface ParquetEmptyShareScanPayload {
+  requestId: number;
+  shares: ParquetEmptyShare[] | null;
+  error?: string;
+}
+
+export interface ParquetEmptyShareScanProgress {
+  requestId: number;
+  /** Work units completed: rows read across all requested columns. */
+  scanned: number;
+  /** Work units this batch will read: `rowCap × names.length`. */
+  total: number;
+}

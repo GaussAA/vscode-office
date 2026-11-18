@@ -451,6 +451,50 @@ body:has(.parquet-app) {
   }
 }
 
+/* The rail's one batch action. It only exists while a structured column still has no answer. */
+.parquet-viewer__sider-scan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin: 0 10px 6px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
+  color: var(--pv-muted);
+  background: var(--pv-control);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+
+  .codicon {
+    font-size: 12px;
+  }
+
+  &:hover {
+    color: var(--pv-fg);
+    background: var(--pv-control-hover);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--pv-focus);
+    outline-offset: -1px;
+  }
+
+  &:disabled {
+    cursor: progress;
+  }
+}
+
+.parquet-viewer__sider-scan-error {
+  flex: 0 0 auto;
+  margin: 0 10px 6px;
+  color: var(--pv-error);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .parquet-viewer__list {
   flex: 1;
   min-height: 0;

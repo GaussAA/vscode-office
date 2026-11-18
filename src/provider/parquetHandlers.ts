@@ -9,11 +9,13 @@
 import type {
   ParquetColumnScanPayload,
   ParquetColumnScanRequest,
+  ParquetEmptyShareScanPayload,
+  ParquetEmptyShareScanRequest,
   ParquetProfilePayload,
   ParquetProfileRequest,
 } from "../common/parquetProfileTypes";
 import type { ByteSource } from "../common/byteSource";
-import { readParquetProfile, scanParquetColumn } from "../service/parquetProfile";
+import { readParquetProfile, scanEmptyShares, scanParquetColumn } from "../service/parquetProfile";
 
 export interface ParquetHandlerContext {
   /** Open the document's bytes: the provider owns the scheme decision (`openByteSource`). */
@@ -35,6 +37,13 @@ async function withSource<T>(
 }
 
 export function createParquetHandlers(context: ParquetHandlerContext) {
+  let activeEmptyScan: AbortController | null = null;
+  let disposed = false;
+  const emit = (type: string, payload: unknown) => {
+    // A reply after the webview is gone has no receiver; the old viewer's scan must not keep
+    // the host busy either, which `dispose` below takes care of.
+    if (!disposed) context.emit(type, payload);
+  };
   return {
     async profile(request?: Partial<ParquetProfileRequest>) {
       if (typeof request?.requestId !== "number") return;
@@ -51,7 +60,7 @@ export function createParquetHandlers(context: ParquetHandlerContext) {
           error: error instanceof Error ? error.message : String(error),
         };
       }
-      context.emit("parquetProfileData", payload);
+      emit("parquetProfileData", payload);
     },
 
     /**
@@ -74,7 +83,51 @@ export function createParquetHandlers(context: ParquetHandlerContext) {
           error: error instanceof Error ? error.message : String(error),
         };
       }
-      context.emit("parquetColumnScanData", payload);
+      emit("parquetColumnScanData", payload);
+    },
+
+    /**
+     * The rail-level batch scan. One request, one source, one pass over a bounded prefix; the
+     * progress message is throttled by the service. A newer batch aborts the previous one, and
+     * `dispose` aborts it when the viewer closes.
+     */
+    async emptyShareScan(request?: Partial<ParquetEmptyShareScanRequest>) {
+      if (typeof request?.requestId !== "number" || !Array.isArray(request.names)) return;
+      const { requestId } = request;
+      const names = request.names.filter((name): name is string => typeof name === "string");
+      if (names.length === 0) return;
+      activeEmptyScan?.abort();
+      const controller = new AbortController();
+      activeEmptyScan = controller;
+      let payload: ParquetEmptyShareScanPayload;
+      try {
+        payload = {
+          requestId,
+          shares: await withSource(context, (source) =>
+            scanEmptyShares(source, names, {
+              signal: controller.signal,
+              onProgress: (scanned, total) =>
+                emit("parquetEmptyShareScanProgress", { requestId, scanned, total }),
+            }),
+          ),
+        };
+      } catch (error) {
+        payload = {
+          requestId,
+          shares: null,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      } finally {
+        if (activeEmptyScan === controller) activeEmptyScan = null;
+      }
+      emit("parquetEmptyShareScanData", payload);
+    },
+
+    /** The webview is gone: stop a batch scan instead of letting it read to the row cap. */
+    dispose() {
+      disposed = true;
+      activeEmptyScan?.abort();
+      activeEmptyScan = null;
     },
   };
 }
