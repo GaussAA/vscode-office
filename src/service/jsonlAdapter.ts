@@ -9,7 +9,9 @@ import {
   JSONL_SEARCH_BYTE_BUDGET,
   JSONL_SEARCH_MAX_MATCHES,
 } from "@/common/jsonlTypes";
+import { byteNeedle, candidateLines } from "@/service/jsonlByteSearch";
 import {
+  decodeJsonlLine,
   matchSnippet as jsonlMatchSnippet,
   readJsonlLineText,
   summarizeDecodedLine,
@@ -58,6 +60,7 @@ export class JsonlAdapter {
       return;
     }
 
+    const byteSearch = byteNeedle(needle);
     const batchSize = options.batchSize ?? JSONL_SEARCH_BATCH;
     const maxMatches = options.maxMatches ?? JSONL_SEARCH_MAX_MATCHES;
     const schedule = options.schedule ?? ((run) => setTimeout(run, 0));
@@ -96,9 +99,9 @@ export class JsonlAdapter {
         Math.min(this.file.lineCount, this.file.advance(scanned, step, JSONL_SEARCH_BYTE_BUDGET)),
       );
 
-      let window;
+      let raw;
       try {
-        window = await this.file.window(scanned, until);
+        raw = await this.file.readLines(scanned, until);
       } catch {
         // A read failure ends the scan politely; the webview keeps what it has.
         if (!cancelToken.cancelled) flush(true);
@@ -110,10 +113,30 @@ export class JsonlAdapter {
         return;
       }
 
-      for (let offset = 0; offset < window.index.lineCount; offset++) {
-        const rawText = readJsonlLineText(window.bytes, window.index, offset);
+      // Byte path: the raw window is scanned once and only candidate lines are decoded. It needs
+      // an ASCII needle and bytes that match the line index; otherwise every line is decoded.
+      const candidates =
+        byteSearch && raw.complete
+          ? candidateLines(
+              raw.bytes,
+              this.file.index.offsets,
+              raw.first,
+              raw.last,
+              raw.start,
+              byteSearch,
+            )
+          : undefined;
+      const window = candidates ? undefined : this.file.toWindow(raw);
+      const count = candidates ? candidates.length : window!.index.lineCount;
+
+      for (let n = 0; n < count; n++) {
+        const offset = candidates ? candidates[n] - scanned : n;
+        const rawText = candidates
+          ? decodeJsonlLine(this.file.lineSlice(raw, candidates[n]))
+          : readJsonlLineText(window!.bytes, window!.index, offset);
         // Case-insensitive match; needle is already lowercased by caller
         // One pass decides the hit and yields the snippet; no lowercase copy of the line.
+        // On the byte path this is still the decision: the prefilter only over-approximates.
         const snippet = jsonlMatchSnippet(rawText, needle);
         if (snippet === undefined) continue;
 

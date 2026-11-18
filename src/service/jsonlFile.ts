@@ -19,6 +19,20 @@ export interface ByteWindow {
   index: JsonlIndex;
 }
 
+/** Raw bytes of lines `[first, last)`, as read from the file. */
+export interface LineBytes {
+  bytes: Uint8Array;
+  /** File offset of `bytes[0]`. */
+  start: number;
+  first: number;
+  last: number;
+  /**
+   * False when the source returned a different number of bytes than the line index promises
+   * (the file changed on disk). The index is then not a valid description of `bytes`.
+   */
+  complete: boolean;
+}
+
 /** Bytes are already in memory: virtual documents, workspaces, and every unit test. */
 export function memoryByteSource(bytes: Uint8Array): ByteSource {
   return {
@@ -146,15 +160,39 @@ export class JsonlFile {
    * back when they build summaries, so absolute line numbers survive.
    */
   async window(from: number, to: number): Promise<ByteWindow> {
+    return this.toWindow(await this.readLines(from, to));
+  }
+
+  /**
+   * Read the bytes of lines `[from, to)` without indexing them. The search prefilter works on
+   * raw bytes and takes line boundaries from the file's own index, so it skips the per-window
+   * newline scan that `window` pays for.
+   */
+  async readLines(from: number, to: number): Promise<LineBytes> {
     const first = Math.max(0, Math.min(from, this.index.lineCount));
     const last = Math.max(first, Math.min(to, this.index.lineCount));
     if (last <= first) {
-      return { bytes: new Uint8Array(0), index: { offsets: [], lineCount: 0 } };
+      return { bytes: new Uint8Array(0), start: 0, first, last, complete: true };
     }
     const start = this.index.offsets[first];
     const end = last < this.index.lineCount ? this.index.offsets[last] : this.source.size;
     const bytes = await this.source.read(start, end - start);
-    return { bytes, index: buildJsonlIndex(bytes) };
+    return { bytes, start, first, last, complete: bytes.byteLength === end - start };
+  }
+
+  /** Index the bytes that `readLines` returned, from the bytes themselves. */
+  toWindow(raw: LineBytes): ByteWindow {
+    if (raw.last <= raw.first) {
+      return { bytes: new Uint8Array(0), index: { offsets: [], lineCount: 0 } };
+    }
+    return { bytes: raw.bytes, index: buildJsonlIndex(raw.bytes) };
+  }
+
+  /** Bytes of one line (terminator included) inside a complete `readLines` result. */
+  lineSlice(raw: LineBytes, line: number): Uint8Array {
+    const from = this.index.offsets[line] - raw.start;
+    const to = line + 1 < raw.last ? this.index.offsets[line + 1] - raw.start : raw.bytes.length;
+    return raw.bytes.subarray(from, to);
   }
 
   close(): void {

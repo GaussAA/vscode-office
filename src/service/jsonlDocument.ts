@@ -71,14 +71,18 @@ function readLineHead(bytes: Uint8Array, index: JsonlIndex, line: number): strin
   return text.replace(/^\uFEFF/, "").replace(/[\r\n]+$/, "");
 }
 
-/** Decode one line to text. Exported so the searcher can scan without re-parsing. */
-export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: number): string {
-  const slice = lineBytes(bytes, index, line);
+/** Decode the bytes of one line (terminator included) to text. */
+export function decodeJsonlLine(slice: Uint8Array): string {
   // A UTF-8 BOM at byte 0 would otherwise make the first line invalid JSON.
   return decoder
     .decode(slice)
     .replace(/^\uFEFF/, "")
     .replace(/[\r\n]+$/, "");
+}
+
+/** Decode one line to text. Exported so the searcher can scan without re-parsing. */
+export function readJsonlLineText(bytes: Uint8Array, index: JsonlIndex, line: number): string {
+  return decodeJsonlLine(lineBytes(bytes, index, line));
 }
 
 /**
