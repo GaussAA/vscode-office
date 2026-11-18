@@ -17,6 +17,8 @@ import {
 } from "./excelSession";
 import { useExcelSave } from "./useExcelSave";
 import { mountExcelSpreadsheet } from "./excelSpreadsheetHost";
+import { clearExcelViewStorage } from "./excelViewState";
+import { clearWindowedFindMemo } from "./windowedFindMemo";
 
 export type { ExcelOpenPayload };
 
@@ -259,6 +261,10 @@ export function useExcelDocumentSession({
 
     handler
       .on("open", (payload: ExcelOpenPayload) => {
+        if (payload.clearCache) {
+          clearExcelViewStorage();
+          clearWindowedFindMemo();
+        }
         activeHost?.dispose();
         activeHost = null;
         const result = session.open(payload);
@@ -284,6 +290,12 @@ export function useExcelDocumentSession({
           return;
         }
         loadPayload(result.payload, result.seq);
+      })
+      .on("clearExcelCache", () => {
+        clearExcelViewStorage();
+        clearWindowedFindMemo();
+        onResetFind();
+        spreadSheetRef.current?.scrollToCell(0, 0, 0);
       })
       .on("saveDone", () => {
         const effect = session.markSaveDone();
