@@ -595,6 +595,7 @@ function parquetStub(fixtures) {
         : params.get('empty') === '1' ? '/empty.parquet'
         : params.get('types') === '1' ? '/types.parquet'
         : params.get('preview') === '1' ? '/preview.parquet'
+        : params.get('wide') === '1' ? '/wide.parquet'
         : params.get('bad') === '1' ? '/bad.parquet'
         : '/sample.parquet';
       const suffix = params.get('range') === 'off' ? '?range=off' : '';
@@ -1368,6 +1369,7 @@ export function startHarness(fixtures, port = 0) {
       path === "/empty.parquet" ||
       path === "/types.parquet" ||
       path === "/preview.parquet" ||
+      path === "/wide.parquet" ||
       path === "/bad.parquet"
     ) {
       const file =
@@ -1383,9 +1385,11 @@ export function startHarness(fixtures, port = 0) {
                   ? fixtures.types
                   : path === "/preview.parquet"
                     ? fixtures.preview
-                    : path === "/bad.parquet"
-                      ? fixtures.bad
-                      : fixtures.big;
+                    : path === "/wide.parquet"
+                      ? fixtures.wide
+                      : path === "/bad.parquet"
+                        ? fixtures.bad
+                        : fixtures.big;
       // `?delay=ms` slows every response for that URL. A scenario that needs "a document is
       // still opening" (a stale reply arriving mid-load) cannot get that window from a local
       // fixture that answers in a millisecond.

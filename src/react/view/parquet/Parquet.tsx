@@ -171,7 +171,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const documentKeyRef = useRef<string | undefined>(undefined);
 
   const { activeColumn, setActiveColumn, focusColumn } = useParquetColumnFocus({
-    fileInfoRef,
+    tableRef,
     tableWrapRef,
   });
 

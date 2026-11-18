@@ -1,235 +1,207 @@
-import { useCallback, useState, type RefObject } from "react";
-import type { ParquetFileInfo } from "@/common/parquetReader";
-import { DATA_COLUMN_WIDTH, INDEX_COLUMN_WIDTH } from "./parquetLayout";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { flushSync } from "react-dom";
+import type { TableRef } from "antd/es/table";
+import { MOTION_SLOW_MS, motionEnabled } from "../../util/motion";
 
 interface UseParquetColumnFocusArgs {
-  fileInfoRef: RefObject<ParquetFileInfo | null>;
+  tableRef: RefObject<TableRef | null>;
   tableWrapRef: RefObject<HTMLDivElement | null>;
 }
 
+/** A frame may land a pixel off; more than this means something else owns the scroll. */
+const INTERRUPT_TOLERANCE = 2;
 /**
- * Bring one field into view without changing the page or the row selection.
- *
- * This lives outside the viewer because the behaviour is a small, testable horizontal-scroll
- * model built on the virtual table's DOM: measure the target instead of computing it from a
- * column width (antd stretches few-column files), keep the separately-scrolled header aligned,
- * and retry for a few frames because the virtual list rebuilds its scrollbar.
+ * Past this many columns the glide stops being motion: every frame re-renders every column of
+ * the visible rows, so a very wide table turns the easing into a handful of blocking long
+ * tasks. Those tables get the column placed directly, which is what they had before.
  */
-export function useParquetColumnFocus({ fileInfoRef, tableWrapRef }: UseParquetColumnFocusArgs) {
+const GLIDE_MAX_COLUMNS = 120;
+
+/**
+ * antd's `TableRef` only types the row-scrolling half. The virtual body's imperative handle
+ * forwards `left` to rc-virtual-list, which sets the horizontal offset directly — the one way
+ * to move that surface without synthesising a drag on its scrollbar.
+ */
+interface HorizontalTableRef {
+  scrollTo(config: { left: number }): void;
+}
+
+/**
+ * Bring one field's column into view without changing the page or the row selection.
+ *
+ * The table's horizontal position belongs to rc-virtual-list, not to a scroll port with a
+ * native offset: the body is shifted by `margin-left`, and the only exposed control is the drag
+ * on its custom scrollbar. The previous implementation synthesised that drag — first with fixed
+ * timers, then with an eased mousemove chain — so every click started its own drag and retry
+ * chain. Two chains read each other's synthetic coordinates, and a click during an earlier jump
+ * landed on whichever chain finished last; the serialised retry loop also kept running for up to
+ * 1.2 s after the column arrived, so the *next* click could fight it and rebound.
+ *
+ * This version owns the offset instead: it measures the column from the header (which renders
+ * every column, unlike the virtual body), eases to that offset one frame at a time, and keeps
+ * the header in step — so a second click cancels the glide and retargets it from wherever the
+ * grid currently is. The duration comes from the motion tokens (ADR-0022); reduced motion
+ * places the column directly.
+ */
+export function useParquetColumnFocus({ tableRef, tableWrapRef }: UseParquetColumnFocusArgs) {
   /** Field whose column the schema click last brought into view; tints it while browsing. */
   const [activeColumn, setActiveColumn] = useState<number | null>(null);
+  /** The one pending frame: measurement or glide step. The newest click owns it. */
+  const frame = useRef(0);
+
+  /**
+   * How far the grid is scrolled horizontally, read from the layout rather than tracked: the
+   * body is moved by `margin-left` on the holder's inner element, so the gap between the wrap
+   * and that element is the offset currently on screen.
+   */
+  const bodyOffset = useCallback((): number => {
+    const wrap = tableWrapRef.current;
+    const inner = wrap?.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner");
+    if (!wrap || !inner) return 0;
+    return Math.max(0, wrap.getBoundingClientRect().left - inner.getBoundingClientRect().left);
+  }, [tableWrapRef]);
+
+  /**
+   * The header is a separately shifted surface: rc-table only moves it when the body reports a
+   * scroll, and a programmatic offset change reports nothing.
+   */
+  const syncHeader = useCallback(
+    (offset: number) => {
+      const header = tableWrapRef.current?.querySelector<HTMLElement>(".ant-table-header");
+      if (!header) return;
+      if (Math.abs(header.scrollLeft - offset) > 0.5) header.scrollLeft = offset;
+    },
+    [tableWrapRef],
+  );
+
+  const apply = useCallback(
+    (offset: number) => {
+      // The virtual body's offset is React state inside rc-virtual-list. Left to the default
+      // scheduler the commit lands a frame after the header write below, so every step shows
+      // labels one column ahead of their values — a shear that reads as the table shaking.
+      flushSync(() => {
+        (tableRef.current as unknown as HorizontalTableRef | null)?.scrollTo?.({ left: offset });
+      });
+      syncHeader(offset);
+    },
+    [syncHeader, tableRef],
+  );
+
+  /**
+   * Where the column has to sit so that it ends up centred, clamped to the table's real range,
+   * plus how many data columns the header rendered.
+   *
+   * The header renders every column, so its cell exists even when the virtual body has not
+   * rendered the target; adding the header's `scrollLeft` puts the cell back into content
+   * coordinates, which do not depend on how far the grid happens to be scrolled right now.
+   */
+  const targetFor = useCallback(
+    (position: number): { offset: number; columns: number } | null => {
+      const wrap = tableWrapRef.current;
+      if (!wrap) return null;
+      const header = wrap.querySelector<HTMLElement>(".ant-table-header");
+      const viewport = wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual");
+      const inner = wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner");
+      const headCell = header?.querySelector<HTMLElement>(`th[aria-colindex="${position + 2}"]`);
+      if (!header || !headCell || !viewport || !inner) return null;
+      const viewportWidth = viewport.clientWidth;
+      // A holder that has not been measured yet has no usable centre; a jump computed from it
+      // would land off the table for no reason.
+      if (viewportWidth <= 0) return null;
+      const headerRect = header.getBoundingClientRect();
+      const cellRect = headCell.getBoundingClientRect();
+      const columnLeft = cellRect.left - headerRect.left + header.scrollLeft;
+      const desired = columnLeft + cellRect.width / 2 - viewportWidth / 2;
+      return {
+        offset: Math.min(Math.max(0, desired), Math.max(0, inner.scrollWidth - viewportWidth)),
+        // The ordinal cells are the index column plus one per field.
+        columns: header.querySelectorAll("th[aria-colindex]").length - 1,
+      };
+    },
+    [tableWrapRef],
+  );
+
+  const stopGlide = useCallback(() => {
+    cancelAnimationFrame(frame.current);
+    frame.current = 0;
+  }, []);
+
+  const glideTo = useCallback(
+    (target: number) => {
+      stopGlide();
+      const start = bodyOffset();
+      const distance = target - start;
+      if (!motionEnabled() || Math.abs(distance) < 1) {
+        apply(target);
+        return;
+      }
+
+      const startedAt = performance.now();
+      let applied = start;
+      let step = 0;
+      const tick = () => {
+        // A layout change moved the body while we were easing: the new geometry wins.
+        const current = bodyOffset();
+        if (step > 0 && Math.abs(current - applied) > INTERRUPT_TOLERANCE) {
+          syncHeader(current);
+          return;
+        }
+        const progress = Math.min(1, (performance.now() - startedAt) / MOTION_SLOW_MS);
+        applied = start + distance * (1 - (1 - progress) ** 3);
+        apply(progress === 1 ? target : applied);
+        step += 1;
+        if (progress === 1) {
+          // The header can clamp a pixel short of the body at the right edge; one more frame
+          // settles the labels on the position the body actually reached.
+          frame.current = requestAnimationFrame(() => syncHeader(bodyOffset()));
+          return;
+        }
+        frame.current = requestAnimationFrame(tick);
+      };
+      frame.current = requestAnimationFrame(tick);
+    },
+    [apply, bodyOffset, stopGlide, syncHeader],
+  );
 
   const focusColumn = useCallback(
     (position: number, mark = true) => {
-      if (mark) {
-        setActiveColumn(position);
-      } else {
-        // Clear active column when mark is false (e.g., during search)
-        setActiveColumn(null);
-      }
-      const colIndex = position + 2;
-
-      const bodyOffset = (): number => {
-        const wrap = tableWrapRef.current;
-        if (!wrap) return 0;
-        const inner = wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner");
-        if (inner) return wrap.getBoundingClientRect().left - inner.getBoundingClientRect().left;
-        const body = wrap.querySelector<HTMLElement>(".ant-table-body, .ant-table-content");
-        return body?.scrollLeft ?? 0;
-      };
-
-      /**
-       * The header is a separate scroll surface. rc-virtual-list moves the body by transform,
-       * so nothing fires the scroll event that normally keeps the two in step.
-       */
-      const syncHeader = () => {
-        const header = tableWrapRef.current?.querySelector<HTMLElement>(".ant-table-header");
-        if (!header) return;
-        const offset = bodyOffset();
-        if (Math.abs(header.scrollLeft - offset) > 1) header.scrollLeft = offset;
-      };
-
-      const isSettled = (): boolean => {
-        const wrap = tableWrapRef.current;
-        const cell = wrap?.querySelector<HTMLElement>(
-          `[role="gridcell"][aria-colindex="${colIndex}"]`,
-        );
-        if (!wrap || !cell) return false;
-        const wrapRect = wrap.getBoundingClientRect();
-        const rect = cell.getBoundingClientRect();
-        const centred =
-          Math.abs(wrapRect.left + Math.max(0, (wrapRect.width - rect.width) / 2) - rect.left) < 2;
-        const header = wrap.querySelector<HTMLElement>(
-          `.ant-table-header th[aria-colindex="${colIndex}"]`,
-        );
-        const aligned = !header || Math.abs(header.getBoundingClientRect().left - rect.left) < 2;
-        return centred && aligned;
-      };
-
-      /** True while a synthetic drag is in flight; a second mousedown would cancel the first. */
-      let dragging = false;
-
-      // Wall-clock budget, not a frame count: on a loaded machine a frame is what is slow, so a
-      // frame budget shrinks exactly when the retries are needed. Declared before `scrollOnce`
-      // because the drag chain schedules the next attempt itself.
-      const deadline = Date.now() + 1200;
-      // Assigned below; the drag chain only reaches it after this function has been called.
-      let attempt: () => void;
-
-      const scrollOnce = () => {
-        const wrap = tableWrapRef.current;
-        if (!wrap) return;
-        const wrapRect = wrap.getBoundingClientRect();
-        // The header renders every column (it is not virtualised), so it is the reliable count.
-        const headerCols = wrap.querySelectorAll(".ant-table-header th[aria-colindex]").length;
-        const columnCount =
-          headerCols > 0 ? headerCols - 1 : (fileInfoRef.current?.columns.length ?? 0);
-        const contentWidth =
-          columnCount > 0
-            ? INDEX_COLUMN_WIDTH + (columnCount + 1) * DATA_COLUMN_WIDTH
-            : (wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner")
-                ?.scrollWidth ?? 0);
-        const maxScroll = Math.max(0, contentWidth - wrapRect.width);
-        if (maxScroll <= 0) {
-          syncHeader();
+      setActiveColumn(mark ? position : null);
+      // Measure after the click has committed: on a cold start the holder's width can still be
+      // zero, and an offset computed from half-measured columns would land somewhere else.
+      stopGlide();
+      frame.current = requestAnimationFrame(() => {
+        frame.current = 0;
+        const target = targetFor(position);
+        if (!target) return;
+        if (target.columns > GLIDE_MAX_COLUMNS) {
+          apply(target.offset);
           return;
         }
-
-        // An off-screen column is not rendered at all, so there is nothing to measure: fall back
-        // to the layout arithmetic, then let the verification pass correct any drift.
-        const cell = wrap.querySelector<HTMLElement>(
-          `[role="gridcell"][aria-colindex="${colIndex}"]`,
-        );
-        const desired = cell
-          ? (() => {
-              const rect = cell.getBoundingClientRect();
-              const centred = wrapRect.left + Math.max(0, (wrapRect.width - rect.width) / 2);
-              // Increasing the offset moves the content left, so the offset we want is the
-              // current one plus however far the cell still has to travel left.
-              return bodyOffset() + (rect.left - centred);
-            })()
-          : INDEX_COLUMN_WIDTH +
-            position * DATA_COLUMN_WIDTH -
-            Math.max(0, (wrapRect.width - DATA_COLUMN_WIDTH) / 2);
-        const target = Math.max(0, Math.min(maxScroll, desired));
-
-        // Drag the thumb rather than clicking the track: rc-virtual-list ignores a mousedown
-        // whose target is the thumb, and a wide thumb can cover the position that means "the
-        // end". A drag is relative, so it works at any thumb size.
-        const track = wrap.querySelector<HTMLElement>(
-          ".ant-table-tbody-virtual-scrollbar-horizontal",
-        );
-        const thumb = track?.querySelector<HTMLElement>(".ant-table-tbody-virtual-scrollbar-thumb");
-        if (track && thumb) {
-          const trackRect = track.getBoundingClientRect();
-          const thumbRect = thumb.getBoundingClientRect();
-          const offsetRange = trackRect.width - thumbRect.width;
-          if (offsetRange > 0 && thumbRect.width > 0) {
-            const px = ((target - bodyOffset()) / maxScroll) * offsetRange;
-            if (Math.abs(px) < 0.5) {
-              syncHeader();
-              return;
-            }
-            const startX = thumbRect.left + thumbRect.width / 2;
-            const startY = trackRect.top + trackRect.height / 2;
-            // The drag handler reads `pageX`, which a synthetic MouseEvent does not reliably
-            // carry (only `clientX` is part of MouseEventInit), so define it explicitly.
-            const fire = (
-              node: EventTarget,
-              type: string,
-              x: number,
-              init: MouseEventInit = {},
-            ) => {
-              const event = new MouseEvent(type, {
-                bubbles: true,
-                cancelable: true,
-                clientX: x,
-                clientY: startY,
-                ...init,
-              });
-              Object.defineProperty(event, "pageX", { value: x });
-              Object.defineProperty(event, "pageY", { value: startY });
-              node.dispatchEvent(event);
-            };
-            fire(thumb, "mousedown", startX, { button: 0, buttons: 1 });
-            dragging = true;
-            // The window listeners only exist after React commits `dragging` (post-paint), and
-            // the scroll is applied on the frame after the move — releasing in the same tick
-            // cancels it, because the drag effect cleans up with `raf.cancel`.
-            const finish = () => {
-              window.setTimeout(() => {
-                fire(window, "mouseup", startX + px, { buttons: 0 });
-                window.setTimeout(() => {
-                  dragging = false;
-                  syncHeader();
-                  // A drag can silently do nothing — the virtual table rebuilds its scrollbar
-                  // when the active-column class changes, and on a loaded machine the drag
-                  // listeners may not be attached yet. This used to end the retry loop (the
-                  // caller saw `dragging` and returned), which is exactly the flake: one dead
-                  // drag left the viewport at offset 0 for the rest of the scenario.
-                  if (!isSettled() && Date.now() <= deadline) requestAnimationFrame(attempt);
-                }, 32);
-              }, 64);
-            };
-            // Move the thumb one frame at a time along an eased path. Firing every mousemove in
-            // one tick makes the scrollbar apply only the last one on its next frame, so the
-            // viewport jumps. The handler is relative to the mousedown, so absolute positions
-            // along the path are safe. Reduced motion keeps the single jump.
-            const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-            const duration = reduced ? 0 : Math.min(420, Math.max(220, 140 + Math.abs(px) * 0.25));
-            const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-            window.setTimeout(() => {
-              if (duration === 0) {
-                fire(window, "mousemove", startX + px, { buttons: 1 });
-                finish();
-                return;
-              }
-              const t0 = performance.now();
-              const step = (now: number) => {
-                const t = Math.min(1, (now - t0) / duration);
-                fire(window, "mousemove", startX + px * ease(t), { buttons: 1 });
-                if (t < 1) requestAnimationFrame(step);
-                else finish();
-              };
-              requestAnimationFrame(step);
-            }, 80);
-            return;
-          }
-        }
-
-        const body = wrap.querySelector<HTMLElement>(".ant-table-body, .ant-table-content");
-        if (body && Math.abs(target - body.scrollLeft) >= 1) {
-          const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-            ? "auto"
-            : "smooth";
-          body.scrollTo({ left: target, behavior });
-        }
-        syncHeader();
-      };
-
-      // Let the active column commit, then verify and retry: the virtual table rebuilds its
-      // scrollbar when a column class changes, so an attempt can land on a detached track or
-      // one whose geometry is still zero. Both are silent.
-      //
-      // Attempts are serialised — a drag takes ~176 ms of timers, so starting the next one two
-      // frames later (33 ms) would overlap it, and only one of two overlapping drags can win.
-      attempt = () => {
-        if (!dragging) {
-          scrollOnce();
-          // `scrollOnce` leaves `dragging` set only when it started a drag chain, and that chain
-          // schedules the next attempt when it finishes.
-          if (dragging) return;
-        }
-        requestAnimationFrame(() => {
-          syncHeader();
-          if (isSettled() || Date.now() > deadline) return;
-          attempt();
-        });
-      };
-      requestAnimationFrame(attempt);
+        glideTo(target.offset);
+      });
     },
-    [fileInfoRef, tableWrapRef],
+    [apply, glideTo, stopGlide, targetFor],
   );
+
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+
+  useEffect(() => {
+    // A wheel turn or a press inside the grid is the reader taking over. The glide is one motion
+    // token long, but it must not keep pulling the offset away from a gesture that started
+    // during it — a wheel turn is applied in its own animation frame.
+    const cancel = (event: Event) => {
+      const wrap = tableWrapRef.current;
+      const target = event.target;
+      if (!wrap || !(target instanceof Node) || !wrap.contains(target)) return;
+      stopGlide();
+    };
+    window.addEventListener("wheel", cancel, { passive: true });
+    window.addEventListener("pointerdown", cancel, { passive: true });
+    return () => {
+      window.removeEventListener("wheel", cancel);
+      window.removeEventListener("pointerdown", cancel);
+    };
+  }, [stopGlide, tableWrapRef]);
 
   return { activeColumn, setActiveColumn, focusColumn };
 }
