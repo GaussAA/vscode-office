@@ -25,9 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Excel/CSV: the per-document view state is versioned and expires after 90 days (old
   `-excel-view` entries migrate), and the windowed find remembers its last three completed
   queries. Cell values remain memory-only.
+- CSV: the windowed record index (record starts and the widest field count, no cell values) is
+  cached in the extension host's global storage. Reopening an unchanged CSV skips the
+  border scan while still fetching the bytes; the cache is capped at 16 MB/file, 64 MB total,
+  5 files and 7 days, and reused by every tab in the session.
+- JSON Preview: the top-level record ranges are cached in the extension host's global storage.
+  Reopening an unchanged JSON document skips `indexJsonArray` while the text is still read into
+  memory; the cache stores offsets only, capped at 16 MB/file, 64 MB total, 5 files and 7 days.
+  The `json-preview:left` layout state is now versioned and expires after 90 days.
 - All viewers: the command palette has **Clear Data Viewer Caches**. It clears the parquet scan
-  cache, the JSONL index, and the per-file layouts/find and search memos of parquet, JSONL and
-  Excel; open views reset, and JSON Preview is not affected. The old
+  cache, the JSONL index, the Excel workbook/CSV indexes, and the per-file layouts/find and
+  search memos of parquet, JSONL, Excel and JSON Preview; open views reset. The old
   `GaussAA.office.clearParquetCache` id remains registered as an alias for existing keybindings.
 
 ### Changed

@@ -27,7 +27,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const jsonlViewerInstance = new JsonlViewerProvider(context);
   const clearCaches = async () => {
     const answer = await vscode.window.showWarningMessage(
-      "Clear all data viewer caches? Parquet scans, the JSONL line index and per-file layouts for parquet, JSONL and Excel will be removed; open views reset. JSON Preview is not affected.",
+      "Clear all data viewer caches? Parquet scans, the JSONL line index, Excel workbook/CSV indexes, and per-file layouts/search state for parquet, JSONL, Excel and JSON Preview will be removed; open views reset.",
       { modal: true },
       "Clear",
     );
