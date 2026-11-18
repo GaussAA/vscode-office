@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **JSONL viewer: indexing progress indicator** — Large JSONL files (e.g. 1 GB, ~5M rows) now show "Indexing… X%" during the initial scan instead of a blank screen. Progress updates stream via `JsonlIndexProgress` messages with `RequestGuard` filtering stale updates. The viewer defers indexing until `resolveCustomEditor` to keep `openCustomDocument` fast (error-fast-fail preserved). 821 unit tests + 2 UI scenarios verified. Commits: 70984b67 (infrastructure), 418055e0 (application), ce28c102 (RequestGuard), 91203b13 (fixes), 6efe2a80 (scenarios).
+
 ## [6.15.0] - 2026-11-17
 
 ### Changed
