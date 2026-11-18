@@ -68,7 +68,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 60));
 test("init: reports the document so the webview can size its directory", async () => {
   const h = await harness(lines(3));
   try {
-    h.handlers.init();
+    await h.handlers.init();
     const info = h.last("jsonlInfo").payload;
     assert.equal(info.lineCount, 3);
     assert.equal(info.fileName, "log.jsonl");

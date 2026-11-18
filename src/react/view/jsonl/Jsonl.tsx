@@ -7,6 +7,7 @@ import {
   type JsonlEntryDetail,
   type JsonlEntryPayload,
   type JsonlEntrySummary,
+  type JsonlIndexProgress,
   type JsonlInfoPayload,
   type JsonlSearchBatch,
 } from "../../../common/jsonlTypes.ts";
@@ -42,6 +43,7 @@ interface SearchMeta {
 
 function JsonlViewerContent() {
   const [info, setInfo] = useState<JsonlInfoPayload | null>(null);
+  const [indexProgress, setIndexProgress] = useState<JsonlIndexProgress | null>(null);
   /**
    * The directory window: one contiguous range and its rows, in a single value. The old
    * pair of a `Map` plus a `{start,end}` could disagree — a late reply extended the range
@@ -137,7 +139,12 @@ function JsonlViewerContent() {
   }, []);
 
   useEffect(() => {
+    handler.on("jsonlIndexProgress", (payload: JsonlIndexProgress) => {
+      setIndexProgress(payload);
+    });
+
     handler.on("jsonlInfo", (payload: JsonlInfoPayload) => {
+      setIndexProgress(null); // Clear progress once info arrives.
       const previous = infoRef.current;
       const isSameFile = previous?.cacheId === payload.cacheId;
       infoRef.current = payload;
@@ -410,7 +417,11 @@ function JsonlViewerContent() {
                   highlight={searchActive ? query.trim() : undefined}
                   emptyText={
                     !info
-                      ? $t("jsonl.loading")
+                      ? indexProgress
+                        ? $t("jsonl.indexing", {
+                            percent: Math.floor((indexProgress.loaded / indexProgress.total) * 100),
+                          })
+                        : $t("jsonl.loading")
                       : searchActive
                         ? searching
                           ? $t("jsonl.searchingShort")
