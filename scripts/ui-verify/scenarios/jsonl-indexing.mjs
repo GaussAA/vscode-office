@@ -8,10 +8,10 @@ export default [
       await page.navigate(`${base}/harness-jsonl?indexing=1`);
 
       // Wait for viewer to mount
-      await page.waitForSelector(".jsonl-viewer");
+      await page.waitFor(`!!document.querySelector('.jsonl-viewer')`);
 
       // Directory should eventually show rows after indexing completes
-      await page.waitForSelector(".jsonl-directory-row", { timeout: 5000 });
+      await page.waitFor(`!!document.querySelector('.jsonl-directory-row')`, 5000);
 
       const rows = await page.evaluate(
         () => document.querySelectorAll(".jsonl-directory-row").length,
@@ -27,7 +27,7 @@ export default [
       await openJsonl(page, base);
 
       // Directory should load quickly without indexing indicator
-      await page.waitForSelector(".jsonl-directory-row", { timeout: 2000 });
+      await page.waitFor(`!!document.querySelector('.jsonl-directory-row')`, 2000);
 
       const rows = await page.evaluate(
         () => document.querySelectorAll(".jsonl-directory-row").length,

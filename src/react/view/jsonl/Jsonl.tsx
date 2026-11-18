@@ -238,7 +238,7 @@ function JsonlViewerContent() {
       }
     });
 
-    handler.emit("init");
+    handler.emit("init", { requestId: indexGuard.current.issue() });
   }, [recenter, requestEntry, selectEntry, startSearch]);
 
   const clearSearch = useCallback(() => {
@@ -426,7 +426,7 @@ function JsonlViewerContent() {
                   highlight={searchActive ? query.trim() : undefined}
                   emptyText={
                     !info
-                      ? indexProgress
+                      ? indexProgress && indexProgress.total > 0
                         ? $t("jsonl.indexing", {
                             percent: Math.floor((indexProgress.loaded / indexProgress.total) * 100),
                           })

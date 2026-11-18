@@ -254,7 +254,7 @@ function jsonlStub(fixtures, limit = 0, indexing = false) {
       if (!msg) return;
       if (msg.type === 'init') {
         const requestId = msg.content && msg.content.requestId;
-        if (indexing) {
+        if (${JSON.stringify(indexing)}) {
           // Simulate indexing with progress updates
           const steps = [20, 40, 60, 80, 99];
           const sendProgress = function(i) {
