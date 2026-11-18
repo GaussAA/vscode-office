@@ -35,6 +35,18 @@ export interface OfficeOpenMessage {
    */
   clearCache?: boolean;
   /**
+   * The host has a workbook row cache for this document (ADR-0027). The webview asks for the
+   * cached metadata before fetching/parsing; absent means the path is unavailable (virtual
+   * documents, harness stubs, CSV/TSV) and the viewer fetches and parses as before.
+   */
+  hostWorkbook?: boolean;
+  /**
+   * The host has a cached CSV record index for this document (ADR-0028). The webview asks for
+   * it before scanning; absent means scan as before (virtual documents, harness stubs, TSV is
+   * included only when the provider sets it).
+   */
+  hostCsv?: boolean;
+  /**
    * Inline bytes for a virtual document, base64-encoded.
    *
    * A `number[]` costs 5-8x the file on the JSON bridge; base64 costs 4/3.

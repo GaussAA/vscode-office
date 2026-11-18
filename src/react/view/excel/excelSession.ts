@@ -15,11 +15,12 @@
  *     still decided by `sheetViewFor`.
  */
 import type { OfficeOpenMessage } from "@/common/openPayload";
+import type { CsvRecordIndex } from "@/common/csvIndex";
 import type { ExcelData } from "./excel_reader";
 import { excelWindowKind, planExcelOpen } from "./excelOpenPlan";
-import { createTextSheetSource, type SheetSource } from "./sheetSource";
+import { createTextSheetSource, type TextSheetSource } from "./sheetSource";
 import { limitForView, sheetViewFor } from "./sheetView";
-import type { WorkbookSheetRows } from "./workbookRows";
+import type { WorkbookSheetRows } from "@/common/workbookRows";
 import { createWorkbookSheetSource, type WorkbookSheetSource } from "./workbookSource";
 
 export type ExcelOpenPayload = OfficeOpenMessage;
@@ -47,13 +48,25 @@ export interface ExcelLoadDeps {
   loadBuffer(payload: ExcelOpenPayload): Promise<ArrayBuffer>;
   loadWorkbookRows(buffer: ArrayBuffer): Promise<WorkbookSheetRows[]>;
   loadSheets(buffer: ArrayBuffer, ext: string): Promise<ExcelData>;
+  /**
+   * Ask the host for a cached workbook (ADR-0027). `null` means miss/unavailable; the caller
+   * then fetches and parses as before. Only called for file workbooks that advertise
+   * `hostWorkbook`.
+   */
+  loadHostWorkbook?(payload: ExcelOpenPayload): Promise<WorkbookSheetSource | null>;
+  /** Hand the freshly parsed rows to the host cache; the current view keeps its local source. */
+  storeHostWorkbook?(payload: ExcelOpenPayload, sheets: WorkbookSheetRows[]): void;
+  /** Ask the host for the cached CSV record index (ADR-0028); null means scan. */
+  loadCsvIndex?(payload: ExcelOpenPayload): Promise<CsvRecordIndex | null>;
+  /** Hand the scanned CSV index to the host cache after the source is built. */
+  storeCsvIndex?(payload: ExcelOpenPayload, index: CsvRecordIndex): void;
 }
 
 export type ExcelLoadOutcome =
   /** A newer generation exists; apply nothing. */
   | { kind: "stale" }
   | { kind: "workbook"; source: WorkbookSheetSource }
-  | { kind: "text"; source: SheetSource }
+  | { kind: "text"; source: TextSheetSource }
   | { kind: "grid"; data: ExcelData }
   | { kind: "error"; message: string; cause: unknown };
 
@@ -267,17 +280,55 @@ export class ExcelSession {
     deps: ExcelLoadDeps,
   ): Promise<ExcelLoadOutcome> {
     try {
-      const buffer = await deps.loadBuffer(payload);
-      if (!this.isCurrent(seq)) return { kind: "stale" };
       const ext = payload.ext ?? "";
       const view = sheetViewFor(ext, payload.size, { virtual: isVirtual(payload) });
+
+      // The host cache is the only path that avoids the whole-workbook parse. A miss falls
+      // through to the existing fetch + parse, so a host problem can never block opening.
+      if (view === "window" && excelWindowKind(ext) === "workbook" && payload.hostWorkbook) {
+        let hostSource: WorkbookSheetSource | null = null;
+        try {
+          hostSource = (await deps.loadHostWorkbook?.(payload)) ?? null;
+        } catch {
+          hostSource = null;
+        }
+        if (!this.isCurrent(seq)) return { kind: "stale" };
+        if (hostSource) return { kind: "workbook", source: hostSource };
+      }
+
+      const buffer = await deps.loadBuffer(payload);
+      if (!this.isCurrent(seq)) return { kind: "stale" };
       if (view === "window") {
         if (excelWindowKind(ext) === "workbook") {
           const rows = await deps.loadWorkbookRows(buffer);
           if (!this.isCurrent(seq)) return { kind: "stale" };
+          if (payload.hostWorkbook) {
+            try {
+              deps.storeHostWorkbook?.(payload, rows);
+            } catch {
+              // Caching is a convenience; the local source already has the rows.
+            }
+          }
           return { kind: "workbook", source: createWorkbookSheetSource(rows) };
         }
-        return { kind: "text", source: createTextSheetSource(buffer) };
+        let csvIndex: CsvRecordIndex | null = null;
+        if (payload.hostCsv) {
+          try {
+            csvIndex = (await deps.loadCsvIndex?.(payload)) ?? null;
+          } catch {
+            csvIndex = null;
+          }
+        }
+        if (!this.isCurrent(seq)) return { kind: "stale" };
+        const source = createTextSheetSource(buffer, csvIndex ?? undefined);
+        if (payload.hostCsv && source.recordIndex !== csvIndex) {
+          try {
+            deps.storeCsvIndex?.(payload, source.recordIndex);
+          } catch {
+            // Caching is a convenience; the source already has the index.
+          }
+        }
+        return { kind: "text", source };
       }
       const data = await deps.loadSheets(buffer, payload.ext);
       if (!this.isCurrent(seq)) return { kind: "stale" };

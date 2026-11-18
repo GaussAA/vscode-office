@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RequestGuard } from "../../util/requestGuard";
 import { searchSheetRows, stepMatch } from "./sheetSearch";
+import { getWindowedFindMemo, setWindowedFindMemo } from "./windowedFindMemo";
 import type { SheetSource } from "./sheetSource";
 import { t } from "./excel_i18n";
 import { ROW_HEIGHT } from "./windowedSheetModel";
@@ -63,6 +64,19 @@ export function useWindowedFind({
       setSearching(false);
       return;
     }
+    const cached = getWindowedFindMemo(needle);
+    if (cached) {
+      setMatches(cached.rows);
+      setCapped(cached.capped);
+      setSearchedQuery(needle);
+      setSearching(false);
+      setProgress(null);
+      if (cached.rows.length > 0) {
+        activeMatch.current = cached.rows[0];
+        jumpToRow(cached.rows[0]);
+      }
+      return;
+    }
     setSearching(true);
     setProgress({ scanned: 0, matches: 0 });
     try {
@@ -76,6 +90,8 @@ export function useWindowedFind({
       setMatches(result.rows);
       setCapped(result.capped);
       setSearchedQuery(needle);
+      if (!result.cancelled)
+        setWindowedFindMemo(needle, { rows: result.rows, capped: result.capped });
       if (result.rows.length > 0) {
         activeMatch.current = result.rows[0];
         jumpToRow(result.rows[0]);

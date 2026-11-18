@@ -1026,6 +1026,36 @@ function windowXlsx() {
 
 const WINDOW_XLSX = windowXlsx();
 
+const LARGE_XLSX = new Map();
+
+/**
+ * A workbook large enough to measure the whole-workbook parse. It is generated on demand and
+ * cached so the UI probe can warm the server and time a second, parse-only open.
+ */
+function largeXlsx(rows) {
+  const cached = LARGE_XLSX.get(rows);
+  if (cached) return cached;
+  const data = [["id", "name", "score", "ok", "note", "tag", "value", "text"]];
+  const filler = "measurement ".repeat(3).trim();
+  for (let row = 0; row < rows; row++) {
+    data.push([
+      String(row),
+      `row-${row}`,
+      String(row / 2),
+      String(row % 2 === 0),
+      `note-${row}`,
+      "probe",
+      String(row * 3),
+      `${filler}-${row}`,
+    ]);
+  }
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Data");
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  LARGE_XLSX.set(rows, buffer);
+  return buffer;
+}
+
 /** The same idea for a legacy workbook: `.xls` is decoded by SheetJS, not ExcelJS. */
 function windowXls() {
   const data = [["id", "name"]];
@@ -1055,7 +1085,7 @@ const EDIT_XLS = editXls();
  * Bridge for a workbook that must open in the windowed view: 12 MB claimed, just under the
  * 15 MB workbook guard and over the 8 MB window threshold.
  */
-function excelWorkbookStub() {
+function excelWorkbookStub(rows = 0) {
   return `<script>
 (function () {
   const api = {
@@ -1065,7 +1095,7 @@ function excelWorkbookStub() {
         window.postMessage({ type: 'open', content: {
           ext: '.xlsx',
           fileName: 'window.xlsx',
-          path: '/window.xlsx',
+          path: ${JSON.stringify(rows > 200 ? `/window.xlsx?rows=${rows}` : "/window.xlsx")},
           scheme: 'file',
           size: 12 * 1024 * 1024,
           readOnly: true,
@@ -1246,6 +1276,10 @@ export function startHarness(fixtures, port = 0) {
         2_000_000,
       );
       const workbookView = path === "/harness-route" && url.searchParams.get("workbook") === "1";
+      const workbookRows = Math.min(
+        Math.max(Number(url.searchParams.get("workbookRows") ?? 0) || 0, 0),
+        1_000_000,
+      );
       const legacyView = path === "/harness-route" && url.searchParams.get("legacy") === "1";
       const many = Math.min(Math.max(Number(url.searchParams.get("many") ?? 0) || 0, 0), 5000);
       const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 0) || 0, 0), 500);
@@ -1257,7 +1291,7 @@ export function startHarness(fixtures, port = 0) {
           : legacyView
             ? excelLegacyStub()
             : workbookView
-              ? excelWorkbookStub()
+              ? excelWorkbookStub(workbookRows)
               : windowed
                 ? excelWindowStub(windowRows)
                 : path === "/harness-json"
@@ -1387,13 +1421,14 @@ export function startHarness(fixtures, port = 0) {
     }
 
     if (path === "/window.xlsx") {
+      const rows = Number(url.searchParams.get("rows") ?? 0) || 0;
       res.writeHead(
         200,
         addCrossOriginHeaders({
           "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         }),
       );
-      res.end(WINDOW_XLSX);
+      res.end(rows > 200 ? largeXlsx(rows) : WINDOW_XLSX);
       return;
     }
 

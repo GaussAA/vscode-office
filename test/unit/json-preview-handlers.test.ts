@@ -36,6 +36,58 @@ function fakeReader(options: {
 
 // -------------------------------------------------- buffer versus disk
 
+test("source: a fresh array stores its ranges once; cached ranges are not stored again", () => {
+  const stored: Array<{ fingerprint: unknown; ranges: unknown }> = [];
+  const text = '[{"id":1},{"id":2}]';
+  const context = {
+    fileName: "data.json",
+    cacheId: "demo:json",
+    read: async () => ({ text, byteSize: text.length, fromBuffer: false }),
+    emit: () => {},
+    reportError: () => {},
+    storeRanges: (fingerprint: unknown, ranges: unknown) => stored.push({ fingerprint, ranges }),
+  };
+  const source: JsonSource = {
+    text,
+    byteSize: text.length,
+    fromBuffer: false,
+    fingerprint: { key: "demo:json", size: text.length, mtimeMs: 1 },
+  };
+  createJsonPreviewHandlers(context, source);
+  assert.equal(stored.length, 1);
+  assert.deepEqual(stored[0]?.fingerprint, source.fingerprint);
+
+  const ranges = stored[0]?.ranges;
+  stored.length = 0;
+  createJsonPreviewHandlers(context, {
+    ...source,
+    records: ranges as Array<{ start: number; end: number }>,
+  });
+  assert.equal(stored.length, 0);
+});
+
+test("source: an object or scalar root does not store ranges", () => {
+  const stored: unknown[] = [];
+  const text = '{"a":1}';
+  createJsonPreviewHandlers(
+    {
+      fileName: "data.json",
+      cacheId: "demo:json",
+      read: async () => ({ text, byteSize: text.length, fromBuffer: false }),
+      emit: () => {},
+      reportError: () => {},
+      storeRanges: (_fingerprint, ranges) => stored.push(ranges),
+    },
+    {
+      text,
+      byteSize: text.length,
+      fromBuffer: false,
+      fingerprint: { key: "demo:json", size: text.length, mtimeMs: 1 },
+    },
+  );
+  assert.equal(stored.length, 0);
+});
+
 test("source: an open buffer wins over the disk, and the disk is not touched", async () => {
   const { reader, calls } = fakeReader({
     buffer: { text: '["from buffer"]', isDirty: false },

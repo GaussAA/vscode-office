@@ -86,7 +86,7 @@ export async function emitFileOfficeOpen(
   handler: Handler,
   uri: Uri,
   webview: Webview,
-  options: { clearCache?: boolean } = {},
+  options: { clearCache?: boolean; hostWorkbook?: boolean; hostCsv?: boolean } = {},
 ): Promise<void> {
   // The webview fetches the bytes itself for this scheme, so the size only informs its size
   // guard and the two stat fields are the share cache's fingerprint; the host never reads the
@@ -102,6 +102,8 @@ export async function emitFileOfficeOpen(
     size,
     mtimeMs,
     ...(options.clearCache ? { clearCache: true } : {}),
+    ...(options.hostWorkbook ? { hostWorkbook: true } : {}),
+    ...(options.hostCsv ? { hostCsv: true } : {}),
   };
   handler.emit("open", payload);
 }

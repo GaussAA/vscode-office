@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as XLSX from "xlsx";
-import { workbookRowsFromSheetJs } from "@/react/view/excel/workbookRows";
+import { workbookRowsFromSheetJs } from "@/common/workbookRows";
 
 /**
  * `.xls`/`.ods` go through SheetJS rather than ExcelJS, so their row extraction is a second

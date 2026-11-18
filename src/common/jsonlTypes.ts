@@ -51,6 +51,8 @@ export interface JsonlInfoPayload {
   cacheId: string;
   lineCount: number;
   byteSize: number;
+  /** One-shot after the unified Clear command found no open JSONL panel to message. */
+  clearCache?: boolean;
 }
 
 export interface JsonlRangeRequest {

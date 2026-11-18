@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import { parseCsv } from "./csvParser";
 import { decodeCsvBufferWithEncoding, type CsvEncoding } from "./csvEncoding";
 import type { CellData, SheetData } from "./x-spreadsheet/index";
-import { workbookRowsFromSheetJs, type WorkbookSheetRows } from "./workbookRows";
+import { workbookRowsFromSheetJs, type WorkbookSheetRows } from "@/common/workbookRows";
 
 type RowMap = NonNullable<SheetData["rows"]>;
 
@@ -62,7 +62,12 @@ const buildCsvCols = (rows: any[][], colCount: number) => {
  * Uses SheetJS for all workbook formats.
  */
 export async function loadWorkbookRows(buffer: ArrayBuffer): Promise<WorkbookSheetRows[]> {
-  return workbookRowsFromSheetJs(XLSX.read(buffer, { type: "array" }));
+  const started = performance.now();
+  const rows = workbookRowsFromSheetJs(XLSX.read(buffer, { type: "array" }));
+  try {
+    performance.measure("excel-workbook-parse", { start: started, end: performance.now() });
+  } catch {}
+  return rows;
 }
 
 const sheetJsColWidthToPx = (col?: XLSX.ColInfo) => {

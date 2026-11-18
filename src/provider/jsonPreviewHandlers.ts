@@ -12,20 +12,29 @@ import {
   type JsonSearchRequest,
 } from "@/common/jsonPreviewTypes";
 import { utf8ByteSize } from "@/service/entryClassifier";
-import { JsonPreviewSession } from "@/service/jsonPreview";
+import { JsonPreviewSession, type JsonRecordRange } from "@/service/jsonPreview";
+
+export interface JsonSourceFingerprint {
+  key: string;
+  size: number;
+  mtimeMs: number;
+}
 
 export interface JsonSource {
   text: string;
   byteSize: number;
   /** True only when the text is an unsaved editor buffer, i.e. it differs from the disk. */
   fromBuffer: boolean;
+  /** Cached top-level record ranges for this text, when the disk fingerprint matched. */
+  records?: JsonRecordRange[] | null;
+  fingerprint?: JsonSourceFingerprint;
 }
 
 /** The three ways the provider can reach a document; the provider backs them with `vscode`. */
 export interface JsonSourceReader {
   /** The editor that has this document open, if any. `isDirty` means it has unsaved edits. */
   openBuffer(): { text: string; isDirty: boolean } | undefined;
-  stat(): PromiseLike<{ size: number }>;
+  stat(): PromiseLike<{ size: number; mtime?: number }>;
   readFile(): PromiseLike<Uint8Array>;
 }
 
@@ -62,17 +71,32 @@ export interface JsonPreviewHandlerContext {
   emit: (type: string, payload: unknown) => void;
   /** A reload that could not read the document; the old session stays. */
   reportError: (message: string) => void;
+  /** Store a freshly indexed range list for the next open/reload (ADR-0028). */
+  storeRanges?: (fingerprint: JsonSourceFingerprint, ranges: JsonRecordRange[]) => void;
 }
 
 export function createJsonPreviewHandlers(context: JsonPreviewHandlerContext, initial: JsonSource) {
-  const open = (source: JsonSource) =>
-    new JsonPreviewSession(
+  const open = (source: JsonSource) => {
+    const session = new JsonPreviewSession(
       source.text,
       source.byteSize,
       context.fileName,
       context.cacheId,
       source.fromBuffer,
+      source.records,
     );
+    if (source.fingerprint && !source.records) {
+      const ranges = session.recordRanges;
+      if (ranges) {
+        try {
+          context.storeRanges?.(source.fingerprint, ranges);
+        } catch {
+          // The cache is a convenience; the live session already has the ranges.
+        }
+      }
+    }
+    return session;
+  };
   // The one owner of the session: a reload replaces it, so every handler reads it at call time.
   let session = open(initial);
 

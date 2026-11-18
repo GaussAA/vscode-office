@@ -63,6 +63,34 @@ test("lineColumnAt: one-based line and column", () => {
   assert.deepEqual(lineColumnAt(text, at), { line: 2, column: 7 });
 });
 
+test("session: cached record ranges are used and exposed", () => {
+  const text = '[{"id":1},{"id":2}]';
+  const ranges = indexJsonArray(text);
+  const preview = new JsonPreviewSession(
+    text,
+    textBytes(text),
+    "data.json",
+    "demo:json",
+    false,
+    ranges,
+  );
+
+  assert.deepEqual(preview.recordRanges, ranges);
+  assert.equal(preview.info.recordCount, 2);
+  assert.equal(preview.recordsInWindow(0, 2).length, 2);
+});
+
+test("session: an invalid cached range falls back to a fresh scan", () => {
+  const text = '[{"id":1},{"id":2}]';
+  const preview = new JsonPreviewSession(text, textBytes(text), "data.json", "demo:json", false, [
+    { start: 0, end: 5 },
+    { start: 3, end: 9 },
+  ]);
+
+  assert.deepEqual(preview.recordRanges, indexJsonArray(text));
+  assert.equal(preview.info.recordCount, 2);
+});
+
 test("session: array info, labels, raw fallback and record detail", () => {
   const text = '[{"id":"alpha","name":"A"},{"name":"B"},42,{"id":3}]';
   const preview = session(text);
