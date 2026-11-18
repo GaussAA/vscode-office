@@ -169,6 +169,10 @@ export function registerSaveHostSuite(): void {
       const workbook = await openWorkbook("echo.xlsx");
       try {
         await makeDirty(workbook);
+        // The bridge can be attached before the host's initial `open` arrives, so the baseline
+        // is whatever this webview has already received. Asserting `0` made the test fail
+        // whenever the initial open happened to be recorded, not because the echo was acted on.
+        const opensBeforeSave = await workbook.bridge.count("open");
         const payload = Buffer.concat([fixtureBytes, Buffer.from("echo-check")]);
 
         await workbook.bridge.post("save", { contentBase64: base64(payload) });
@@ -182,7 +186,7 @@ export function registerSaveHostSuite(): void {
 
         assert.strictEqual(
           await workbook.bridge.count("open"),
-          0,
+          opensBeforeSave,
           "the host re-sent the document after our own save: the echo was not skipped",
         );
       } finally {
