@@ -12,12 +12,20 @@ import { buildDocumentCacheId } from "./handlers/officeContent";
 import { parquetScanCache } from "../service/parquetScanCache";
 import { registerDataViewerCacheClearer } from "../service/dataViewerCacheClear";
 import { ExcelWorkbookCache } from "../service/excelWorkbookCache";
+import { CsvIndexCache } from "../service/csvIndexCache";
 import { createExcelWorkbookHost } from "./excelWorkbookHost";
+import { createExcelCsvHost } from "./excelCsvHost";
+import path from "node:path";
 
 const EXCEL_WORKBOOK_SUFFIXES = new Set([".xlsx", ".xlsm", ".xls", ".ods"]);
+const EXCEL_CSV_SUFFIXES = new Set([".csv", ".tsv"]);
 
 function isWorkbookUri(uri: vscode.Uri): boolean {
   return EXCEL_WORKBOOK_SUFFIXES.has(getFileSuffix(uri.fsPath));
+}
+
+function isCsvUri(uri: vscode.Uri): boolean {
+  return EXCEL_CSV_SUFFIXES.has(getFileSuffix(uri.fsPath));
 }
 
 /**
@@ -40,8 +48,13 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
   private excelClearPending = false;
   /** Parsed windowed workbook rows, shared by every Excel tab in this session (ADR-0027). */
   private readonly excelWorkbooks = new ExcelWorkbookCache();
+  /** Scanned CSV record indexes, shared by every Excel tab (ADR-0028). */
+  private readonly excelCsvIndexes: CsvIndexCache;
 
   constructor(private context: vscode.ExtensionContext) {
+    this.excelCsvIndexes = new CsvIndexCache(
+      path.join(context.globalStorageUri.fsPath, "csv-index"),
+    );
     registerDataViewerCacheClearer(() => this.clearDataViewerCaches());
   }
 
@@ -49,9 +62,10 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
    * Clear the host scan cache and every open parquet/spreadsheet view. When none is open the
    * webview caches cannot be reached from the host, so the next open carries a one-shot flag.
    */
-  public clearDataViewerCaches(): void {
+  public async clearDataViewerCaches(): Promise<void> {
     parquetScanCache.clear();
     this.excelWorkbooks.clear();
+    await this.excelCsvIndexes.clear().catch(() => undefined);
     const parquetActive = [...this.parquetHandlers].filter((handler) => !handler.disposed);
     for (const handler of parquetActive) handler.emit("clearParquetCache");
     if (parquetActive.length === 0) this.parquetClearPending = true;
@@ -131,6 +145,7 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
     handleCommonEvent(uri, handler, this.saves, {
       clearCache,
       hostWorkbook: route === "excel" && isWorkbookUri(uri),
+      hostCsv: route === "excel" && isCsvUri(uri),
     });
 
     if (route === "parquet") {
@@ -164,23 +179,32 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
     }
 
     if (route === "excel") {
+      const stat = async () => {
+        try {
+          const value = await vscode.workspace.fs.stat(uri);
+          return { size: value.size, mtimeMs: value.mtime };
+        } catch {
+          return null;
+        }
+      };
       const workbook = createExcelWorkbookHost({
         documentCacheId: buildDocumentCacheId(uri),
         cache: this.excelWorkbooks,
-        stat: async () => {
-          try {
-            const stat = await vscode.workspace.fs.stat(uri);
-            return { size: stat.size, mtimeMs: stat.mtime };
-          } catch {
-            return null;
-          }
-        },
+        stat,
+        emit: (type, payload) => handler.emit(type, payload),
+      });
+      const csv = createExcelCsvHost({
+        documentCacheId: buildDocumentCacheId(uri),
+        cache: this.excelCsvIndexes,
+        stat,
         emit: (type, payload) => handler.emit(type, payload),
       });
       handler
         .on("excelWorkbookOpen", (request) => workbook.open(request))
         .on("excelWorkbookRows", (request) => workbook.rows(request))
-        .on("excelWorkbookStore", (request) => workbook.store(request));
+        .on("excelWorkbookStore", (request) => workbook.store(request))
+        .on("excelCsvIndexOpen", (request) => csv.open(request))
+        .on("excelCsvIndexStore", (request) => csv.store(request));
       this.excelPanels.add(handler);
       webviewPanel.onDidDispose(() => this.excelPanels.delete(handler));
     }

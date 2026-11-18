@@ -41,6 +41,12 @@ export interface OfficeOpenMessage {
    */
   hostWorkbook?: boolean;
   /**
+   * The host has a cached CSV record index for this document (ADR-0028). The webview asks for
+   * it before scanning; absent means scan as before (virtual documents, harness stubs, TSV is
+   * included only when the provider sets it).
+   */
+  hostCsv?: boolean;
+  /**
    * Inline bytes for a virtual document, base64-encoded.
    *
    * A `number[]` costs 5-8x the file on the JSON bridge; base64 costs 4/3.

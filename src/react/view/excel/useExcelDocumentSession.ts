@@ -21,6 +21,7 @@ import { clearExcelViewStorage } from "./excelViewState";
 import { clearWindowedFindMemo } from "./windowedFindMemo";
 import { createHostWorkbookTransport } from "./hostWorkbookTransport";
 import { createHostWorkbookSource } from "./hostWorkbookSource";
+import { createCsvIndexTransport } from "./csvIndexTransport";
 
 export type { ExcelOpenPayload };
 
@@ -167,6 +168,7 @@ export function useExcelDocumentSession({
     if (!container) return;
     let activeHost: ReturnType<typeof mountExcelSpreadsheet> | null = null;
     const workbookTransport = createHostWorkbookTransport(handler);
+    const csvIndexTransport = createCsvIndexTransport(handler);
     const loadDeps = {
       ...LOAD_DEPS,
       loadHostWorkbook: async () => {
@@ -183,6 +185,17 @@ export function useExcelDocumentSession({
       ) => {
         // Let the local source paint first; the host copy is only needed by a later open.
         setTimeout(() => workbookTransport.store(sheets), 0);
+      },
+      loadCsvIndex: async () => {
+        const index = await csvIndexTransport.open();
+        return index ? { starts: index.starts, maxFields: index.maxFields } : null;
+      },
+      storeCsvIndex: (
+        _payload: ExcelOpenPayload,
+        index: Parameters<typeof csvIndexTransport.store>[0],
+      ) => {
+        // The scan already produced the source; the host copy is for the next open.
+        setTimeout(() => csvIndexTransport.store(index), 0);
       },
     };
 
@@ -340,6 +353,7 @@ export function useExcelDocumentSession({
       activeHost?.dispose();
       session.invalidate();
       workbookTransport.dispose();
+      csvIndexTransport.dispose();
       gridReadyRef.current = false;
       spreadSheetRef.current = null;
       setActiveSpreadsheet(null);
