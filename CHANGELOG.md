@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it clears the host scan cache and every stored share/UI entry, and resets open parquet views
   (row, filter, widths, shares). With no parquet view open the next open clears; JSONL and Excel
   state are untouched.
+- Parquet: whole-file search results are memoized for the current document (last three normalized
+  queries, VS Code session only). Re-running a query returns the same hits without another pass;
+  the memo is dropped when the document changes or Clear Parquet Cache runs.
 
 ### Changed
 

@@ -1,6 +1,6 @@
 # ADR-0025 parquet 缓存分层：聚合落盘、样本进 host 内存
 
-- 状态：已接受（2026-11-18，方向；第一、二块已落地，其余待做）
+- 状态：已接受（2026-11-18，方向；第一、二、三块已落地，第四块评估后不调整）
 - 日期：2026-11-18
 
 ## 背景
@@ -40,7 +40,7 @@ empty-share 扫描、按页解码与全文件搜索。现状是**缓存按功能
 | -------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------- |
 | **磁盘**（webview localStorage） | empty-share 聚合；per-file UI（列宽、当前行、字段过滤）；侧栏宽全局 | `parquet-shares:<documentCacheId>`、`parquet-ui:<documentCacheId>`、`parquet-sider-width` | 数据 7 天、UI 90 天；每前缀 LRU 20     | `size + mtime + CACHE_VERSION`、TTL、损坏/形状错删除 |
 | **host 内存**                    | 单列完整扫描（top-N、计数、覆盖率）；批量扫描复用                   | `documentCacheId + size + mtime + SCAN_VERSION`                                           | 按文件 LRU 3；VS Code 会话；跨标签共享 | 文件指纹、Clear、LRU                                 |
-| **webview 内存**                 | 搜索 query memo（默认 3 条 / 8 MB）；页面 chunk/range               | 每 webview / 每文档                                                                       | 标签关闭即失                           | 文件变化、Clear、文档切换                            |
+| **webview 内存**                 | 搜索 query memo（默认 3 条；结果 ≤5k 行）；页面 chunk/range         | 每 webview / 每文档                                                                       | 标签关闭即失                           | 文件变化、Clear、文档切换                            |
 
 **磁盘继续留在 webview localStorage**，不是 host-owned：现有 share 缓存、行恢复、JSONL/Excel
 状态都在这一层；搬家的收益（host 可清、跨标签串行）不足以抵消 UI 状态每次改宽/改行的 IPC。
@@ -122,10 +122,12 @@ Clear cache 在没有 parquet 视图打开时由 host 记一个 one-shot 标记�
   1. UI 状态恢复（列宽/行/字段过滤，侧栏全局，90 天，旧键 fallback）+ share 合并写入 + 单测
      （已完成）。
   2. host 单列扫描缓存 + 批量复用 + Clear cache 命令（此时才真正“全清”）（已完成）。
-  3. 搜索 query memo。
-  4. 页面 chunk/预取调优（按 perf 结果取舍）。
-- **默认值**（可调）：host LRU 3 个文件；search memo 3 条 / 8 MB；页面 4 chunk + 一页预取；
-  数据 7 天 / UI 90 天；每前缀 LRU 20；命令名 `GaussAA.office.clearParquetCache`。
+  3. 搜索 query memo（已完成）。
+  4. 页面 chunk/预取调优（评估后不调整）：页面闸门的热路径是渲染受限、冷路径是解码受限，
+     3 chunk 已覆盖 15k 行且有一页预取；加到 4 chunk 只增内存，没有可证明的收益。
+- **默认值**（可调）：host LRU 3 个文件；search memo 3 条（受 5k 行结果上限约束）；页面保持
+  3 chunk + 一页预取；数据 7 天 / UI 90 天；每前缀 LRU 20；命令名
+  `GaussAA.office.clearParquetCache`。
 
 ## 审计附录（2026-11-18，HEAD `75838e96`）
 
