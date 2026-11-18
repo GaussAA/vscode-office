@@ -25,6 +25,15 @@ export async function activate(context: vscode.ExtensionContext) {
   activateCompare(context);
   const viewerInstance = new OfficeViewerProvider(context);
   const jsonlViewerInstance = new JsonlViewerProvider(context);
+  if (context.extensionMode !== vscode.ExtensionMode.Production) {
+    // Real-host smoke tests need the cache roots the extension API does not expose. This
+    // command exists only in the test host; it is not contributed to package.json.
+    context.subscriptions.push(
+      vscode.commands.registerCommand("GaussAA.office.__cachePaths", () => ({
+        globalStorage: context.globalStorageUri.fsPath,
+      })),
+    );
+  }
   const clearCaches = async () => {
     const answer = await vscode.window.showWarningMessage(
       "Clear all data viewer caches? Parquet scans, the JSONL line index, Excel workbook/CSV indexes, and per-file layouts/search state for parquet, JSONL, Excel and JSON Preview will be removed; open views reset.",

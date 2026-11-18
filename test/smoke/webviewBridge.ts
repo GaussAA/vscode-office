@@ -133,10 +133,12 @@ class CdpSession {
   }
 }
 // Runs in the outer webview frame. The inner frame is same-origin, so its window is reachable.
+// Do not require a canvas here: the windowed spreadsheet and the JSON preview have none. The
+// existing Excel grid tests ask for the canvas separately.
 const INSTALL_RECORDER = `(() => {
   const inner = document.querySelector('iframe');
   const win = inner && inner.contentWindow;
-  if (!win || !inner.contentDocument || !inner.contentDocument.querySelector('canvas')) return false;
+  if (!win || !inner.contentDocument) return false;
   if (!win.__hostLog) {
     win.__hostLog = [];
     win.addEventListener('message', (event) => {
@@ -153,6 +155,12 @@ const INSTALL_RECORDER = `(() => {
   return true;
 })()`;
 
+const CANVAS_READY = `(() => {
+  const inner = document.querySelector('iframe');
+  const win = inner && inner.contentWindow;
+  return !!(win && inner.contentDocument && inner.contentDocument.querySelector('canvas'));
+})()`;
+
 export class WebviewBridge {
   private constructor(private readonly session: CdpSession) {}
 
@@ -161,7 +169,10 @@ export class WebviewBridge {
    * canvas is rendered. By then the host has answered `init` with `open`, so the host-side
    * `send()` has finished and a later `change` cannot be overwritten by it.
    */
-  static async attachToNewWebview(knownIds: ReadonlySet<string>): Promise<WebviewBridge> {
+  static async attachToNewWebview(
+    knownIds: ReadonlySet<string>,
+    options: { waitForCanvas?: boolean } = {},
+  ): Promise<WebviewBridge> {
     const target = await waitFor(
       async () => (await listWebviewTargets()).find((candidate) => !knownIds.has(candidate.id)),
       () => "no new webview target appeared on the debugging port",
@@ -170,9 +181,16 @@ export class WebviewBridge {
     const bridge = new WebviewBridge(session);
     await waitFor(
       () => session.evaluate<boolean>(INSTALL_RECORDER),
-      () => "the Excel canvas never rendered inside the webview",
+      () => "the webview inner frame never became reachable",
       60000,
     );
+    if (options.waitForCanvas !== false) {
+      await waitFor(
+        () => session.evaluate<boolean>(CANVAS_READY),
+        () => "the Excel canvas never rendered inside the webview",
+        60000,
+      );
+    }
     return bridge;
   }
 
@@ -188,13 +206,16 @@ export class WebviewBridge {
     );
   }
 
-  /**
-   * Run a script in the outer webview frame. Used when several messages must leave the
+  /** Run a script in the outer webview frame. Used when several messages must leave the
    * webview back to back (no round trip to the test in between) or when a payload is better
-   * generated there than serialised through the debugging port.
-   */
+   * generated there than serialised through the debugging port. */
   async run(expression: string): Promise<void> {
     await this.session.evaluate<unknown>(expression);
+  }
+
+  /** Evaluate in the outer frame and return the value; windowed tests poll DOM/perf here. */
+  async evaluate<T>(expression: string): Promise<T> {
+    return this.session.evaluate<T>(expression);
   }
 
   /** Everything the host has posted to this webview since the recorder was installed. */

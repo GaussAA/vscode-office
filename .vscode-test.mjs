@@ -3,6 +3,10 @@
 // this file to our custom editor" can be observed. `verify:ui` covers the other half
 // (the webview's DOM) in a plain browser.
 //
+// The order matters: extension.test.cjs starts with the "activation is still lazy" check,
+// so it must run before hostCache.test.cjs, whose before() activates the extension and opens
+// large fixtures. A plain glob is not ordered; list the two suites explicitly.
+//
 // Two configurations on purpose. `smoke-stable` is the everyday run; `smoke-min` runs
 // against the oldest VS Code we claim to support, which turns the `engines.vscode` floor
 // from a declaration into something that is actually tested.
@@ -15,7 +19,7 @@
 // extension runs there. Raising the floor without touching (3) silently stops testing it.
 import { defineConfig } from "@vscode/test-cli";
 
-const files = "out/test/smoke/**/*.test.cjs";
+const files = ["out/test/smoke/extension.test.cjs", "out/test/smoke/hostCache.test.cjs"];
 const workspaceFolder = "./test/fixtures/workspace";
 const mocha = {
   ui: "bdd",

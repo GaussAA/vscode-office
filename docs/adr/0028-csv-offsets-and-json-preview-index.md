@@ -114,6 +114,18 @@ ADR-0026 把 CSV 偏移缓存推迟（21 MB CSV 的 `excel-csv-scan` 为 126 ms�
 - **Clear**：Office provider 的 `clearDataViewerCaches` 变 async，清 CSV 索引；JSON Preview
   的 `clearJsonPreviewCaches` 清 ranges 并通知打开的面板；两者都注册到统一 registry。
 - **UI harness 仍走 fallback**（fake bridge 不设 `hostCsv`，JSON Preview 无 host 缓存）；
-  host 路径由 host/session/source/transport 单测覆盖；真实 VS Code 的第二次打开仍待人工验。
-- **仍待**：真实宿主第二次打开验证；CSV 的字节仍要 fetch（收益是扫描）；JSON Preview 文本
-  仍读入内存；版本号与发布（与前面累积的修复一起，未发）。
+  host 路径由 host/session/source/transport 单测覆盖。
+- **真宿主验证已完成**：新增 `test/smoke/hostCache.test.ts`，在真实 VS Code Extension
+  Development Host + CDP 里打开大文件两次，用新的 `GaussAA.office.__cachePaths`（仅非
+  production 注册）定位 globalStorage：
+  - CSV 300k 行：第一次有 `excel-csv-scan`，第二次为 0 且有 `excel-csv-index-hit`，`csv-index`
+    的 `.bin` mtime 不变；
+  - Excel 30k×8（10.45 MB，窗口阈值 8 MB 与 host 上限 15 MB 之间）：第一次有
+    `excel-workbook-parse`，第二次为 0；
+  - JSON Preview 150k 条、JSONL 150k 行：第二次 `.bin` mtime 不变（range/line index 未重写）。
+  - `pnpm test:smoke` 结果为 21/21；4 个 cache 用例连续 3 次通过。前两次运行里既有的
+    save suite 各有一个时序 flake（分别是 save echo 与 external change，第三次全绿），与
+    缓存无关；`.vscode-test.mjs` 现在显式固定 extension.test → hostCache.test 的顺序，避免
+    新 suite 的激活破坏 activation-is-lazy 断言。
+- **仍待**：版本号与发布（与前面累积的修复一起，未发）；save suite 的时序 flake 在 CI 上
+  仍需观察。
