@@ -88,7 +88,9 @@ test("host disk cache: evicts under the total byte budget", async (t) => {
   const root = await temporaryRoot(t);
   const store = makeStore(root, { maxTotalBytes: 12, maxEntryBytes: 64 });
   await store.set("a", 1, {}, new Uint8Array(6));
+  await new Promise((resolve) => setTimeout(resolve, 10)); // ensure different timestamps
   await store.set("b", 1, {}, new Uint8Array(6));
+  await new Promise((resolve) => setTimeout(resolve, 10));
   await store.set("c", 1, {}, new Uint8Array(6));
 
   assert.equal(await store.get("a", 1), null);

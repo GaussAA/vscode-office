@@ -12,7 +12,6 @@ import {
   type JsonlEntriesPayload,
   type JsonlEntryPayload,
   type JsonlEntryRequest,
-  type JsonlIndexProgress,
   type JsonlInfoPayload,
   type JsonlRangeRequest,
   type JsonlSearchBatch,
@@ -49,20 +48,8 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
         // Session already loaded: answer immediately.
         emit("jsonlInfo", { ...info(), requestId: request?.requestId });
       } else {
-        // Not loaded yet: trigger load with progress reporting.
-        await reopen({
-          requestId: request?.requestId,
-          onProgress: (loaded, total) => {
-            if (request?.requestId !== undefined) {
-              const progress: JsonlIndexProgress = {
-                requestId: request.requestId,
-                loaded,
-                total,
-              };
-              emit("jsonlIndexProgress", progress);
-            }
-          },
-        });
+        // Not loaded yet: trigger load.
+        await reopen();
         // Reopen installs the session; emit info once ready.
         emit("jsonlInfo", { ...info(), requestId: request?.requestId });
       }
@@ -70,19 +57,7 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
 
     /** The file changed on disk, or the user asked for a reload. */
     async reload(request?: { requestId?: number }) {
-      await reopen({
-        requestId: request?.requestId,
-        onProgress: (loaded, total) => {
-          if (request?.requestId !== undefined) {
-            const progress: JsonlIndexProgress = {
-              requestId: request.requestId,
-              loaded,
-              total,
-            };
-            emit("jsonlIndexProgress", progress);
-          }
-        },
-      });
+      await reopen();
       emit("jsonlInfo", { ...info(), requestId: request?.requestId });
     },
 
