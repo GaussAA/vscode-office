@@ -89,9 +89,9 @@ export class JsonlFile {
     readonly index: JsonlIndex,
   ) {}
 
-  /** Read the size and build the index. Nothing else is retained. */
-  static async open(source: ByteSource): Promise<JsonlFile> {
-    return new JsonlFile(source, await buildJsonlIndexFrom(source));
+  /** Build the index, unless a fingerprint-validated index was loaded from disk. */
+  static async open(source: ByteSource, cachedIndex?: JsonlIndex): Promise<JsonlFile> {
+    return new JsonlFile(source, cachedIndex ?? (await buildJsonlIndexFrom(source)));
   }
 
   get lineCount(): number {
