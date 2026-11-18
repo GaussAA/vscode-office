@@ -112,8 +112,8 @@ test("search: nested columns are searched as their assembled JSON", async () => 
 
   const result = await searchParquetValues(info, "ko");
 
-  // "ko" appears in `tags` (LIST) and in `meta` (STRUCT) of row 1 only.
-  assert.deepEqual(result.rows, [0]);
+  // "ko" appears in `tags` and `meta` of row 1, and in `meta` of row 5.
+  assert.deepEqual(result.rows, [0, 4]);
   assert.equal(result.capped, false);
 });
 

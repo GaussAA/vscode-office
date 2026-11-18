@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Parquet: LIST/STRUCT fields now show an empty share. Their leaf statistics do not describe a
+  row, so the rail shows `null ?`; opening the column profile scans the column and the badge
+  becomes `empty 67%` (or `empty ~33%` when the scan stopped at its row cap). The scan counts
+  null, empty string, empty list, empty binary and empty map as no data, and the profile header
+  shows both the metadata null share and the scanned empty share.
 - Parquet: clicking the selected schema field again clears the column highlight. The second
   click only dismisses the tint; it does not move the grid.
 
@@ -18,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the header, 16% on the active field row). The light theme keeps the same 14%: its green
   (STRING) and amber (BOOLEAN) text is one step darker so both stay above 4.5:1 on the tinted
   column.
+- Parquet: the column scan reports nulls and empties separately with a combined `emptyRatio`,
+  instead of folding empty lists into the null count.
 
 ### Fixed
 

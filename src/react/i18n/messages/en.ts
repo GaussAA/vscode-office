@@ -192,6 +192,8 @@ export default {
     nullShare: "{percent}% of rows are null",
     partialStatistics: "Partial statistics",
     noStatistics: "No row-group statistics",
+    emptyShare: "{percent}% of the scanned rows are null or empty",
+    nestedScanHint: "No row-level statistics for LIST/STRUCT; scan to count null or empty",
     profileTitle: "Column profile",
     profileScanning: "Scanning this column…",
     profileScan: "Scan this column",

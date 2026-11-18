@@ -554,6 +554,79 @@ export default [
     },
   },
   {
+    name: "parquet-profile-list-empty",
+    async run({ page, base }) {
+      await openParquet(page, base, "?nested=1&profile=1");
+      const ready = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-null').length === 3`,
+      );
+      expect(ready, "the nested profile badges never rendered");
+      const before = json(
+        await page.evaluate(`JSON.stringify([...document.querySelectorAll('.parquet-viewer__list-item')].map(row => ({
+            name: row.dataset.column,
+            badge: row.querySelector('.parquet-viewer__list-null')?.textContent ?? null,
+            label: row.getAttribute('aria-label'),
+        })))`),
+      );
+      const tags = before.find((row) => row.name === "tags");
+      const meta = before.find((row) => row.name === "meta");
+      // LIST and STRUCT values have no row-level statistics: the rail must say "ask", not
+      // stay silent, and the aria sentence must explain the question mark.
+      expect(tags?.badge === "null ?", `LIST badge is ${tags?.badge}`);
+      expect(meta?.badge === "null ?", `STRUCT badge is ${meta?.badge}`);
+      expect(
+        tags?.label.includes("statistics") && tags?.label.includes("scan"),
+        `the LIST badge is unexplained: ${tags?.label}`,
+      );
+
+      // Opening the profile scans the column; one click is the whole price of the answer.
+      await page.evaluate(`(() => {
+          const row = [...document.querySelectorAll('.parquet-viewer__list-item')]
+              .find(item => item.dataset.column === 'tags');
+          row?.querySelector('.parquet-viewer__list-null')?.click();
+      })()`);
+      await page.waitFor(`!!document.querySelector('.parquet-viewer__profile')`);
+      const scanned = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__profile-empty')`,
+      );
+      expect(scanned, "the LIST scan never reported an empty share");
+      const panel = json(
+        await page.evaluate(`JSON.stringify({
+            empty: document.querySelector('.parquet-viewer__profile-empty')?.textContent ?? null,
+            values: [...document.querySelectorAll('.parquet-viewer__profile-value')].map(n => n.textContent),
+            note: document.querySelector('.parquet-viewer__profile-note')?.textContent ?? null,
+        })`),
+      );
+      // 2 null lists + 2 empty lists of 6 rows.
+      expect(panel.empty === "empty 67%", `empty share is ${panel.empty}`);
+      expect(panel.values.length === 2, `top-N has ${panel.values.length} rows`);
+      expect(
+        panel.values.includes('["ko","en"]') && panel.values.includes('["ja"]'),
+        `top-N lost the populated lists: ${JSON.stringify(panel.values)}`,
+      );
+      expect(panel.note.includes("6 of 6"), `the note does not admit coverage: ${panel.note}`);
+
+      await page.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+      await page.waitFor(`!document.querySelector('.parquet-viewer__profile')`);
+      const after = json(
+        await page.evaluate(`JSON.stringify((() => {
+            const row = [...document.querySelectorAll('.parquet-viewer__list-item')]
+                .find(item => item.dataset.column === 'tags');
+            return {
+                badge: row?.querySelector('.parquet-viewer__list-null')?.textContent ?? null,
+                label: row?.getAttribute('aria-label') ?? null,
+            };
+        })())`),
+      );
+      expect(after.badge === "empty 67%", `the rail still shows ${after.badge}`);
+      expect(
+        after.label.includes("67% of the scanned rows are null or empty"),
+        `the scanned share is unexplained: ${after.label}`,
+      );
+      return "LIST null ? → empty 67% after one scan, top-N excludes null/empty rows";
+    },
+  },
+  {
     name: "parquet-profile-silent-host",
     async run({ page, base }) {
       // No `profile=1`: the fake host never answers, so the rail must stay bare. A viewer that
@@ -571,7 +644,22 @@ export default [
         state.firstLabel && !state.firstLabel.includes("null"),
         `a silent host still claimed something about nulls: ${state.firstLabel}`,
       );
-      return "no host answer, no number";
+      // The same rule for the new nested hint: `null ?` is an answer too, so it may only appear
+      // after the host has actually said the column is nested.
+      await openParquet(page, base, "?nested=1");
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const nested = json(
+        await page.evaluate(`JSON.stringify({
+                badges: document.querySelectorAll('.parquet-viewer__list-null').length,
+                tags: document.querySelector('.parquet-viewer__list-item[data-column="tags"]')?.getAttribute('aria-label') ?? null,
+            })`),
+      );
+      expect(nested.badges === 0, `a silent host still produced ${nested.badges} nested badge(s)`);
+      expect(
+        nested.tags && !nested.tags.includes("scan"),
+        `a silent host still offered a scan for tags: ${nested.tags}`,
+      );
+      return "no host answer, no number (scalar or nested)";
     },
   },
   {

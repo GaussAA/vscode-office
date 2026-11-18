@@ -78,8 +78,20 @@ export interface ParquetColumnScan {
   complete: boolean;
   /** Distinct non-null values in the scanned prefix. */
   distinct: number;
-  /** Nulls seen and skipped — the profile already reports their share. */
+  /** Null/undefined values seen and skipped — the profile already reports their share. */
   nulls: number;
+  /**
+   * Empty values seen and skipped: `""`, an empty list, an empty binary, an empty map. They
+   * carry no data, so they are not top-N candidates; a LIST written by a writer that stores
+   * `[]` instead of NULL shows up here rather than in `nulls`.
+   */
+  empties: number;
+  /**
+   * `(nulls + empties) / scanned`: the share of scanned rows with no data. This is the number
+   * the rail shows once a column has been scanned, because metadata statistics only know nulls
+   * (and say nothing row-level about a LIST).
+   */
+  emptyRatio: number;
   top: ParquetColumnScanValue[];
 }
 

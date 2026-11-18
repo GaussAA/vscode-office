@@ -173,6 +173,9 @@ export default {
     nullShare: "{percent}% строк содержат null",
     partialStatistics: "Частичная статистика",
     noStatistics: "Нет статистики по группам строк",
+    emptyShare: "{percent}% просканированных строк — null или пустые",
+    nestedScanHint:
+      "Для LIST/STRUCT нет статистики на уровне строк; просканируйте, чтобы посчитать null или пустые",
     profileTitle: "Профиль столбца",
     profileScanning: "Сканирование столбца…",
     profileScan: "Сканировать столбец",

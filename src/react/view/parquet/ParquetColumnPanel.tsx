@@ -1,6 +1,7 @@
 import type { ParquetColumnProfile, ParquetColumnScan } from "@/common/parquetProfileTypes";
 import { $t } from "../../i18n/i18nConfig.ts";
 import type { ParquetColumnInfo } from "@/common/parquetReader";
+import { formatShare } from "./formatShare";
 
 interface ParquetColumnPanelProps {
   column: ParquetColumnInfo;
@@ -31,7 +32,20 @@ export default function ParquetColumnPanel({
 }: ParquetColumnPanelProps) {
   const nullShare =
     stats?.state === "available" && stats.nullRatio !== undefined
-      ? `${Math.round(stats.nullRatio * 100)}%`
+      ? formatShare("null", stats.nullRatio).marked
+      : null;
+  // The scan is the only value-level answer, so it is where empty lists and empty strings
+  // are counted. `~` marks a prefix: the note below says how many rows it covered.
+  const emptyShare =
+    scan && scan.scanned > 0 && scan.emptyRatio !== undefined
+      ? formatShare("empty", scan.emptyRatio, !scan.complete).marked
+      : null;
+  const coverage =
+    scan && !scan.complete
+      ? $t("parquet.profileScanned", {
+          scanned: scan.scanned.toLocaleString(),
+          total: scan.rowCount.toLocaleString(),
+        })
       : null;
   return (
     <section className="parquet-viewer__profile" aria-label={$t("parquet.profileTitle")}>
@@ -39,6 +53,11 @@ export default function ParquetColumnPanel({
         <span className="parquet-viewer__profile-name">{column.name}</span>
         <span className="parquet-viewer__profile-type">{column.type}</span>
         {nullShare && <span className="parquet-viewer__profile-null">null {nullShare}</span>}
+        {emptyShare && (
+          <span className="parquet-viewer__profile-empty" title={coverage ?? undefined}>
+            empty {emptyShare}
+          </span>
+        )}
         {stats?.min !== undefined && stats.max !== undefined && (
           <span className="parquet-viewer__profile-range">
             {stats.min} … {stats.max}

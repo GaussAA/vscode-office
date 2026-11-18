@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import type { ParquetProfile } from "@/common/parquetProfileTypes";
+import type { ParquetColumnScan, ParquetProfile } from "@/common/parquetProfileTypes";
 import { $t } from "../../i18n/i18nConfig.ts";
 import { COLUMN_ICONS } from "./parquetCell";
+import { formatShare } from "./formatShare";
 import type { ParquetColumnInfo } from "@/common/parquetReader";
 
 interface ParquetSchemaProps {
@@ -10,20 +11,11 @@ interface ParquetSchemaProps {
   siderWidth: number;
   /** Null while the host has not answered; every row then simply has no badge. */
   profile?: ParquetProfile | null;
+  /** Per-column scan answers, keyed by name; a scanned nested column can show a number. */
+  scans: ReadonlyMap<string, ParquetColumnScan>;
   onFocusColumn: (position: number) => void;
   /** Open the profile panel for this column (mouse on the badge, or `i` on the focused row). */
   onInspectColumn: (column: ParquetColumnInfo) => void;
-}
-
-/**
- * `0.4%` must not render as `0%`: the number is the answer, so it rounds only when the
- * difference stays visible.
- */
-function formatNullShare(ratio: number): { badge: string; percent: string } {
-  if (ratio <= 0) return { badge: "null 0%", percent: "0" };
-  if (ratio < 0.01) return { badge: "null <1%", percent: "<1" };
-  const percent = String(Math.round(ratio * 100));
-  return { badge: `null ${percent}%`, percent };
 }
 
 /**
@@ -35,6 +27,7 @@ export default function ParquetSchema({
   activeColumn,
   siderWidth,
   profile,
+  scans,
   onFocusColumn,
   onInspectColumn,
 }: ParquetSchemaProps) {
@@ -146,13 +139,26 @@ export default function ParquetSchema({
           const kind = column.category;
           const active = activeColumn === position;
           const stats = statsByName.get(column.name);
+          const scan = scans.get(column.name);
           // The badge is visual only; the row's accessible name carries the same sentence, so
           // a screen reader hears "Jump to column name — 12% of rows are null" rather than a
           // bare percentage the surrounding UI cannot explain.
           let badge: string | null = null;
           let summary: string | null = null;
-          if (stats?.state === "available" && stats.nullRatio !== undefined) {
-            const share = formatNullShare(stats.nullRatio);
+          if (scan && scan.emptyRatio !== undefined && scan.scanned > 0) {
+            // A scan is value-level, so it is the only source that can count empty lists and
+            // empty strings; `empty` in the badge keeps it distinct from the metadata `null`.
+            const share = formatShare("empty", scan.emptyRatio, !scan.complete);
+            badge = share.badge;
+            summary = $t("parquet.emptyShare", { percent: share.percent });
+            if (!scan.complete) {
+              summary += ` · ${$t("parquet.profileScanned", {
+                scanned: scan.scanned.toLocaleString(),
+                total: scan.rowCount.toLocaleString(),
+              })}`;
+            }
+          } else if (stats?.state === "available" && stats.nullRatio !== undefined) {
+            const share = formatShare("null", stats.nullRatio);
             badge = share.badge;
             summary = $t("parquet.nullShare", { percent: share.percent });
           } else if (stats?.state === "partial") {
@@ -161,6 +167,11 @@ export default function ParquetSchema({
           } else if (stats?.state === "missing") {
             badge = "—";
             summary = $t("parquet.noStatistics");
+          } else if (stats?.state === "nested") {
+            // Leaf statistics are not row values, so there is no metadata number. This is the
+            // mouse path to the scan; `i` on the focused row is the keyboard path.
+            badge = "null ?";
+            summary = $t("parquet.nestedScanHint");
           }
           const label = $t("parquet.jumpToColumn", { name: column.name });
           return (
@@ -187,6 +198,7 @@ export default function ParquetSchema({
                 <span
                   className="parquet-viewer__list-null"
                   aria-hidden="true"
+                  title={summary ?? undefined}
                   onClick={(event) => {
                     // Mouse convenience only: an interactive element inside the row button
                     // would be invalid HTML, so the keyboard path is `i` on the focused row.

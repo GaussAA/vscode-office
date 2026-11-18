@@ -5,6 +5,7 @@ import type { ParquetColumnProfile, ParquetProfile } from "@/common/parquetProfi
 import { createParquetHandlers } from "@/provider/parquetHandlers";
 import { openParquetFile } from "@/common/parquetReader";
 import type { ByteSource } from "@/common/byteSource";
+import { formatShare } from "@/react/view/parquet/formatShare";
 import { memoryByteSource } from "@/service/jsonlFile";
 import {
   profileFromParquet,
@@ -226,11 +227,36 @@ test("scan: top-N counts values and skips nulls the profile already reports", as
   assert.ok(topSum <= 3000 - 429, `counts exceed rows: ${topSum}`);
 });
 
-test("scan: empty arrays are treated as null for list columns", async () => {
-  // Create a test to verify empty arrays are counted as nulls
-  // This would need a fixture with a LIST column containing empty arrays
-  // For now, we document the expected behavior
-  assert.ok(true, "Empty arrays should be counted as nulls in scanParquetColumn");
+test("scan: empty lists are no data, and the empty share combines nulls and empties", async () => {
+  const scan = await scanParquetColumn(memoryByteSource(await bytesOf("nested")), "tags");
+
+  assert.equal(scan.rowCount, 6);
+  assert.equal(scan.scanned, 6);
+  assert.equal(scan.complete, true);
+  // Rows 2 and 6 have no list at all; rows 3 and 5 carry an empty list. Both are "no data",
+  // but they are different facts and the panel has to be able to say which is which.
+  assert.equal(scan.nulls, 2);
+  assert.equal(scan.empties, 2);
+  assert.equal(scan.emptyRatio, 4 / 6);
+  assert.equal(scan.distinct, 2);
+  assert.deepEqual(scan.top.map((entry) => entry.value).sort(), ['["ja"]', '["ko","en"]']);
+  assert.ok(
+    scan.top.every((entry) => entry.value !== "[]"),
+    `an empty list leaked into top-N: ${JSON.stringify(scan.top)}`,
+  );
+});
+
+test("scan: an empty string is empty, not a top-N value", async () => {
+  const scan = await scanParquetColumn(memoryByteSource(await bytesOf("nested")), "id");
+
+  assert.equal(scan.nulls, 0);
+  assert.equal(scan.empties, 1);
+  assert.equal(scan.emptyRatio, 1 / 6);
+  assert.equal(scan.distinct, 5);
+  assert.ok(
+    scan.top.every((entry) => entry.value !== ""),
+    `an empty string leaked into top-N: ${JSON.stringify(scan.top)}`,
+  );
 });
 
 test("scan: a row cap is reported as a prefix, not as the file", async () => {
@@ -248,6 +274,29 @@ test("scan: an unknown column is an error, not an empty histogram", async () => 
     scanParquetColumn(memoryByteSource(await bytesOf("multigroup")), "nope"),
     /no column named nope/,
   );
+});
+
+test("formatShare: <1% stays visible and a scanned prefix is marked with ~", () => {
+  assert.deepEqual(formatShare("null", 0), {
+    badge: "null 0%",
+    percent: "0",
+    marked: "0%",
+  });
+  assert.deepEqual(formatShare("null", 0.004), {
+    badge: "null <1%",
+    percent: "<1",
+    marked: "<1%",
+  });
+  assert.deepEqual(formatShare("empty", 4 / 6), {
+    badge: "empty 67%",
+    percent: "67",
+    marked: "67%",
+  });
+  assert.deepEqual(formatShare("empty", 1 / 3, true), {
+    badge: "empty ~33%",
+    percent: "33",
+    marked: "~33%",
+  });
 });
 
 test("handlers: a column scan is answered with its requestId and a close", async () => {

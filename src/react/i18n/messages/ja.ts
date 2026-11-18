@@ -173,6 +173,9 @@ export default {
     nullShare: "行の {percent}% が null です",
     partialStatistics: "一部の行グループのみ統計あり",
     noStatistics: "行グループ統計なし",
+    emptyShare: "スキャンした行の {percent}% が null または空です",
+    nestedScanHint:
+      "LIST/STRUCT の値には行レベルの統計がありません。スキャンして null または空を数えます",
     profileTitle: "列プロファイル",
     profileScanning: "この列をスキャン中…",
     profileScan: "この列をスキャン",

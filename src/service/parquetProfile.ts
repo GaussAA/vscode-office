@@ -86,23 +86,11 @@ function stateOf(aggregate: Aggregate, rowGroupCount: number): ParquetProfileSta
 }
 
 /**
- * Check if a value should be counted as empty/null for list-type columns.
- * Empty arrays are semantically null for list columns.
- */
-function isEmptyValue(value: MinMax): boolean {
-  // Empty arrays (represented as empty byte arrays in min/max stats for LIST columns)
-  if (value instanceof Uint8Array && value.byteLength === 0) return true;
-  return false;
-}
-
-/**
  * Aggregate per-row-group statistics into one answer per top-level column.
  *
  * A partial answer is reported as partial rather than summed into a total: three of ten row
  * groups is a fact about three row groups, and calling it "the column's nulls" would be a lie
  * the UI cannot detect.
- *
- * For LIST columns, empty arrays are treated as null values because they carry no data.
  */
 export function profileFromParquet(info: {
   metadata: FileMetaData;
@@ -137,11 +125,10 @@ export function profileFromParquet(info: {
       }
       const min = stats.min_value ?? stats.min;
       const max = stats.max_value ?? stats.max;
-      // For LIST columns, check if min/max indicate empty arrays
-      if (min !== undefined && !isEmptyValue(min)) {
+      if (min !== undefined) {
         aggregate.min = pickExtreme(aggregate.min, min, "min");
       }
-      if (max !== undefined && !isEmptyValue(max)) {
+      if (max !== undefined) {
         aggregate.max = pickExtreme(aggregate.max, max, "max");
       }
     }
@@ -215,9 +202,10 @@ function scanDisplayText(value: unknown): string {
 /**
  * Count values of one column over a bounded prefix.
  *
- * Nulls are skipped rather than counted: their share is already a property of the column in the
- * profile, and letting `NULL` win every top-N makes the panel useless. Empty arrays are also
- * treated as null for list columns, because an empty list carries no data.
+ * Nulls and empty values are skipped rather than counted in top-N: letting `NULL` or `[]` win
+ * every top-N makes the panel useless. They are still counted separately, because "no data"
+ * is the quality signal the rail shows, and a LIST writes it as an empty array rather than a
+ * NULL. `emptyRatio` is their combined share.
  */
 export async function scanParquetColumn(
   source: ByteSource,
@@ -237,6 +225,7 @@ export async function scanParquetColumn(
   const counts = new Map<string, number>();
   let scanned = 0;
   let nulls = 0;
+  let empties = 0;
 
   while (scanned < maxRows) {
     const end = Math.min(scanned + PARQUET_SCAN_CHUNK, maxRows);
@@ -251,11 +240,12 @@ export async function scanParquetColumn(
     });
     for (const row of rows) {
       const value = row[name];
-      // Treat null, undefined, and empty arrays as null for counting purposes.
-      const isEmpty =
-        value === null || value === undefined || (Array.isArray(value) && value.length === 0);
-      if (isEmpty) {
+      if (value === null || value === undefined) {
         nulls += 1;
+        continue;
+      }
+      if (isEmptyScanValue(value)) {
+        empties += 1;
         continue;
       }
       const text = scanDisplayText(value);
@@ -278,6 +268,20 @@ export async function scanParquetColumn(
     complete: scanned >= info.rowCount,
     distinct: counts.size,
     nulls,
+    empties,
+    emptyRatio: scanned > 0 ? (nulls + empties) / scanned : 0,
     top: ranked,
   };
+}
+
+/**
+ * A value that carries no data even though it is not NULL. A LIST writer stores "no value"
+ * as `[]` and a string writer may store `""`; both mean the same thing to a reader.
+ */
+function isEmptyScanValue(value: unknown): boolean {
+  if (value === "") return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (value instanceof Uint8Array) return value.byteLength === 0;
+  if (value instanceof Map) return value.size === 0;
+  return false;
 }

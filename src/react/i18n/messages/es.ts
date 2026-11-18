@@ -174,6 +174,9 @@ export default {
     nullShare: "{percent} % de las filas son nulas",
     partialStatistics: "Estadísticas parciales",
     noStatistics: "Sin estadísticas por grupo de filas",
+    emptyShare: "{percent} % de las filas analizadas son nulas o están vacías",
+    nestedScanHint:
+      "LIST/STRUCT no tiene estadísticas por fila; analiza para contar nulos o vacíos",
     profileTitle: "Perfil de columna",
     profileScanning: "Analizando la columna…",
     profileScan: "Analizar la columna",

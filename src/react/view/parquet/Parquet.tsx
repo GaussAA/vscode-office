@@ -98,6 +98,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    */
   const [profilePanel, setProfilePanel] = useState<{ column: ParquetColumnInfo } | null>(null);
   const [columnScan, setColumnScan] = useState<ParquetColumnScan | null>(null);
+  /**
+   * Scan answers by column name. They outlive the panel: a scanned LIST keeps its empty share
+   * in the rail after the panel closes, and scanning another column must not erase it.
+   */
+  const [scans, setScans] = useState<Map<string, ParquetColumnScan>>(() => new Map());
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanRequest = useRef(new RequestGuard());
@@ -280,6 +285,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setError(null);
       setFileInfo(null);
       setProfile(null);
+      setScans(new Map());
       // Everything the previous document asked the host is now unwanted. The profile request
       // is only re-issued once this file has opened, so without this a late reply from the old
       // file lands in the gap. The scan guard is cancelled too: today openProfilePanel also
@@ -444,8 +450,14 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (!payload || !scanRequest.current.isCurrent(payload.requestId)) return;
       scanRequest.current.settle(payload.requestId);
       setScanLoading(false);
-      if (payload.scan) setColumnScan(payload.scan);
-      else setScanError(payload.error ?? "The scan failed.");
+      const scan = payload.scan;
+      if (scan) {
+        setColumnScan(scan);
+        // Keep the answer behind the panel: the rail shows the empty share from now on.
+        setScans((previous) => new Map(previous).set(scan.name, scan));
+      } else {
+        setScanError(payload.error ?? "The scan failed.");
+      }
     });
   }, []);
 
@@ -841,6 +853,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               activeColumn={activeColumn}
               siderWidth={siderWidth}
               profile={profile}
+              scans={scans}
               onFocusColumn={focusColumn}
               onInspectColumn={openProfilePanel}
             />

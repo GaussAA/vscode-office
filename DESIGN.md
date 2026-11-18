@@ -374,7 +374,7 @@ Tab 的顺序是：命令栏 → 侧栏（过滤框、字段、侧栏拖拽把�
 
 - **Shape:** 6px 圆角、`6px 8px` 内距、最小高度 32px、行间 1px 空隙。
 - **Contents:** 类型图标（14px，按类型取色）+ 字段名（12px/500，单行省略）+ 空值率徽标（有统计时）+ 类型徽标（右对齐）。
-- **Null share:** `null 12%`（9.5px 等宽、muted、无底色、`tabular-nums`）。它是视觉徽标，无统计时退成 `—`；整句走字段行的 `aria-label`（"Jump to column name — 12% of rows are null"），所以读者不需要猜这个百分数是什么。低于 1% 且非零显示 `null <1%`，不四舍五入成 0。
+- **Null / empty share:** `null 12%` 来自 row-group statistics：精确、只数 null。结构列没有行级统计时显示 `null ?`；打开画像扫描后变成 `empty 12%`（`~` 前缀表示只扫描了前 20 万行），它把 null、空字符串、空 list、空二进制与空 map 都算作「没有数据」。两者都是 9.5px 等宽、muted、无底色、`tabular-nums`；整句走字段行的 `aria-label`（"Jump to column name — 12% of rows are null" / "… — 12% of the scanned rows are null or empty"），低于 1% 且非零显示 `<1%`，不四舍五入成 0。
 - **States:** hover 用 `list-hoverBackground`；激活行用 Signal Blue 16% 混入底色（浅色主题 14%）、字段名转 Signal Blue；再次点击当前行取消高亮；`focus-visible` 用 `outline-offset: -1px`（贴内边，避免与相邻行粘连）。
 
 ### Type badges
@@ -425,8 +425,9 @@ Tab 的顺序是：命令栏 → 侧栏（过滤框、字段、侧栏拖拽把�
 停靠在底栏正上方，与值面板共用同一个槽位（`bottom: 100%`），所以打开它不会让表格重新分页。
 一次只开一个：选中单元格会收起画像面板，打开画像面板会收起值面板。
 
-- **打开方式**：字段行聚焦时按 `i`，或用鼠标点该行的 `null N%` 徽标。徽标不是独立焦点（行内嵌套可交互元素是无效 HTML），键盘路径就是 `i`。
-- **头部**：字段名、类型、`null N%` 与 `min … max`（都有统计时才出现）；关闭按钮贴右。
+- **打开方式**：字段行聚焦时按 `i`，或用鼠标点该行的 `null N%` / `empty N%` / `null ?` / `—` 徽标。徽标不是独立焦点（行内嵌套可交互元素是无效 HTML），键盘路径就是 `i`。
+- **头部**：字段名、类型、`null N%`（statistics）、`empty N%`（scan，前缀为 `~`）与 `min … max`（都有统计时才出现）；关闭按钮贴右。
+- **结构列**：LIST/STRUCT 没有行级统计，`null ?` 是「可以问」的徽标；打开面板会按需扫描单列（有统计的列也自动扫描），扫描结果同时回填侧栏徽标。`empty` 把 null、空字符串、空 list、空二进制与空 map 合并为「没有数据」，前缀扫描必须带 `~`。
 - **正文**：top-N 每行 `值  次数`（等宽、`tabular-nums`）；底部一行 `Scanned N of M rows · K distinct values`，N 必须是真实扫描行数，不能写总数。
 - **没有统计的文件**：不自动扫描，正文是一个「Scan this column」按钮——扫描要解码，得先问。
 - **键盘**：`Esc` 关闭并把焦点还给打开它的字段行；焦点环沿用 1px `focusBorder`。

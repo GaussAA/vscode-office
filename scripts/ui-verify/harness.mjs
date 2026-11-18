@@ -541,6 +541,27 @@ function parquetStub(fixtures) {
       { name: "score", type: "DOUBLE", state: "partial", groupsWithStatistics: 1 },
     ],
   };
+  /**
+   * The answer for the nested fixture (`/nested.parquet`): LIST and STRUCT columns have no
+   * row-level statistics, so they are state `nested` and the rail offers a scan instead.
+   */
+  const nestedProfile = {
+    rowCount: 6,
+    rowGroupCount: 1,
+    hasAnyStatistics: true,
+    columns: [
+      {
+        name: "id",
+        type: "STRING",
+        state: "available",
+        groupsWithStatistics: 1,
+        nullCount: 0,
+        nullRatio: 0,
+      },
+      { name: "tags", type: "LIST", state: "nested", groupsWithStatistics: 0 },
+      { name: "meta", type: "STRUCT", state: "nested", groupsWithStatistics: 0 },
+    ],
+  };
   return `<script>
 (function () {
   window.__openExternalCalls = [];
@@ -556,27 +577,38 @@ function parquetStub(fixtures) {
         if (params.get('profile') !== '1') return;
         const requestId = msg.content && msg.content.requestId;
         const name = String(msg.content && msg.content.name);
+        const scan = params.get('nested') === '1'
+          ? name === 'tags'
+            ? { name: name, scanned: 6, rowCount: 6, complete: true, distinct: 2, nulls: 2, empties: 2, emptyRatio: 4 / 6, top: [
+                { value: '["ko","en"]', count: 1 },
+                { value: '["ja"]', count: 1 },
+              ] }
+            : name === 'id'
+              ? { name: name, scanned: 6, rowCount: 6, complete: true, distinct: 5, nulls: 0, empties: 1, emptyRatio: 1 / 6, top: [
+                  { value: 'row-1', count: 1 },
+                ] }
+              : { name: name, scanned: 6, rowCount: 6, complete: true, distinct: 2, nulls: 2, empties: 0, emptyRatio: 2 / 6, top: [] }
+          : { name: name, scanned: 300, rowCount: 300, complete: true, distinct: 98,
+              nulls: name === 'name' ? 12 : 0,
+              empties: 0,
+              emptyRatio: name === 'name' ? 12 / 300 : 0,
+              top: [
+                { value: 'service-a-0', count: 40 },
+                { value: 'service-b-1', count: 31 },
+              ] };
         setTimeout(function () {
-          window.postMessage({ type: 'parquetColumnScanData', content: { requestId: requestId, scan: {
-            name: name,
-            scanned: 300,
-            rowCount: 300,
-            complete: true,
-            distinct: 98,
-            nulls: 12,
-            top: [
-              { value: 'service-a-0', count: 40 },
-              { value: 'service-b-1', count: 31 },
-            ],
-          } } }, '*');
+          window.postMessage({ type: 'parquetColumnScanData', content: { requestId: requestId, scan: scan } }, '*');
         }, 40);
         return;
       }
       if (msg.type === 'parquetProfile') {
         if (params.get('profile') !== '1') return;
         const requestId = msg.content && msg.content.requestId;
+        const answer = params.get('nested') === '1'
+          ? ${JSON.stringify(nestedProfile)}
+          : ${JSON.stringify(profile)};
         setTimeout(function () {
-          window.postMessage({ type: 'parquetProfileData', content: { requestId: requestId, profile: ${JSON.stringify(profile)} } }, '*');
+          window.postMessage({ type: 'parquetProfileData', content: { requestId: requestId, profile: answer } }, '*');
         }, 40);
         return;
       }

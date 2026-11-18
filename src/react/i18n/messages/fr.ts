@@ -174,6 +174,9 @@ export default {
     nullShare: "{percent} % des lignes sont nulles",
     partialStatistics: "Statistiques partielles",
     noStatistics: "Pas de statistiques par groupe de lignes",
+    emptyShare: "{percent} % des lignes analysées sont nulles ou vides",
+    nestedScanHint:
+      "Pas de statistiques au niveau des lignes pour LIST/STRUCT ; analysez pour compter les valeurs nulles ou vides",
     profileTitle: "Profil de colonne",
     profileScanning: "Analyse de la colonne…",
     profileScan: "Analyser la colonne",
