@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.15.1] - 2026-11-18
+
+### Fixed
+
+- **Parquet column jump**: clicking several schema fields in a row now always lands on the last
+  one. The previous jump animated a synthetic scrollbar drag per click, so a second click while
+  the first drag (or its retry chain) was still alive could rebound, apply an older target, or
+  leave the requested column outside the viewport. The jump now owns the horizontal offset: it
+  measures the column from the header, eases to it with the motion token (zeroed under
+  `prefers-reduced-motion`), retargets on every click, keeps the header in step, and clamps at
+  both ends of the table. Tables wider than 120 columns place the column immediately instead of
+  turning the easing into long, blocking frames.
+
 ## [6.15.0] - 2026-11-17
 
 ### Changed
