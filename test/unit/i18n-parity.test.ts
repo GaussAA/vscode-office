@@ -54,12 +54,12 @@ const MAX_MISSING: Record<string, number> = {
   "zh-cn": 0,
   "zh-tw": 0,
   ja: 70, // +2 from jsonl.indexing, jsonl.indexingBytes
-  de: 70,
-  fr: 70,
-  es: 70,
-  "pt-br": 70,
-  ko: 70,
-  ru: 70,
+  de: 68,
+  fr: 68,
+  es: 68,
+  "pt-br": 68,
+  ko: 68,
+  ru: 68,
 };
 
 function flatten(tree: Record<string, unknown>, prefix = ""): Map<string, unknown> {

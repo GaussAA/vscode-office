@@ -1,48 +1,40 @@
-/**
- * Scenario: JSONL viewer shows indexing progress on initial load.
- * Verifies that the progress indicator appears and updates during indexing.
- */
+import { expect, json, openJsonl } from "../helpers.mjs";
 
-import { test } from "./framework.mjs";
+/** 2 scenarios: indexing progress display and fast load without progress. */
+export default [
+  {
+    name: "jsonl-indexing-basic",
+    async run({ page, base }) {
+      await page.navigate(`${base}/harness-jsonl?indexing=1`);
 
-test({
-  name: "jsonl-indexing-basic",
-  route: "/harness-jsonl?indexing=1",
-  async run({ page, assert }) {
-    // Wait for the viewer to mount
-    await page.waitFor(".jsonl-viewer");
+      // Wait for viewer to mount
+      await page.waitForSelector(".jsonl-viewer");
 
-    // Check that progress text appears during indexing
-    // Note: The actual text depends on timing, but it should contain "Indexing"
-    const emptyText = await page.textContent(".jsonl-directory .ant-spin-container");
+      // Directory should eventually show rows after indexing completes
+      await page.waitForSelector(".jsonl-directory-row", { timeout: 5000 });
 
-    // Simple assertion: the viewer mounted
-    assert(emptyText !== null, "Directory container should be present");
+      const rows = await page.evaluate(
+        () => document.querySelectorAll(".jsonl-directory-row").length,
+      );
 
-    // Wait for indexing to complete and directory to populate
-    await page.waitFor(".jsonl-directory-row", { timeout: 5000 });
-
-    // Verify that rows are displayed after indexing
-    const rows = await page.$$(".jsonl-directory-row");
-    assert(rows.length > 0, "Directory should show rows after indexing completes");
-
-    console.log(`✓ Indexing completed, ${rows.length} rows displayed`);
+      expect(rows > 0, `Expected rows after indexing, got ${rows}`);
+      return `Indexing completed, ${rows} rows displayed`;
+    },
   },
-});
+  {
+    name: "jsonl-no-progress-on-small-file",
+    async run({ page, base }) {
+      await openJsonl(page, base);
 
-test({
-  name: "jsonl-no-progress-on-small-file",
-  route: "/harness-jsonl",
-  async run({ page, assert }) {
-    // For files without indexing simulation, no progress should be shown
-    await page.waitFor(".jsonl-viewer");
+      // Directory should load quickly without indexing indicator
+      await page.waitForSelector(".jsonl-directory-row", { timeout: 2000 });
 
-    // Directory should load directly without indexing indicator
-    await page.waitFor(".jsonl-directory-row", { timeout: 2000 });
+      const rows = await page.evaluate(
+        () => document.querySelectorAll(".jsonl-directory-row").length,
+      );
 
-    const rows = await page.$$(".jsonl-directory-row");
-    assert(rows.length > 0, "Small file should load rows immediately");
-
-    console.log(`✓ Small file loaded ${rows.length} rows without progress indicator`);
+      expect(rows > 0, `Expected immediate load, got ${rows} rows`);
+      return `Small file loaded ${rows} rows without progress`;
+    },
   },
-});
+];

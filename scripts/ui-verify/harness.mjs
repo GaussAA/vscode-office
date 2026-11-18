@@ -234,7 +234,7 @@ function manyFixtures(count) {
   });
 }
 
-function jsonlStub(fixtures, limit = 0) {
+function jsonlStub(fixtures, limit = 0, indexing = false) {
   const summaries = fixtures.map(({ index, kind, raw, size, label, error }) => ({
     index,
     kind,
@@ -254,9 +254,8 @@ function jsonlStub(fixtures, limit = 0) {
       if (!msg) return;
       if (msg.type === 'init') {
         const requestId = msg.content && msg.content.requestId;
-        if (${JSON.stringify(indexing)}) {
+        if (indexing) {
           // Simulate indexing with progress updates
-          let progress = 0;
           const steps = [20, 40, 60, 80, 99];
           const sendProgress = function(i) {
             if (i >= steps.length) {
@@ -1242,7 +1241,11 @@ export function startHarness(fixtures, port = 0) {
                       ? smokeStub(url.searchParams.get("route") ?? "html")
                       : route === "parquet"
                         ? parquetStub(fixtures)
-                        : jsonlStub(url.searchParams.get("empty") === "1" ? [] : jsonl, limit);
+                        : jsonlStub(
+                            url.searchParams.get("empty") === "1" ? [] : jsonl,
+                            limit,
+                            url.searchParams.get("indexing") === "1",
+                          );
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;
