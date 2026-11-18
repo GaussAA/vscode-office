@@ -676,6 +676,54 @@ export default [
     },
   },
   {
+    name: "parquet-profile-share-cache",
+    async run({ page, base }) {
+      await openParquet(page, base, "?nested=1&profile=1");
+      await page.waitFor(`document.querySelectorAll('.parquet-viewer__list-null').length === 3`);
+      await page.evaluate(`document.querySelector('.parquet-viewer__sider-scan')?.click()`);
+      const scanned = await page.waitFor(
+        `(() => {
+        const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+            .find(row => row.dataset.column === name)
+            ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+        return badge('tags') === 'empty 67%' && badge('meta') === 'empty 33%';
+      })()`,
+        4000,
+      );
+      expect(scanned, "the first open did not produce the shares to cache");
+
+      // The same document and fingerprint: the rail is answered from storage, no scan, no
+      // action. The page is a fresh webview, so this is the persistence path, not React state.
+      await openParquet(page, base, "?nested=1&profile=1", { keepShareCache: true });
+      const cached = await page.waitFor(
+        `(() => {
+        const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+            .find(row => row.dataset.column === name)
+            ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+        return badge('tags') === 'empty 67%' && badge('meta') === 'empty 33%';
+      })()`,
+        2000,
+      );
+      expect(cached, "reopening the same file lost its cached shares");
+      const noAction = await page.waitFor(`!document.querySelector('.parquet-viewer__sider-scan')`);
+      expect(noAction, "the rail offered a scan although every share was cached");
+
+      // A changed mtime means different bytes; the entry must not be reused.
+      await openParquet(page, base, "?nested=1&profile=1&mtime=2", { keepShareCache: true });
+      const invalidated = await page.waitFor(
+        `(() => {
+        const badge = (name) => [...document.querySelectorAll('.parquet-viewer__list-item')]
+            .find(row => row.dataset.column === name)
+            ?.querySelector('.parquet-viewer__list-null')?.textContent ?? null;
+        return badge('tags') === 'null ?' && !!document.querySelector('.parquet-viewer__sider-scan');
+      })()`,
+        2000,
+      );
+      expect(invalidated, "a changed mtime reused a stale empty share");
+      return "same fingerprint reuses the cache; changed mtime rescans";
+    },
+  },
+  {
     name: "parquet-profile-silent-host",
     async run({ page, base }) {
       // No `profile=1`: the fake host never answers, so the rail must stay bare. A viewer that

@@ -72,14 +72,16 @@ export async function jumpJsonl(page, entry) {
   expect(loaded, `entry L${entry} never finished rendering`);
 }
 
-export async function openParquet(page, base, query = "") {
-  // The viewer remembers the page a document was left on (localStorage, keyed by path).
-  // Scenarios share one browser profile, so without this a scenario that ends on page 2
-  // would leave the next one unable to find row 1. Start every scenario from a clean slate;
-  // `parquet-restore-page` proves the restoring half deliberately.
+export async function openParquet(page, base, query = "", options = {}) {
+  // The viewer remembers the page a document was left on (localStorage, keyed by path), and a
+  // scan result is cached under `parquet-shares:`. Scenarios share one browser profile, so
+  // without clearing them a scenario that ends on page 2 would leave the next one unable to
+  // find row 1, and a cached share could make the next scenario start already scanned.
+  // `keepShareCache` is for the scenario that deliberately exercises the reuse path.
   await page.navigate(`${base}/stats`);
+  const shareFilter = options.keepShareCache ? "" : " || key.startsWith('parquet-shares:')";
   await page.evaluate(`Object.keys(localStorage)
-        .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width')
+        .filter(key => key.startsWith('parquet-state:') || key === 'parquet-sider-width'${shareFilter})
         .forEach(key => localStorage.removeItem(key))`);
   await page.navigate(`${base}/harness-parquet${query}`);
   // A real page has cells; an empty file renders antd's empty state; a broken one renders

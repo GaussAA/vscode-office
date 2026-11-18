@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every structured column that has no answer yet. It scans a bounded prefix column by column in
   one request, skips the top-N histogram, reports progress, and aborts when a newer scan starts
   or the viewer closes; the action disappears once every structured column has a share.
+- Parquet: empty-share scan results are cached per document (stable cache id + file size + mtime,
+  7-day TTL, LRU 20). Reopening the same file restores the `empty` badges without scanning; a
+  changed file, a cache-version bump, an expired or corrupt entry all miss and are removed.
+  Documents without a stable mtime are not cached.
 - Parquet: clicking the selected schema field again clears the column highlight. The second
   click only dismisses the tint; it does not move the grid.
 

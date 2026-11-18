@@ -18,6 +18,12 @@ export interface OfficeOpenMessage {
   readOnly: boolean;
   /** Byte size when the scheme can answer; undefined means "unknown", never "small". */
   size?: number;
+  /**
+   * Last-modified time in milliseconds when the host could stat the document. Together with
+   * `size` it is the fingerprint the parquet share cache uses; absent means "cannot validate",
+   * so a cached scan is not reused.
+   */
+  mtimeMs?: number;
   /** Set when the host refused to read an oversized virtual document. */
   tooLarge?: boolean;
   /**

@@ -38,6 +38,11 @@ import {
   pageSizeForBodyHeight,
 } from "./parquetLayout.ts";
 import { loadPersistedRow, savePersistedRow } from "./parquetPersistence.ts";
+import {
+  loadParquetShares,
+  saveParquetShares,
+  type ParquetShareScope,
+} from "./parquetShareCache.ts";
 import { type CellCursor, type TableRow } from "./parquetCell.tsx";
 
 import ParquetTopBar from "./ParquetTopBar.tsx";
@@ -95,6 +100,8 @@ type ParquetOpenPayload = Pick<OfficeOpenMessage, "path" | "buffer" | "bufferBas
   fileName?: string;
   ext?: string;
   size?: number;
+  documentCacheId?: string;
+  mtimeMs?: number;
   tooLarge?: boolean;
 };
 function ParquetViewer({ dark }: { dark: boolean }) {
@@ -122,6 +129,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
    * in the rail after the panel closes, and scanning another column must not erase it.
    */
   const [shares, setShares] = useState<Map<string, ParquetEmptyShare>>(() => new Map());
+  /** The ref is what the async handlers and the batch action read; state is for rendering. */
+  const sharesRef = useRef<Map<string, ParquetEmptyShare>>(new Map());
+  /** The document whose fingerprint the shares belong to; null means "do not cache". */
+  const shareScopeRef = useRef<ParquetShareScope | null>(null);
   /** The rail-level batch scan: one request, bounded progress, cancel on close/document swap. */
   const [structuredScan, setStructuredScan] = useState<{
     loading: boolean;
@@ -133,6 +144,18 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanRequest = useRef(new RequestGuard());
+
+  /**
+   * Merge scan answers into the rail and the persisted cache. The async message handlers are
+   * registered once, so they read `sharesRef` instead of closing over a stale map.
+   */
+  const commitShares = useCallback((incoming: Iterable<ParquetEmptyShare>) => {
+    const next = new Map(sharesRef.current);
+    for (const share of incoming) next.set(share.name, share);
+    sharesRef.current = next;
+    setShares(next);
+    saveParquetShares(shareScopeRef.current, [...next.values()]);
+  }, []);
   const [rowJump, setRowJump] = useState<number | null>(null);
   const [inspected, setInspected] = useState<{
     row: number;
@@ -312,6 +335,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setError(null);
       setFileInfo(null);
       setProfile(null);
+      // The shares belong to the document being left; drop them before the async open. A late
+      // reply from it is already rejected by the request guards.
+      sharesRef.current = new Map();
+      shareScopeRef.current = null;
       setShares(new Map());
       setStructuredScan({ loading: false, scanned: 0, total: 0, error: null });
       // Everything the previous document asked the host is now unwanted. The profile request
@@ -348,6 +375,25 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             : await openParquetFile((await openParquetSource(payload.path ?? "")).file);
         fileInfoRef.current = info;
         setFileInfo(info);
+        // Only load the cached shares once the document has opened: the fingerprint describes
+        // this file. Inline bytes have no stable identity, so they never get a cache scope.
+        const shareScope =
+          payload.mtimeMs !== undefined &&
+          !payload.bufferBase64 &&
+          !payload.buffer &&
+          payload.documentCacheId
+            ? {
+                key: payload.documentCacheId,
+                size: payload.size,
+                mtimeMs: payload.mtimeMs,
+              }
+            : null;
+        shareScopeRef.current = shareScope;
+        const cachedShares = new Map(
+          loadParquetShares(shareScope).map((share) => [share.name, share]),
+        );
+        sharesRef.current = cachedShares;
+        setShares(cachedShares);
         // Ask the host for the profile in the same turn the file opens. Request ids are
         // monotonic, so a reply that belongs to the previous document is ignored instead of
         // painting another file's null rates.
@@ -483,12 +529,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (scan) {
         setColumnScan(scan);
         // Keep the answer behind the panel: the rail shows the empty share from now on.
-        setShares((previous) => new Map(previous).set(scan.name, emptyShareOf(scan)));
+        commitShares([emptyShareOf(scan)]);
       } else {
         setScanError(payload.error ?? "The scan failed.");
       }
     });
-  }, []);
+  }, [commitShares]);
 
   useEffect(() => {
     handler.on(
@@ -516,14 +562,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         });
         return;
       }
-      setShares((previous) => {
-        const next = new Map(previous);
-        for (const share of shares) next.set(share.name, share);
-        return next;
-      });
+      commitShares(shares);
       setStructuredScan({ loading: false, scanned: 0, total: 0, error: null });
     });
-  }, []);
+  }, [commitShares]);
 
   /**
    * Esc closes the panel and puts focus back on the field row that opened it.
@@ -596,7 +638,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     const info = fileInfoRef.current;
     if (!info) return;
     const names = info.columns
-      .filter((column) => column.nested && !shares.has(column.name))
+      .filter((column) => column.nested && !sharesRef.current.has(column.name))
       .slice(0, STRUCTURED_SCAN_BATCH)
       .map((column) => column.name);
     if (names.length === 0) return;
@@ -604,7 +646,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     const requestId = emptyShareRequest.current.issue();
     setStructuredScan({ loading: true, scanned: 0, total: 0, error: null });
     handler.emit("parquetEmptyShareScan", { requestId, names });
-  }, [shares]);
+  }, []);
 
   const jumpToRow = useCallback(
     (warnWhenEmpty = true) => {
