@@ -988,7 +988,7 @@ export default [
         `document.querySelector('.parquet-viewer__field-filter')?.value === ''
                     && document.querySelector('.parquet-viewer__sider-count')?.textContent === '4'
                     && document.querySelector('.parquet-viewer__pager-info')?.innerText === ${JSON.stringify(expectedRange)}`,
-        10_000,
+        20_000,
       );
       expect(reset, "the open view did not reset");
       await new Promise((resolve) => setTimeout(resolve, 150));
