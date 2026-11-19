@@ -983,14 +983,21 @@ export default [
             })()`);
 
       await page.evaluate(`window.postMessage({ type: 'clearParquetCache', content: {} }, '*')`);
-      const expectedRange = rangeOf(await pageSize(page), 0, 300);
-      const reset = await page.waitFor(
+      const cleared = await page.waitFor(
         `document.querySelector('.parquet-viewer__field-filter')?.value === ''
-                    && document.querySelector('.parquet-viewer__sider-count')?.textContent === '4'
-                    && document.querySelector('.parquet-viewer__pager-info')?.innerText === ${JSON.stringify(expectedRange)}`,
+                    && document.querySelector('.parquet-viewer__sider-count')?.textContent === '4'`,
         20_000,
       );
-      expect(reset, "the open view did not reset");
+      expect(cleared, "the open view did not clear its filter/sider");
+      // The reset also restores the sider width, which changes the grid width and can change
+      // rows-per-page. Read the page size after the reset, not before it: pinning the range to
+      // the pre-reset size made this fail on CI viewports that differ from the local one.
+      const expectedRange = rangeOf(await pageSize(page), 0, 300);
+      const reset = await page.waitFor(
+        `document.querySelector('.parquet-viewer__pager-info')?.innerText === ${JSON.stringify(expectedRange)}`,
+        20_000,
+      );
+      expect(reset, "the page did not reset to the first screen");
       await new Promise((resolve) => setTimeout(resolve, 150));
       const after = json(await page.evaluate(`JSON.stringify(${measure})`));
       expect(
