@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **CSV/TSV: 350 MB file size limit** (up from 200 MB, 1.75× increase). The windowed view can now open files up to 350 MB. This limit is chosen to stay within the CSV index cache cap (16 MB per file): a 350 MB file produces ~14.5 MB of index data, which fits in the cache and avoids re-scanning on every open. Larger files would require async chunked indexing with progress reporting (deferred to future work).
+## [6.17.0] - 2026-11-19
 
 ### Added
 
+- **JSONL viewer: indexing progress while the line index builds** — Large JSONL files now show
+  `Indexing… X%` instead of a blank pane. The host defers indexing to `resolveCustomEditor`,
+  streams progress with `RequestGuard`, shares one build between concurrent opens of the same
+  document, and surfaces a failed build in the empty state (cancelling stays silent). The built
+  index is still stored in the host's disk cache and reused on the next open.
 - **JSONL viewer: 5x faster search** — Byte-level ASCII prefilter with Horspool algorithm accelerates full-text search from ~12.5s to ~3s for 1 GB / 5M rows (5.1x for single-hit, 4.5x for no-hit, 1.7x for capped-10k-hit scenarios). Non-ASCII needles or Unicode folding requirements (İ, Kelvin sign) fall back to the full decode path. Differential tests verify result parity across 5000+ comparisons including İstanbul edge cases. Commit: 25de4156.
 - JSONL: the whole-file line index is cached in the extension host's global storage. Reopening
   an unchanged JSONL file no longer scans every byte to rebuild it; the cache is keyed by
@@ -45,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CSV/TSV: 350 MB file size limit** (up from 200 MB, 1.75× increase). The windowed view can now open files up to 350 MB. This limit is chosen to stay within the CSV index cache cap (16 MB per file): a 350 MB file produces ~14.5 MB of index data, which fits in the cache and avoids re-scanning on every open. Larger files would require async chunked indexing with progress reporting (deferred to future work).
 - The Clear command no longer only covers parquet; the old id is an alias and is no longer
   shown in the command palette.
 
