@@ -276,11 +276,116 @@ export function jsonText(value: unknown): string {
   }
 }
 
+/**
+ * Pretty-print `value` but keep only the first `limit` characters, without allocating the
+ * full string. `chars` still counts the whole output so the value bar can label the value;
+ * the old `JSON.stringify(value, null, 2)` allocated the full text (tens of MB for a large
+ * record) just to slice 200k off it, which is what made opening the value panel janky.
+ * A circular value falls back to `String(value)`, matching `jsonText`'s catch.
+ */
+export function jsonTextBounded(value: unknown, limit: number): ValueText {
+  let text = "";
+  let chars = 0;
+  let truncated = false;
+  const write = (chunk: string) => {
+    chars += chunk.length;
+    if (truncated) return;
+    if (text.length >= limit) {
+      truncated = true;
+      return;
+    }
+    const fit = Math.min(chunk.length, limit - text.length);
+    text += chunk.slice(0, fit);
+    if (fit < chunk.length) truncated = true;
+  };
+  const seen = new WeakSet<object>();
+  const scalar = (v: unknown): void => {
+    if (v === null) {
+      write("null");
+      return;
+    }
+    switch (typeof v) {
+      case "string":
+        write(JSON.stringify(v));
+        return;
+      case "number":
+        // JSON has no NaN/Infinity; JSON.stringify emits null for both.
+        write(Number.isFinite(v) ? String(v) : "null");
+        return;
+      case "boolean":
+        write(v ? "true" : "false");
+        return;
+      default:
+        // undefined/function/symbol: null in an array, omitted from an object's keys below.
+        write("null");
+    }
+  };
+  const emit = (v: unknown, indent: string): void => {
+    if (v === null || typeof v !== "object") {
+      scalar(v);
+      return;
+    }
+    if (seen.has(v)) throw new Error("circular");
+    seen.add(v);
+    try {
+      if (Array.isArray(v)) {
+        if (v.length === 0) {
+          write("[]");
+          return;
+        }
+        write("[\n");
+        for (let i = 0; i < v.length; i++) {
+          write(indent + "  ");
+          emit(v[i], indent + "  ");
+          if (i < v.length - 1) write(",");
+          write("\n");
+        }
+        write(indent + "]");
+        return;
+      }
+      const record = v as Record<string, unknown>;
+      const keys = Object.keys(record).filter((key) => {
+        const child = record[key];
+        return child !== undefined && typeof child !== "function" && typeof child !== "symbol";
+      });
+      if (keys.length === 0) {
+        write("{}");
+        return;
+      }
+      write("{\n");
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        write(indent + "  " + JSON.stringify(key) + ": ");
+        emit(record[key], indent + "  ");
+        if (i < keys.length - 1) write(",");
+        write("\n");
+      }
+      write(indent + "}");
+    } finally {
+      seen.delete(v);
+    }
+  };
+  try {
+    emit(value, "");
+  } catch {
+    const fallback = String(value);
+    text = fallback.slice(0, limit);
+    chars = fallback.length;
+    truncated = fallback.length > limit;
+  }
+  return { text, chars, truncated };
+}
+
 export function fullValueText(value: unknown, limit = JSONL_VALUE_TEXT_LIMIT): ValueText {
-  const text = jsonText(value);
-  const chars = text.length;
-  if (chars <= limit) return { text, chars, truncated: false };
-  return { text: text.slice(0, limit), chars, truncated: true };
+  if (typeof value === "string") {
+    if (value.length <= limit) return { text: value, chars: value.length, truncated: false };
+    return { text: value.slice(0, limit), chars: value.length, truncated: true };
+  }
+  try {
+    return jsonTextBounded(value, limit);
+  } catch {
+    return { text: String(value), chars: String(value).length, truncated: false };
+  }
 }
 
 /** Read the value a tree key points at. */

@@ -13,6 +13,7 @@ import {
   buildEntryModel,
   valueAtPath,
   jsonText,
+  jsonTextBounded,
   fullValueText,
 } from "../../src/react/view/entry/entryFormat.ts";
 
@@ -245,6 +246,49 @@ test("fullValueText: stringifies objects", () => {
   const result = fullValueText(obj);
   assert(result.text.includes('"a"'));
   assert.strictEqual(result.truncated, false);
+});
+
+test("jsonTextBounded: matches JSON.stringify under the limit", () => {
+  const value = { a: 1, b: [true, null, "x\n"], c: {}, d: [] };
+  const expected = JSON.stringify(value, null, 2);
+  const result = jsonTextBounded(value, 10_000);
+  assert.strictEqual(result.text, expected);
+  assert.strictEqual(result.chars, expected.length);
+  assert.strictEqual(result.truncated, false);
+});
+
+test("jsonTextBounded: stops at the limit and still counts the whole output", () => {
+  const value = { items: Array.from({ length: 10_000 }, (_, index) => ({ id: index })) };
+  const expected = JSON.stringify(value, null, 2);
+  const result = jsonTextBounded(value, 1_000);
+  assert.strictEqual(result.text.length, 1_000);
+  assert.strictEqual(result.text, expected.slice(0, 1_000));
+  assert.strictEqual(result.chars, expected.length);
+  assert.strictEqual(result.truncated, true);
+});
+
+test("jsonTextBounded: undefined/function/symbol follow JSON.stringify", () => {
+  const value = { a: undefined, b: () => 1, c: [undefined, () => 1] };
+  const expected = JSON.stringify(value, null, 2);
+  const result = jsonTextBounded(value, 10_000);
+  assert.strictEqual(result.text, expected);
+});
+
+test("jsonTextBounded: circular values fall back like jsonText", () => {
+  const value: any = { a: 1 };
+  value.self = value;
+  const result = jsonTextBounded(value, 10_000);
+  assert.strictEqual(result.text, String(value));
+});
+
+test("fullValueText: a large object is bounded without allocating the full text", () => {
+  const value = { items: Array.from({ length: 20_000 }, (_, index) => ({ id: index })) };
+  const expected = JSON.stringify(value, null, 2);
+  const result = fullValueText(value, 2_000);
+  assert.strictEqual(result.text.length, 2_000);
+  assert.strictEqual(result.text, expected.slice(0, 2_000));
+  assert.strictEqual(result.chars, expected.length);
+  assert.strictEqual(result.truncated, true);
 });
 
 // ===== Build Entry Model =====

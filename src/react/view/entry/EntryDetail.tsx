@@ -1,7 +1,7 @@
 import "./Entry.less";
 import { CopyOutlined } from "@ant-design/icons";
 import { $t } from "../../i18n/i18nConfig.ts";
-import { Button, Modal, Segmented, Tree } from "antd";
+import { Button, ConfigProvider, Modal, Segmented, Tree } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { DataNode } from "antd/es/tree";
@@ -379,17 +379,22 @@ export default function EntryDetail({
       </div>
     );
   } else if (model) {
+    // Expanding a large record used to animate every node the antd Tree had just flattened;
+    // the collapse/expand motion is the expensive half on a 10k-node tree. The row highlight
+    // and the tree's own render are enough feedback.
     const tree = (
-      <Tree
-        className={`jsonl-detail__tree${wrap ? " jsonl-detail__tree--wrap" : ""}`}
-        treeData={treeData}
-        expandedKeys={expandedKeys}
-        onExpand={(keys) => setExpanded(keys)}
-        selectedKeys={activeKey ? [activeKey] : []}
-        onSelect={(keys) => setActiveKey(keys.length ? String(keys[0]) : null)}
-        {...(wrap ? {} : { height, itemHeight: ROW_HEIGHT, virtual: true })}
-        showIcon={false}
-      />
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <Tree
+          className={`jsonl-detail__tree${wrap ? " jsonl-detail__tree--wrap" : ""}`}
+          treeData={treeData}
+          expandedKeys={expandedKeys}
+          onExpand={(keys) => setExpanded(keys)}
+          selectedKeys={activeKey ? [activeKey] : []}
+          onSelect={(keys) => setActiveKey(keys.length ? String(keys[0]) : null)}
+          {...(wrap ? {} : { height, itemHeight: ROW_HEIGHT, virtual: true })}
+          showIcon={false}
+        />
+      </ConfigProvider>
     );
     body = wrap ? <div className="jsonl-detail__scroll">{tree}</div> : tree;
   } else {
