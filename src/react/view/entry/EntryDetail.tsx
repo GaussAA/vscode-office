@@ -177,6 +177,33 @@ export default function EntryDetail({
     return nodes;
   }, [model, wrap, highlight]);
 
+  const onExpand = useCallback((keys: React.Key[]) => setExpanded(keys), []);
+  const onSelect = useCallback(
+    (keys: React.Key[]) => setActiveKey(keys.length ? String(keys[0]) : null),
+    [],
+  );
+
+  // Opening the value panel flips `valueOpen` in this component. Without this memo, that
+  // re-rendered every memoized tree node for a 1.3 MB object just to show a 200k text panel;
+  // with it, only the panel subtree updates.
+  const tree = useMemo(
+    () => (
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <Tree
+          className={`jsonl-detail__tree${wrap ? " jsonl-detail__tree--wrap" : ""}`}
+          treeData={treeData}
+          expandedKeys={expandedKeys}
+          onExpand={onExpand}
+          selectedKeys={activeKey ? [activeKey] : []}
+          onSelect={onSelect}
+          {...(wrap ? {} : { height, itemHeight: ROW_HEIGHT, virtual: true })}
+          showIcon={false}
+        />
+      </ConfigProvider>
+    ),
+    [treeData, expandedKeys, wrap, height, activeKey, onExpand, onSelect],
+  );
+
   const copyValue = useCallback(() => {
     if (!entry) return;
     void copy(jsonText(activeValue()), "value");
@@ -379,23 +406,6 @@ export default function EntryDetail({
       </div>
     );
   } else if (model) {
-    // Expanding a large record used to animate every node the antd Tree had just flattened;
-    // the collapse/expand motion is the expensive half on a 10k-node tree. The row highlight
-    // and the tree's own render are enough feedback.
-    const tree = (
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <Tree
-          className={`jsonl-detail__tree${wrap ? " jsonl-detail__tree--wrap" : ""}`}
-          treeData={treeData}
-          expandedKeys={expandedKeys}
-          onExpand={(keys) => setExpanded(keys)}
-          selectedKeys={activeKey ? [activeKey] : []}
-          onSelect={(keys) => setActiveKey(keys.length ? String(keys[0]) : null)}
-          {...(wrap ? {} : { height, itemHeight: ROW_HEIGHT, virtual: true })}
-          showIcon={false}
-        />
-      </ConfigProvider>
-    );
     body = wrap ? <div className="jsonl-detail__scroll">{tree}</div> : tree;
   } else {
     body = <div className="jsonl-empty">{$t("jsonl.noTree")}</div>;

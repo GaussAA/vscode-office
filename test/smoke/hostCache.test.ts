@@ -285,4 +285,128 @@ describe("host caches (real VS Code)", function () {
     );
     second.close();
   });
+
+  it("JSON Preview: the 1.3 MB user workspace expands without the stringify stall", async function () {
+    const userFile = String.raw`C:\WorkSpace\trajectory-quality-inspection\tests\true-test\2026-11-19-codex-kimi-pass14-14samples-selfdeployed\data\workspace_0001_workspace_workspace.json`;
+    let bytes: Uint8Array;
+    try {
+      bytes = await fsp.readFile(userFile);
+    } catch {
+      // Local-only fixture: absent on CI runners.
+      this.skip();
+      return;
+    }
+    const uri = await writeFixture("user-workspace.json", bytes);
+    const bridge = await openJsonPreview(uri);
+    try {
+      await waitForInner(bridge, ".jsonl-detail__tree", "the object tree did not render", 120_000);
+      await waitForInner(
+        bridge,
+        ".ant-tree-treenode .ant-tree-node-content-wrapper",
+        "the object tree has no rows",
+        120_000,
+      );
+      const treeDiag = await bridge.evaluate<string>(`(() => {
+        const doc = document.querySelector('iframe')?.contentWindow?.document;
+        if (!doc) return JSON.stringify({ error: 'no iframe document' });
+        return JSON.stringify([...doc.querySelectorAll('.ant-tree-treenode')].slice(0, 5).map((node) => ({
+          key: node.getAttribute('data-node-key'),
+          selected: node.className.includes('ant-tree-treenode-selected'),
+          title: node.querySelector('.ant-tree-title')?.textContent ?? null,
+        })));
+      })()`);
+      console.log(`tree diag ${treeDiag}`);
+      await bridge.evaluate(`(() => {
+        const doc = document.querySelector('iframe')?.contentWindow?.document;
+        doc?.querySelector('.ant-tree-treenode .ant-tree-title')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      })()`);
+      await sleep(500);
+      const treeAfter = await bridge.evaluate<string>(`(() => {
+        const doc = document.querySelector('iframe')?.contentWindow?.document;
+        if (!doc) return JSON.stringify({ error: 'no iframe document' });
+        return JSON.stringify([...doc.querySelectorAll('.ant-tree-treenode')].slice(0, 5).map((node) => ({
+          key: node.getAttribute('data-node-key'),
+          selected: node.className.includes('ant-tree-treenode-selected'),
+        })));
+      })()`);
+      console.log(`tree after click ${treeAfter}`);
+      await waitForInner(bridge, ".jsonl-valuebar", "the value bar never rendered", 60_000);
+      const valueMs = await bridge.evaluate<number>(`(() => {
+        const win = document.querySelector('iframe')?.contentWindow;
+        const doc = win?.document;
+        win.__dshLongTasks = [];
+        try {
+          new win.PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              win.__dshLongTasks.push({
+                start: Math.round(entry.startTime),
+                duration: Math.round(entry.duration),
+              });
+            }
+          }).observe({ type: 'longtask', buffered: true });
+        } catch {}
+        const start = performance.now();
+        doc?.querySelector('.jsonl-valuebar__toggle')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        const sync = performance.now() - start;
+        win.__dshValueState = { sync, opened: false };
+        win.requestAnimationFrame(() => {
+          win.__dshValueState.opened = true;
+          win.__dshValueState.at = Math.round(performance.now() - start);
+        });
+        return sync;
+      })()`);
+      console.log(`value click sync ${Math.round(valueMs)} ms`);
+      await sleep(1500);
+      const diag = await bridge.evaluate<string>(`(() => {
+        const win = document.querySelector('iframe')?.contentWindow;
+        const doc = win?.document;
+        return JSON.stringify({
+          longtasks: win?.__dshLongTasks ?? [],
+          state: win?.__dshValueState ?? null,
+          barClass: doc?.querySelector('.jsonl-valuebar')?.className ?? null,
+          body: !!doc?.querySelector('.jsonl-valuebar__body'),
+          text: !!doc?.querySelector('.jsonl-valuebar__text'),
+        });
+      })()`);
+      console.log(`value panel diag ${diag}`);
+      await waitForInner(
+        bridge,
+        ".jsonl-valuebar__body .jsonl-valuebar__text",
+        "the value panel did not open",
+        60_000,
+      );
+      assert.ok(valueMs < 500, `value panel expand took ${valueMs} ms`);
+
+      await bridge.evaluate(`(() => {
+        const doc = document.querySelector('iframe')?.contentWindow?.document;
+        const button = [...doc.querySelectorAll('.jsonl-detail__header button')]
+          .find((candidate) => /全部展开|Expand all/.test(candidate.textContent || ''));
+        button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      })()`);
+      await sleep(500);
+      const confirmAppeared = await bridge.evaluate<boolean>(`(() => {
+        const doc = document.querySelector('iframe')?.contentWindow?.document;
+        return !!doc?.querySelector('.ant-modal-confirm-btns .ant-btn-primary');
+      })()`);
+      const treeMs = await bridge.evaluate<number>(`(() => {
+        const doc = document.querySelector('iframe')?.contentWindow?.document;
+        const start = performance.now();
+        doc.querySelector('.ant-modal-confirm-btns .ant-btn-primary')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        return performance.now() - start;
+      })()`);
+      // The confirm only appears above EXPAND_ALL_CONFIRM nodes; a smaller object expands
+      // directly, so accept either path and still wait for the tree to grow.
+      await waitForInner(bridge, ".ant-tree-treenode", "the tree never expanded", 60_000);
+      assert.ok(treeMs < 3000, `expand-all took ${treeMs} ms`);
+      console.log(
+        `user json: value ${Math.round(valueMs)} ms, tree ${Math.round(treeMs)} ms, ` +
+          `confirm ${confirmAppeared}, ${bytes.byteLength} bytes`,
+      );
+    } finally {
+      bridge.close();
+    }
+  });
 });
