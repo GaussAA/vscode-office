@@ -165,9 +165,15 @@ export function registerSaveHostSuite(): void {
         await workbook.bridge.post("save", { contentBase64: base64(payload) });
 
         await waitFor(
-          async () => (await workbook.bridge.count("saveDone")) > 0,
-          () => "the host never answered saveDone",
+          async () => {
+            const done = await workbook.bridge.count("saveDone");
+            const failed = await workbook.bridge.count("saveFailed");
+            return done > 0 || failed > 0;
+          },
+          () => "the host never answered the save",
+          90_000,
         );
+        assert.strictEqual(await workbook.bridge.count("saveFailed"), 0, "the save failed");
         await expectLabel(workbook.uri, workbook.fileName);
         const written = await vscode.workspace.fs.readFile(workbook.uri);
         assert.ok(Buffer.from(written).equals(payload), "the file does not hold the saved bytes");
@@ -189,9 +195,15 @@ export function registerSaveHostSuite(): void {
 
         await workbook.bridge.post("save", { contentBase64: base64(payload) });
         await waitFor(
-          async () => (await workbook.bridge.count("saveDone")) > 0,
-          () => "the host never answered saveDone",
+          async () => {
+            const done = await workbook.bridge.count("saveDone");
+            const failed = await workbook.bridge.count("saveFailed");
+            return done > 0 || failed > 0;
+          },
+          () => "the host never answered the save",
+          90_000,
         );
+        assert.strictEqual(await workbook.bridge.count("saveFailed"), 0, "the save failed");
         // The watcher echo of the write arrives well inside the 1.5 s skip window; give it
         // time to arrive and be (not) acted upon.
         await sleep(1200);
@@ -223,8 +235,20 @@ export function registerSaveHostSuite(): void {
       })()`);
 
         await waitFor(
-          async () => (await workbook.bridge.count("saveDone")) > 0,
-          () => "the host never answered saveDone",
+          async () => {
+            const done = await workbook.bridge.count("saveDone");
+            const failed = await workbook.bridge.count("saveFailed");
+            return done > 0 || failed > 0;
+          },
+          () => "the host never answered the large save",
+          // A 12 MB write on a slow CI disk has taken longer than the default 30 s. Wait longer
+          // and treat a saveFailed as a failure with its own message instead of a bare timeout.
+          90_000,
+        );
+        assert.strictEqual(
+          await workbook.bridge.count("saveFailed"),
+          0,
+          "the large save failed before saveDone",
         );
         const stat = await vscode.workspace.fs.stat(workbook.uri);
         assert.strictEqual(stat.size, size, "the large save did not reach the disk");
