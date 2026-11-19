@@ -17,6 +17,7 @@
  * second `*.test.ts` file, whose order relative to that check would depend on the file glob.
  */
 import * as assert from "node:assert";
+import { writeFile as writeNodeFile } from "node:fs/promises";
 import * as vscode from "vscode";
 import { WebviewBridge, sleep, waitFor } from "./webviewBridge";
 
@@ -131,11 +132,22 @@ export function registerSaveHostSuite(): void {
         await makeDirty(workbook);
         const opensBefore = await workbook.bridge.count("open");
 
-        await vscode.workspace.fs.writeFile(workbook.uri, fixtureBytes);
-
-        await waitFor(
-          async () => (await workbook.bridge.count("open")) > opensBefore,
-          () => "the host never re-sent the document after the external write",
+        // `vscode.workspace.fs.writeFile` goes through VS Code's own file service; the
+        // watcher is not guaranteed to emit a change event for that internal write, which is
+        // what made this test flaky. Write through Node instead: the watcher then sees the
+        // same raw file event an editor outside this process would produce.
+        const deadline = Date.now() + 30_000;
+        let lastWriteAt = 0;
+        while (Date.now() < deadline && (await workbook.bridge.count("open")) <= opensBefore) {
+          if (Date.now() - lastWriteAt > 2_000) {
+            await writeNodeFile(workbook.uri.fsPath, fixtureBytes);
+            lastWriteAt = Date.now();
+          }
+          await sleep(100);
+        }
+        assert.ok(
+          (await workbook.bridge.count("open")) > opensBefore,
+          "the host never re-sent the document after the external write",
         );
         await expectLabel(workbook.uri, workbook.fileName);
         assert.ok(findTab(workbook.uri), `the panel went away; open tabs: ${describeTabs()}`);
