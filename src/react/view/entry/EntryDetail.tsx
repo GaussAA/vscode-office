@@ -19,6 +19,7 @@ import {
   preview,
   readPathKey,
   typeLabel,
+  type NodeModel,
 } from "./entryFormat.ts";
 import EntryValuePanel from "./EntryValuePanel.tsx";
 import { chipClass, chipLabel, toAntdNodes } from "./entryTreeAdapter.tsx";
@@ -83,8 +84,15 @@ export default function EntryDetail({
   // build; small entries wrap (variable row height, virtual list off), big ones stay on one
   // line so the fixed-height virtual list keeps working.
   const model = useMemo(
-    () => (entry?.kind === "value" ? buildEntryModel(entry.value) : null),
-    [entry],
+    () =>
+      entry?.kind === "value"
+        ? // Small entries paint three levels; a multi-MB object stops at two and loads the
+          // rest on expand. A reveal needs the whole path to highlight it, so it is eager.
+          buildEntryModel(entry.value, {
+            lazyDepth: revealKey ? Number.POSITIVE_INFINITY : entry.size > 200_000 ? 2 : 3,
+          })
+        : null,
+    [entry, revealKey],
   );
   const wrap = model?.wrap ?? false;
 
@@ -177,6 +185,18 @@ export default function EntryDetail({
     return nodes;
   }, [model, wrap, highlight]);
 
+  const loadData = useCallback(
+    async (node: DataNode) => {
+      const source = (node as DataNode & { dataRef?: NodeModel }).dataRef;
+      if (!source?.lazy) return;
+      // Yield once so the expand spinner paints before building this node's children.
+      await Promise.resolve();
+      const built = buildEntryModel(source.value, { lazyDepth: 1 });
+      node.children = toAntdNodes(built.nodes, wrap, highlight);
+    },
+    [wrap, highlight],
+  );
+
   const onExpand = useCallback((keys: React.Key[]) => setExpanded(keys), []);
   const onSelect = useCallback(
     (keys: React.Key[]) => setActiveKey(keys.length ? String(keys[0]) : null),
@@ -188,7 +208,13 @@ export default function EntryDetail({
   // with it, only the panel subtree updates.
   const tree = useMemo(
     () => (
-      <ConfigProvider theme={{ token: { motion: false } }}>
+      <ConfigProvider
+        theme={{
+          // Short enough to stay responsive on a 10k-node tree; the user still sees the
+          // expand/collapse affordance instead of an instant jump.
+          token: { motion: true, motionDurationMid: "0.15s", motionDurationFast: "0.1s" },
+        }}
+      >
         <Tree
           className={`jsonl-detail__tree${wrap ? " jsonl-detail__tree--wrap" : ""}`}
           treeData={treeData}
@@ -196,12 +222,13 @@ export default function EntryDetail({
           onExpand={onExpand}
           selectedKeys={activeKey ? [activeKey] : []}
           onSelect={onSelect}
+          loadData={loadData}
           {...(wrap ? {} : { height, itemHeight: ROW_HEIGHT, virtual: true })}
           showIcon={false}
         />
       </ConfigProvider>
     ),
-    [treeData, expandedKeys, wrap, height, activeKey, onExpand, onSelect],
+    [treeData, expandedKeys, wrap, height, activeKey, onExpand, onSelect, loadData],
   );
 
   const copyValue = useCallback(() => {

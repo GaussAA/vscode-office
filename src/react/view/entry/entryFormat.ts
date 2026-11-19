@@ -138,6 +138,8 @@ export interface NodeModel {
    * row says how many keys are below the cap.
    */
   depthCapped?: number;
+  /** Composite whose children are built on the first expand (lazy tree). */
+  lazy?: boolean;
 }
 
 export interface EntryModel {
@@ -164,6 +166,8 @@ export interface EntryModelOptions {
   wrapNodeLimit?: number;
   wrapTextLimit?: number;
   defaultExpandDepth?: number;
+  /** Build children only to this depth; deeper composites are marked lazy. */
+  lazyDepth?: number;
 }
 
 /**
@@ -177,6 +181,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
   const wrapNodeLimit = options.wrapNodeLimit ?? WRAP_NODE_LIMIT;
   const wrapTextLimit = options.wrapTextLimit ?? WRAP_TEXT_LIMIT;
   const defaultExpandDepth = options.defaultExpandDepth ?? DEFAULT_EXPAND_DEPTH;
+  const lazyDepth = options.lazyDepth ?? Number.POSITIVE_INFINITY;
 
   const composite = isComposite(value);
   const wrap = composite && countNodes(value, wrapNodeLimit, maxDepth) <= wrapNodeLimit;
@@ -215,6 +220,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
               : 0
           : 0;
       const capped = hiddenKeys > 0;
+      const lazy = childComposite && !capped && childPath.length >= lazyDepth;
       nodes.push({
         key,
         path: childPath,
@@ -225,7 +231,8 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
         preview:
           wrap && typeof child === "string" ? wrappedText(child, wrapTextLimit) : preview(child),
         composite: childComposite && !capped,
-        children: childComposite && !capped ? walk(child, childPath) : [],
+        children: childComposite && !capped && !lazy ? walk(child, childPath) : [],
+        ...(lazy ? { lazy: true } : {}),
         ...(capped ? { depthCapped: hiddenKeys } : {}),
       });
     }

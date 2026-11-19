@@ -58,7 +58,9 @@ export function toAntdNodes(nodes: NodeModel[], wrap: boolean, highlight?: strin
     return {
       key: node.key,
       isLeaf: !node.composite,
-      children: node.composite ? toAntdNodes(node.children, wrap, highlight) : undefined,
+      children:
+        node.composite && !node.lazy ? toAntdNodes(node.children, wrap, highlight) : undefined,
+      ...(node.lazy ? { dataRef: node } : {}),
       title: (
         <span className={`jsonl-kv${wrap ? " jsonl-kv--wrap" : ""}`}>
           <span className="jsonl-key">{renderHighlighted(node.label, highlight)}</span>
