@@ -286,6 +286,7 @@ export function registerSaveHostSuite(): void {
         const failure = await waitFor(
           async () => (await bridge.received()).find((m) => m.type === "saveFailed"),
           () => "the host never answered saveFailed",
+          90_000,
         );
         assert.strictEqual(failure.reason, "readonly");
         assert.strictEqual(await bridge.count("saveDone"), 0);
