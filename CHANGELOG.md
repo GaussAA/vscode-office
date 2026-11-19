@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.18.0] - 2026-11-19
+
+### Changed
+
+- **JSON Preview: the value panel no longer stringifies the whole value** — Opening the panel
+  used to run `JSON.stringify(value, null, 2)` over the entire record and then slice 200k off
+  it; a 1.5 MB object stalled the webview. `jsonTextBounded` now builds only the first 200k
+  characters while still counting the full length, and `Copy value` keeps copying the whole
+  value. On the reported 1.5 MB workspace the panel opens in ~2 ms.
+- **JSON Preview: the tree builds two levels and loads the rest on expand** — Small entries
+  build three levels; a multi-MB object builds two and the antd tree loads deeper children
+  through `loadData`. A search reveal is eager so its path can be highlighted. The first
+  paint no longer builds the whole 1.3 MB tree.
+- **JSON Preview: motion is back, sized for a large tree** — Expand/collapse runs on
+  0.12–0.16 s motion tokens instead of no animation, the value panel fades in through the
+  same tokens, and `prefers-reduced-motion` zeroes both. (The earlier fix had disabled the
+  tree motion entirely; that was too blunt.)
+
+### Fixed
+
+- **UI verification: `parquet-clear-cache` on CI** — The reset pager range was pinned to the
+  rows-per-page measured before the sider width was restored; a CI viewport that changes rows
+  per page then never matched. The scenario now waits for filter+sider, then measures.
+- **Smoke: read-only save on CI** — The test first activates the built-in git extension and
+  opens a `git:` revision; its `saveFailed` wait now matches the 90 s budget of the other save
+  paths instead of the 30 s default.
+
 ## [6.17.0] - 2026-11-19
 
 ### Added
