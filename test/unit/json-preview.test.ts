@@ -105,12 +105,14 @@ test("session: array info, labels, raw fallback and record detail", () => {
   assert.equal(records[3].label, "3");
   assert.equal(records[2].raw, "42");
 
-  const detail = preview.record(0, true);
+  const detail = preview.record(0);
   assert.ok(detail);
   if (detail.kind !== "value") assert.fail("expected a value record");
   assert.equal(detail.index, 0);
   assert.deepEqual(detail.value, { id: "alpha", name: "A" });
-  assert.equal(detail.text, '{"id":"alpha","name":"A"}');
+  // The tree needs the value only; Raw is a 120-character summary (ADR-0030).
+  assert.equal(detail.text, "");
+  assert.equal(detail.raw, '{"id":"alpha","name":"A"}');
   assert.equal(preview.record(4), null);
   assert.equal(preview.recordsInWindow(3, 99).length, 1);
 });

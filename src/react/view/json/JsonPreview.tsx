@@ -6,7 +6,6 @@ import {
   type JsonInfoPayload,
   type JsonRecordPayload,
   type JsonRecordSummary,
-  type JsonRecordTextPayload,
   type JsonRecordsPayload,
   type JsonRootPayload,
   type JsonSearchBatch,
@@ -110,9 +109,6 @@ export default function JsonPreview() {
   const selectedRef = useRef(0);
   const queryRef = useRef("");
   const entries = useRef(new RequestGuard());
-  /** Raw-text fetches for a record that shipped only the value (ADR-0030). */
-  const entryText = useRef(new RequestGuard());
-  const modeRef = useRef<DetailMode>("tree");
   /** Record windows in flight. A new document clears them, so an old document's reply is dropped. */
   const records = useRef(new PendingRequests());
   /** The search scan; `cancel()` says whether the host is still running one. */
@@ -122,9 +118,6 @@ export default function JsonPreview() {
   useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
-  useEffect(() => {
-    modeRef.current = mode;
-  }, [mode]);
   useEffect(() => {
     queryRef.current = query.trim();
   }, [query]);
@@ -149,19 +142,12 @@ export default function JsonPreview() {
     }
   }, []);
 
-  const requestDetail = useCallback((index: number, withText = modeRef.current === "raw") => {
+  const requestDetail = useCallback((index: number) => {
     const current = infoRef.current;
     if (!current || current.rootKind !== "array" || current.recordCount === 0) return;
     const requestId = entries.current.issue();
-    entryText.current.cancel();
     setDetailLoading(true);
-    handler.emit("jsonRecord", { requestId, index, withText });
-  }, []);
-
-  /** Fetch the raw record text for a detail that shipped only the parsed value (ADR-0030). */
-  const requestText = useCallback((index: number) => {
-    const requestId = entryText.current.issue();
-    handler.emit("jsonRecordText", { requestId, index });
+    handler.emit("jsonRecord", { requestId, index });
   }, []);
 
   useEffect(() => {
@@ -229,21 +215,6 @@ export default function JsonPreview() {
           term && payload.entry?.kind === "value" ? firstMatchKey(payload.entry.value, term) : null;
         if (key) revealAt(key);
         else setReveal(null);
-      })
-      .on("jsonRecordTextData", (payload: JsonRecordTextPayload) => {
-        if (!entryText.current.isCurrent(payload.requestId)) return;
-        entryText.current.settle(payload.requestId);
-        setDetail((previous) =>
-          previous && previous.index === payload.index
-            ? {
-                ...previous,
-                text: payload.text,
-                textChars: payload.textChars,
-                textTruncated: payload.textTruncated,
-                textIncluded: true,
-              }
-            : previous,
-        );
       })
       .on("jsonSearchBatch", (batch: JsonSearchBatch) => {
         if (!search.current.isCurrent(batch.requestId)) return;
@@ -413,16 +384,12 @@ export default function JsonPreview() {
       entry={arrayRoot ? detail : root}
       loading={arrayRoot ? detailLoading : !root}
       mode={mode}
-      onModeChange={(next) => {
-        setMode(next);
-        if (next === "raw" && arrayRoot && detail && !detail.textIncluded) requestText(selected);
-      }}
+      onModeChange={setMode}
       actionsHost={actionsHost}
       entryLabel={arrayRoot ? `[${selected}]` : "root"}
       highlight={searchActive ? query.trim() : undefined}
       revealKey={reveal?.key}
       revealNonce={reveal?.nonce}
-      onRequestText={arrayRoot ? () => requestText(selected) : undefined}
     />
   );
 

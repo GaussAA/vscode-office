@@ -127,39 +127,20 @@ export interface JsonlEntriesPayload {
 export interface JsonlEntryRequest {
   requestId: number;
   index: number;
-  /**
-   * Ship the raw line text too. The tree only needs the parsed value, so the webview asks for
-   * the text when it actually shows Raw (ADR-0030); error lines always carry it because their
-   * raw text is the content.
-   */
-  withText?: boolean;
 }
 
-/** Ask for the raw text of an entry that was fetched without it. */
-export interface JsonlEntryTextRequest {
-  requestId: number;
-  index: number;
-}
-
-export interface JsonlEntryTextPayload {
-  requestId: number;
-  index: number;
-  /** The line's text, capped at `JSONL_MAX_TEXT_CHARS`. */
-  text: string;
-  textChars: number;
-  textTruncated: boolean;
-}
-
-/** Everything the detail pane needs for one entry: the summary plus its full text/value. */
+/** Everything the detail pane needs for one entry: the summary plus its value or raw text. */
 interface JsonlDetailBase extends JsonlEntryBase {
-  /** Full line text, capped at JSONL_MAX_TEXT_CHARS; empty when `textIncluded` is false. */
+  /**
+   * The line's text, capped at JSONL_MAX_TEXT_CHARS. Empty for `value` lines: the value is
+   * already in the payload, and the Raw tab shows the same 120-character summary as every
+   * other surface (ADR-0030). Error lines ship it because their text IS the content.
+   */
   text: string;
   /** Character count of the whole line, before the cap. */
   textChars: number;
   /** True when `text` is shorter than the line; the raw view says so instead of pretending. */
   textTruncated: boolean;
-  /** False when the host shipped the value but not the raw line (ask with `jsonlEntryText`). */
-  textIncluded: boolean;
 }
 
 export type JsonlEntryDetail =

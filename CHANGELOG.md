@@ -30,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   chunks the browser can skip off-screen, has an "Expand" toggle for reading, still copies the
   whole value, and now also carries the raw text of `invalid` / `too-large` lines. A composite
   root with no selected row points the bar at the whole record (path `L<n>` / `[n]`). The JSONL
-  and JSON detail payloads no longer ship the raw line unless Raw — or an error line — needs it.
+  and JSON detail payloads no longer ship the raw line at all; error lines still do, because that
+  text is the content the panel reads.
 - **The product name is `Data File Viewer (Parquet, JSONL)`** (display name, READMEs, release
   title template). 7.0.0 is the first release with the new name; 6.x titles are unchanged.
 - **Frame budgets cover JSONL and JSON.** `jsonl-frames-select`, `jsonl-frames-expand`,

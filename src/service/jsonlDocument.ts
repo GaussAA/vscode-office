@@ -256,7 +256,6 @@ export function buildJsonlEntry(
   index: JsonlIndex,
   line: number,
   baseLine = 0,
-  withText = false,
 ): JsonlEntryDetail {
   const rawText = readJsonlLineText(bytes, index, line);
   const classification = classifyEntry(rawText);
@@ -267,21 +266,22 @@ export function buildJsonlEntry(
   // like a complete value.
   const textChars = classification.text.length;
   const textTruncated = textChars > JSONL_MAX_TEXT_CHARS;
-  const text = textTruncated
+  const fullText = textTruncated
     ? classification.text.slice(0, JSONL_MAX_TEXT_CHARS)
     : classification.text;
   // The tree needs the parsed value, not the line: shipping both doubles every detail message
-  // (ADR-0030). Error lines are the exception — their raw text is the content the panel reads.
-  const textIncluded = withText || classification.kind !== "value";
+  // (ADR-0030). Raw shows the same 120-character summary as every other surface (`raw` below),
+  // so a value line never carries its text. Error lines are the exception — their raw text is
+  // the content the panel reads.
+  const text = classification.kind === "value" ? "" : fullText;
 
   const base = {
     index: at,
     size: classification.byteSize,
     raw: truncate(classification.text, JSONL_RAW_PREVIEW_CHARS),
-    text: textIncluded ? text : "",
+    text,
     textChars,
     textTruncated,
-    textIncluded,
   };
 
   if (classification.kind === "empty") {

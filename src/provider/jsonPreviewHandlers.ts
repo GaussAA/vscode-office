@@ -8,7 +8,6 @@
 import {
   JSON_MAX_ARRAY_BYTES,
   type JsonRecordRequest,
-  type JsonRecordTextRequest,
   type JsonRecordsRequest,
   type JsonSearchRequest,
 } from "@/common/jsonPreviewTypes";
@@ -134,20 +133,7 @@ export function createJsonPreviewHandlers(context: JsonPreviewHandlerContext, in
       context.emit("jsonRecordData", {
         requestId: request.requestId,
         index: request.index,
-        entry: session.record(request.index, request.withText === true),
-      });
-    },
-
-    /** Raw text for a record that was fetched without it (ADR-0030). */
-    recordText(request?: Partial<JsonRecordTextRequest>) {
-      if (typeof request?.requestId !== "number" || typeof request.index !== "number") return;
-      const entry = session.record(request.index, true);
-      context.emit("jsonRecordTextData", {
-        requestId: request.requestId,
-        index: request.index,
-        text: entry?.text ?? "",
-        textChars: entry?.textChars ?? 0,
-        textTruncated: entry?.textTruncated ?? false,
+        entry: session.record(request.index),
       });
     },
 

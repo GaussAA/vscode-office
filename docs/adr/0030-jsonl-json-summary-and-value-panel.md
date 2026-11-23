@@ -49,6 +49,7 @@
   `entry.text`（≤ `MAX_TEXT_CHARS` = 1,000,000，沿用现有截断提示）。`readSelection` 的规则随之改为：值条目
   在无选中时指向整条记录（补上现在返回 `null` 的缺口），错误态直接给条目原文。
 - **Raw 标签保留**：它是「看原始文本长什么样」的入口，默认 120 摘要；全文仍走面板。它不是第二个全文通道。
+  值条目不再携带原文，这份摘要就是宿主下发的 `raw`；错误行的 `text` 仍随详情下发，因为面板要读它。
 - **可展开**：停靠形态不变（撑高树、不遮树），新增「展开读」把面板临时铺满右栏高度；展开与开合都进帧闸门。
 - 打开面板不再走无界 `JSON.stringify`；`EntryValuePanel` 不再用 `title` 承担动作名（`DESIGN.md` 已禁止）。
 
@@ -58,10 +59,11 @@
 `highlight` 传给 `buildEntryModel`（现在只有 JSON 预览传）。左栏搜索结果片段保留自己的 ±上下文，但同样受
 120 字符上限约束。
 
-### 5. 详情消息按需给原文
+### 5. 详情消息不再携带原文
 
-`jsonlEntryData` 与 JSON 记录消息不再无条件携带最多 1,000,000 字符的 `text`：树模式只发结构化值与大小；
-Raw 或面板需要时才发取原文的请求。省的是每条消息的构造、序列化与结构化克隆——正是「反复切条目」时的手感。
+`jsonlEntryData` 与 JSON 记录消息不再携带原文：值条目的 `text` 恒为空，Raw 直接渲染宿主的 `raw`
+摘要（≤120 字符），树只需要解析后的值。错误行是例外——它的文本就是内容、面板要读它，所以仍随详情
+下发（≤1,000,000 字符）。省的是每条消息的构造、序列化与结构化克隆——正是「反复切条目」时的手感。
 
 ### 6. 帧闸门覆盖 JSONL 与 JSON
 
@@ -115,7 +117,7 @@ README 与 `PRODUCT.md` 的对应段落）；代码不在本轮。下面 1–5 �
    400 → 120、搜索片段套上限、删 `RAW_PREVIEW_CHARS`；单测覆盖切分、转义与计数。
 2. `feat(jsonl): delete the wrap mode` —— 删 wrap 相关字段与分支、非虚拟路径，改写对应场景。
 3. `feat(jsonl): the value panel is the only full-text channel` —— 4M 预算 + 行虚拟化 + 展开读 + 错误态接管 +
-   根记录补位 + 按需拉原文；单测与 UI 场景。
+   根记录补位 + 值条目不再携带原文；单测与 UI 场景。
 4. `perf(jsonl,json): frame budgets` —— 四个帧场景、基线数字、`docs/agents/perf.md`。
 5. `polish(motion): tokens everywhere on JSONL/JSON` —— 字面时长与 `ConfigProvider` 硬编码收编，
    `prefers-reduced-motion` 断言。
@@ -134,9 +136,8 @@ README 与 `PRODUCT.md` 的对应段落）；代码不在本轮。下面 1–5 �
   `content-visibility: auto`（视口外的块不参与布局）——比「每行一个 DOM 节点」在 4M 字符下更省，也不会
   因为换行把行高算错；「展开读」把正文从 200px 拉到 70vh；`invalid` / `too-large` 的 body 变为 120 字符
   摘要，原文进面板；`readSelection` 对复合根补位，面板指向整条记录。
-- **按需原文**：`jsonlEntry` / `jsonRecord` 增加 `withText`，值条目默认不带 `text`；新增
-  `jsonlEntryText` / `jsonlEntryTextData` 与 `jsonRecordText` / `jsonRecordTextData`，Raw 标签与错误态
-  按需取。错误行仍在详情里直接带原文（它的正文就是内容，多一次往返没有收益）。
+- **原文**：`jsonlEntryData` 与 `jsonRecord` 不再携带原文——值条目的 `text` 恒为空，Raw 直接渲染宿主的
+  `raw` 摘要（120 字符）；错误行仍带原文（≤1,000,000 字符），因为面板要读它。
 - **命中居中**：JSONL 详情树现在也接收 `highlight`，`buildEntryModel` 把摘要窗口移到首个命中；左栏片段
   同样受 120 上限约束。
 - **帧闸门**：`jsonl-frames-select` / `jsonl-frames-expand` / `jsonl-frames-panel` /

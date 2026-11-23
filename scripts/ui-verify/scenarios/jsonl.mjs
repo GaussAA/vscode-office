@@ -569,6 +569,36 @@ export default [
     },
   },
   {
+    name: "jsonl-raw-summary",
+    async run({ page, base }) {
+      await openJsonl(page, base);
+      await jumpJsonl(page, 13);
+      const ready = await page.waitFor(
+        `document.querySelector('.jsonl-detail__index')?.innerText === 'L13' && !!document.querySelector('.jsonl-detail__tree')`,
+      );
+      expect(ready, "entry 13 never rendered");
+      await page.evaluate(`[...document.querySelectorAll('.ant-segmented-item')]
+                .find(node => node.innerText.trim() === 'Raw')
+                ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+      const painted = await page.waitFor(
+        `!!document.querySelector('.jsonl-detail__rawpane .jsonl-detail__raw')`,
+      );
+      expect(painted, "Raw did not render its summary");
+      const state = json(
+        await page.evaluate(`JSON.stringify({
+                body: document.querySelector('.jsonl-detail__rawpane .jsonl-detail__raw')?.innerText.length ?? 0,
+                notice: document.querySelector('.jsonl-detail__rawpane .jsonl-detail__notice')?.innerText ?? null,
+                bar: !!document.querySelector('.jsonl-valuebar__toggle'),
+            })`),
+      );
+      // Raw is a summary too (ADR-0030): the host ships the value, not the line.
+      expect(state.body <= 121, `Raw painted ${state.body} characters, not the 120 summary`);
+      expect(/of [\d,]+ characters/.test(state.notice ?? ""), `raw notice is ${state.notice}`);
+      expect(state.bar, "the value bar is missing; the panel is the full-text channel");
+      return `raw summary ${state.body} chars + counted notice`;
+    },
+  },
+  {
     name: "jsonl-frames-select",
     async run({ page, base }) {
       await openJsonl(page, base, "dark", "&many=300");

@@ -204,7 +204,7 @@ function jsonlFixtures() {
     return {
       index,
       kind: "value",
-      raw: text,
+      raw: text.length <= 120 ? text : `${text.slice(0, 120)}…`,
       text,
       size: text.length,
       textChars: text.length,
@@ -315,11 +315,14 @@ function jsonlStub(fixtures, limit = 0, indexing = false) {
           if (inValue) return 'value';
           return undefined;
         }
-        const matched = summaries.filter(function (s) { return (s.raw || '').toLowerCase().indexOf(q) >= 0; }).map(function (s) {
-          const text = s.raw || '';
+        // The host searches the whole line; the directory only sees the 120-character summary,
+        // so match and snippet against the fixture's full text.
+        const matched = fixtures.filter(function (f) { return (f.text || f.raw || '').toLowerCase().indexOf(q) >= 0; }).map(function (f) {
+          const text = f.text || f.raw || '';
+          const summary = summaries.filter(function (s) { return s.index === f.index; })[0] || {};
           const at = text.toLowerCase().indexOf(q);
           const snippet = at < 0 ? undefined : (at > 24 ? '…' : '') + text.slice(Math.max(0, at - 24), at + q.length + 24) + (at + q.length + 24 < text.length ? '…' : '');
-          return Object.assign({}, s, { snippet: snippet, hit: s.kind === 'value' ? hitKind(text, q) : undefined });
+          return Object.assign({}, summary, { snippet: snippet, hit: f.kind === 'value' ? hitKind(text, q) : undefined });
         });
         const head = matched.slice(0, 3);
         setTimeout(function () {
@@ -335,33 +338,8 @@ function jsonlStub(fixtures, limit = 0, indexing = false) {
         const requestId = msg.content.requestId;
         const index = msg.content.index;
         setTimeout(function () {
-          const fixture = fixtures[index];
-          window.postMessage({
-            type: 'jsonlEntryData',
-            content: {
-              requestId,
-              index,
-              entry: fixture ? Object.assign({}, fixture, { textIncluded: true }) : null,
-            },
-          }, '*');
+          window.postMessage({ type: 'jsonlEntryData', content: { requestId, index, entry: fixtures[index] ?? null } }, '*');
         }, 60);
-      }
-      if (msg.type === 'jsonlEntryText') {
-        const requestId = msg.content.requestId;
-        const index = msg.content.index;
-        setTimeout(function () {
-          const fixture = fixtures[index] || {};
-          window.postMessage({
-            type: 'jsonlEntryTextData',
-            content: {
-              requestId,
-              index,
-              text: fixture.text || '',
-              textChars: fixture.textChars || (fixture.text || '').length,
-              textTruncated: !!fixture.textTruncated,
-            },
-          }, '*');
-        }, 40);
       }
     },
     getState() { return undefined; },
@@ -400,7 +378,7 @@ function jsonPreviewFixtures(count = 5) {
     return {
       index,
       kind: "value",
-      raw,
+      raw: raw.length <= 120 ? raw : `${raw.slice(0, 120)}…`,
       text: raw,
       textChars: raw.length,
       size: raw.length,
@@ -437,12 +415,11 @@ function jsonStub(mode = "array", count = 5, fromBuffer = false) {
   const entry = {
     index: 0,
     kind: "value",
-    raw: objectRaw,
-    text: objectRaw,
+    raw: objectRaw.length <= 120 ? objectRaw : `${objectRaw.slice(0, 120)}…`,
+    text: "",
     textChars: objectRaw.length,
     size: objectRaw.length,
     textTruncated: false,
-    textIncluded: true,
     value: objectValue,
   };
   return `<script>
@@ -502,26 +479,7 @@ function jsonStub(mode = "array", count = 5, fromBuffer = false) {
         const requestId = msg.content.requestId;
         const index = msg.content.index;
         setTimeout(function () {
-          const fixture = fixtures[index];
-          post('jsonRecordData', {
-            requestId: requestId,
-            index: index,
-            entry: fixture ? Object.assign({}, fixture, { textIncluded: true }) : null,
-          });
-        }, 40);
-      }
-      if (msg.type === 'jsonRecordText') {
-        const requestId = msg.content.requestId;
-        const index = msg.content.index;
-        const fixture = fixtures[index] || {};
-        setTimeout(function () {
-          post('jsonRecordTextData', {
-            requestId: requestId,
-            index: index,
-            text: fixture.text || '',
-            textChars: fixture.textChars || (fixture.text || '').length,
-            textTruncated: !!fixture.textTruncated,
-          });
+          post('jsonRecordData', { requestId: requestId, index: index, entry: fixtures[index] ?? null });
         }, 40);
       }
       if (msg.type === 'jsonSearchCancel') {
@@ -532,9 +490,9 @@ function jsonStub(mode = "array", count = 5, fromBuffer = false) {
         const query = String(msg.content.query || '');
         const needle = query.toLowerCase();
         const matched = fixtures.filter(function (entry) {
-          return (entry.raw || '').toLowerCase().indexOf(needle) >= 0;
+          return (entry.text || entry.raw || '').toLowerCase().indexOf(needle) >= 0;
         }).map(function (entry) {
-          const raw = entry.raw || '';
+          const raw = entry.text || entry.raw || '';
           const at = raw.toLowerCase().indexOf(needle);
           const snippet = at < 0 ? raw.slice(0, 80) : (at > 20 ? '…' : '') + raw.slice(Math.max(0, at - 20), at + needle.length + 30) + (at + needle.length + 30 < raw.length ? '…' : '');
           return { index: entry.index, count: 1, snippet: snippet };

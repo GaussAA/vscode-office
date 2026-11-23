@@ -18,26 +18,24 @@ const base = {
   text: "",
   textChars: 0,
   textTruncated: false,
-  textIncluded: false,
 };
 
 function valueEntry(value: unknown, index = 0): JsonlEntryDetail {
-  return { ...base, index, kind: "value", value, textIncluded: true };
+  return { ...base, index, kind: "value", value };
 }
 
 function errorEntry(kind: "invalid" | "too-large", text: string): JsonlEntryDetail {
-  const base = {
+  const entry = {
     index: 0,
     size: text.length,
     raw: "",
     text,
     textChars: text.length,
     textTruncated: false,
-    textIncluded: true,
   };
   return kind === "invalid"
-    ? { ...base, kind: "invalid", error: "Unexpected end of JSON input" }
-    : { ...base, kind: "too-large" };
+    ? { ...entry, kind: "invalid", error: "Unexpected end of JSON input" }
+    : { ...entry, kind: "too-large" };
 }
 
 test("selection: a scalar root is selected without a tree row", () => {

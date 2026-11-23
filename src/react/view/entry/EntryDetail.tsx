@@ -19,6 +19,7 @@ import {
   makePathKey,
   preview,
   readPathKey,
+  summaryHead,
   typeLabel,
   type NodeModel,
 } from "./entryFormat.ts";
@@ -53,11 +54,6 @@ interface Props {
   revealKey?: string | null;
   /** Bumped when the same key is chosen again; a value-only reveal would bail out. */
   revealNonce?: number;
-  /**
-   * Called when the raw text is needed but the detail payload did not carry it (ADR-0030:
-   * the host ships the value, and the raw line only when asked).
-   */
-  onRequestText?: () => void;
 }
 
 /** Right pane: the full tree (or raw text) of exactly one entry. */
@@ -72,7 +68,6 @@ export default function EntryDetail({
   highlight,
   revealKey,
   revealNonce,
-  onRequestText,
 }: Props) {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const toggleRef = useRef<HTMLButtonElement | null>(null);
@@ -123,14 +118,8 @@ export default function EntryDetail({
     setActiveKey(revealKey);
   }, [defaultExpanded, model, revealKey, revealNonce]);
 
-  // The host ships the value, not the raw line: ask for the text the first time it is needed.
-  const textMissing = entry !== null && entry.kind === "value" && !entry.textIncluded;
-  const textRequested = useRef(false);
-  useEffect(() => {
-    if (mode !== "raw" || !textMissing || textRequested.current) return;
-    textRequested.current = true;
-    onRequestText?.();
-  }, [mode, textMissing, onRequestText]);
+  // The host ships the value, not the raw line (ADR-0030): Raw is a summary too, and the
+  // value panel is where the full content is read.
 
   useEffect(() => {
     // Measure the tree's own box, not the pane: the value bar takes height from the pane and
@@ -418,14 +407,16 @@ export default function EntryDetail({
 
   const rawView = useMemo(() => {
     if (!entry) return null;
-    const summary = rawSummary(entry);
-    const shown = summary.text.length;
+    // A value line ships its 120-character `raw` summary, not the line; an error line ships
+    // its text because that text is the content. Either way the view is a summary.
+    const source = entry.kind === "value" ? entry.raw : entry.text;
+    const summary = summaryHead(source);
     return (
       <div className="jsonl-detail__rawpane">
-        {(summary.truncated || entry.textTruncated) && (
+        {entry.textChars > summary.text.length && (
           <div className="jsonl-detail__notice">
             {$t("jsonl.valueTruncated", {
-              shown: shown.toLocaleString(),
+              shown: summary.text.length.toLocaleString(),
               total: entry.textChars.toLocaleString(),
             })}
           </div>
@@ -443,15 +434,15 @@ export default function EntryDetail({
   } else if (entry.kind === "empty") {
     body = <div className="jsonl-empty">{$t("jsonl.emptyLine")}</div>;
   } else if (mode === "raw") {
-    body = textMissing ? <div className="jsonl-empty">{$t("jsonl.loading")}</div> : rawView;
+    body = rawView;
   } else if (entry.kind === "invalid") {
     body = (
       <div className="jsonl-detail__error">
         <div className="jsonl-chip jsonl-chip--error">{$t("jsonl.invalidJson")}</div>
         <div className="jsonl-detail__notice">
-          {textMissing ? $t("jsonl.loading") : $t("jsonl.summaryOnly", { chars: SUMMARY_CHARS })}
+          {$t("jsonl.summaryOnly", { chars: SUMMARY_CHARS })}
         </div>
-        <pre className="jsonl-detail__raw">{textMissing ? "" : rawSummary(entry).text}</pre>
+        <pre className="jsonl-detail__raw">{rawSummary(entry).text}</pre>
       </div>
     );
   } else if (entry.kind === "too-large") {
@@ -462,9 +453,9 @@ export default function EntryDetail({
           {$t("jsonl.tooLargeHint", { limit: formatBytes(JSONL_MAX_LINE_BYTES) })}
         </div>
         <div className="jsonl-detail__notice">
-          {textMissing ? $t("jsonl.loading") : $t("jsonl.summaryOnly", { chars: SUMMARY_CHARS })}
+          {$t("jsonl.summaryOnly", { chars: SUMMARY_CHARS })}
         </div>
-        <pre className="jsonl-detail__raw">{textMissing ? "" : rawSummary(entry).text}</pre>
+        <pre className="jsonl-detail__raw">{rawSummary(entry).text}</pre>
       </div>
     );
   } else if (!isComposite(entry.value)) {

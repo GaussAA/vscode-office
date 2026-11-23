@@ -119,28 +119,12 @@ export interface JsonRecordsPayload {
 export interface JsonRecordRequest {
   requestId: number;
   index: number;
-  /** Ship the record's raw text too; the tree only needs the parsed value (ADR-0030). */
-  withText?: boolean;
 }
 
 export interface JsonRecordPayload {
   requestId: number;
   index: number;
   entry: JsonlEntryDetail | null;
-}
-
-/** Ask for the raw text of a record that was fetched without it. */
-export interface JsonRecordTextRequest {
-  requestId: number;
-  index: number;
-}
-
-export interface JsonRecordTextPayload {
-  requestId: number;
-  index: number;
-  text: string;
-  textChars: number;
-  textTruncated: boolean;
 }
 
 /** A whole-document parse for object/scalar roots (and a root too-large/error entry). */
