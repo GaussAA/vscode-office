@@ -8,10 +8,10 @@
 import type { JsonlEntryDetail } from "./jsonlTypes";
 import {
   MAX_TEXT_CHARS,
-  RAW_PREVIEW_CHARS,
   RECORD_MAX_BYTES,
   SEARCH_BATCH,
   SEARCH_MAX_MATCHES,
+  SUMMARY_CHARS,
 } from "./recordConstants";
 
 /** A top-level array larger than this is not indexed. */
@@ -22,8 +22,8 @@ export const JSON_MAX_OBJECT_BYTES = 20 * 1024 * 1024;
 export const JSON_RECORD_MAX_BYTES = RECORD_MAX_BYTES;
 /** Characters of raw text shipped for a record/root. */
 export const JSON_MAX_TEXT_CHARS = MAX_TEXT_CHARS;
-/** Characters of raw text kept for a record label fallback / preview. */
-export const JSON_RAW_PREVIEW_CHARS = RAW_PREVIEW_CHARS;
+/** Characters of raw text kept for a record label fallback / preview (one number, ADR-0030). */
+export const JSON_RAW_PREVIEW_CHARS = SUMMARY_CHARS;
 /** Records parsed per summary window request. */
 export const JSON_RECORD_WINDOW = 100;
 /** Records per search result message. */
@@ -119,12 +119,28 @@ export interface JsonRecordsPayload {
 export interface JsonRecordRequest {
   requestId: number;
   index: number;
+  /** Ship the record's raw text too; the tree only needs the parsed value (ADR-0030). */
+  withText?: boolean;
 }
 
 export interface JsonRecordPayload {
   requestId: number;
   index: number;
   entry: JsonlEntryDetail | null;
+}
+
+/** Ask for the raw text of a record that was fetched without it. */
+export interface JsonRecordTextRequest {
+  requestId: number;
+  index: number;
+}
+
+export interface JsonRecordTextPayload {
+  requestId: number;
+  index: number;
+  text: string;
+  textChars: number;
+  textTruncated: boolean;
 }
 
 /** A whole-document parse for object/scalar roots (and a root too-large/error entry). */

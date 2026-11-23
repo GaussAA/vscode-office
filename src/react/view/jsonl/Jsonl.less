@@ -1,5 +1,7 @@
 /* ---------- left directory pane ---------- */
 
+@import "../../common/motion.less";
+
 .jsonl-index {
   position: relative;
   height: 100%;
@@ -92,8 +94,8 @@
   font-size: 11px;
   cursor: pointer;
   transition:
-    background 0.12s ease,
-    color 0.12s ease;
+    background var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
 }
 
 .jsonl-load-more:not(:disabled):hover {

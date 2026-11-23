@@ -12,6 +12,7 @@ import {
   type JsonlEntriesPayload,
   type JsonlEntryPayload,
   type JsonlEntryRequest,
+  type JsonlEntryTextRequest,
   type JsonlIndexError,
   type JsonlIndexProgress,
   type JsonlInfoPayload,
@@ -143,7 +144,11 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
       }
       let payload: JsonlEntryPayload;
       try {
-        payload = (await s.readEntry(request.requestId, request.index)) ?? {
+        payload = (await s.readEntry(
+          request.requestId,
+          request.index,
+          request.withText === true,
+        )) ?? {
           requestId: request.requestId,
           index: request.index,
           entry: null,
@@ -153,6 +158,35 @@ export function createJsonlHandlers(context: JsonlHandlerContext) {
         payload = { requestId: request.requestId, index: request.index, entry: null };
       }
       emit("jsonlEntryData", payload);
+    },
+
+    /** Raw text for a detail that arrived without it (ADR-0030). */
+    async entryText(request?: Partial<JsonlEntryTextRequest>) {
+      if (typeof request?.requestId !== "number" || typeof request.index !== "number") return;
+      const s = session();
+      if (!s) {
+        emit("jsonlEntryTextData", {
+          requestId: request.requestId,
+          index: request.index,
+          text: "",
+          textChars: 0,
+          textTruncated: false,
+        });
+        return;
+      }
+      let payload = {
+        requestId: request.requestId,
+        index: request.index,
+        text: "",
+        textChars: 0,
+        textTruncated: false,
+      };
+      try {
+        payload = (await s.readEntryText(request.requestId, request.index)) ?? payload;
+      } catch {
+        // Same terminal-answer rule as `entry`: the raw tab must stop loading.
+      }
+      emit("jsonlEntryTextData", payload);
     },
 
     search(request?: JsonlSearchRequest) {

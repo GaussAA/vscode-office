@@ -4,12 +4,14 @@ import {
   MAX_CHILDREN,
   MAX_DEPTH,
   buildEntryModel,
-  countNodes,
-  readPathKey,
-  WRAP_NODE_LIMIT,
+  chunkText,
   fullValueText,
   makePathKey,
+  preview,
+  readPathKey,
+  stringSummary,
 } from "@/react/view/entry/entryFormat";
+import { SUMMARY_CHARS } from "@/common/recordConstants";
 import { highlightRuns } from "@/react/common/highlight";
 
 const objectOfSize = (size: number): Record<string, number> =>
@@ -27,23 +29,6 @@ function maxDepth(nodes: ChainNode[], depth = 1): number {
   }
   return deepest;
 }
-
-test("countNodes: exactly the limit still fits, one more does not", () => {
-  assert.equal(countNodes(objectOfSize(WRAP_NODE_LIMIT)), WRAP_NODE_LIMIT);
-  // Regression: returning exactly `limit` here made one-more-node entries look wrappable.
-  assert.equal(
-    countNodes(objectOfSize(WRAP_NODE_LIMIT + 1)),
-    WRAP_NODE_LIMIT + 1,
-    "crossing the cap must be reported as limit + 1",
-  );
-});
-
-test("countNodes: stops descending at MAX_DEPTH", () => {
-  // A chain deeper than MAX_DEPTH can never produce a node beyond MAX_DEPTH - 1.
-  let chain: Record<string, unknown> = { leaf: 1 };
-  for (let depth = 0; depth < MAX_DEPTH + 5; depth++) chain = { child: chain };
-  assert.ok(countNodes(chain) <= MAX_DEPTH);
-});
 
 test('buildEntryModel: caps children and appends a non-selectable "more keys" row', () => {
   const model = buildEntryModel(objectOfSize(MAX_CHILDREN + 20));
@@ -66,12 +51,12 @@ test("buildEntryModel: keeps the tree inside MAX_DEPTH", () => {
   assert.equal(model.keys.length, model.count);
 });
 
-test("buildEntryModel: a scalar entry produces no rows", () => {
+test("buildEntryModel: a scalar entry produces no rows and no wrap mode", () => {
   const model = buildEntryModel("just a string");
   assert.equal(model.nodes.length, 0);
   assert.equal(model.count, 0);
   assert.equal(model.truncated, false);
-  assert.equal(model.wrap, false, "a scalar has nothing to wrap");
+  assert.equal("wrap" in model, false, "ADR-0030 removed the wrap flag entirely");
 });
 
 test("buildEntryModel: a node at the depth cap is a leaf that counts its hidden keys", () => {
@@ -97,30 +82,6 @@ test("buildEntryModel: shallowKeys stop at the default expand depth", () => {
   assert.ok(!model.shallowKeys.includes(makePathKey(["a", "b", "c"])));
 });
 
-test("buildEntryModel: decides wrapping itself, in the same walk that builds the tree", () => {
-  // Small entries wrap (variable row height); big ones would freeze a virtual list.
-  const small = buildEntryModel({ a: 1, b: "two" });
-  assert.equal(small.wrap, true);
-
-  const big = buildEntryModel(objectOfSize(WRAP_NODE_LIMIT + 1));
-  assert.equal(big.wrap, false);
-
-  // The boundary is inclusive: exactly `wrapNodeLimit` nodes still wrap.
-  const atLimit = buildEntryModel(objectOfSize(WRAP_NODE_LIMIT));
-  assert.equal(atLimit.wrap, true);
-  assert.equal(buildEntryModel(objectOfSize(WRAP_NODE_LIMIT + 1)).wrap, false);
-});
-
-test("buildEntryModel: wrap mode cuts very long strings, single-line mode does not", () => {
-  const long = "x".repeat(5000);
-  const wrapped = buildEntryModel({ text: long });
-  assert.ok(wrapped.nodes[0].preview.endsWith("chars)"), "wrap mode appends the original length");
-  assert.ok(wrapped.nodes[0].preview.length < long.length);
-
-  const nodes = buildEntryModel({ text: long }, { maxChildren: 10, wrapNodeLimit: 0 });
-  assert.equal(nodes.wrap, false);
-});
-
 test("buildEntryModel: array indices are labelled in brackets and stay addressable", () => {
   const model = buildEntryModel(["a", "b"]);
   assert.deepEqual(
@@ -128,8 +89,8 @@ test("buildEntryModel: array indices are labelled in brackets and stay addressab
     ["[0]", "[1]"],
   );
   assert.deepEqual(model.nodes[1].path, [1]);
-  // In wrap mode a string preview is the raw text, not a JSON-quoted literal.
-  assert.equal(model.nodes[1].preview, "b");
+  // Every row is a single-line, JSON-quoted summary now.
+  assert.equal(model.nodes[1].preview, '"b"');
 });
 
 test("buildEntryModel: honours a node budget and reports truncation", () => {
@@ -137,6 +98,52 @@ test("buildEntryModel: honours a node budget and reports truncation", () => {
   assert.equal(model.count, 10);
   assert.equal(model.truncated, true);
   assert.equal(model.nodes.length, 10);
+});
+
+test("buildEntryModel: a long string is one 120-character summary, never wrapped", () => {
+  const long = "x".repeat(5_000);
+  const model = buildEntryModel({ text: long });
+  const [node] = model.nodes;
+  assert.ok(node.preview.endsWith("(5,000 chars)"), `preview is ${node.preview.slice(-30)}`);
+  assert.ok(node.preview.length <= SUMMARY_CHARS + 20, `preview is ${node.preview.length} chars`);
+  // `JSON.stringify(value).slice(...)` would have allocated all 5,000 characters; the summary
+  // only ever holds the window plus its marker.
+});
+
+test("buildEntryModel: a search hit moves the summary window to the match", () => {
+  const value = `${"a".repeat(300)}needle${"b".repeat(300)}`;
+  const plain = buildEntryModel({ text: value });
+  assert.ok(plain.nodes[0].preview.startsWith('"aaa'), "without a hit the head is shown");
+  const hit = buildEntryModel({ text: value }, { highlight: "needle" });
+  assert.ok(hit.nodes[0].preview.startsWith('"…'), `centred summary is ${hit.nodes[0].preview}`);
+  assert.ok(hit.nodes[0].preview.includes("needle"), "the hit is inside the summary");
+  assert.ok(hit.nodes[0].preview.endsWith("(606 chars)"));
+});
+
+test("stringSummary: short strings are quoted, long ones carry the hidden length", () => {
+  assert.equal(stringSummary("hello"), '"hello"');
+  const long = stringSummary("y".repeat(200));
+  assert.ok(long.startsWith('"yyy'));
+  assert.ok(long.endsWith('…" (200 chars)'));
+});
+
+test("chunkText: keeps whole lines and splits lines longer than one chunk", () => {
+  assert.deepEqual(chunkText(""), []);
+  assert.deepEqual(chunkText("a\nb"), ["a\nb"]);
+  const lines = Array.from({ length: 6 }, (_, index) => `line ${index}`);
+  const chunks = chunkText(lines.join("\n"), 12);
+  assert.ok(chunks.length > 1, `expected several chunks, got ${chunks.length}`);
+  assert.equal(chunks.join("\n"), lines.join("\n"), "chunking must not lose characters");
+  const oneLong = "z".repeat(30);
+  const split = chunkText(oneLong, 8);
+  assert.equal(split.length, 4);
+  assert.equal(split.join(""), oneLong);
+});
+
+test("preview: strings keep the single summary number", () => {
+  assert.equal(preview("short"), '"short"');
+  const long = preview("q".repeat(300));
+  assert.ok(long.includes("(300 chars)"));
 });
 
 test("highlightRuns: splits only the matched runs and is case-insensitive", () => {
@@ -163,12 +170,12 @@ test("model: the node cap is reported so the tree can say it was cut", () => {
 });
 
 test("fullValueText: strings are read as text, everything else as pretty JSON", () => {
-  const text = fullValueText("line one\nline two");
+  const text = fullValueText("line one\nline two", 1_000);
   assert.equal(text.text, "line one\nline two");
   assert.equal(text.truncated, false);
   assert.equal(text.chars, 17);
 
-  const object = fullValueText({ a: 1 });
+  const object = fullValueText({ a: 1 }, 1_000);
   assert.equal(object.text, '{\n  "a": 1\n}');
 });
 
@@ -183,11 +190,6 @@ test("fullValueText: a cap is reported, and Copy still has the whole value", () 
   const fits = fullValueText(value, 50);
   assert.equal(fits.truncated, false);
   assert.equal(fits.text, value);
-});
-
-test("countNodes: honours a caller-supplied depth cap", () => {
-  const chain = { a: { b: { c: { d: { e: 1 } } } } };
-  assert.ok(countNodes(chain, 100, 2) <= 2);
 });
 
 test("buildEntryModel: the overflow row has a key that cannot collide with a real path", () => {

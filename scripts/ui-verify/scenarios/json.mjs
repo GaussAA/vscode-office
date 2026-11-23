@@ -1,4 +1,5 @@
 import { expect, json, openJson, setInput } from "../helpers.mjs";
+import { describeFrames, framesOf, summarizeFrames } from "../frames.mjs";
 
 /** Command-opened JSON preview: records, search, object roots, and the non-happy states. */
 export default [
@@ -186,6 +187,29 @@ export default [
       expect(state.title === "No records", `unexpected empty title: ${state.title}`);
       expect(state.records === 0, "empty array rendered record rows");
       return state.title;
+    },
+  },
+  {
+    name: "json-preview-frames-record",
+    async run({ page, base }) {
+      await openJson(page, base, "array", "&records=200");
+      const ready = await page.waitFor(`document.querySelectorAll('.json-record').length >= 20`);
+      expect(ready, "the record rail rendered fewer than 20 rows");
+      await page.clearFrames();
+      const switched = await page.evaluate(`(async () => {
+                const rows = [...document.querySelectorAll('.json-record')];
+                const targets = rows.slice(0, 20);
+                for (const row of targets) {
+                    row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                    await new Promise((resolve) => setTimeout(resolve, 60));
+                }
+                return targets.length;
+            })()`);
+      expect(switched === 20, `only ${switched} record rows were clicked`);
+      return describeFrames(
+        summarizeFrames(await framesOf(page), "20 record switches"),
+        "Record switches re-parse one record and rebuild the tree; check the window size and the lazy depth.",
+      );
     },
   },
 ];

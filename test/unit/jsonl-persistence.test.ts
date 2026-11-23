@@ -109,9 +109,9 @@ test("jsonl state: clear removes every document entry only", () => {
   storage.clear();
   saveJsonlPersisted("a", { left: 300, selected: 1, mode: "tree" });
   saveJsonlPersisted("b", { left: 300, selected: 2, mode: "tree" });
-  storage.setItem("excel-view:doc", "{}");
+  storage.setItem("other-view:doc", "{}");
   clearJsonlPersisted();
   assert.equal(storage.getItem(PREFIX + "a"), null);
   assert.equal(storage.getItem(PREFIX + "b"), null);
-  assert.ok(storage.getItem("excel-view:doc"));
+  assert.ok(storage.getItem("other-view:doc"));
 });

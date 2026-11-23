@@ -1,7 +1,6 @@
 import { $t } from "../../i18n/i18nConfig.ts";
-import type { RefObject } from "react";
-import { JSONL_VALUE_TEXT_LIMIT } from "../../../common/jsonlTypes.ts";
-import type { ValueText } from "./entryFormat.ts";
+import { useMemo, useState, type RefObject } from "react";
+import { chunkText, type ValueText } from "./entryFormat.ts";
 
 interface Props {
   path: string;
@@ -11,6 +10,8 @@ interface Props {
   chars: number | null;
   open: boolean;
   panel: ValueText | null;
+  /** Truncation fact to show above the text, if the value or the shipped line was cut. */
+  notice?: string | null;
   toggleRef: RefObject<HTMLButtonElement | null>;
   onToggle: () => void;
 }
@@ -18,6 +19,10 @@ interface Props {
 /**
  * The docked selection bar under the tree. Presentational: the selection read model owns the
  * labels, and `EntryDetail` owns the keyboard and the open state.
+ *
+ * Since ADR-0030 this is the only full-text channel, so the body renders in chunks
+ * (`content-visibility` skips what is outside the scrollport) and has its own expand toggle:
+ * reading a multi-megabyte value in a 200px strip is not reading.
  */
 export default function EntryValuePanel({
   path,
@@ -26,9 +31,13 @@ export default function EntryValuePanel({
   chars,
   open,
   panel,
+  notice,
   toggleRef,
   onToggle,
 }: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const chunks = useMemo(() => (panel ? chunkText(panel.text) : []), [panel]);
+
   return (
     <div className={`jsonl-valuebar${open ? " jsonl-valuebar--open" : ""}`}>
       <button
@@ -53,18 +62,25 @@ export default function EntryValuePanel({
         />
       </button>
       {open && panel && (
-        <div className="jsonl-valuebar__body">
-          {panel.truncated && (
-            <div className="jsonl-valuebar__notice">
-              {$t("jsonl.valueTruncated", {
-                shown: JSONL_VALUE_TEXT_LIMIT.toLocaleString(),
-                total: panel.chars.toLocaleString(),
-              })}
-            </div>
-          )}
-          <pre className="jsonl-valuebar__text" tabIndex={0}>
-            {panel.text}
-          </pre>
+        <div className={`jsonl-valuebar__body${expanded ? " jsonl-valuebar__body--expanded" : ""}`}>
+          <div className="jsonl-valuebar__meta">
+            {notice ? <span className="jsonl-valuebar__notice">{notice}</span> : <span />}
+            <button
+              type="button"
+              className="jsonl-valuebar__expand"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? $t("jsonl.shrinkValue") : $t("jsonl.expandValue")}
+            </button>
+          </div>
+          <div className="jsonl-valuebar__scroll" tabIndex={0}>
+            {chunks.map((chunk, index) => (
+              <div className="jsonl-valuebar__chunk" key={index}>
+                {chunk}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

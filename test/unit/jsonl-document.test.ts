@@ -149,22 +149,38 @@ test("summary: a line over the parse cap decodes only its head", () => {
   assert.equal(summary.kind, "too-large");
   assert.equal(summary.size, line.length);
   assert.ok(summary.raw.startsWith('{"blob":"AAAA'));
-  assert.ok(summary.raw.length <= 401, `summary raw is ${summary.raw.length} chars`);
+  assert.ok(summary.raw.length <= 121, `summary raw is ${summary.raw.length} chars`);
 });
 
 test("detail: text past the cap is a marked prefix, not a silent cut", () => {
   const text = "x".repeat(JSONL_MAX_TEXT_CHARS + 25);
   const { bytes, index } = open(`{"text":"${text}"}`);
-  const entry = buildJsonlEntry(bytes, index, 0);
+  const entry = buildJsonlEntry(bytes, index, 0, 0, true);
+  assert.equal(entry.textIncluded, true);
   assert.equal(entry.textChars, text.length + 11);
   assert.equal(entry.textTruncated, true);
   assert.equal(entry.text.length, JSONL_MAX_TEXT_CHARS);
   assert.ok(!entry.text.endsWith("…"), "a suffix would hide the fact that text is missing");
 
   const small = open('{"a":1}');
-  const whole = buildJsonlEntry(small.bytes, small.index, 0);
+  const whole = buildJsonlEntry(small.bytes, small.index, 0, 0, true);
   assert.equal(whole.textTruncated, false);
   assert.equal(whole.textChars, whole.text.length);
+});
+
+test("detail: the tree payload ships the value, not the line (ADR-0030)", () => {
+  const { bytes, index } = open('{"id":7}\n\n{"id":1,}');
+  const value = buildJsonlEntry(bytes, index, 0);
+  if (value.kind !== "value") assert.fail(`expected a value entry, got ${value.kind}`);
+  assert.deepEqual(value.value, { id: 7 });
+  assert.equal(value.textIncluded, false, "a value entry omits the raw text unless asked");
+  assert.equal(value.text, "");
+  assert.equal(value.textChars, '{"id":7}'.length);
+  // Error lines are the exception: their raw text is the content the panel reads.
+  const invalid = buildJsonlEntry(bytes, index, 2);
+  assert.equal(invalid.kind, "invalid");
+  assert.equal(invalid.textIncluded, true);
+  assert.equal(invalid.text, '{"id":1,}');
 });
 
 test("classify: the summary carries the identity label, not the value", () => {
@@ -183,7 +199,7 @@ test("classify: the summary carries the identity label, not the value", () => {
 test("detail: every kind carries the text the raw view needs", () => {
   const { bytes, index } = open('{"id":7}\n\n[1,2]');
 
-  const value = buildJsonlEntry(bytes, index, 0);
+  const value = buildJsonlEntry(bytes, index, 0, 0, true);
   assert.equal(value.kind, "value");
   assert.equal(value.label, "7");
   assert.deepEqual(value.value, { id: 7 });
@@ -193,10 +209,11 @@ test("detail: every kind carries the text the raw view needs", () => {
   assert.equal(empty.kind, "empty");
   assert.equal(empty.text, "");
 
-  const arrayLine = buildJsonlEntry(bytes, index, 2);
+  const arrayLine = buildJsonlEntry(bytes, index, 2, 0, true);
   assert.equal(arrayLine.kind, "value");
   assert.deepEqual(arrayLine.value, [1, 2]);
   assert.equal(arrayLine.label, undefined);
+  assert.equal(arrayLine.text, "[1,2]");
 });
 
 test("detail: an invalid line keeps its parse error and its text", () => {

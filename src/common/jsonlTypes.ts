@@ -11,7 +11,7 @@
  *    right detail pane. Keeping them apart means scrolling the directory never
  *    ships hundreds of full JSON documents to the webview.
  */
-import { MAX_TEXT_CHARS, RAW_PREVIEW_CHARS, RECORD_MAX_BYTES } from "./recordConstants";
+import { MAX_TEXT_CHARS, RECORD_MAX_BYTES, SUMMARY_CHARS } from "./recordConstants";
 
 /**
  * A line larger than this is not parsed; it is shown as raw text instead.
@@ -36,14 +36,11 @@ export const JSONL_CHUNK_SIZE = 500;
 /** Bytes decoded per search turn, in addition to the line step. */
 export const JSONL_SEARCH_BYTE_BUDGET = 8 * 1024 * 1024;
 
-/** How many characters of the raw line are kept for previews. */
-export const JSONL_RAW_PREVIEW_CHARS = RAW_PREVIEW_CHARS;
+/** How many characters of the raw line are kept for previews (one number, ADR-0030). */
+export const JSONL_RAW_PREVIEW_CHARS = SUMMARY_CHARS;
 
 /** Upper bound for the full text shipped to the raw view. */
 export const JSONL_MAX_TEXT_CHARS = MAX_TEXT_CHARS;
-
-/** Upper bound for the selection panel's text; `Copy value` still copies the whole value. */
-export const JSONL_VALUE_TEXT_LIMIT = 200_000;
 
 export interface JsonlInfoPayload {
   fileName: string;
@@ -130,16 +127,39 @@ export interface JsonlEntriesPayload {
 export interface JsonlEntryRequest {
   requestId: number;
   index: number;
+  /**
+   * Ship the raw line text too. The tree only needs the parsed value, so the webview asks for
+   * the text when it actually shows Raw (ADR-0030); error lines always carry it because their
+   * raw text is the content.
+   */
+  withText?: boolean;
+}
+
+/** Ask for the raw text of an entry that was fetched without it. */
+export interface JsonlEntryTextRequest {
+  requestId: number;
+  index: number;
+}
+
+export interface JsonlEntryTextPayload {
+  requestId: number;
+  index: number;
+  /** The line's text, capped at `JSONL_MAX_TEXT_CHARS`. */
+  text: string;
+  textChars: number;
+  textTruncated: boolean;
 }
 
 /** Everything the detail pane needs for one entry: the summary plus its full text/value. */
 interface JsonlDetailBase extends JsonlEntryBase {
-  /** Full line text, capped at JSONL_MAX_TEXT_CHARS. */
+  /** Full line text, capped at JSONL_MAX_TEXT_CHARS; empty when `textIncluded` is false. */
   text: string;
   /** Character count of the whole line, before the cap. */
   textChars: number;
   /** True when `text` is shorter than the line; the raw view says so instead of pretending. */
   textTruncated: boolean;
+  /** False when the host shipped the value but not the raw line (ask with `jsonlEntryText`). */
+  textIncluded: boolean;
 }
 
 export type JsonlEntryDetail =

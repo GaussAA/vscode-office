@@ -2,8 +2,8 @@
  * Per-document webview state with a version and a TTL.
  *
  * `savePersistedState` already bounds the number of entries; this wrapper adds the two
- * missing pieces shared by JSONL and Excel: an older entry can be migrated by reading its
- * pre-version shape once, and an entry that is too old is dropped instead of restored
+ * missing pieces shared by persisted viewer state: an older entry can be migrated by reading
+ * its pre-version shape once, and an entry that is too old is dropped instead of restored
  * forever. The stored record is `{ v, data, ts }`; `ts` is written by `savePersistedState`
  * and drives both the TTL and the LRU order.
  */
@@ -24,17 +24,7 @@ interface StoredRecord {
   data?: unknown;
 }
 
-/**
- * Used by an old key that is not under the shared prefix (the Excel legacy suffix). A
- * missing timestamp predates the persistent helper and is accepted as a one-time legacy
- * migration; a timestamp, when present, still has to be fresh.
- */
-export function isPersistedEntryFresh(stored: unknown, maxAgeMs: number): boolean {
-  if (!stored || typeof stored !== "object") return false;
-  const ts = (stored as StoredRecord).ts;
-  return typeof ts !== "number" || Date.now() - ts <= maxAgeMs;
-}
-
+/** Remove one stored entry; a storage failure is not the caller's problem. */
 function remove(key: string): void {
   try {
     localStorage.removeItem(key);

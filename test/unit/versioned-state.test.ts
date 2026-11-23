@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   clearPersistedPrefix,
-  isPersistedEntryFresh,
   loadVersionedState,
   saveVersionedState,
 } from "@/react/common/versionedState";
@@ -145,11 +144,4 @@ test("versioned state: clear removes only entries under the prefix", () => {
   clearPersistedPrefix(PREFIX);
   assert.equal(storage.getItem(PREFIX + "a"), null);
   assert.ok(storage.getItem("other:b"));
-});
-
-test("versioned state: a legacy key without a timestamp is accepted once", () => {
-  assert.equal(isPersistedEntryFresh({ ri: 1 }, DAY), true);
-  assert.equal(isPersistedEntryFresh({ ri: 1, ts: Date.now() }, DAY), true);
-  assert.equal(isPersistedEntryFresh({ ri: 1, ts: Date.now() - 2 * DAY }, DAY), false);
-  assert.equal(isPersistedEntryFresh(null, DAY), false);
 });

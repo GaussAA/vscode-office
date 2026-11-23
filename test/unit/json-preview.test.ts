@@ -105,9 +105,9 @@ test("session: array info, labels, raw fallback and record detail", () => {
   assert.equal(records[3].label, "3");
   assert.equal(records[2].raw, "42");
 
-  const detail = preview.record(0);
+  const detail = preview.record(0, true);
   assert.ok(detail);
-  assert.equal(detail.kind, "value");
+  if (detail.kind !== "value") assert.fail("expected a value record");
   assert.equal(detail.index, 0);
   assert.deepEqual(detail.value, { id: "alpha", name: "A" });
   assert.equal(detail.text, '{"id":"alpha","name":"A"}');

@@ -7,6 +7,7 @@ import {
   type JsonlEntryDetail,
   type JsonlEntryPayload,
   type JsonlEntrySummary,
+  type JsonlEntryTextPayload,
   type JsonlIndexError,
   type JsonlIndexProgress,
   type JsonlInfoPayload,
@@ -64,10 +65,13 @@ function JsonlViewerContent() {
 
   const infoRef = useRef<JsonlInfoPayload | null>(null);
   const selectedRef = useRef(0);
+  const modeRef = useRef<DetailMode>("tree");
   const queryRef = useRef("");
   /** Index windows in flight; the tag is what that request may do to the window when it lands. */
   const ranges = useRef(new PendingRequests<"replace" | "append">());
   const entries = useRef(new RequestGuard());
+  /** Raw-text fetches for a detail that arrived without its line (ADR-0030). */
+  const entryText = useRef(new RequestGuard());
   /** The search scan. `cancel()` says whether the host is still running one, so no mirror flag. */
   const search = useRef(new RequestGuard());
   /** Guard for init/reload: filters stale progress from superseded indexing runs. */
@@ -82,6 +86,9 @@ function JsonlViewerContent() {
   useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
   useEffect(() => {
     queryRef.current = query;
   }, [query]);
@@ -100,11 +107,18 @@ function JsonlViewerContent() {
     [],
   );
 
-  const requestEntry = useCallback((index: number) => {
+  const requestEntry = useCallback((index: number, withText = modeRef.current === "raw") => {
     const requestId = entries.current.issue();
+    entryText.current.cancel();
     setDetail(null);
     setDetailLoading(true);
-    handler.emit("jsonlEntry", { requestId, index });
+    handler.emit("jsonlEntry", { requestId, index, withText });
+  }, []);
+
+  /** Fetch the raw line for a detail that shipped only the parsed value (ADR-0030). */
+  const requestText = useCallback((index: number) => {
+    const requestId = entryText.current.issue();
+    handler.emit("jsonlEntryText", { requestId, index });
   }, []);
 
   const selectEntry = useCallback(
@@ -191,11 +205,13 @@ function JsonlViewerContent() {
       setInfo(payload);
 
       let target = selectedRef.current;
+      let restoredMode: DetailMode = modeRef.current;
       if (!isSameFile || payload.clearCache) {
         const restored = payload.clearCache ? null : loadJsonlPersisted(payload.cacheId);
         if (restored) {
           setLeftWidth(restored.left);
           setMode(restored.mode);
+          restoredMode = restored.mode;
         }
         target = restored?.selected ?? 0;
         setQuery("");
@@ -220,7 +236,7 @@ function JsonlViewerContent() {
         setDetailLoading(false);
       } else {
         recenter(target, payload.lineCount);
-        requestEntry(target);
+        requestEntry(target, restoredMode === "raw");
       }
 
       // A same-file refresh re-runs the active search against the new bytes. A different
@@ -249,6 +265,23 @@ function JsonlViewerContent() {
       if (payload.index !== selectedRef.current) return;
       setDetail(payload.entry);
       setDetailLoading(false);
+    });
+
+    // The raw line for a detail that shipped only the value (ADR-0030).
+    handler.on("jsonlEntryTextData", (payload: JsonlEntryTextPayload) => {
+      if (!entryText.current.isCurrent(payload.requestId)) return;
+      entryText.current.settle(payload.requestId);
+      setDetail((previous) =>
+        previous && previous.index === payload.index
+          ? {
+              ...previous,
+              text: payload.text,
+              textChars: payload.textChars,
+              textTruncated: payload.textTruncated,
+              textIncluded: true,
+            }
+          : previous,
+      );
     });
 
     handler.on("jsonlSearchBatch", (batch: JsonlSearchBatch) => {
@@ -284,6 +317,7 @@ function JsonlViewerContent() {
     handler.on("clearJsonlCache", () => {
       clearJsonlPersisted();
       searchMemo.current.clear();
+      entryText.current.cancel();
       const stale = search.current.cancel();
       if (stale !== null) handler.emit("jsonlSearchCancel", { requestId: stale });
       searchAutoSelected.current = false;
@@ -517,8 +551,13 @@ function JsonlViewerContent() {
                   entry={detail}
                   loading={detailLoading || !info}
                   mode={mode}
-                  onModeChange={setMode}
+                  onModeChange={(next) => {
+                    setMode(next);
+                    if (next === "raw" && detail && !detail.textIncluded) requestText(selected);
+                  }}
                   actionsHost={detailBar}
+                  highlight={searchActive ? query.trim() : undefined}
+                  onRequestText={() => requestText(selected)}
                 />
               </Splitter.Panel>
             </Splitter>

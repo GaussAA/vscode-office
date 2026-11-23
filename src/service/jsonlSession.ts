@@ -13,6 +13,7 @@ import {
   JSONL_RANGE_BYTE_BUDGET,
   type JsonlEntriesPayload,
   type JsonlEntryPayload,
+  type JsonlEntryTextPayload,
   type JsonlSearchBatch,
 } from "@/common/jsonlTypes";
 import { buildJsonlEntry, buildJsonlSummaries } from "@/service/jsonlDocument";
@@ -117,11 +118,34 @@ export class JsonlSession {
     };
   }
 
-  async readEntry(requestId: number, line: number): Promise<JsonlEntryPayload | null> {
+  async readEntry(
+    requestId: number,
+    line: number,
+    withText = false,
+  ): Promise<JsonlEntryPayload | null> {
     if (!Number.isInteger(line) || line < 0 || line >= this.file.lineCount) return null;
     const window = await this.file.window(line, line + 1);
     if (window.index.lineCount === 0) return null;
-    return { requestId, index: line, entry: buildJsonlEntry(window.bytes, window.index, 0, line) };
+    return {
+      requestId,
+      index: line,
+      entry: buildJsonlEntry(window.bytes, window.index, 0, line, withText),
+    };
+  }
+
+  /** The raw line for a detail that was fetched without it (ADR-0030). */
+  async readEntryText(requestId: number, line: number): Promise<JsonlEntryTextPayload | null> {
+    if (!Number.isInteger(line) || line < 0 || line >= this.file.lineCount) return null;
+    const window = await this.file.window(line, line + 1);
+    if (window.index.lineCount === 0) return null;
+    const entry = buildJsonlEntry(window.bytes, window.index, 0, line, true);
+    return {
+      requestId,
+      index: line,
+      text: entry.text,
+      textChars: entry.textChars,
+      textTruncated: entry.textTruncated,
+    };
   }
 
   /**

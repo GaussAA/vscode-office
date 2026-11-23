@@ -17,6 +17,7 @@ import {
   JSONL_SEARCH_BATCH,
   JSONL_SEARCH_MAX_MATCHES,
 } from "@/common/jsonlTypes";
+import { MAX_TEXT_CHARS, SUMMARY_CHARS, VALUE_PANEL_MAX_CHARS } from "@/common/recordConstants";
 
 test("JSON and JSONL record limits are equal (both derive from RECORD_MAX_BYTES)", () => {
   assert.equal(
@@ -42,7 +43,13 @@ test("JSON and JSONL raw preview lengths are equal", () => {
     JSONL_RAW_PREVIEW_CHARS,
     "Both formats should use the same raw preview length",
   );
-  assert.equal(JSON_RAW_PREVIEW_CHARS, 400, "Expected 400-char preview");
+  assert.equal(JSON_RAW_PREVIEW_CHARS, 120, "Expected the shared 120-character summary");
+  assert.equal(JSON_RAW_PREVIEW_CHARS, SUMMARY_CHARS, "the summary number lives in one place");
+});
+
+test("the value panel budget is shared, not per format", () => {
+  assert.equal(VALUE_PANEL_MAX_CHARS, 4_000_000, "Expected the 4,000,000-character panel budget");
+  assert.ok(VALUE_PANEL_MAX_CHARS > MAX_TEXT_CHARS, "the panel must be able to show a whole line");
 });
 
 test("JSON and JSONL search batch sizes are equal", () => {

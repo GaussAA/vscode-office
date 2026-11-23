@@ -194,17 +194,31 @@ function previewText(text: string): string {
   return truncate(text, JSON_RAW_PREVIEW_CHARS);
 }
 
-/** The detail shape the JSONL tree uses, built from one classification (no second parse). */
-function detailFrom(index: number, classification: EntryClassification): JsonlEntryDetail {
+/**
+ * The detail shape the JSONL tree uses, built from one classification (no second parse).
+ * `withText` is the same contract as JSONL: the tree needs the parsed value, and the raw text
+ * is shipped only when asked for (ADR-0030) — error roots always carry it.
+ */
+function detailFrom(
+  index: number,
+  classification: EntryClassification,
+  withText = false,
+): JsonlEntryDetail {
   const textChars = classification.text.length;
   const textTruncated = textChars > JSON_MAX_TEXT_CHARS;
+  const textIncluded = withText || classification.kind !== "value";
   const base = {
     index,
     size: classification.byteSize,
     raw: previewText(classification.text),
-    text: textTruncated ? classification.text.slice(0, JSON_MAX_TEXT_CHARS) : classification.text,
+    text: textIncluded
+      ? textTruncated
+        ? classification.text.slice(0, JSON_MAX_TEXT_CHARS)
+        : classification.text
+      : "",
     textChars,
     textTruncated,
+    textIncluded,
   };
   switch (classification.kind) {
     case "empty":
@@ -223,10 +237,12 @@ export function readJsonRecordDetail(
   text: string,
   range: { start: number; end: number },
   index: number,
+  withText = false,
 ): JsonlEntryDetail {
   return detailFrom(
     index,
     classifyEntry(text.slice(range.start, range.end), JSON_RECORD_MAX_BYTES),
+    withText,
   );
 }
 
@@ -299,9 +315,11 @@ export class JsonPreviewSession {
       rootKind = "too-large";
     } else {
       // An object or scalar root: classified once, from the first non-whitespace character.
+      // The root's raw text stays in the payload — it is the only way the Raw tab can show it,
+      // and there is exactly one root per document.
       const classification = classifyEntry(text.slice(first), JSON_MAX_OBJECT_BYTES);
       if (classification.kind === "value") {
-        this.rootEntry = detailFrom(0, classification);
+        this.rootEntry = detailFrom(0, classification, true);
         rootKind = text[first] === "{" ? "object" : "scalar";
       } else if (classification.kind === "too-large") {
         rootKind = "too-large";
@@ -349,11 +367,11 @@ export class JsonPreviewSession {
     return summaries;
   }
 
-  record(index: number): JsonlEntryDetail | null {
+  record(index: number, withText = false): JsonlEntryDetail | null {
     if (!this.records || !Number.isInteger(index) || index < 0 || index >= this.records.length) {
       return null;
     }
-    return readJsonRecordDetail(this.text, this.records[index], index);
+    return readJsonRecordDetail(this.text, this.records[index], index, withText);
   }
 
   search(requestId: number, query: string, options: Omit<JsonSearchOptions, "shouldStop">): void {

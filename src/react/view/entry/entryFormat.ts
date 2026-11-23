@@ -2,11 +2,15 @@
  * JSONL tree model: framework-free.
  *
  * This module used to build antd `DataNode`s with JSX titles, which meant the interesting
- * part — how deep, how wide, when to truncate, whether to wrap — could only be exercised by
- * bundling React. It now returns plain data; rendering is one adapter in `EntryDetail`.
+ * part — how deep, how wide, when to truncate — could only be exercised by bundling React.
+ * It now returns plain data; rendering is one adapter in `EntryDetail`.
+ *
+ * Every single-line preview goes through `preview()`, which reads `SUMMARY_CHARS` from the
+ * shared record constants (ADR-0030). There is no wrap mode: all rows are one line and the
+ * tree is always a fixed-height virtual list.
  */
 
-import { JSONL_VALUE_TEXT_LIMIT } from "@/common/jsonlTypes";
+import { SUMMARY_CHARS } from "@/common/recordConstants";
 import { toDisplayText } from "@/common/displayText";
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -31,10 +35,6 @@ export const EXPAND_ALL_CONFIRM = 5000;
 export const AUTO_EXPAND_LIMIT = 300;
 /** Default expansion depth for larger entries. */
 export const DEFAULT_EXPAND_DEPTH = 2;
-/** Entries at or below this node count render with wrapping (virtual scrolling off). */
-export const WRAP_NODE_LIMIT = 2_000;
-/** Strings longer than this are cut even in wrap mode. */
-export const WRAP_TEXT_LIMIT = 2000;
 
 export const makePathKey = (path: PathSeg[]): string => JSON.stringify(path);
 // JSON.parse returns `any`; the type assertion is safe because we control the serialization
@@ -59,14 +59,90 @@ export function typeClass(value: unknown): string {
   return typeof value;
 }
 
-export function preview(value: unknown): string {
+/** JSON-escaped body of the first `limit` characters; quotes are added by the caller. */
+function escapedBody(text: string, limit: number): string {
+  const quoted = JSON.stringify(text.slice(0, limit));
+  return quoted.length >= 2 ? quoted.slice(1, -1) : "";
+}
+
+/**
+ * The one-line summary of a string value.
+ *
+ * A long string is cut before it is stringified: `JSON.stringify(value).slice(0, 120)` used to
+ * allocate the whole value just to show 120 characters, on every visible row. The marker says
+ * how many characters are hidden, so a 121-character string and an 8 MB one are distinguishable.
+ * With a search term, the window is centred on the first hit instead of the value's head.
+ */
+export function stringSummary(text: string, highlight?: string): string {
+  const limit = SUMMARY_CHARS;
+  if (text.length <= limit) return JSON.stringify(text);
+  const count = ` (${text.length.toLocaleString()} chars)`;
+  let start = 0;
+  if (highlight) {
+    const hit = text.toLowerCase().indexOf(highlight.toLowerCase());
+    if (hit > 0) start = Math.max(0, hit - Math.floor(limit / 3));
+  }
+  const body = escapedBody(text.slice(start, start + limit), limit);
+  const lead = start > 0 ? "…" : "";
+  const tail = start + limit < text.length ? "…" : "";
+  return `"${lead}${body}${tail}"${count}`;
+}
+
+/**
+ * The first `limit` characters of a raw text line, for the Raw tab and the error bodies.
+ * The panel is where the rest is read; this only has to make the value identifiable.
+ */
+export function summaryHead(
+  text: string,
+  limit = SUMMARY_CHARS,
+): { text: string; truncated: boolean } {
+  return text.length > limit
+    ? { text: text.slice(0, limit), truncated: true }
+    : { text, truncated: false };
+}
+
+/**
+ * Split the value panel's text into render chunks.
+ *
+ * The panel is the only full-text channel and may hold up to `VALUE_PANEL_MAX_CHARS`; painting
+ * it as one text node costs a layout pass over everything. Chunks stay small, the browser skips
+ * off-screen ones (`content-visibility: auto`), and a line longer than one chunk is cut so a
+ * minified 1 MB string still becomes several chunks instead of one giant box. Lines are kept
+ * intact otherwise, so the chunk boundary falls where a newline already existed.
+ */
+export function chunkText(text: string, maxChars = 4_000): string[] {
+  if (!text) return [];
+  const chunks: string[] = [];
+  let current: string[] = [];
+  let size = 0;
+  const flush = () => {
+    if (current.length > 0) {
+      chunks.push(current.join("\n"));
+      current = [];
+      size = 0;
+    }
+  };
+  for (const line of text.split("\n")) {
+    if (line.length > maxChars) {
+      flush();
+      for (let at = 0; at < line.length; at += maxChars) {
+        chunks.push(line.slice(at, at + maxChars));
+      }
+      continue;
+    }
+    current.push(line);
+    size += line.length + 1;
+    if (size >= maxChars) flush();
+  }
+  flush();
+  return chunks;
+}
+
+export function preview(value: unknown, highlight?: string): string {
   if (value === null) return "null";
   if (Array.isArray(value)) return "[…]";
   if (typeof value === "object") return "{…}";
-  if (typeof value === "string") {
-    const text = JSON.stringify(value);
-    return text.length > 120 ? `${text.slice(0, 120)}…` : text;
-  }
+  if (typeof value === "string") return stringSummary(value, highlight);
   if (typeof value === "bigint") return `${value}n`;
   return toDisplayText(value);
 }
@@ -88,33 +164,6 @@ export function pathToText(path: PathSeg[]): string {
 
 function segmentLabel(seg: PathSeg): string {
   return typeof seg === "number" ? `[${seg}]` : String(seg);
-}
-
-function wrappedText(text: string, limit: number): string {
-  return text.length <= limit
-    ? text
-    : `${text.slice(0, limit)}… (${text.length.toLocaleString()} chars)`;
-}
-
-/** Cheap node count used to decide whether wrapping is affordable. */
-export function countNodes(value: unknown, limit = WRAP_NODE_LIMIT, maxDepth = MAX_DEPTH): number {
-  let count = 0;
-  let capped = false;
-  const walk = (current: unknown, depth: number) => {
-    if (capped || !isComposite(current) || depth >= maxDepth) return;
-    const entries = Array.isArray(current) ? current : Object.values(current);
-    for (const child of entries) {
-      if (count >= limit) {
-        capped = true;
-        return;
-      }
-      count++;
-      walk(child, depth + 1);
-    }
-  };
-  walk(value, 0);
-  // limit + 1 marks "too many"; returning exactly limit would read as "just fits"
-  return capped ? limit + 1 : count;
 }
 
 /** One row of the detail tree, as data. Rendering lives in `EntryDetail`. */
@@ -152,22 +201,17 @@ export interface EntryModel {
   truncated: boolean;
   /** The node cap that produced `truncated`; the tree renders it as a notice row. */
   limit: number;
-  /**
-   * Whether to render this entry with wrapping. Decided here, by the same walk that builds
-   * the tree, so callers no longer have to call `countNodes` first and then `buildTree`.
-   */
-  wrap: boolean;
 }
 
 export interface EntryModelOptions {
   maxChildren?: number;
   maxDepth?: number;
   maxNodes?: number;
-  wrapNodeLimit?: number;
-  wrapTextLimit?: number;
   defaultExpandDepth?: number;
   /** Build children only to this depth; deeper composites are marked lazy. */
   lazyDepth?: number;
+  /** Search term; long-string summaries are centred on its first occurrence. */
+  highlight?: string;
 }
 
 /**
@@ -178,13 +222,9 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
   const maxChildren = options.maxChildren ?? MAX_CHILDREN;
   const maxDepth = options.maxDepth ?? MAX_DEPTH;
   const maxNodes = options.maxNodes ?? MAX_TREE_NODES;
-  const wrapNodeLimit = options.wrapNodeLimit ?? WRAP_NODE_LIMIT;
-  const wrapTextLimit = options.wrapTextLimit ?? WRAP_TEXT_LIMIT;
   const defaultExpandDepth = options.defaultExpandDepth ?? DEFAULT_EXPAND_DEPTH;
   const lazyDepth = options.lazyDepth ?? Number.POSITIVE_INFINITY;
-
-  const composite = isComposite(value);
-  const wrap = composite && countNodes(value, wrapNodeLimit, maxDepth) <= wrapNodeLimit;
+  const highlight = options.highlight;
 
   const keys: string[] = [];
   const shallowKeys: string[] = [];
@@ -228,8 +268,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
         value: child,
         kind: typeClass(child),
         typeLabel: typeLabel(child),
-        preview:
-          wrap && typeof child === "string" ? wrappedText(child, wrapTextLimit) : preview(child),
+        preview: preview(child, highlight),
         composite: childComposite && !capped,
         children: childComposite && !capped && !lazy ? walk(child, childPath) : [],
         ...(lazy ? { lazy: true } : {}),
@@ -256,7 +295,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
   };
 
   const nodes = walk(value, []);
-  return { nodes, keys, shallowKeys, count, truncated, limit: maxNodes, wrap };
+  return { nodes, keys, shallowKeys, count, truncated, limit: maxNodes };
 }
 
 /**
@@ -383,7 +422,7 @@ export function jsonTextBounded(value: unknown, limit: number): ValueText {
   return { text, chars, truncated };
 }
 
-export function fullValueText(value: unknown, limit = JSONL_VALUE_TEXT_LIMIT): ValueText {
+export function fullValueText(value: unknown, limit: number): ValueText {
   if (typeof value === "string") {
     if (value.length <= limit) return { text: value, chars: value.length, truncated: false };
     return { text: value.slice(0, limit), chars: value.length, truncated: true };

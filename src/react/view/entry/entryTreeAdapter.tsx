@@ -44,7 +44,7 @@ function renderHighlighted(text: string, highlight?: string): React.ReactNode {
   );
 }
 
-export function toAntdNodes(nodes: NodeModel[], wrap: boolean, highlight?: string): DataNode[] {
+export function toAntdNodes(nodes: NodeModel[], highlight?: string): DataNode[] {
   return nodes.map((node) => {
     if (node.overflow !== undefined) {
       return {
@@ -54,20 +54,16 @@ export function toAntdNodes(nodes: NodeModel[], wrap: boolean, highlight?: strin
         title: <span className="jsonl-more">{$t("jsonl.moreKeys", { count: node.overflow })}</span>,
       };
     }
-    const longString = wrap && typeof node.value === "string";
     return {
       key: node.key,
       isLeaf: !node.composite,
-      children:
-        node.composite && !node.lazy ? toAntdNodes(node.children, wrap, highlight) : undefined,
+      children: node.composite && !node.lazy ? toAntdNodes(node.children, highlight) : undefined,
       ...(node.lazy ? { dataRef: node } : {}),
       title: (
-        <span className={`jsonl-kv${wrap ? " jsonl-kv--wrap" : ""}`}>
+        <span className="jsonl-kv">
           <span className="jsonl-key">{renderHighlighted(node.label, highlight)}</span>
           <span className="jsonl-colon">:</span>
-          <span
-            className={`jsonl-val jsonl-val--${node.kind}${longString ? " jsonl-val--wrap" : ""}`}
-          >
+          <span className={`jsonl-val jsonl-val--${node.kind}`}>
             {renderHighlighted(node.preview, highlight)}
           </span>
           {node.composite && <span className="jsonl-type">{node.typeLabel}</span>}

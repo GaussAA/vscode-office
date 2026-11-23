@@ -6,6 +6,8 @@
  * The search logic lives here, so the Unicode case-insensitive bug is fixed in one place.
  */
 
+import { SUMMARY_CHARS } from "@/common/recordConstants";
+
 export interface SearchOptions<TBatch> {
   /** Records decoded per event-loop turn. */
   step?: number;
@@ -136,10 +138,15 @@ export function snippetAround(
 
 /**
  * Snippet around the first match of `needle` (from `foldNeedle`): 50 characters before and 150
- * after. Without a match it is the head of the text.
+ * after, clamped to the one summary number (ADR-0030). Without a match it is the head of the
+ * text.
  */
 export function matchSnippet(text: string, needle: string): string {
   const match = findCaseInsensitive(text, needle);
-  if (!match) return text.length <= 200 ? text : `${text.slice(0, 200)}…`;
-  return snippetAround(text, match.start, match.end, 50, 150);
+  const snippet = !match
+    ? text.length <= 200
+      ? text
+      : `${text.slice(0, 200)}…`
+    : snippetAround(text, match.start, match.end, 50, 150);
+  return snippet.length <= SUMMARY_CHARS ? snippet : `${snippet.slice(0, SUMMARY_CHARS)}…`;
 }

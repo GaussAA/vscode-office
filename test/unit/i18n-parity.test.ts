@@ -42,9 +42,10 @@ const LOCALES = {
  * without translating it raises this budget, which is exactly the kind of change that should
  * be a conscious decision rather than a silent fallback.
  *
- * The 56 keys below are the `parquet` chrome and the whole `jsonl` viewer. Translating them
- * into seven languages is a job for a native speaker, not a commit hook; until then the
- * English fallback is correct but unlocalised, and this budget keeps the gap from growing.
+ * The budget covers the `parquet` chrome and the whole `jsonl` viewer, plus the three
+ * summary / value-panel strings ADR-0030 added to English. Translating them into seven
+ * languages is a job for a native speaker, not a commit hook; until then the English fallback
+ * is correct but unlocalised, and this budget keeps the gap from growing.
  * A partial `jsonl` block is deliberately not shipped: a handful of translated strings inside
  * an otherwise English viewer made one header mixed-language, which is worse than fallback.
  * The count is exact, not slack: a new English key must either be translated or move this
@@ -53,13 +54,13 @@ const LOCALES = {
 const MAX_MISSING: Record<string, number> = {
   "zh-cn": 0,
   "zh-tw": 0,
-  ja: 69,
-  de: 69,
-  fr: 69,
-  es: 69,
-  "pt-br": 69,
-  ko: 69,
-  ru: 69,
+  ja: 72,
+  de: 72,
+  fr: 72,
+  es: 72,
+  "pt-br": 72,
+  ko: 72,
+  ru: 72,
 };
 
 function flatten(tree: Record<string, unknown>, prefix = ""): Map<string, unknown> {

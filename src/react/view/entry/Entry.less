@@ -251,6 +251,13 @@
   animation: jsonl-valuebar-in var(--motion-base) var(--motion-ease);
 }
 
+.jsonl-valuebar__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 6px;
+}
+
 @keyframes jsonl-valuebar-in {
   from {
     opacity: 0;
@@ -275,13 +282,38 @@
 }
 
 .jsonl-valuebar__notice {
-  padding: 0 0 6px;
   color: var(--jl-warn);
   font-size: 11px;
   line-height: 1.5;
 }
 
-.jsonl-valuebar__text {
+.jsonl-valuebar__expand {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--jl-radius-sm);
+  background: transparent;
+  color: var(--jl-muted);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.jsonl-valuebar__expand:hover {
+  background: var(--jl-control-hover);
+  color: var(--jl-fg);
+}
+
+.jsonl-valuebar__expand:focus-visible {
+  outline: 1px solid var(--jl-focus);
+  outline-offset: -1px;
+}
+
+.jsonl-valuebar__scroll {
   max-height: 200px;
   margin: 0;
   padding: 8px 10px;
@@ -297,11 +329,22 @@
   user-select: text;
 }
 
+/* The panel is the only full-text channel and may hold millions of characters; chunks keep
+   layout work proportional to what is on screen (`content-visibility` skips the rest). */
+.jsonl-valuebar__chunk {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
 /* A scrollable region has to be focusable, or the keyboard cannot reach the part that
-   scrolled out of the 200px window. */
-.jsonl-valuebar__text:focus-visible {
+   scrolled out of the window. */
+.jsonl-valuebar__scroll:focus-visible {
   outline: 1px solid var(--jl-focus);
   outline-offset: -1px;
+}
+
+.jsonl-valuebar__body--expanded .jsonl-valuebar__scroll {
+  max-height: 70vh;
 }
 
 /* ---------- detail header ---------- */
@@ -341,8 +384,8 @@
   font-family: inherit;
   font-size: 11px;
   transition:
-    background 0.12s ease,
-    color 0.12s ease;
+    background var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
 }
 
 .jsonl-detail__header .ant-btn:not(:disabled):hover {
@@ -477,42 +520,6 @@
   min-height: 120px;
   color: var(--jl-muted);
   font-size: 12px;
-}
-
-/* wrapping mode: variable row height, so the virtual list is off. */
-.jsonl-detail__scroll {
-  height: 100%;
-  overflow: auto;
-}
-
-.jsonl-detail__tree--wrap {
-  .ant-tree-treenode {
-    align-items: flex-start;
-  }
-
-  .ant-tree-node-content-wrapper {
-    display: block;
-    height: auto;
-    max-width: calc(100% - 28px);
-    padding: 2px 8px 2px 2px;
-    line-height: 1.6;
-  }
-
-  .ant-tree-switcher {
-    padding-top: 3px;
-    line-height: 1.6;
-  }
-}
-
-.jsonl-kv--wrap {
-  display: inline;
-  white-space: normal;
-}
-
-.jsonl-val--wrap {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
 @media (max-width: 720px) {

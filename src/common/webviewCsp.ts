@@ -9,8 +9,8 @@
  * - `script-src 'wasm-unsafe-eval'`: `hyparquet-compressors` compiles a WebAssembly module to
  *   decode SNAPPY/ZSTD/BROTLI/LZ4 column chunks. Without it the parquet viewer cannot open a
  *   compressed file at all.
- * - `data:` / `blob:` on `img-src` and `connect-src`: spreadsheet images and the parquet
- *   viewer's `readRange` responses are served from blob or data URLs.
+ * - `data:` / `blob:` on `img-src` and `connect-src`: the parquet viewer's `readRange`
+ *   responses are served from blob or data URLs.
  *
  * `'unsafe-eval'` stays blocked. `frame-src`, `media-src` and `worker-src` used to exist for the
  * HTML preview panel, the archive viewer and pdf.js; all three were removed in 6.0.0, and

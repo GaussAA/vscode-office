@@ -144,6 +144,7 @@ class JsonPreviewPanel {
       })
       .on("jsonRecords", (request) => handlers.records(request))
       .on("jsonRecord", (request) => handlers.record(request))
+      .on("jsonRecordText", (request) => handlers.recordText(request))
       .on("jsonSearch", (request) => handlers.search(request))
       .on("jsonSearchCancel", () => handlers.cancelSearch())
       .on("jsonReload", () => {

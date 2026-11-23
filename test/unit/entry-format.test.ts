@@ -9,7 +9,6 @@ import {
   pathToText,
   makePathKey,
   readPathKey,
-  countNodes,
   buildEntryModel,
   valueAtPath,
   jsonText,
@@ -85,11 +84,13 @@ test("preview: shows quoted strings", () => {
   assert.strictEqual(preview("hello"), '"hello"');
 });
 
-test("preview: truncates long strings", () => {
+test("preview: truncates long strings to the one summary number", () => {
   const long = "x".repeat(150);
   const result = preview(long);
-  assert(result.endsWith("…"));
-  assert(result.length < long.length + 10);
+  assert(result.startsWith('"'), `expected a quoted summary: ${result}`);
+  assert(result.includes("…"), `expected an ellipsis: ${result}`);
+  assert(result.endsWith("(150 chars)"), `expected the original length: ${result}`);
+  assert(result.length <= 160, `summary is ${result.length} characters`);
 });
 
 test("preview: shows bigint with 'n' suffix", () => {
@@ -155,32 +156,7 @@ test("makePathKey and readPathKey: round-trip path with indices", () => {
 
 // ===== Node Counting =====
 
-test("countNodes: counts flat object", () => {
-  const obj = { a: 1, b: 2, c: 3 };
-  assert.strictEqual(countNodes(obj), 3);
-});
-
-test("countNodes: counts nested structure", () => {
-  const obj = { a: { b: { c: 1 } } };
-  assert.strictEqual(countNodes(obj), 3);
-});
-
-test("countNodes: respects limit", () => {
-  const large = { a: 1, b: 2, c: 3, d: 4, e: 5 };
-  const count = countNodes(large, 3);
-  assert.strictEqual(count, 4); // limit + 1 to indicate capped
-});
-
-test("countNodes: handles arrays", () => {
-  const arr = [1, 2, [3, 4, 5]];
-  assert.strictEqual(countNodes(arr), 6); // 3 top + 3 nested
-});
-
-test("countNodes: respects max depth", () => {
-  const deep = { a: { b: { c: { d: 1 } } } };
-  const count = countNodes(deep, 100, 2);
-  assert(count <= 2); // Stops at depth 2
-});
+// (countNodes was the wrap-mode pre-scan; ADR-0030 removed wrap mode, so it is gone.)
 
 // ===== Value at Path =====
 
@@ -227,7 +203,7 @@ test("jsonText: handles circular references gracefully", () => {
 // ===== Full Value Text =====
 
 test("fullValueText: returns complete text under limit", () => {
-  const result = fullValueText("short");
+  const result = fullValueText("short", 1_000);
   assert.strictEqual(result.text, "short");
   assert.strictEqual(result.chars, 5);
   assert.strictEqual(result.truncated, false);
@@ -243,7 +219,7 @@ test("fullValueText: truncates long text", () => {
 
 test("fullValueText: stringifies objects", () => {
   const obj = { a: 1 };
-  const result = fullValueText(obj);
+  const result = fullValueText(obj, 1_000);
   assert(result.text.includes('"a"'));
   assert.strictEqual(result.truncated, false);
 });

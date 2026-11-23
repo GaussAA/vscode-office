@@ -259,6 +259,10 @@ export default {
     hideValue: "Collapse value",
     valueChars: "{count} characters",
     valueTruncated: "Showing the first {shown} of {total} characters.",
+    summaryOnly:
+      "Showing the first {chars} characters — the full text is in the value panel below.",
+    expandValue: "Expand",
+    shrinkValue: "Shrink",
     treeTruncated: "Tree truncated at {count} nodes.",
     tooLargeHint: "Lines above {limit} are not parsed; the text below is what could be read.",
     value: "Copy value",

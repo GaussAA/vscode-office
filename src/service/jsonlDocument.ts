@@ -174,7 +174,12 @@ export function classifyHit(value: unknown, needle: string): "key" | "value" | "
 export function matchSnippet(text: string, needle: string, radius = 48): string | undefined {
   const match = findCaseInsensitive(text, foldNeedle(needle));
   if (!match) return undefined;
-  return snippetAround(text, match.start, match.end, radius, radius);
+  // One summary number everywhere (ADR-0030), snippets included: the directory row is a
+  // summary, and the panel is where the full value is read.
+  return truncate(
+    snippetAround(text, match.start, match.end, radius, radius),
+    JSONL_RAW_PREVIEW_CHARS,
+  );
 }
 
 /**
@@ -251,6 +256,7 @@ export function buildJsonlEntry(
   index: JsonlIndex,
   line: number,
   baseLine = 0,
+  withText = false,
 ): JsonlEntryDetail {
   const rawText = readJsonlLineText(bytes, index, line);
   const classification = classifyEntry(rawText);
@@ -264,14 +270,18 @@ export function buildJsonlEntry(
   const text = textTruncated
     ? classification.text.slice(0, JSONL_MAX_TEXT_CHARS)
     : classification.text;
+  // The tree needs the parsed value, not the line: shipping both doubles every detail message
+  // (ADR-0030). Error lines are the exception — their raw text is the content the panel reads.
+  const textIncluded = withText || classification.kind !== "value";
 
   const base = {
     index: at,
     size: classification.byteSize,
     raw: truncate(classification.text, JSONL_RAW_PREVIEW_CHARS),
-    text,
+    text: textIncluded ? text : "",
     textChars,
     textTruncated,
+    textIncluded,
   };
 
   if (classification.kind === "empty") {

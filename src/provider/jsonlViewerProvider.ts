@@ -218,6 +218,7 @@ export class JsonlViewerProvider implements vscode.CustomReadonlyEditorProvider<
       .on("fileChange", () => handlers.reload())
       .on("jsonlIndex", (request) => handlers.index(request))
       .on("jsonlEntry", (request) => handlers.entry(request))
+      .on("jsonlEntryText", (request) => handlers.entryText(request))
       .on("jsonlSearch", (request) => handlers.search(request))
       .on("jsonlSearchCancel", (request) => handlers.cancelSearch(request));
 
