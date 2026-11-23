@@ -86,3 +86,8 @@ ADR-0026 的测量（`excel-workbook-parse-probe`，300,001 行 × 8 列）给�
 - **验收**：`pnpm check` 897 tests；`verify:ui` 110/110（fallback）；`verify:perf` 13/13；
   session 单测断言 host hit 零 fetch/parse、miss 回填；ADR-0026 的测量仍作为“第一次打开”
   的观测，host 命中是第二次打开的收益。
+
+## 后续（7.0.0）
+
+工作簿 host 缓存随表格预览在 [ADR-0029](./0029-narrow-to-two-viewers.md) 删除；JSONL/JSON 共用的
+`HostDiskCache` 不受影响。

@@ -75,7 +75,7 @@ window rather than a signal.
 ## Adding a scenario
 
 Add the scenario to the module in `scenarios/` that matches its viewer (`parquet-*.mjs`,
-`jsonl.mjs`, `json.mjs`, `compare.mjs`, `excel-motion.mjs`, `other.mjs`); `runner.mjs` imports
+`jsonl.mjs`, `json.mjs`, `compare.mjs`, `other.mjs`); `runner.mjs` imports
 every module and merges them. A new module has to be imported there as well:
 
 ```js
@@ -103,18 +103,16 @@ Rules that keep this suite useful:
 
 ## Route smoke vs. real scenarios
 
-`remaining-routes-smoke` walks the **React** routes without a behavioural scenario of their
-own — `excel` since the Git History panel was removed in 6.8.0 — with a minimal `open`
-payload and asserts that
-something mounted and nothing threw. Its job is to catch fork-wide breakage (entry, provider,
-shared utilities), **not** rendering correctness. It polls for the mount (`page.waitFor`)
-rather than sleeping a fixed delay: the excel chunk is ~1.3 MB and mounts slower on a loaded
-machine than any fixed delay we would pick.
+`remaining-routes-smoke` walked the **React** routes without a behavioural scenario of their
+own — `excel` since the Git History panel was removed in 6.8.0 — with a minimal `open` payload
+and asserted that something mounted and nothing threw. Its job was to catch fork-wide breakage
+(entry, provider, shared utilities), **not** rendering correctness.
 
-`parquet` (`parquet-*`), `jsonl` (`jsonl-*`) and `json` (`json-*`) have their own scenarios instead.
-`test/unit/viewer-registry.test.ts` asserts that every route in `main.tsx` is covered one way
-or the other, so adding a route without coverage fails the build instead of silently shrinking
-the suite.
+The spreadsheet viewer was removed in 7.0.0 ([ADR-0029](../adr/0029-narrow-to-two-viewers.md)), so
+`parquet` (`parquet-*`), `jsonl` (`jsonl-*`) and `json` (`json-*`) are the only routes left and
+each has its own scenarios; the route-smoke scenario goes with the route. `viewer-registry.test.ts`
+asserts that every route in `main.tsx` is covered one way or the other, so adding a route without
+coverage fails the build instead of silently shrinking the suite.
 
 No viewer is served outside the React route table anymore: the HTML preview panel and the PDF
 viewer were the last two, and both were removed in 6.0.0.

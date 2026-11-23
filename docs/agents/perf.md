@@ -1,14 +1,13 @@
 # Performance gate
 
 `pnpm verify:perf` runs the built viewers in headless Chrome **and the JSONL / JSON / parquet
-profile host services in Node** and asserts ten numbers that used to be catastrophic and
+profile host services in Node** and asserts nine numbers that used to be catastrophic and
 invisible:
 
 | invariant                                       | budget                                    | why it exists                                                                                                                                                                                                                               |
 | ----------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | first paint reads at most 1.25x the file        | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file                                                                                                 |
 | a whole-file search is one pass                 | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                                                                                                                      |
-| a 21 MB CSV paints its windowed view            | < 2 s, heap < 200 MB, < 100 DOM rows      | the read-only window scans bytes for record starts instead of building a cell object per value: measured 477 ms / 33 MB / 42 rows                                                                                                           |
 | a page turn on 60 columns stays usable          | best of 3: warm < 2 s, cold < 5 s         | idle: 210 ms warm (render of 3,000 cells), 520 ms cold (one decoded data page per column). Loose on purpose — load inflates samples 2-4x, and the regression this catches is 5-10x                                                          |
 | a JSONL directory window stays in budget        | 80 MB / 40 lines: ≤ 3 rows, < 1.5 s       | a 500-line request without the 4 MB byte budget parses all 40 × 2 MB lines before the first row; measured 15 ms / 1 row                                                                                                                     |
 | a whole-file JSONL search is one pass           | 200k lines < 5 s, `scanned == total`      | the line window per turn must stay byte-bounded; a per-batch re-read or an unbounded window shows up as an order-of-magnitude jump. Measured 0.3–0.5 s                                                                                      |
@@ -105,11 +104,19 @@ raise the budget in the same commit and say why.
 ADR-0022 defines "smooth" as something measured, so `verify:ui` records **frame gaps** during
 paging, scrolling and selecting on the 250k-row fixture, and fails above a ceiling:
 
-| scenario                | fixture                         | baseline (3 local + 2 CI rounds) | ceiling       |
-| ----------------------- | ------------------------------- | -------------------------------- | ------------- |
-| `parquet-frames-paging` | 5 page turns                    | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
-| `parquet-frames-scroll` | horizontal travel + PageDown ×5 | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
-| `parquet-frames-select` | 20 cell selections              | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+| scenario                     | fixture                         | baseline (3 local + 2 CI rounds) | ceiling       |
+| ---------------------------- | ------------------------------- | -------------------------------- | ------------- |
+| `parquet-frames-paging`      | 5 page turns                    | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+| `parquet-frames-scroll`      | horizontal travel + PageDown ×5 | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+| `parquet-frames-select`      | 20 cell selections              | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+| `jsonl-frames-select`        | 20 entry switches               | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+| `jsonl-frames-expand`        | 3 subtree expands               | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+| `jsonl-frames-panel`         | open a 5,000-char value panel   | 0 gaps ≥ 50 ms                   | 1 gap, 150 ms |
+| `json-preview-frames-record` | 20 record switches              | 0 gaps in 4 of 5 runs            | 1 gap, 150 ms |
+
+The four JSONL/JSON rows come from ADR-0030: they reuse the same rAF collector, and their
+ceilings were set after five local runs (one run recorded a single 50 ms gap on record
+switching, inside the ceiling). The only direction from here is down.
 
 The ceiling was set **after** five runs agreed on zero: one gap under 150 ms is tolerated for a
 GC pause, anything beyond is an order-of-magnitude regression. ADR-0022 decision 4 says the only
@@ -141,11 +148,6 @@ just a verdict.
   cost of the DOM shape several UI scenarios assert on. Not gated because a budget there sits
   inside run-to-run noise (~2x on a loaded machine) while the regression it would guard is
   only 2-3x.
-- **The editable spreadsheet path below 8 MB** is still all-at-once, so it has no budget: the
-  numbers move with the grid implementation, not with us. Above 8 MB the windowed view is
-  gated (row above). The size guard asks before loading a workbook above 15 MB, or a CSV/TSV
-  above 25 MB **from a virtual workspace**; a local CSV/TSV is windowed up to 350 MB
-  ([ADR-0016](../adr/0016-preview-size-guard.md)).
 - **Parquet row virtualisation: shipped, after moving the suite with it.** antd's `virtual`
   table renders the ~22 rows the viewport holds instead of all 50, which halved the warm page
   turn (210 → 111 ms) and left the cold one decode-bound (632 ms, unchanged). The price was a
@@ -156,12 +158,6 @@ just a verdict.
 - **Page-turn timing varies 2-4x with machine load**, so `parquet-wide-page-turn` asserts the
   best of three samples and reports all of them: 210-915 ms warm and 520-1,850 ms cold were all
   observed on the same build and hardware.
-- **Two spreadsheet micro-optimisations that were measured and dropped** (on the 152 MB CSV):
-  the double UTF-8 decode is 108 ms of a 9.7 s load, and the extra JSZip pass for a workbook's
-  sort state is 15-41 ms of a 10 s load — about 1% each. The time is in `parseCsv` (1.5 s) and
-  then in one object per cell plus the grid; windowing is the only fix that moves it. The
-  decode is still worth collapsing for the transient allocation, but it is not a performance
-  project.
 - **Inline bytes over the bridge** are base64 now, not a `number[]` (5-8x the file on a JSON
   message vs 4/3). `parquet-inline-buffer` renders a virtual document from a base64 payload, so
   the decode path is covered; nothing measures the message size itself.
@@ -169,21 +165,15 @@ just a verdict.
   search checks above catch the shape regressions, and the index scan is linear by design.
   Since ADR-0026 the host disk cache skips the scan on a fingerprint hit; the invariant is
   asserted with a counting ByteSource (zero source reads on a hit), not with a wall clock.
-- **Whole-workbook Excel parse** is measured by the `excel-workbook-parse-probe` UI scenario
-  (300,001 rows x 8 columns, generated harness workbook): on 2026-11-18 it took **6,466 ms
-  parse / 8,095 ms open (80%)**; the run is a measurement, not a budget. The ADR-0026
-  threshold (`>1.5 s` or `>50%` of open) is exceeded. ADR-0027 keeps the first open parsing in
-  the webview and caches the parsed rows in the extension host; a later open of the same file
-  asks for metadata/windows and skips both fetch and parse. The UI harness has no host bridge
-  for this, so the probe measures the first-open fallback, not the host hit.
-- **CSV record scan** is reported by `sheet-window-first-paint` (`excel-csv-scan`):
-  126 ms of a 542 ms 21 MB open (2026-11-18). ADR-0028 caches the record index in the host
-  disk store; a hit uses `excel-csv-index-hit` and still fetches the bytes. The probe remains
-  on the fallback path.
+- **Whole-workbook Excel parse and the CSV record scan** were measured by
+  `excel-workbook-parse-probe` and `sheet-window-first-paint` until the spreadsheet viewer was
+  removed in 7.0.0 ([ADR-0029](../adr/0029-narrow-to-two-viewers.md)); their numbers live in
+  ADR-0027/ADR-0028 as history.
 - **JSON Preview array index** is checked by the JSON perf scenarios (<6 s on a 91.6 MB array,
   the cold path). ADR-0028 caches the top-level record ranges in the host disk store; a hit
   still reads the text but skips `indexJsonArray`. The cached path is not in the perf gate.
 - **Open latency itself** (1-3 s for 1M rows x 5 columns, dominated by decoding the first data
   page per column plus loading the ~430 KB parquet bundle) is not asserted either: it moves
   with bundle size, and the byte budget above already catches the failure mode that mattered.
-- Nothing here asserts smoothness of scrolling; only the numbers above are enforced.
+- Nothing here asserts smoothness of scrolling; only the numbers above and the frame scenarios
+  are enforced.

@@ -44,3 +44,9 @@ status: accepted
 - **6.8.0 的更正**：Git 历史后来还是删了（它不在三种格式之内，是本仓最贵的继承债），见
   CHANGELOG 6.8.0 的 Removed。本条记录的是 6.0.0 当时的范围，不改写。
 - 6.0.0 的 CHANGELOG 必须把每个被删格式逐条列出；三份 README 的格式清单重写为三项。
+
+## 后续（7.0.0）
+
+[ADR-0029](./0029-narrow-to-two-viewers.md) 把范围从三种收窄到两种：表格预览整体删除，只留 parquet、
+JSONL 与命令式 JSON 检查器；发布标题与产品名随之改成 `Data File Viewer (Parquet, JSONL)`。
+本文记录的是 6.0.0 当时的范围，不改写。

@@ -51,3 +51,9 @@ JSON 预览以**显式命令**打开，**不注册为 Viewer**：
 - 100 MB 数组 fixture（91.6 MB、50,000 条记录）在宿主侧测得：索引 350–614 ms、100 条记录窗口 2–3 ms、单条详情 <1 ms、全文件搜索 559–1137 ms（2026-11-16 在 Node v24.20.0 / Windows x64 上测得，`pnpm verify:perf` 的 `json-array-index-window-search` 场景，3 次取范围；索引与搜索波动较大，机器负载不同数字会变）；闸门预算分别为 6 s / 2 s / 8 s。
 - UI 场景覆盖记录列表虚拟化（500 条记录时 DOM <100 行）、记录搜索高亮、对象根路径搜索、buffer 标签、invalid / too-large / 空数组；真实 VS Code smoke 覆盖命令打开 webview 面板，并断言 `.json` 没有 custom editor 声明。
 - JSON 的 tree/value panel/keyboard 复用 `EntryDetail`，只给它加了可选的 `entryLabel`、`highlight`、`revealKey`；JSONL 的既有场景保持通过。
+
+## 后续（7.0.0）
+
+产品名去掉 Excel（[ADR-0029](./0029-narrow-to-two-viewers.md)）；JSON 预览仍是命令式只读检查器，
+身份、入口与不接管 `.json` 的承诺不变。摘要与值面板契约见
+[ADR-0030](./0030-jsonl-json-summary-and-value-panel.md)。

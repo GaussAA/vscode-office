@@ -1,32 +1,31 @@
-# Data File Viewer (Parquet, JSONL, Excel)
+# Data File Viewer (Parquet, JSONL)
 
 [English](README.md) | [简体中文](README-CN.md) | 繁體中文
 
 ## 介紹
 
-這個擴充功能在 VS Code 裡只預覽**三種東西**：
+這個擴充功能在 VS Code 裡只預覽**兩樣東西**：
 
-| 格式                                                     | 你能得到什麼                                            |
-| -------------------------------------------------------- | ------------------------------------------------------- |
-| 試算表：`.xls`、`.xlsx`、`.xlsm`、`.csv`、`.tsv`、`.ods` | 可編輯格線與尋找/取代；大檔案進入唯讀視窗檢視           |
-| Parquet：`.parquet`                                      | ZSTD/GZIP/BROTLI/LZ4 欄位、懶載入分頁、全檔案搜尋，唯讀 |
-| JSONL / NDJSON：`.jsonl`、`.ndjson`                      | 左側項目目錄，右側把選取項目呈現為樹狀或原文            |
+| 格式                                | 你能得到什麼                                            |
+| ----------------------------------- | ------------------------------------------------------- |
+| Parquet：`.parquet`                 | ZSTD/GZIP/BROTLI/LZ4 欄位、懶載入分頁、全檔案搜尋，唯讀 |
+| JSONL / NDJSON：`.jsonl`、`.ndjson` | 左側項目目錄，右側把選取項目呈現為樹狀或原文            |
 
 就這些。這個 fork 從上游繼承的其他格式——Word、PowerPoint、PDF、ePub、字型、圖片、PSD、
-ICNS、XMind、HTML、Java `.class`、壓縮檔——都在 **6.0.0** 移除：其中一部分 VS Code
-原生已經支援，其餘都有更成熟的專用閱讀器。理由見
-[ADR-0015](docs/adr/0015-narrow-to-three-viewers.md)，升級說明見 [CHANGELOG.md](CHANGELOG.md)。
+ICNS、XMind、HTML、Java `.class`、壓縮檔——都在 **6.0.0** 移除
+（[ADR-0015](docs/adr/0015-narrow-to-three-viewers.md)）。可編輯的試算表預覽
+（`.xls`、`.xlsx`、`.xlsm`、`.csv`、`.tsv`、`.ods`）在 **7.0.0** 移除
+（[ADR-0029](docs/adr/0029-narrow-to-two-viewers.md)）：`.csv`/`.tsv` 回到 VS Code 自己的文字編輯器，
+活頁簿格式交給 Office/WPS，本擴充功能不再維護第二份解析器。
 
 除此之外還有一個命令式開啟的唯讀 JSON 檢查器，用來讀大的 `.json` 頂層陣列；它不註冊
 `.json`、不改變預設編輯器，見下面的 [JSON 陣列](#json-陣列不開啟文字編輯器也能讀)。
 
-## 本倉庫：Data File Viewer (Parquet, JSONL, Excel)（fork）
+## 本倉庫：Data File Viewer (Parquet, JSONL)（fork）
 
 本倉庫 fork 自 [cweijan/vscode-office](https://github.com/cweijan/vscode-office)（MIT，見
 [NOTICE.md](NOTICE.md)），以 `GaussAA.office-viewer-plus` 發佈，可與原版並存安裝。這個 fork
 只服務一個人的資料工作，因此只保留那部分工作真正會用到的格式。
-
-如果同時安裝了原版，兩者都會宣告可以開啟相同的表格檔案，VS Code 會選其中一個作為預設。想指定時，在分頁上用 **重新開啟編輯器的方式…**，或設定 `workbench.editorAssociations`（例如 `{ "*.xlsx": "GaussAA.officeViewer" }`）。最省事的做法是停用原版。
 
 ### Parquet：上游打不開的壓縮檔案
 
@@ -82,18 +81,25 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解碼。
 ![JSONL 雙欄檢視](docs/screenshots/jsonl-two-pane.png)
 
 - **檔案位元組不進 webview**：webview 只拿到可見項目的摘要和選取項目的完整值。
-- **全檔案搜尋**：分批串流回傳，命中處帶上下文片段並醒目顯示。
+- **全檔案搜尋**：分批串流回傳，命中處帶上下文片段並醒目顯示；長值裡的命中在樹裡也看得見——
+  摘要以第一個命中為中心，而不是永遠從第 0 個字元開始截。
 - **目錄讀身分，不只看原始開頭**：項目有頂層身分鍵時顯示它；身分鍵是物件時再往裡讀一層
   （如 `id: { query }`）。
-- **長值可以讀全，不是截斷。** 樹是概覽：大項目每列固定單列、字串預覽 120 字元；小項目（≤2,000 節點）仍允許葉子換行到 2,000 字元。無論哪種，選取一列後樹下方展開值面板，給出全文、路徑、類型、字元數與整值複製。節點數超過 2,000 的項目自動退回固定列高虛擬清單，避免極端列卡死介面。
-- **上限會說出來。** 單列超過 8 MB 時以原始文字顯示而不解析成樹；原文超過 1,000,000 字元時明確標為截斷；樹的 20,000 節點上限也有提示列，而不是無聲結束。
-- 鍵盤：`←`/`→` 折疊展開，`Space` 切換，`Enter` 開啟或收合值面板，`Ctrl+C` 複製值，`Ctrl+Shift+C` 複製路徑，`Esc` 收合面板。
+- **摘要只有一個數：120 字元。** 樹列、詳情頭、Raw 標籤、目錄標籤與搜尋片段都讀同一個常數，
+  超出補 `… (N chars)`。沒有換行模式；所有項目都走固定列高的虛擬清單，再長的一列也卡不死介面。
+- **值面板是唯一的全文通道。** 選取一個值後，樹下方展開停靠面板，給全文、路徑、類型與字元數；
+  正文按列渲染、最多顯示 4,000,000 字元、可展開鋪滿右欄，`Copy value` 永遠是整值。解析不了的
+  （`invalid`）或超過 8 MB 解析上限的（`too-large`）列，原文也在同一個面板裡讀，而不是鋪滿正文。
+- **上限會說出來。** 單列超過 8 MB 時以原始文字顯示而不解析成樹；原文最多 1,000,000 字元並明確
+  標為截斷；樹的 20,000 節點上限也有提示列，而不是無聲結束。
+- 鍵盤：`←`/`→` 折疊展開，`Space` 切換，`Enter` 開啟或收合值面板，`Ctrl+C` 複製值，
+  `Ctrl+Shift+C` 複製路徑，`Esc` 收合面板。
 
 ![JSONL 值面板](docs/screenshots/jsonl-value-panel.png)
 
 ### JSON 陣列：不開啟文字編輯器也能讀
 
-唯讀檢查器，面向頂層是陣列或物件的 `.json` 檔案。它是命令，不是第四個 viewer：不註冊
+唯讀檢查器，面向頂層是陣列或物件的 `.json` 檔案。它是命令，不是 viewer：不註冊
 `.json`、不接管預設編輯器、不寫 `contributes.customEditors`。入口是命令面板
 （**Data File Viewer: Preview JSON**）、檔案總管右鍵和 JSON 編輯器標題。
 
@@ -106,28 +112,22 @@ SNAPPY / GZIP / BROTLI / ZSTD / LZ4 都能解碼。
 - **只接受嚴格 JSON。** 註解和尾逗號會給出帶行列的解析錯誤，並留一個 **Open in Text Editor** 出口；
   編輯器有未儲存修改時優先讀 buffer，並在工具列標明。
 - **唯讀是承諾。** 沒有編輯、schema 驗證或 JSONC；所有動作最終都回到文字編輯器。
+- **摘要與值面板和 JSONL 同源**：120 字元摘要、停靠值面板作為唯一全文通道（最多 4,000,000 字元）、
+  命中居中的摘要。
 - 鍵盤：記錄清單 `↑`/`↓`/`Home`/`End`；樹 `←`/`→`/`Space` 收合展開、`Enter` 切換值面板、
   `Ctrl+C` / `Ctrl+Shift+C` 複製值/路徑、`Esc` 清除搜尋或收合面板。
 
 ![JSON 搜尋結果](docs/screenshots/json-search.png)
 
-上限：100 MB 陣列、20 MB 物件根、單筆記錄 8 MB（超過按原文顯示）、每筆原文最多
-1,000,000 字元、每次搜尋最多 10,000 個命中。記錄清單是虛擬清單；樹沿用 JSONL 的
+上限：100 MB 陣列、20 MB 物件根、單筆記錄 8 MB（超過按原文顯示）、每筆原文最多 1,000,000 字元、
+值面板最多 4,000,000 字元、每次搜尋最多 10,000 個命中。記錄清單是虛擬清單；樹沿用 JSONL 的
 20,000 節點/每層 200 子項/12 層上限。
-
-### 表格：大檔案也能直接看
-
-超過 8 MB 後，CSV/TSV 與活頁簿進入唯讀視窗檢視：DOM 裡只有視窗內的行，21 MB 的 CSV 首屏
-約 0.5 s、堆約 33 MB，而可編輯網格需要數秒與數百 MB。尋找按區塊掃全檔案，跳列只改捲動偏移，
-活頁簿帶 sheet 選擇器。閾值以上要編輯就用文字編輯器（**Open in VS Code**）。
-
-![唯讀視窗檢視](docs/screenshots/excel-windowed.png)
 
 ### 驗收方式
 
 ```bash
 pnpm test        # 解析邏輯單元測試（node:test，不引入額外框架）
-pnpm verify:ui   # 無頭瀏覽器 DOM 斷言；截圖輸出到 .ui-verify/shots
+pnpm verify:ui   # 無頭瀏覽器 DOM 斷言 + 互動幀間隔；截圖輸出到 .ui-verify/shots
 pnpm verify:perf # 大檔案首屏位元組/耗時與搜尋耗時閘門
 ```
 
@@ -138,24 +138,23 @@ CI 在每次 push 時都會跑這三項，以及 `pnpm build` 和 `pnpm run pack
 
 - parquet 唯讀，沒有寫入端。
 - JSONL 搜尋比對原始文字，不理解 JSON 路徑。
-- 表格超過 8 MB 後的編輯留給文字編輯器；視窗檢視本身就是唯讀的。
+- 不做試算表/Office 預覽：`.xls`、`.xlsx`、`.xlsm`、`.ods`、`.csv`、`.tsv` 都不再由這個擴充功能
+  開啟（CSV/TSV 回落到 VS Code 文字編輯器）。
 
 ### 已知缺口
 
 - 超大檔案的 parquet 全檔案搜尋受 I/O 限制（會讀取走訪到的每個 row group）。
-- 表格超過 8 MB 時進入唯讀視窗檢視（只渲染視窗內的行），且所有活頁簿格式（`.xlsx`、`.xlsm`、
-  `.xls`、`.ods`）都以列文字視窗化。活頁簿超過 15 MB、虛擬工作區裡的 CSV/TSV 超過 25 MB 時
-  先詢問再載入；本機 CSV/TSV 最多可視窗化到 200 MB。
-- JSONL 單行超過 8 MB 時只以原始文字顯示、不解析成樹；原文檢視只送出前 1,000,000 個字元
-  （並明確提示），不會假裝那是全文。
-- JSONL 的樹有上限：20,000 個節點、每層 200 個子項、12 層。截斷時樹會說出來；要看剩下的
-  內容用原文檢視。
+- JSONL 單列超過 8 MB 時只以原始文字顯示、不解析成樹；原文上限 1,000,000 字元（並明確提示），
+  不會假裝那是全文。
+- JSONL 的樹有上限：20,000 個節點、每層 200 個子項、12 層。截斷時樹會說出來；剩下的內容用值面板
+  來讀。
 - 目錄視窗按位元組（4 MB）而不是列數封頂：由超大列組成的檔案只在選取處附近列出少量項目，
   不會為了填滿一屏先解析整塊。用項目編號跳轉；視窗只會向下追加，填不滿一屏時末尾有一列
   顯式的「載入更多項目」。
-- JSON 預覽的陣列上限 100 MB、物件根上限 20 MB；單筆記錄超過 8 MB 按原文顯示，搜尋最多
-  10,000 個命中，JSONC/尾逗號會被拒絕。它是命令式面板，視窗重新載入後不恢復上一次預覽的
-  文件，需要重新執行命令。
+- JSON 預覽的陣列上限 100 MB、物件根上限 20 MB；單筆記錄超過 8 MB 按原文顯示，值面板上限
+  4,000,000 字元，搜尋最多 10,000 個命中，JSONC/尾逗號會被拒絕。它是命令式面板，視窗重新載入後
+  不恢復上一次預覽的文件，需要重新執行命令。
+- 試算表完全不預覽：`.xlsx/.xlsm/.xls/.ods` 在 VS Code 裡沒有回落路徑，`.csv/.tsv` 以純文字開啟。
 
 上游的遙測已完全移除。
 
@@ -163,7 +162,8 @@ CI 在每次 push 時都會跑這三項，以及 `pnpm build` 和 `pnpm run pack
 
 - YAML：文件大綱與錨點導覽（別名引用可跳轉到定義）
 - XML：文件格式化
-- 圖示主題：8 個 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 圖示，涵蓋試算表、parquet 與 JSONL
+- 圖示主題：8 個 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) 圖示，
+  涵蓋試算表、parquet 與 JSONL 檔案（試算表預覽移除後，這些圖示仍用於在檔案總管裡認出檔案）
 
 ## 開發
 
@@ -179,8 +179,6 @@ pnpm check:full   # check + build + smoke + verify:ui + verify:perf
 
 ## 致謝
 
-- 試算表解析：[SheetJS/sheetjs](https://github.com/SheetJS/sheetjs)
-- 試算表呈現：[myliang/x-spreadsheet](https://github.com/myliang/x-spreadsheet)
 - Parquet：[hyparquet](https://github.com/hyparam/hyparquet) 與
   [hyparquet-compressors](https://github.com/hyparam/hyparquet-compressors)
 - 圖示主題：[PKief/vscode-material-icon-theme](https://github.com/PKief/vscode-material-icon-theme)

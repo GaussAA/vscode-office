@@ -13,7 +13,7 @@ _Avoid_: 插件, viewer
 _Avoid_: 预览器, 面板, 功能
 
 **Preview surface（预览面）**:
-某个 viewer 呈现内容的具体形态：树、网格、画布、纯文本。一个 viewer 只给一个形态，形态是选择而不是选项。
+某个 viewer 呈现内容的具体形态：树、网格、纯文本。一个 viewer 只给一个形态，形态是选择而不是选项。
 _Avoid_: 界面, UI
 
 **Command preview（命令预览）**:
@@ -25,12 +25,13 @@ _Avoid_: 临时预览、弹窗（它可以是完整的 webview 面板）；也�
 因此它的单位是「列」而不是「行」，行数差只是它的一条结论。
 _Avoid_: diff 工具、合并、三方对比（本轮都不做）
 
-**Editable surface（可编辑预览面）**:
-会把握改的结果写回文件的预览面。6.0.0 起只剩表格（Excel/CSV）；我们自己写的 viewer（parquet、jsonl）是只读的。只读不是可编辑面的退化版本，而是另一种承诺。
-_Avoid_: 编辑器（与 VS Code 自己的 editor 冲突）；也别把只读的 viewer 叫「缺功能」
+**Read-only preview（只读预览）**:
+一个不写回文件的预览面。现在所有 viewer 与命令预览都是这一种：没有保存路径、没有编辑态、没有脏标记。
+只读不是「缺功能」，而是这个扩展对数据文件的全部承诺。
+_Avoid_: 可编辑面、Editable surface（那个术语随表格预览在 7.0.0 删除）
 
 **Format（格式）**:
-由文件名决定的文件种类（parquet、jsonl、xlsx…），决定用哪个 viewer。
+由文件名决定的文件种类（parquet、jsonl、json…），决定用哪个 viewer；不在集合里的格式交给宿主自己的编辑器。
 _Avoid_: 把 codec 混进 format
 
 **Native preview（原生预览）**:
@@ -65,8 +66,18 @@ _Avoid_: JSON 行；把 JSONL Line 当成 JSON Document
 _Avoid_: row、line、条目（太泛）
 
 **JSON Preview（JSON 预览）**:
-由命令显式打开的只读 JSON 检查面：记录列表 + 记录树 + 值面板。它不注册文件选择器、不接管 `.json`、不属于三种 Viewer 的格式集合。
-_Avoid_: JSON viewer、第四个 viewer（它不是 viewer）
+由命令显式打开的只读 JSON 检查面：记录列表 + 记录树 + 值面板。它不注册文件选择器、不接管 `.json`、不属于两种 Viewer 的格式集合。
+_Avoid_: JSON viewer、把它当成 Viewer
+
+**Summary（摘要）**:
+一个值在列表行或树行里的一行表示：单行省略、固定 `SUMMARY_CHARS`（120）个字符，超出补 `… (N chars)`。
+它是读数的入口，不是全文；全文只在值面板里读。
+_Avoid_: 预览、截断显示（那是结果，不是概念）
+
+**Value panel（值面板）**:
+详情树下沿停靠的只读全文通道：当前选中值的完整文本、路径、类型与字符数，可展开铺满右栏。它是这个扩展里
+唯一的全文通道，`invalid` / `too-large` 的错误原文也走它。
+_Avoid_: 实况窗（维护者的口语别名）、tooltip、弹窗、详情面板
 
 **Record index（记录索引）**:
 JSON Record 在顶层数组中的零基位置，是记录列表的稳定地址；不是文件行号，也不是表格行号。
@@ -151,6 +162,8 @@ _Avoid_: 已知限制、暂不支持（那会把两种东西混成一个词）
 _Avoid_: bug 列表、TODO（那些是执行层的东西，不是对外的承诺）
 
 **recordConstants（记录常量）**:
-JSON 与 JSONL 共享的记录限制与搜索参数（`RECORD_MAX_BYTES` 8MB、`MAX_TEXT_CHARS` 1M、`RAW_PREVIEW_CHARS` 400、`SEARCH_BATCH` 200、`SEARCH_MAX_MATCHES` 10,000）。两种格式的类型文件从这里派生各自的命名导出，确保值只在一处定义。
+JSON 与 JSONL 共享的记录限制、摘要与搜索参数（`RECORD_MAX_BYTES` 8MB、`MAX_TEXT_CHARS` 1,000,000、
+`SUMMARY_CHARS` 120、`VALUE_PANEL_MAX_CHARS` 4,000,000、`SEARCH_BATCH` 200、`SEARCH_MAX_MATCHES` 10,000）。
+两种格式的类型文件从这里派生各自的命名导出，确保值只在一处定义。
 _位置_: `src/common/recordConstants.ts`
 _Avoid_: 常量重复、magic number

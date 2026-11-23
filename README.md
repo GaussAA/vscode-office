@@ -1,25 +1,26 @@
-# Data File Viewer (Parquet, JSONL, Excel)
+# Data File Viewer (Parquet, JSONL)
 
 English | [简体中文](README-CN.md) | [繁體中文](README-TW.md)
 
 ## Introduction
 
-This extension previews **three things** in VS Code:
+This extension previews **two things** in VS Code:
 
-| Format                                                         | What you get                                                                 |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Spreadsheets: `.xls`, `.xlsx`, `.xlsm`, `.csv`, `.tsv`, `.ods` | Read-only grid and find/replace; large files open in a windowed view         |
-| Parquet: `.parquet`                                            | ZSTD/GZIP/BROTLI/LZ4 columns, lazy paging, whole-file search, read-only      |
-| JSONL / NDJSON: `.jsonl`, `.ndjson`                            | A directory of entries on the left, the selected entry as a tree or raw text |
+| Format                              | What you get                                                                 |
+| ----------------------------------- | ---------------------------------------------------------------------------- |
+| Parquet: `.parquet`                 | ZSTD/GZIP/BROTLI/LZ4 columns, lazy paging, whole-file search, read-only      |
+| JSONL / NDJSON: `.jsonl`, `.ndjson` | A directory of entries on the left, the selected entry as a tree or raw text |
 
-That is the whole list. Everything else this fork inherited — Word, PowerPoint, PDF, ePub,
-fonts, images, PSD, ICNS, XMind, HTML, Java `.class`, archives — was removed in **6.0.0**:
-VS Code already covers some of them, and the rest have better dedicated readers. The rationale
-is in [ADR-0015](docs/adr/0015-narrow-to-three-viewers.md); the upgrade notes are in
-[CHANGELOG.md](CHANGELOG.md).
+That is the whole list. Everything else this fork inherited — Word, PowerPoint, PDF, ePub, fonts,
+images, PSD, ICNS, XMind, HTML, Java `.class`, archives — was removed in **6.0.0**: VS Code
+already covers some of them, and the rest have better dedicated readers
+([ADR-0015](docs/adr/0015-narrow-to-three-viewers.md)). The editable spreadsheet viewer
+(`.xls`, `.xlsx`, `.xlsm`, `.csv`, `.tsv`, `.ods`) was removed in **7.0.0**
+([ADR-0029](docs/adr/0029-narrow-to-two-viewers.md)): `.csv`/`.tsv` open in VS Code's own text
+editor, and the workbook formats are left to Office/WPS instead of a second parser here.
 
-Beyond the three viewers, a command-opened read-only JSON inspector handles large `.json`
-arrays without registering `.json` or changing the default editor; see
+Beyond the two viewers, a command-opened read-only JSON inspector handles large `.json` arrays
+without registering `.json` or changing the default editor; see
 [JSON arrays](#json-arrays-inspect-without-the-text-editor).
 
 ## This fork
@@ -28,8 +29,6 @@ This repository is a fork of [cweijan/vscode-office](https://github.com/cweijan/
 (MIT, see [NOTICE.md](NOTICE.md)). It builds as `GaussAA.office-viewer-plus` and installs
 alongside the original. The fork is maintained for one person's data work, which is why it only
 keeps the formats that work involves.
-
-If both extensions are installed, each one offers to open the same spreadsheet files, so VS Code picks one as the default. To choose, use **Reopen Editor With…** on a tab, or set `workbench.editorAssociations` (for example `{ "*.xlsx": "GaussAA.officeViewer" }`). Disabling the original is the simplest way to avoid the question.
 
 ### Parquet: the files upstream cannot open
 
@@ -98,18 +97,23 @@ lists entries, the right pane renders the selected entry as a tree (or as raw te
 - **Bytes stay in the extension host.** The webview receives summaries for the visible
   entries and one full value for the selected entry — never the file.
 - **Search across the whole file**, streamed in batches with a snippet around the match and
-  the term highlighted.
+  the term highlighted. A hit inside a long value is shown in the tree summary too: the summary
+  is centred on the first match instead of always starting at character zero.
 - **The directory reads identity**, not just the raw head: an entry's top-level identity key
   is used when present, and an object-valued one is looked into one level (`id: { query }`).
-- **Long values are readable, not clipped.** The tree is an overview: large entries use one
-  fixed-height line per row with a 120-character string preview, while small entries (≤2,000
-  nodes) still wrap leaf strings up to 2,000 characters. Either way, selecting a row opens a
-  value panel docked under it with the full text, the path, the type, the character count and
-  a whole-value copy. Entries above 2,000 nodes fall back to a fixed-height virtual list so a
-  pathological line cannot freeze the UI.
-- **The limits say so.** A line above 8 MB is shown as raw text instead of a tree; a line above
-  1,000,000 characters is a marked prefix; the tree reports its 20,000-node cap instead of
-  ending without a word.
+- **One summary number: 120 characters.** Every value summary is a single line capped at 120
+  characters and marked `… (N chars)` — tree rows, the detail header, the Raw tab, the directory
+  labels and search snippets all read the same constant. There is no wrap mode; entries of every
+  size use a fixed-height virtual list, so a pathological line cannot freeze the UI.
+- **The value panel is the only full-text channel.** Selecting a value opens a docked panel
+  under the tree with the full text, the path, the type and the character count. It renders by
+  line, shows up to 4,000,000 characters of the value, expands to the full pane height, and
+  `Copy value` always copies the whole value. Lines that cannot be parsed (`invalid`) or are
+  above the 8 MB parse limit (`too-large`) read their raw text in the same panel instead of
+  flooding the body.
+- **The limits say so.** A line above 8 MB is shown as raw text instead of a tree; the raw text
+  is capped at 1,000,000 characters with a notice; the tree reports its 20,000-node cap instead
+  of ending without a word.
 - Keyboard: `←`/`→` collapse/expand, `Space` toggles, `Enter` opens or closes the value panel,
   `Ctrl+C` copies the value, `Ctrl+Shift+C` copies the path, `Esc` closes the panel.
 
@@ -118,8 +122,8 @@ lists entries, the right pane renders the selected entry as a tree (or as raw te
 ### JSON arrays: inspect without the text editor
 
 A read-only inspector for `.json` files whose top-level value is an array or an object. It is a
-command, not a fourth viewer: it does not register `.json`, does not take over the default
-editor, and never appears in `contributes.customEditors`. Open it from the command palette
+command, not a viewer: it does not register `.json`, does not take over the default editor, and
+never appears in `contributes.customEditors`. Open it from the command palette
 (**Data File Viewer: Preview JSON**), the Explorer context menu, or the JSON editor title.
 
 ![JSON preview](docs/screenshots/json-records.png)
@@ -135,6 +139,8 @@ editor, and never appears in `contributes.customEditors`. Open it from the comma
   labelled in the toolbar.
 - **Read-only, by contract.** There is no editing path, no schema validation, no JSONC; every
   action ends in the text editor.
+- **The same summary and value panel as JSONL.** 120-character summaries, the docked value panel
+  as the only full-text channel (4,000,000 characters), a hit-centred summary.
 - Keyboard: `↑`/`↓`/`Home`/`End` in the record list; `←`/`→`/`Space` expand and collapse the
   record tree; `Enter` toggles the value panel; `Ctrl+C` / `Ctrl+Shift+C` copy the value/path;
   `Esc` clears the search or closes the value panel.
@@ -142,19 +148,9 @@ editor, and never appears in `contributes.customEditors`. Open it from the comma
 ![JSON search results](docs/screenshots/json-search.png)
 
 Limits: 100 MB arrays, 20 MB object roots, 8 MB per record (above that the record is raw
-text), 1,000,000 characters of raw text per record, and 10,000 matches per search. The record
-list is virtual; the tree reuses the JSONL bounds (20,000 nodes, 200 children per level, 12
-levels).
-
-### Spreadsheets: large files stay usable
-
-Above 8 MB, CSV/TSV and workbook files open in a read-only windowed table: only the rows the
-viewport holds are in the DOM, so a 21 MB CSV paints in ~0.5 s with ~33 MB of heap where the
-editable grid needs seconds and hundreds of megabytes. Find scans the file in blocks, "go to
-row" only moves the scroll offset, and workbooks keep a sheet picker. Editing above the
-threshold stays in the text editor (**Open in VS Code**).
-
-![Read-only windowed spreadsheet](docs/screenshots/excel-windowed.png)
+text), 1,000,000 characters of raw text per record, 4,000,000 characters in the value panel,
+and 10,000 matches per search. The record list is virtual; the tree reuses the JSONL bounds
+(20,000 nodes, 200 children per level, 12 levels).
 
 ### Verification
 
@@ -171,28 +167,27 @@ CI runs all three on every push, together with `pnpm build` and `pnpm run packag
 
 - Parquet stays read-only: there is no writer.
 - JSONL search matches raw text, not JSON paths.
-- Editing above 8 MB stays in the text editor; the windowed view is read-only by design.
+- No spreadsheet or Office preview: `.xls`, `.xlsx`, `.xlsm`, `.ods`, `.csv` and `.tsv` are not
+  opened by this extension (CSV/TSV fall back to VS Code's text editor).
 
 ### Known gaps
 
 - Whole-file parquet search on a very large file is I/O bound because it reads every row
   group it visits.
-- Spreadsheets above 8 MB open in a read-only windowed view (viewport rows only), and every
-  workbook format — `.xlsx`, `.xlsm`, `.xls`, `.ods` — is windowed as row text. Workbooks
-  above 15 MB, and CSV/TSV from a virtual workspace above 25 MB, ask before loading at all;
-  a local CSV/TSV may be windowed up to 350 MB.
-- A JSONL line above 8 MB is shown as raw text instead of a parsed tree, and the raw view
-  ships the first 1,000,000 characters (with a notice) rather than the whole line.
+- A JSONL line above 8 MB is shown as raw text instead of a parsed tree, and the raw text is
+  capped at 1,000,000 characters (with a notice) rather than the whole line.
 - The JSONL tree is bounded: 20,000 nodes, 200 children per level, 12 levels. The tree says
-  when it stopped; the raw view is the way to see the rest.
+  when it stopped; the value panel is how you read the rest of a value.
 - A directory window is bounded by bytes (4 MB), so a file of very large lines shows fewer
   entries around the selection rather than parsing a whole chunk. Use the entry-number field
   to move; the window only appends downward, and a window too short to fill the pane carries
   an explicit "Load more entries" row.
 - The JSON preview stops at 100 MB for a top-level array and 20 MB for an object root; a
-  single record above 8 MB is raw text, search stops at 10,000 matches, and JSONC/trailing
-  commas are rejected. It is a command-opened panel, so a window reload does not restore the
-  last previewed document; use the command again.
+  single record above 8 MB is raw text, the value panel stops at 4,000,000 characters, search
+  stops at 10,000 matches, and JSONC/trailing commas are rejected. It is a command-opened
+  panel, so a window reload does not restore the last previewed document; use the command again.
+- Spreadsheets are not previewed at all: `.xlsx/.xlsm/.xls/.ods` have no fallback inside
+  VS Code, and `.csv/.tsv` open as text.
 
 Upstream telemetry has been removed entirely.
 
@@ -200,7 +195,9 @@ Upstream telemetry has been removed entirely.
 
 - YAML: document outline and anchor navigation (Go to Definition for alias references)
 - XML: document formatting
-- Icon theme: 8 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons for spreadsheets, parquet and JSONL
+- Icon theme: 8 [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) icons
+  for spreadsheets, parquet and JSONL files (the icons still identify those files even though
+  the spreadsheet viewer is gone)
 
 ## Development
 
@@ -216,8 +213,6 @@ Press `F5` in VS Code and choose **Extension** to run the local build.
 
 ## Credits
 
-- Spreadsheet parsing: [SheetJS/sheetjs](https://github.com/SheetJS/sheetjs)
-- Spreadsheet rendering: [myliang/x-spreadsheet](https://github.com/myliang/x-spreadsheet)
 - Parquet: [hyparquet](https://github.com/hyparam/hyparquet) and
   [hyparquet-compressors](https://github.com/hyparam/hyparquet-compressors)
 - Material Icon theme: [PKief/vscode-material-icon-theme](https://github.com/PKief/vscode-material-icon-theme)

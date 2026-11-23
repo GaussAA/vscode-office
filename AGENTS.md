@@ -4,7 +4,7 @@
 
 ## 这是什么
 
-[cweijan/vscode-office](https://github.com/cweijan/vscode-office)（Office Viewer）的 fork，MIT。我们在上游基础上继续开发：补 zstd 压缩的 parquet、新增 JSONL 树视图。6.0.0 起只保留三个 viewer——表格、parquet、JSONL（[ADR-0015](./docs/adr/0015-narrow-to-three-viewers.md)）。身份是 `GaussAA.office-viewer-plus`，与原版可共存。理由与后果见 [docs/adr/0001-fork-office-viewer.md](./docs/adr/0001-fork-office-viewer.md)。
+[cweijan/vscode-office](https://github.com/cweijan/vscode-office)（Office Viewer）的 fork，MIT。我们在上游基础上继续开发：补 zstd 压缩的 parquet、新增 JSONL 树视图。6.0.0 起只保留表格、parquet、JSONL 三个 viewer（[ADR-0015](./docs/adr/0015-narrow-to-three-viewers.md)）；7.0.0 删掉表格，只留 parquet 与 JSONL 两个 viewer，JSON 仍是由命令打开的只读检查器（[ADR-0029](./docs/adr/0029-narrow-to-two-viewers.md)）。身份是 `GaussAA.office-viewer-plus`，与原版可共存。理由与后果见 [docs/adr/0001-fork-office-viewer.md](./docs/adr/0001-fork-office-viewer.md)。
 
 ## Agent skills
 
@@ -23,13 +23,14 @@ webview 的验收方式是无头浏览器断言 + 截图，见 docs/agents/ui-ve
 ### Performance gate
 
 parquet 首屏字节数、全文件搜索耗时、宽表翻页耗时、列画像读出的字节数、扫单列读出的字节数，
-大表格窗口视图的首屏/堆/渲染行数，以及 JSONL 的字节预算窗口/20 万行搜索、JSON 100 MB 数组的
-索引/窗口/搜索是不变量，由 `pnpm verify:perf` 守住（CI 在每次 push 上跑），见 docs/agents/perf.md。
+以及 JSONL 的字节预算窗口/20 万行搜索、JSON 100 MB 数组的索引/窗口/搜索是不变量，由 `pnpm verify:perf`
+守住（CI 在每次 push 上跑）；JSONL 与 JSON 交互期间的帧间隔由 `pnpm verify:ui` 的帧场景守住。
+见 docs/agents/perf.md。
 
 ### Release
 
-版本号、tag、Release 标题与正文只有一套写法（`Data File Viewer (Parquet, JSONL, Excel) v<version>` + 与 CHANGELOG 同源的
-正文），步骤与校验见 docs/agents/release.md。发布格式漂移算发布缺陷，就地修。
+版本号、tag、Release 标题与正文只有一套写法（`Data File Viewer (Parquet, JSONL) v<version>` + 与 CHANGELOG 同源的
+正文；6.x 及以前是 `Data File Viewer (Parquet, JSONL, Excel) v<version>`），步骤与校验见 docs/agents/release.md。发布格式漂移算发布缺陷，就地修。
 
 ### Domain docs
 
@@ -52,8 +53,8 @@ parquet 首屏字节数、全文件搜索耗时、宽表翻页耗时、列画像
 - `src/provider/` —— 每个 viewer 一个 `CustomReadonlyEditorProvider`
 - `src/react/view/<viewer>/` —— webview 内的 React 视图
 - `src/common/` —— 类型、工具与 host/webview 共享的逻辑（如 `parquetReader.ts`、`parquetSchema.ts`）
-- `src/service/` —— 跨视图服务（如 `officeViewType.ts`、`csvService.ts`）
-- `vite.config.ts` + `build.ts` —— 构建，产出 `out/`；webview 每个视图一个 Vite 入口。根是 `"type": "module"`，但 `build.ts` 会给 `out/` 生成一个 `{"type":"commonjs"}` 的 `package.json` —— 扩展宿主跑的是 CJS（见 ADR-0012），不要删它
+- `src/service/` —— 跨视图服务（如 `jsonlSession.ts`、`jsonPreview.ts`）
+- `vite.config.ts` + `build.ts` —— 构建，产出 `out/`；webview 只有一个 Vite 入口（`index.html` → `src/react/main.tsx`，按 viewType 路由）。根是 `"type": "module"`，但 `build.ts` 会给 `out/` 生成一个 `{"type":"commonjs"}` 的 `package.json` —— 扩展宿主跑的是 CJS（见 ADR-0012），不要删它
 - `package.json` 的 `contributes.customEditors` —— viewer 与文件模式的唯一登记处
 
 ## 常用命令
@@ -73,7 +74,7 @@ pnpm check:baseline   # 断言 engines / @types / 运行时依赖的 engines.nod
 pnpm check            # lint + baseline + typecheck + typecheck:self-test + test（pre-commit 跑这个）
 pnpm check:full       # check + build + check-bundled-imports + test:smoke + verify:ui + verify:perf（CI 跑这个）
 pnpm verify:ui        # 无头浏览器验收：断言 DOM + 截图到 .ui-verify/shots（--docs 刷新 docs/screenshots）
-pnpm verify:perf      # 无头浏览器性能闸门：首屏字节数、全文件搜索、宽表翻页、窗口视图开销（大文件在 .perf/，缓存）
+pnpm verify:perf      # 无头浏览器性能闸门：首屏字节数、全文件搜索、宽表翻页、JSONL/JSON 索引与搜索（大文件在 .perf/，缓存）
 ```
 
 **四层测试各管一件事**：`pnpm test` 管纯逻辑（用 `tsx` 直接导入 `src` 的 `.ts`，不经打包），`pnpm test:smoke` 管真实宿主里的激活与 custom editor 路由，`pnpm verify:ui` 管 webview 的 DOM，`pnpm verify:perf` 管大文件下的字节数与耗时。四者的失败模式不重叠——`verify:ui` 渲染的是 webview 的 HTML，它看不见「VS Code 有没有激活这个扩展」，所以升 `engines`、改激活事件、动 CSP 这类改动必须靠 smoke 兜；而 DOM 全绿也说明不了「打开一个 1M 行的 parquet 要下载两倍文件大小」，那只有字节计数能看见。

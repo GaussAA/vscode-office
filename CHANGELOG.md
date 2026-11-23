@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **The spreadsheet viewer is gone.** `.xls`, `.xlsx`, `.xlsm`, `.csv`, `.tsv` and `.ods` are no
+  longer opened by this extension ([ADR-0029](docs/adr/0029-narrow-to-two-viewers.md)): the
+  `GaussAA.officeViewer` custom editor, the vendored `x-spreadsheet` engine, the windowed
+  read-only table, the workbook host cache, the CSV offset cache and the save path were removed,
+  together with the `xlsx`, `iconv-lite` and `dompurify` dependencies. `.csv`/`.tsv` open in
+  VS Code's own text editor; the workbook formats have no fallback here. What remains is parquet,
+  JSONL and the command-opened read-only JSON inspector.
+- **The wrap mode is gone.** The JSONL/JSON detail tree is always a fixed-height virtual list;
+  `WRAP_NODE_LIMIT`, `WRAP_TEXT_LIMIT` and the non-virtual rendering path were removed
+  ([ADR-0030](docs/adr/0030-jsonl-json-summary-and-value-panel.md)).
+
+### Changed
+
+- **One summary number: 120 characters.** Tree rows, detail headers, the Raw tab, directory labels
+  and search snippets all read `SUMMARY_CHARS`; a cut value says `… (N chars)`, a long string is
+  no longer stringified whole just to show its head, and a search hit moves the summary window to
+  the match instead of always starting at character zero.
+- **The value panel is the only full-text channel.** It renders up to 4,000,000 characters in
+  chunks the browser can skip off-screen, has an "Expand" toggle for reading, still copies the
+  whole value, and now also carries the raw text of `invalid` / `too-large` lines. A composite
+  root with no selected row points the bar at the whole record (path `L<n>` / `[n]`). The JSONL
+  and JSON detail payloads no longer ship the raw line unless Raw — or an error line — needs it.
+- **The product name is `Data File Viewer (Parquet, JSONL)`** (display name, READMEs, release
+  title template). 7.0.0 is the first release with the new name; 6.x titles are unchanged.
+- **Frame budgets cover JSONL and JSON.** `jsonl-frames-select`, `jsonl-frames-expand`,
+  `jsonl-frames-panel` and `json-preview-frames-record` reuse the parquet rAF collector; after
+  five local runs the ceiling is 1 gap / 150 ms.
+- **JSONL/JSON motion uses the shared tokens.** The remaining literal durations became
+  `--motion-fast` / `--motion-base`, the detail tree's antd motion follows
+  `prefers-reduced-motion`, and expanding a tree stays instant.
+
 ## [6.18.0] - 2026-11-19
 
 ### Changed

@@ -59,3 +59,8 @@
   `prefers-reduced-motion`）。散落的 34 处 `transition` 逐面收敛，不一次性重写。
 - 不做：像素基线、骨架屏、滚动联动、另两个 viewer、设计 token 大重构。
 - 交互增强（键盘可达性、列宽拖拽等）**不在这一批**：它需要自己的一轮取舍，先做视觉与动效的地基。
+
+## 后续（7.0.0）
+
+[ADR-0030](./0030-jsonl-json-summary-and-value-panel.md) 把帧预算从 parquet 扩到 JSONL 与 JSON，
+并把详情树的展开/折叠定为瞬时（不做 antd 展开动画）；动效语言本身不变。

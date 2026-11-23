@@ -5,17 +5,17 @@
 
 ## 唯一命名格式
 
-| 东西                | 格式                                                                | 例子                                              |
-| ------------------- | ------------------------------------------------------------------- | ------------------------------------------------- |
-| Git tag             | `v<major>.<minor>.<patch>`                                          | `v6.4.1`                                          |
-| GitHub Release 标题 | `Data File Viewer (Parquet, JSONL, Excel) v<major>.<minor>.<patch>` | `Data File Viewer (Parquet, JSONL, Excel) v6.4.1` |
-| Release 正文小标题  | `### Added` / `### Changed` / `### Fixed` / `### Removed`           | —                                                 |
-| 附件名              | `<name>-<version>.vsix`（vsce 自动生成）                            | `office-viewer-plus-6.4.1.vsix`                   |
-| CHANGELOG 小节      | `## [<version>] - <YYYY-MM-DD>`                                     | `## [6.4.1] - 2026-11-10`                         |
+| 东西                | 格式                                                         | 例子                                       |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------------ |
+| Git tag             | `v<major>.<minor>.<patch>`                                   | `v7.0.0`                                   |
+| GitHub Release 标题 | `Data File Viewer (Parquet, JSONL) v<major>.<minor>.<patch>` | `Data File Viewer (Parquet, JSONL) v7.0.0` |
+| Release 正文小标题  | `### Added` / `### Changed` / `### Fixed` / `### Removed`    | —                                          |
+| 附件名              | `<name>-<version>.vsix`（vsce 自动生成）                     | `office-viewer-plus-7.0.0.vsix`            |
+| CHANGELOG 小节      | `## [<version>] - <YYYY-MM-DD>`                              | `## [7.0.0] - 2026-12-01`                  |
 
 三条硬规则：
 
-1. **标题只写产品名与版本**：`Data File Viewer (Parquet, JSONL, Excel) v6.4.1`。不写「项目质量全面提升」这类后缀 ——
+1. **标题只写产品名与版本**：`Data File Viewer (Parquet, JSONL) v7.0.0`。不写「项目质量全面提升」这类后缀 ——
    那是发布说明的正文，不是标题；也不写裸版本号（`6.4.0`）或带 `v` 却省产品名（`v6.2.0 - …`）。
    历史上有过这三种写法，已统一。
 2. **正文不要重复版本号**：GitHub 已经把版本与日期放在标题和左侧，正文第一行也不要再写
@@ -23,16 +23,18 @@
 3. **正文与 CHANGELOG 同源**：Release 正文 = CHANGELOG 里该版本小节的内容，去掉那一行标题。
    不同步就是两份事实。
 
-### 产品名分界：6.4.4 及以前用旧名
+### 产品名分界：三个名字，两次真实重命名
 
-产品的 Marketplace 显示名在 **6.4.4** 改成 `Data File Viewer (Parquet, JSONL, Excel)`
-（原因见 CHANGELOG：`Office Viewer Plus` 被 Marketplace 判定为「显示名已被占用」）。所以标题有且只有
-两个年代，边界不是随意的：
+产品的 Marketplace 显示名改过两次：**6.4.4** 从 `Office Viewer Plus` 改成
+`Data File Viewer (Parquet, JSONL, Excel)`（原因见 CHANGELOG：`Office Viewer Plus` 被 Marketplace 判定为
+「显示名已被占用」）；**7.0.0** 删掉表格预览后（ADR-0029）改成 `Data File Viewer (Parquet, JSONL)`。
+所以标题有三个年代，边界不是随意的：
 
-| 版本            | 标题前缀                                              |
-| --------------- | ----------------------------------------------------- |
-| `v6.4.4` 及更早 | `Office Viewer Plus v<version>`                       |
-| `v6.4.5` 及以后 | `Data File Viewer (Parquet, JSONL, Excel) v<version>` |
+| 版本              | 标题前缀                                              |
+| ----------------- | ----------------------------------------------------- |
+| `v6.4.4` 及更早   | `Office Viewer Plus v<version>`                       |
+| `v6.4.5` – `v6.x` | `Data File Viewer (Parquet, JSONL, Excel) v<version>` |
+| `v7.0.0` 及以后   | `Data File Viewer (Parquet, JSONL) v<version>`        |
 
 **不要**为了「列表看起来齐整」把旧 Release 改成新名：那等于声称 4.x 时代的产品就叫这个名字，
 是改写事实。分界本身是统一的，因为它对应一次真实的重命名。
@@ -63,7 +65,7 @@
 - [ ] **4. 提交并打 tag**：
       `bash
       git add -A && git commit -m "release: <version>"
-      git tag -a v<version> -m "Data File Viewer (Parquet, JSONL, Excel) <version>"
+      git tag -a v<version> -m "Data File Viewer (Parquet, JSONL) <version>"
       `
 - [ ] **5. 推送**：`git push origin main && git push origin v<version>`
 
@@ -129,8 +131,9 @@ curl -s https://open-vsx.org/api/GaussAA/office-viewer-plus | jq -r '.version'
 gh release list --repo GaussAA/vscode-office --limit 30
 ```
 
-v6.4.5 起的标题应全部是 `Data File Viewer (Parquet, JSONL, Excel) v<版本>`。
-任何一条不符合上表，都算发布缺陷，就地修（`gh release edit <tag> --title …`），不要等下周。
+v6.4.5 – v6.x 的标题应全部是 `Data File Viewer (Parquet, JSONL, Excel) v<版本>`；v7.0.0 起是
+`Data File Viewer (Parquet, JSONL) v<版本>`。任何一条不符合上表，都算发布缺陷，就地修
+（`gh release edit <tag> --title …`），不要等下周。
 
 ## 为什么写下来
 

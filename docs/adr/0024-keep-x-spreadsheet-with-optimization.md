@@ -32,3 +32,8 @@ SheetJS（`xlsx`）负责解析和写入，x-spreadsheet 负责渲染和编辑�
 - 出现 x-spreadsheet 做不到的需求（协同编辑、图表）。
 - 出现修不动的 x-spreadsheet 缺陷。
 - 出现维护良好、带公式编辑和冻结窗格的开源替代。
+
+## 后续（7.0.0）
+
+[ADR-0029](./0029-narrow-to-two-viewers.md) 删除了表格预览与 `x-spreadsheet`，本文的「保留并优化」不再
+成立，上面三条替代方案判据也不再需要。本文不改写。

@@ -129,3 +129,8 @@ ADR-0026 把 CSV 偏移缓存推迟（21 MB CSV 的 `excel-csv-scan` 为 126 ms�
     新 suite 的激活破坏 activation-is-lazy 断言。
 - **仍待**：版本号与发布（与前面累积的修复一起，未发）；save suite 的时序 flake 在 CI 上
   仍需观察。
+
+## 后续（7.0.0）
+
+CSV 偏移缓存随表格预览在 [ADR-0029](./0029-narrow-to-two-viewers.md) 删除；JSON Preview 的范围缓存与
+`json-preview:left` 的 version/TTL 仍有效。

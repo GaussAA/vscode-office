@@ -306,8 +306,8 @@ pnpm exec tsx --test test/unit/parquet-open.test.ts
 **Scope**（可选）：
 
 - `parquet`: Parquet 相关
-- `excel`: Excel 相关
-- `csv`: CSV 相关
+- `jsonl`: JSONL 相关
+- `json`: 命令式 JSON 预览
 - `ui`: UI 组件
 - `types`: 类型定义
 

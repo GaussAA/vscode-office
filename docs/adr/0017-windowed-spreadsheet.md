@@ -66,3 +66,8 @@ interface SheetSource {
      ADR-0016 已记修订。
 - 性能闸门需要一条新检查：窗口路径的首屏耗时与堆不随文件大小线性增长（用一个 50 MB CSV 验，
   断言首屏 < 2 s、堆 < 200 MB）。这条在阶段 2 落地时加。
+
+## 后续（7.0.0）
+
+窗口化表格随表格预览在 [ADR-0029](./0029-narrow-to-two-viewers.md) 删除，连同 8 MB 窗口阈值、
+350 MB 上限与 `sheet-window-first-paint` 场景。本文不改写。
