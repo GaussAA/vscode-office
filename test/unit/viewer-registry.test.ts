@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 /**
  * Registration has several touch points and nothing used to check that they agree, so
  * drifts shipped unnoticed: a provider registered for a viewType nobody contributes, a
- * React route missing from the smoke list, and a duplicated file pattern. These tests turn
+ * React route missing from the UI suite, and a duplicated file pattern. These tests turn
  * that silence into a red build.
  */
 
@@ -29,8 +29,8 @@ const readManifest = (): Manifest => JSON.parse(read("package.json")) as Manifes
 /**
  * Every UI scenario source: the runner's driver plus the modules it imports.
  *
- * The scenarios used to live in `runner.mjs`; scanning only that file would have made these two
- * coverage tests pass on an empty set the moment they moved.
+ * The scenarios used to live in `runner.mjs`; scanning only that file would have made the
+ * coverage test below pass on an empty set the moment they moved.
  */
 const scenarioSources = (): string => {
   const dir = "scripts/ui-verify/scenarios";
@@ -39,6 +39,25 @@ const scenarioSources = (): string => {
     .map((name) => read(`${dir}/${name}`));
   return [read("scripts/ui-verify/runner.mjs"), ...modules].join("\n");
 };
+
+/**
+ * The scenario that owns each React route. Every route on its own also proves the view mounts,
+ * so a route with no scenario is a view nothing renders outside VS Code (ADR-0014 warned that
+ * registration, contribution and the UI suite have to move together).
+ */
+const DEDICATED_SCENARIOS: Record<string, string> = {
+  parquet: "parquet-paging",
+  jsonl: "jsonl-directory",
+  json: "json-records",
+  compare: "compare-same-schema",
+};
+
+/** Routes `src/react/main.tsx` actually handles. */
+function mainRoutes(): string[] {
+  return [...read("src/react/main.tsx").matchAll(/case\s+['"]([^'"]+)['"]:/g)].map(
+    (match) => match[1],
+  );
+}
 
 function walk(dir: string, extensions: string[]): string[] {
   const out: string[] = [];
@@ -131,49 +150,29 @@ test("no viewType declares the same file pattern twice", () => {
   assert.deepEqual(duplicates, []);
 });
 
-test("every React route is covered by the smoke list or a dedicated scenario", () => {
-  const mainRouteText = read("src/react/main.tsx");
-  const routes = [...mainRouteText.matchAll(/case\s+['"]([^'"]+)['"]:/g)].map((match) => match[1]);
+test("every React route has a scenario that renders it", () => {
+  const routes = mainRoutes();
   assert.ok(routes.length >= 4, "the route switch should still have its cases");
 
   const runner = scenarioSources();
-  const smokeBlock = /const routes = \[([\s\S]*?)\]/.exec(runner);
-  assert.ok(smokeBlock, "the smoke scenario should build its routes from a literal array");
-  const smoked = new Set([...smokeBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]));
-
-  // Routes that get their own scenario instead of the mount-only smoke.
-  const dedicated: Record<string, string> = {
-    parquet: "parquet-paging",
-    jsonl: "jsonl-directory",
-    json: "json-records",
-    compare: "compare-same-schema",
-  };
-
   // The source is formatted by oxfmt, which emits double quotes — every scraper in this file
   // accepts either style so a format pass can never silently empty a scan.
   const hasScenario = (name: string) => new RegExp(`name:\\s*['"]${name}['"]`).test(runner);
 
   const uncovered = routes.filter((route) => {
-    if (smoked.has(route)) return false;
-    const scenario = dedicated[route];
+    const scenario = DEDICATED_SCENARIOS[route];
     return !(scenario && hasScenario(scenario));
   });
 
   assert.deepEqual(
     uncovered,
     [],
-    "add the route to the smoke list, or give it a scenario and list it in `dedicated`",
+    "give the route a scenario and list it in `DEDICATED_SCENARIOS`, or nothing renders it outside VS Code",
   );
 });
 
-test("the smoke list names routes that actually exist", () => {
-  const runner = scenarioSources();
-  const smokeBlock = /const routes = \[([\s\S]*?)\]/.exec(runner);
-  assert.ok(smokeBlock, "the smoke scenario should build its routes from a literal array");
-  const smoked = [...smokeBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
-  const known = new Set(
-    [...read("src/react/main.tsx").matchAll(/case\s+['"]([^'"]+)['"]:/g)].map((match) => match[1]),
-  );
-  const unknown = smoked.filter((route) => !known.has(route));
-  assert.deepEqual(unknown, [], "a smoke route that main.tsx does not handle can never mount");
+test("the scenario table names only routes main.tsx handles", () => {
+  const known = new Set(mainRoutes());
+  const unknown = Object.keys(DEDICATED_SCENARIOS).filter((route) => !known.has(route));
+  assert.deepEqual(unknown, [], "a mapping for a route main.tsx does not handle can never run");
 });

@@ -22,12 +22,11 @@ export default defineConfig(({ command, mode }) => ({
   plugins: [
     nodePolyfills({
       // 包含需要的 Node.js 内置模块
-      include: ["util", "stream", "buffer", "process", "events"],
+      include: ["util", "stream", "process", "events"],
       // 也包含子路径
       protocolImports: true,
       // 使用插件提供的 polyfills
       globals: {
-        Buffer: true,
         global: true,
         process: true,
       },
@@ -45,10 +44,6 @@ export default defineConfig(({ command, mode }) => ({
   },
   resolve: {
     conditions: ["browser", "module", "import", "default"],
-  },
-  optimizeDeps: {
-    include: ["buffer"],
-    exclude: ["xlsx"], // 不预构建，避免缓存问题
   },
   server: {
     cors: {
@@ -87,9 +82,6 @@ export default defineConfig(({ command, mode }) => ({
             }
             if (id.includes("antd") || id.includes("@ant-design")) {
               return "vendor-antd";
-            }
-            if (id.includes("xlsx")) {
-              return "vendor-xlsx";
             }
           }
         },

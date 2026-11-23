@@ -17,7 +17,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { parquetWriteBuffer } from "hyparquet-writer";
-import { registerSaveHostSuite } from "./saveHostSuite";
 
 const EXTENSION_ID = "GaussAA.office-viewer-plus";
 
@@ -162,10 +161,6 @@ describe("custom editors", () => {
 
   const cases: Array<{ viewType: string; fixture: () => Promise<vscode.Uri> }> = [
     {
-      viewType: "GaussAA.officeViewer",
-      fixture: async () => vscode.Uri.joinPath(workspaceRoot(), "sample.csv"),
-    },
-    {
       viewType: "GaussAA.jsonlViewer",
       fixture: async () => vscode.Uri.joinPath(workspaceRoot(), "sample.jsonl"),
     },
@@ -231,6 +226,3 @@ describe("JSON preview command", () => {
     );
   });
 });
-
-// Last on purpose: these open real Excel viewers, which the lazy-activation check above must not see.
-registerSaveHostSuite();

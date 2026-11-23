@@ -61,7 +61,6 @@ import json from "./scenarios/json.mjs";
 import jsonl from "./scenarios/jsonl.mjs";
 import jsonlIndexing from "./scenarios/jsonl-indexing.mjs";
 import compare from "./scenarios/compare.mjs";
-import excelMotion from "./scenarios/excel-motion.mjs";
 import parquetA11y from "./scenarios/parquet-a11y.mjs";
 import parquetFrames from "./scenarios/parquet-frames.mjs";
 import parquetMotion from "./scenarios/parquet-motion.mjs";
@@ -83,7 +82,6 @@ const scenarios = [
   ...parquetSurfaces,
   ...parquetMotion,
   ...parquetColumnJump,
-  ...excelMotion,
   ...parquetA11y,
   ...parquetTabOrder,
   ...parquetFrames,

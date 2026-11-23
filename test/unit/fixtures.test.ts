@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { decodeCsvBuffer } from "@/react/view/excel/csvEncoding";
-import { parseCsv } from "@/react/view/excel/csvParser";
 import { openParquetFile, readParquetRows } from "@/common/parquetReader";
 import { buildJsonlIndex, readJsonlLineText, summarizeDecodedLine } from "@/service/jsonlDocument";
 
 /**
- * Every file under `test/fixtures/{parquet,spreadsheet,jsonl}` is produced by
+ * Every file under `test/fixtures/{parquet,jsonl}` is produced by
  * `scripts/generate-test-fixtures.mjs`. This file is what makes them evidence: a fixture that no
  * test reads says nothing about the viewer.
  */
@@ -100,49 +98,6 @@ test("parquet: a file that is not parquet is rejected with the footer error", as
     openParquetFile(await bytesOf("parquet/corrupted.parquet")),
     /footer != PAR1/,
   );
-});
-
-// ------------------------------------------------------------------- csv
-
-test("csv: a UTF-8 BOM is stripped before parsing", async () => {
-  const raw = new Uint8Array(await bytesOf("spreadsheet/utf8-bom.csv"));
-  assert.deepEqual([...raw.subarray(0, 3)], [0xef, 0xbb, 0xbf], "fixture must really have a BOM");
-
-  const { rows } = parseCsv(decodeCsvBuffer(raw.buffer.slice(0) as ArrayBuffer));
-  assert.ok(rows.length > 1);
-  assert.ok(!rows[0][0].startsWith("\uFEFF"), `header cell kept the BOM: ${rows[0][0]}`);
-});
-
-test("csv: quotes, embedded commas and embedded newlines stay inside their cell", async () => {
-  const { rows, delimiter } = parseCsv(
-    decodeCsvBuffer(await bytesOf("spreadsheet/quotes-newlines.csv")),
-  );
-  assert.equal(delimiter, ",");
-  assert.deepEqual(rows[0], ["id", "text", "note"]);
-  assert.equal(rows.length, 5);
-  assert.equal(rows[2][1], 'Text with "nested quotes"');
-  assert.equal(rows[3][1], "Multi-line\ntext here");
-  assert.equal(rows[4][1], "Comma, in text");
-  assert.ok(rows.every((row) => row.length === 3));
-});
-
-test("csv: a tab-separated file is detected as TSV", async () => {
-  const { rows, delimiter } = parseCsv(decodeCsvBuffer(await bytesOf("spreadsheet/sample.tsv")));
-  assert.equal(delimiter, "\t");
-  assert.deepEqual(rows[0], ["id", "name", "score", "note"]);
-  assert.equal(rows.length, 4);
-});
-
-test("csv: empty and header-only files produce no data rows", async () => {
-  assert.deepEqual(parseCsv(decodeCsvBuffer(await bytesOf("spreadsheet/empty.csv"))).rows, []);
-  const header = parseCsv(decodeCsvBuffer(await bytesOf("spreadsheet/header-only.csv"))).rows;
-  assert.deepEqual(header, [["id", "name", "score"]]);
-});
-
-test("csv: a file without a header is all data", async () => {
-  const { rows } = parseCsv(decodeCsvBuffer(await bytesOf("spreadsheet/no-header.csv")));
-  assert.deepEqual(rows[0], ["1", "apple", "10.5"]);
-  assert.equal(rows.length, 3);
 });
 
 // ----------------------------------------------------------------- jsonl

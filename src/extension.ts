@@ -5,7 +5,6 @@ import { OfficeViewerProvider } from "./provider/officeViewerProvider";
 import { JsonlViewerProvider } from "./provider/jsonlViewerProvider";
 import { activateJsonPreview } from "./provider/jsonPreview";
 import { activateCompare } from "./provider/comparePanel";
-import { switchCsvEditor } from "./service/csvService";
 import { FileUtil } from "./common/fileUtil";
 import { ReactApp } from "./common/reactApp";
 import { activateYaml } from "./provider/yaml";
@@ -36,16 +35,13 @@ export async function activate(context: vscode.ExtensionContext) {
   }
   const clearCaches = async () => {
     const answer = await vscode.window.showWarningMessage(
-      "Clear all data viewer caches? Parquet scans, the JSONL line index, Excel workbook/CSV indexes, and per-file layouts/search state for parquet, JSONL, Excel and JSON Preview will be removed; open views reset.",
+      "Clear all data viewer caches? Parquet scans, the JSONL line index, the JSON preview index, and per-file layouts/search state for parquet, JSONL and JSON preview will be removed; open views reset.",
       { modal: true },
       "Clear",
     );
     if (answer === "Clear") await clearDataViewerCaches();
   };
   context.subscriptions.push(
-    vscode.commands.registerCommand("GaussAA.office.csv.switch", (uri) => {
-      switchCsvEditor(uri);
-    }),
     vscode.commands.registerCommand("GaussAA.office.clearDataViewerCaches", clearCaches),
     // Backward-compatible alias for existing keybindings; it is not contributed to the palette.
     vscode.commands.registerCommand("GaussAA.office.clearParquetCache", clearCaches),

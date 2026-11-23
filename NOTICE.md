@@ -4,7 +4,9 @@ This project is a fork of [Office Viewer](https://github.com/cweijan/vscode-offi
 Weijan Chen (@cweijan), licensed under the MIT License. The original copyright notice is
 preserved in [LICENSE](./LICENSE).
 
-Fork identity: `GaussAA.office-viewer-plus` (display name "Data File Viewer (Parquet, JSONL, Excel)", formerly "Office Viewer Plus", which the Marketplace rejected as taken).
+Fork identity: `GaussAA.office-viewer-plus` (display name "Data File Viewer (Parquet, JSONL)" since
+7.0.0; "Data File Viewer (Parquet, JSONL, Excel)" from 6.4.5 to 6.x; formerly "Office Viewer Plus",
+which the Marketplace rejected as taken).
 
 ## What this fork changed
 
@@ -19,6 +21,11 @@ Fork identity: `GaussAA.office-viewer-plus` (display name "Data File Viewer (Par
   `.tsv`, `.ods`), parquet and JSONL remain. Word, PowerPoint, PDF, ePub, fonts, images, PSD,
   ICNS, XMind, HTML, Java `.class` and archives were removed: VS Code covers some of them and a
   dedicated reader covers the rest. See [ADR-0015](docs/adr/0015-narrow-to-three-viewers.md).
+- **Narrowed to two viewers (7.0.0).** The spreadsheet viewer and everything that existed only
+  for it — the vendored `x-spreadsheet` engine, the windowed read-only table, the workbook host
+  cache, the CSV offset cache and the save path — were removed. What remains is parquet, JSONL
+  and the command-opened read-only JSON inspector. See
+  [ADR-0029](docs/adr/0029-narrow-to-two-viewers.md).
 - **Parquet: compressed columns actually decode.** Upstream bundles `hyparquet` without
   `hyparquet-compressors`, so only SNAPPY works and ZSTD files fail with
   `parquet unsupported compression codec: ZSTD`. This fork passes `compressors` from
@@ -84,9 +91,9 @@ original authors.
 
 ### Forks
 
-| Path                                  | Project                                                                                                                 | License | Upstream                                 | Our delta                                                                                          |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `src/react/view/excel/x-spreadsheet/` | `x-data-spreadsheet` — the spreadsheet engine behind the `.xlsx/.csv/.ods` viewer (patch applied upstream in `48b10e4`) | MIT     | https://github.com/myliang/x-spreadsheet | ~+3.2k/−1k lines over 45 files: toolbar icons, hyperlink/formula bar/sheet images, clipboard, find |
+None remain. The only one was `src/react/view/excel/x-spreadsheet/` (`x-data-spreadsheet`), and it
+left the repository with the spreadsheet viewer in 7.0.0 ([ADR-0029](docs/adr/0029-narrow-to-two-viewers.md)):
+the code it covered is gone, so there is nothing left to attribute for it.
 
 ## Working with upstream
 

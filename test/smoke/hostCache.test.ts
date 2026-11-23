@@ -1,41 +1,23 @@
 /// <reference types="mocha" />
 /**
- * Real-host verification for the ADR-0026..0028 caches (not the browser fake-bridge harness).
+ * Real-host verification for the ADR-0026 disk caches (not the browser fake-bridge harness).
  *
- * What only this suite can prove:
- *   - the CSV record index really travels through the extension host and back into a *new*
- *     webview (the second page has an `excel-csv-index-hit` measure and no `excel-csv-scan`);
- *   - the parsed workbook rows really live in the host between two webviews (the second page
- *     has no `excel-workbook-parse` measure);
- *   - the JSON Preview / JSONL disk entries are written on the first open and not rewritten on
- *     the second, which is the observable difference a cache hit makes.
+ * What only this suite can prove: the JSON Preview / JSONL disk entries are written on the
+ * first open and not rewritten on the second, which is the observable difference a cache hit
+ * makes.
  *
- * The cache roots are read through the test-only `__cachePaths` command. The fixture sizes are
- * chosen around the real thresholds: workbook >8 MB (windowed) but <15 MB (host cache cap),
- * CSV/JSON/JSONL large enough to be meaningful without slowing the suite to minutes.
+ * The cache roots are read through the test-only `__cachePaths` command.
  */
 import * as assert from "node:assert";
 import { promises as fsp } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import * as XLSX from "xlsx";
 import { sleep, waitFor, WebviewBridge } from "./webviewBridge";
 
 const EXTENSION_ID = "GaussAA.office-viewer-plus";
-const EXCEL_VIEW = "GaussAA.officeViewer";
 const JSONL_VIEW = "GaussAA.jsonlViewer";
 const CACHE_PATHS_COMMAND = "GaussAA.office.__cachePaths";
-
-const MB = 1024 * 1024;
-
-function csvFixture(rows: number): Uint8Array {
-  const parts = ["id,name,score,ok,note,tag\n"];
-  for (let row = 0; row < rows; row++) {
-    parts.push(`${row},row-${row},${row / 2},${row % 2 === 0},note-${row},probe\n`);
-  }
-  return new TextEncoder().encode(parts.join(""));
-}
 
 function jsonlFixture(rows: number): Uint8Array {
   const parts: string[] = [];
@@ -53,39 +35,6 @@ function jsonFixture(rows: number): Uint8Array {
   }
   parts.push("]");
   return new TextEncoder().encode(parts.join(""));
-}
-
-/** 30k × 8 is ~10.4 MB on the wire: windowed (>8 MB) and under the 15 MB host-cache cap. */
-function workbookFixture(rows: number): Uint8Array {
-  const data: string[][] = [["id", "name", "score", "ok", "note", "tag", "value", "text"]];
-  const filler = "measurement ".repeat(3).trim();
-  for (let row = 0; row < rows; row++) {
-    data.push([
-      String(row),
-      `row-${row}`,
-      String(row / 2),
-      String(row % 2 === 0),
-      `note-${row}`,
-      "probe",
-      String(row * 3),
-      `${filler}-${row}`,
-    ]);
-  }
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Data");
-  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Uint8Array;
-}
-
-async function webviewMeasures(bridge: WebviewBridge) {
-  return bridge.evaluate<{ csvScan: number; csvHit: number; workbookParse: number }>(`(() => {
-    const win = document.querySelector('iframe')?.contentWindow;
-    const count = (name) => (win ? win.performance.getEntriesByName(name).length : 0);
-    return {
-      csvScan: count('excel-csv-scan'),
-      csvHit: count('excel-csv-index-hit'),
-      workbookParse: count('excel-workbook-parse'),
-    };
-  })()`);
 }
 
 async function waitForInner(
@@ -107,13 +56,13 @@ async function waitForInner(
 async function openViewer(uri: vscode.Uri, viewType: string): Promise<WebviewBridge> {
   const known = await WebviewBridge.knownTargetIds();
   await vscode.commands.executeCommand("vscode.openWith", uri, viewType);
-  return WebviewBridge.attachToNewWebview(known, { waitForCanvas: false });
+  return WebviewBridge.attachToNewWebview(known);
 }
 
 async function openJsonPreview(uri: vscode.Uri): Promise<WebviewBridge> {
   const known = await WebviewBridge.knownTargetIds();
   await vscode.commands.executeCommand("GaussAA.office.previewJson", uri);
-  return WebviewBridge.attachToNewWebview(known, { waitForCanvas: false });
+  return WebviewBridge.attachToNewWebview(known);
 }
 
 async function closeActiveEditor(): Promise<void> {
@@ -180,63 +129,6 @@ describe("host caches (real VS Code)", function () {
     await vscode.workspace.fs.writeFile(uri, bytes);
     return uri;
   }
-
-  it("CSV: a second open uses the cached record index", async () => {
-    const uri = await writeFixture("host-cache.csv", csvFixture(300_000));
-
-    const first = await openViewer(uri, EXCEL_VIEW);
-    await waitForInner(first, ".windowed-sheet__row", "the windowed CSV did not render");
-    await waitFor(
-      async () => (await webviewMeasures(first)).csvScan > 0,
-      () => "the first CSV open did not scan",
-    );
-    await sleep(1500);
-    const firstMeasures = await webviewMeasures(first);
-    const files = await waitForCache(root, "csv-index");
-    const mtimes = await binMtimes(root, "csv-index");
-    assert.ok(firstMeasures.csvScan >= 1, JSON.stringify(firstMeasures));
-    first.close();
-    await closeActiveEditor();
-
-    const second = await openViewer(uri, EXCEL_VIEW);
-    await waitForInner(second, ".windowed-sheet__row", "the second CSV open did not render");
-    await sleep(1000);
-    const secondMeasures = await webviewMeasures(second);
-    assert.equal(secondMeasures.csvScan, 0, "the second open scanned again");
-    assert.ok(secondMeasures.csvHit >= 1, JSON.stringify(secondMeasures));
-    assert.deepEqual(await cacheBins(root, "csv-index"), files);
-    assert.deepEqual(await binMtimes(root, "csv-index"), mtimes);
-    second.close();
-  });
-
-  it("Excel: a second open reuses the parsed host workbook rows", async () => {
-    const bytes = workbookFixture(30_000);
-    assert.ok(
-      bytes.byteLength > 8 * MB && bytes.byteLength < 15 * MB,
-      `the workbook fixture is ${(bytes.byteLength / MB).toFixed(2)} MB, not windowed/host-cacheable`,
-    );
-    const uri = await writeFixture("host-cache.xlsx", bytes);
-
-    const first = await openViewer(uri, EXCEL_VIEW);
-    await waitForInner(first, ".windowed-sheet__row", "the windowed workbook did not render");
-    await waitFor(
-      async () => (await webviewMeasures(first)).workbookParse > 0,
-      () => "the first workbook open did not parse",
-      60000,
-    );
-    await sleep(2500);
-    const firstMeasures = await webviewMeasures(first);
-    assert.ok(firstMeasures.workbookParse >= 1, JSON.stringify(firstMeasures));
-    first.close();
-    await closeActiveEditor();
-
-    const second = await openViewer(uri, EXCEL_VIEW);
-    await waitForInner(second, ".windowed-sheet__row", "the second workbook open did not render");
-    await sleep(1000);
-    const secondMeasures = await webviewMeasures(second);
-    assert.equal(secondMeasures.workbookParse, 0, "the second open reparsed the workbook");
-    second.close();
-  });
 
   it("JSON Preview: a second preview reuses the cached record ranges", async () => {
     const uri = await writeFixture("host-cache.json", jsonFixture(150_000));
@@ -367,13 +259,13 @@ describe("host caches (real VS Code)", function () {
           state: win?.__dshValueState ?? null,
           barClass: doc?.querySelector('.jsonl-valuebar')?.className ?? null,
           body: !!doc?.querySelector('.jsonl-valuebar__body'),
-          text: !!doc?.querySelector('.jsonl-valuebar__text'),
+          text: !!doc?.querySelector('.jsonl-valuebar__scroll'),
         });
       })()`);
       console.log(`value panel diag ${diag}`);
       await waitForInner(
         bridge,
-        ".jsonl-valuebar__body .jsonl-valuebar__text",
+        ".jsonl-valuebar__body .jsonl-valuebar__scroll",
         "the value panel did not open",
         60_000,
       );

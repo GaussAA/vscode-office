@@ -45,7 +45,7 @@ test("clear cache: removes every parquet-derived key and leaves other viewers al
   const others = [
     "jsonl-state:file:///a.jsonl",
     "json-preview:left:file:///a.json",
-    "excel-view:file:///a.xlsx",
+    "other-view:file:///a.bin",
     "unrelated",
   ];
   for (const key of [...parquet, ...others]) storage.setItem(key, "{}");

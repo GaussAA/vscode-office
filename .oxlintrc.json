@@ -4,9 +4,9 @@
 // which blocked TypeScript 7 (see #18). oxlint does not depend on the TypeScript package
 // at all, runs the whole tree in under a second, and understands the TS/JSX syntax we use.
 //
-// Scope: every hand-written `.ts`/`.tsx` in `src/` **and** `test/`. The only JavaScript left
-// in the tree is the vendored x-spreadsheet engine under `src/react/view/excel/x-spreadsheet/`,
-// which is a fork (ADR-0009) and stays excluded — everything we wrote ourselves is now `.ts`.
+// Scope: every hand-written `.ts`/`.tsx` in `src/` **and** `test/`. The vendored x-spreadsheet
+// engine — a fork (ADR-0009) and the last JavaScript in the tree — left with the spreadsheet
+// viewer (ADR-0029), so there is no source directory that needs a parser exception any more.
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "react", "react-hooks", "import", "unicorn", "oxc"],
@@ -43,12 +43,5 @@
       }
     ]
   },
-  "ignorePatterns": [
-    "**/*.d.ts",
-    "src/react/view/excel/x-spreadsheet/**",
-    "vditor/**",
-    "out/**",
-    "node_modules/**",
-    ".vscode-test/**"
-  ]
+  "ignorePatterns": ["**/*.d.ts", "out/**", "node_modules/**", ".vscode-test/**"]
 }

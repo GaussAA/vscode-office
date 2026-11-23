@@ -16,12 +16,9 @@ test("clear cache registry: awaits every registered clearer", async () => {
     await Promise.resolve();
     calls.push("jsonl");
   });
-  registerDataViewerCacheClearer(() => {
-    calls.push("excel");
-  });
 
   await clearDataViewerCaches();
-  assert.deepEqual(calls, ["parquet", "jsonl", "excel"]);
+  assert.deepEqual(calls, ["parquet", "jsonl"]);
   resetDataViewerCacheClearers();
 });
 

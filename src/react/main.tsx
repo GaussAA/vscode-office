@@ -1,4 +1,3 @@
-import "./polyfills/buffer";
 import ReactDOM from "react-dom/client";
 import "./util/vscode.js";
 import { getConfigs } from "./util/vscodeConfig.ts";
@@ -7,7 +6,6 @@ import "./main.css";
 import { ConfigProvider } from "antd";
 import { lazy } from "react";
 import { antThemeConfig } from "./antThemeConfig.ts";
-const Excel = lazy(() => import("./view/excel/Excel.tsx"));
 const Parquet = lazy(() => import("./view/parquet/Parquet.tsx"));
 const Jsonl = lazy(() => import("./view/jsonl/Jsonl.tsx"));
 const JsonPreview = lazy(() => import("./view/json/JsonPreview.tsx"));
@@ -21,8 +19,6 @@ initI18n(configs?.language);
 export default function App() {
   const route = configs?.route;
   switch (route) {
-    case "excel":
-      return <Excel />;
     case "parquet":
       return <Parquet />;
     case "jsonl":

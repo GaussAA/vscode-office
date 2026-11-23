@@ -13,7 +13,6 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
-import * as XLSX from "xlsx";
 import { repoRoot } from "./fixtures.mjs";
 
 const WEBVIEW_ROOT = join(repoRoot, "out", "webview");
@@ -336,8 +335,33 @@ function jsonlStub(fixtures, limit = 0, indexing = false) {
         const requestId = msg.content.requestId;
         const index = msg.content.index;
         setTimeout(function () {
-          window.postMessage({ type: 'jsonlEntryData', content: { requestId, index, entry: fixtures[index] } }, '*');
+          const fixture = fixtures[index];
+          window.postMessage({
+            type: 'jsonlEntryData',
+            content: {
+              requestId,
+              index,
+              entry: fixture ? Object.assign({}, fixture, { textIncluded: true }) : null,
+            },
+          }, '*');
         }, 60);
+      }
+      if (msg.type === 'jsonlEntryText') {
+        const requestId = msg.content.requestId;
+        const index = msg.content.index;
+        setTimeout(function () {
+          const fixture = fixtures[index] || {};
+          window.postMessage({
+            type: 'jsonlEntryTextData',
+            content: {
+              requestId,
+              index,
+              text: fixture.text || '',
+              textChars: fixture.textChars || (fixture.text || '').length,
+              textTruncated: !!fixture.textTruncated,
+            },
+          }, '*');
+        }, 40);
       }
     },
     getState() { return undefined; },
@@ -418,6 +442,7 @@ function jsonStub(mode = "array", count = 5, fromBuffer = false) {
     textChars: objectRaw.length,
     size: objectRaw.length,
     textTruncated: false,
+    textIncluded: true,
     value: objectValue,
   };
   return `<script>
@@ -477,7 +502,26 @@ function jsonStub(mode = "array", count = 5, fromBuffer = false) {
         const requestId = msg.content.requestId;
         const index = msg.content.index;
         setTimeout(function () {
-          post('jsonRecordData', { requestId: requestId, index: index, entry: fixtures[index] ?? null });
+          const fixture = fixtures[index];
+          post('jsonRecordData', {
+            requestId: requestId,
+            index: index,
+            entry: fixture ? Object.assign({}, fixture, { textIncluded: true }) : null,
+          });
+        }, 40);
+      }
+      if (msg.type === 'jsonRecordText') {
+        const requestId = msg.content.requestId;
+        const index = msg.content.index;
+        const fixture = fixtures[index] || {};
+        setTimeout(function () {
+          post('jsonRecordTextData', {
+            requestId: requestId,
+            index: index,
+            text: fixture.text || '',
+            textChars: fixture.textChars || (fixture.text || '').length,
+            textTruncated: !!fixture.textTruncated,
+          });
         }, 40);
       }
       if (msg.type === 'jsonSearchCancel') {
@@ -734,7 +778,6 @@ function serveParquet(req, res, file, stats, supportRange) {
 function smokeStub(route) {
   const name =
     {
-      excel: "smoke.xlsx",
       word: "smoke.docx",
       ppt: "smoke.pptx",
       pdf: "smoke.pdf",
@@ -893,271 +936,6 @@ function compareStub(mode) {
 }
 
 /**
- * Bridge for the spreadsheet size guard: a `file:` payload that claims to be 900 MB.
- *
- * The guard is a payload decision, not a file decision — the viewer must refuse before it
- * fetches anything — so a stub that lies about `size` tests it without committing a large
- * fixture. `/huge.csv` is a three-line CSV, so "Open anyway" can prove it really loads.
- */
-function excelGuardStub() {
-  return `<script>
-(function () {
-  const api = {
-    postMessage(msg) {
-      if (!msg || msg.type !== 'init') return;
-      setTimeout(function () {
-        window.postMessage({ type: 'open', content: {
-          ext: '.csv',
-          fileName: 'huge.csv',
-          path: '/huge.csv',
-          scheme: 'file',
-          size: 900 * 1024 * 1024,
-          readOnly: true,
-          documentCacheId: 'demo:huge',
-        } }, '*');
-      }, 60);
-    },
-    getState() { return undefined; },
-    setState() {},
-  };
-  window.acquireVsCodeApi = function () { return api; };
-})();
-</script>`;
-}
-
-/**
- * Bridge for the save branches: a small editable grid whose postMessage traffic is recorded.
- * `saveDone` is sent back by the stub, so dirty state can be observed without a real host.
- */
-function excelEditStub(mode = "direct") {
-  const file =
-    mode === "format"
-      ? { ext: ".xls", fileName: "edit.xls", path: "/edit.xls", size: 4096 }
-      : {
-          ext: ".csv",
-          fileName: mode === "readonly" ? "readonly.csv" : "edit.csv",
-          path: "/edit.csv",
-          size: 128,
-        };
-  return `<script>
-(function () {
-  window.__excelMessages = [];
-  window.__saveDone = false;
-  window.__saveFailed = false;
-  const api = {
-    postMessage(msg) {
-      if (!msg) return;
-      if (msg.type === 'init') {
-        setTimeout(function () {
-          window.postMessage({ type: 'open', content: {
-            ext: '${file.ext}',
-            fileName: '${file.fileName}',
-            path: '${file.path}',
-            scheme: 'file',
-            size: ${file.size},
-            readOnly: ${mode === "readonly" ? "true" : "false"},
-            documentCacheId: 'demo:edit-${mode}',
-          } }, '*');
-        }, 60);
-        return;
-      }
-      const content = msg.content || {};
-      window.__excelMessages.push({
-        type: msg.type,
-        ext: content.ext || '',
-        base64Length: (content.contentBase64 || '').length,
-        byteLength: Array.isArray(content.content) ? content.content.length : 0,
-      });
-      if (msg.type === 'save') {
-        // ?failSave=1: stub replies with saveFailed instead of saveDone
-        if (new URLSearchParams(location.search).get('failSave') === '1') {
-          setTimeout(function () {
-            window.__saveFailed = true;
-            window.postMessage({ type: 'saveFailed', content: { reason: 'stub-error' } }, '*');
-          }, 30);
-          return;
-        }
-        const release = function () {
-          window.__saveDone = true;
-          window.postMessage({ type: 'saveDone' }, '*');
-        };
-        // ?holdSave=1: the host is still writing; the scenario decides when it finishes.
-        if (new URLSearchParams(location.search).get('holdSave') === '1') {
-          window.__releaseSaveDone = release;
-        } else {
-          setTimeout(release, 30);
-        }
-      }
-    },
-    getState() { return undefined; },
-    setState() {},
-  };
-  window.acquireVsCodeApi = function () { return api; };
-})();
-</script>`;
-}
-
-/**
- * Bridge for the large-file windowed view: a `file:` payload just under the size guard, so the
- * viewer picks the read-only window instead of the editable grid.
- */
-function excelWindowStub(rows = 5000) {
-  return `<script>
-(function () {
-  const api = {
-    postMessage(msg) {
-      if (!msg || msg.type !== 'init') return;
-      setTimeout(function () {
-        window.postMessage({ type: 'open', content: {
-          ext: '.csv',
-          fileName: 'window.csv',
-          path: '/window.csv?rows=${rows}',
-          scheme: 'file',
-          size: 12 * 1024 * 1024,
-          readOnly: true,
-          documentCacheId: 'demo:window',
-        } }, '*');
-      }, 60);
-    },
-    getState() { return undefined; },
-    setState() {},
-  };
-  window.acquireVsCodeApi = function () { return api; };
-})();
-</script>`;
-}
-
-/**
- * The windowed view's workbook: two sheets, generated once with SheetJS.
- *
- * Committing a binary fixture would hide what the test depends on; generating it here keeps the
- * row contents visible next to the assertions.
- */
-function windowXlsx() {
-  const data = [["id", "name", "score", "ok"]];
-  for (let row = 0; row < 200; row++)
-    data.push([String(row), `row-${row}`, String(row / 2), String(row % 2 === 0)]);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Data");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["a"], ["b"], ["c"]]), "Extra");
-  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-}
-
-const WINDOW_XLSX = windowXlsx();
-
-const LARGE_XLSX = new Map();
-
-/**
- * A workbook large enough to measure the whole-workbook parse. It is generated on demand and
- * cached so the UI probe can warm the server and time a second, parse-only open.
- */
-function largeXlsx(rows) {
-  const cached = LARGE_XLSX.get(rows);
-  if (cached) return cached;
-  const data = [["id", "name", "score", "ok", "note", "tag", "value", "text"]];
-  const filler = "measurement ".repeat(3).trim();
-  for (let row = 0; row < rows; row++) {
-    data.push([
-      String(row),
-      `row-${row}`,
-      String(row / 2),
-      String(row % 2 === 0),
-      `note-${row}`,
-      "probe",
-      String(row * 3),
-      `${filler}-${row}`,
-    ]);
-  }
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Data");
-  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-  LARGE_XLSX.set(rows, buffer);
-  return buffer;
-}
-
-/** The same idea for a legacy workbook: `.xls` is decoded by SheetJS, not ExcelJS. */
-function windowXls() {
-  const data = [["id", "name"]];
-  for (let row = 0; row < 50; row++) data.push([String(row), `legacy-${row}`]);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Old");
-  return XLSX.write(workbook, { type: "buffer", bookType: "biff8" });
-}
-
-const WINDOW_XLS = windowXls();
-
-/** A small editable legacy workbook: formatted save must ask before writing. */
-function editXls() {
-  const data = [
-    ["id", "name"],
-    ["1", "alpha"],
-    ["2", "beta"],
-  ];
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), "Data");
-  return XLSX.write(workbook, { type: "buffer", bookType: "biff8" });
-}
-
-const EDIT_XLS = editXls();
-
-/**
- * Bridge for a workbook that must open in the windowed view: 12 MB claimed, just under the
- * 15 MB workbook guard and over the 8 MB window threshold.
- */
-function excelWorkbookStub(rows = 0) {
-  return `<script>
-(function () {
-  const api = {
-    postMessage(msg) {
-      if (!msg || msg.type !== 'init') return;
-      setTimeout(function () {
-        window.postMessage({ type: 'open', content: {
-          ext: '.xlsx',
-          fileName: 'window.xlsx',
-          path: ${JSON.stringify(rows > 200 ? `/window.xlsx?rows=${rows}` : "/window.xlsx")},
-          scheme: 'file',
-          size: 12 * 1024 * 1024,
-          readOnly: true,
-          documentCacheId: 'demo:window-xlsx',
-        } }, '*');
-      }, 60);
-    },
-    getState() { return undefined; },
-    setState() {},
-  };
-  window.acquireVsCodeApi = function () { return api; };
-})();
-</script>`;
-}
-
-/** Bridge for a legacy workbook: `.xls` at 12 MB, windowed through SheetJS. */
-function excelLegacyStub() {
-  return `<script>
-(function () {
-  const api = {
-    postMessage(msg) {
-      if (!msg || msg.type !== 'init') return;
-      setTimeout(function () {
-        window.postMessage({ type: 'open', content: {
-          ext: '.xls',
-          fileName: 'window.xls',
-          path: '/window.xls',
-          scheme: 'file',
-          size: 12 * 1024 * 1024,
-          readOnly: true,
-          documentCacheId: 'demo:window-xls',
-        } }, '*');
-      }, 60);
-    },
-    getState() { return undefined; },
-    setState() {},
-  };
-  window.acquireVsCodeApi = function () { return api; };
-})();
-</script>`;
-}
-
-/**
  * The recording and reordering layer every fake host shares.
  *
  * The per-viewer stubs only know how to *answer*. Three things scenarios kept needing could not be
@@ -1253,8 +1031,8 @@ export function startHarness(fixtures, port = 0) {
   const stats = { ranged: 0, full: 0 };
 
   /**
-   * Add headers required for SharedArrayBuffer support (needed by xlsx library).
-   * See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer#security_requirements
+   * `Cross-Origin-Resource-Policy` on every fixture response: the webview fetches parquet
+   * fixtures from the harness origin, not from its own.
    */
   const addCrossOriginHeaders = (headers) => ({
     ...headers,
@@ -1286,53 +1064,27 @@ export function startHarness(fixtures, port = 0) {
               ? (url.searchParams.get("route") ?? "html")
               : "jsonl";
       const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
-      const guard = path === "/harness-route" && url.searchParams.get("guard") === "1";
-      const editParam = path === "/harness-route" ? (url.searchParams.get("edit") ?? "") : "";
-      const edit = ["direct", "format", "readonly"].includes(editParam) ? editParam : "";
-      const windowed = path === "/harness-route" && url.searchParams.get("window") === "1";
-      const windowRows = Math.min(
-        Math.max(Number(url.searchParams.get("windowRows") ?? 5000) || 5000, 1),
-        2_000_000,
-      );
-      const workbookView = path === "/harness-route" && url.searchParams.get("workbook") === "1";
-      const workbookRows = Math.min(
-        Math.max(Number(url.searchParams.get("workbookRows") ?? 0) || 0, 0),
-        1_000_000,
-      );
-      const legacyView = path === "/harness-route" && url.searchParams.get("legacy") === "1";
       const many = Math.min(Math.max(Number(url.searchParams.get("many") ?? 0) || 0, 0), 5000);
       const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 0) || 0, 0), 500);
       const jsonl = many > 0 ? manyFixtures(many) : entries;
-      const stub = edit
-        ? excelEditStub(edit)
-        : guard
-          ? excelGuardStub()
-          : legacyView
-            ? excelLegacyStub()
-            : workbookView
-              ? excelWorkbookStub(workbookRows)
-              : windowed
-                ? excelWindowStub(windowRows)
-                : path === "/harness-json"
-                  ? jsonStub(
-                      url.searchParams.get("mode") ?? "array",
-                      Math.min(
-                        Math.max(Number(url.searchParams.get("records") ?? 5) || 5, 1),
-                        5000,
-                      ),
-                      url.searchParams.get("buffer") === "1",
-                    )
-                  : route === "compare"
-                    ? compareStub(url.searchParams.get("case") ?? "same")
-                    : path === "/harness-route"
-                      ? smokeStub(url.searchParams.get("route") ?? "html")
-                      : route === "parquet"
-                        ? parquetStub(fixtures)
-                        : jsonlStub(
-                            url.searchParams.get("empty") === "1" ? [] : jsonl,
-                            limit,
-                            url.searchParams.get("indexing") === "1",
-                          );
+      const stub =
+        path === "/harness-json"
+          ? jsonStub(
+              url.searchParams.get("mode") ?? "array",
+              Math.min(Math.max(Number(url.searchParams.get("records") ?? 5) || 5, 1), 5000),
+              url.searchParams.get("buffer") === "1",
+            )
+          : route === "compare"
+            ? compareStub(url.searchParams.get("case") ?? "same")
+            : path === "/harness-route"
+              ? smokeStub(url.searchParams.get("route") ?? "html")
+              : route === "parquet"
+                ? parquetStub(fixtures)
+                : jsonlStub(
+                    url.searchParams.get("empty") === "1" ? [] : jsonl,
+                    limit,
+                    url.searchParams.get("indexing") === "1",
+                  );
       // The real policy, from `src/common/webviewCsp.ts`. The only local addition is the
       // nonce: the injected stub is inline, and production has no inline script at all.
       const origin = `http://${req.headers.host}`;
@@ -1344,35 +1096,6 @@ export function startHarness(fixtures, port = 0) {
       // Same helper the extension uses: a shell whose `<base>` cannot be rewritten makes this
       // run fail, which is the point — the alternative is a green suite and a black webview.
       const processShim = `<script nonce="${nonce}">window.process={env:{},platform:"browser",arch:"x64",version:"",versions:{},emit:()=>false};</script>`;
-      const utilShim = `<script nonce="${nonce}">
-// Monkey-patch for util module: intercept object property access to add debuglog
-(function(){
-  const noop = (..._)=>{};
-  const debuglog = (_)=>noop;
-  
-  // Override Object.prototype temporarily during module load to inject debuglog
-  const originalDefineProperty = Object.defineProperty;
-  Object.defineProperty = function(obj, prop, desc) {
-    const result = originalDefineProperty.call(this, obj, prop, desc);
-    // If an empty object is created and accessed for .debuglog, inject it
-    if (obj && typeof obj === 'object' && Object.keys(obj).length === 0) {
-      if (!obj.debuglog) {
-        try {
-          obj.debuglog = debuglog;
-          obj.format = (f,...a) => String(f);
-          obj.inspect = (v) => String(v);
-        } catch(e) {}
-      }
-    }
-    return result;
-  };
-  
-  // Also patch direct property access
-  setTimeout(() => {
-    Object.defineProperty = originalDefineProperty;
-  }, 100);
-})();
-</script>`;
       const html = applyWebviewBase(indexHtml, origin)
         .replace(
           /<meta id="office-configs"[^>]*>/,
@@ -1381,14 +1104,9 @@ export function startHarness(fixtures, port = 0) {
         .replace("{{csp}}", csp)
         .replace(
           '<script type="module"',
-          `<style>${theme}</style>\n${processShim}\n${utilShim}\n${stub.replace("<script>", `<script nonce="${nonce}">`)}\n${bridgeShim(nonce)}\n<script type="module"`,
+          `<style>${theme}</style>\n${processShim}\n${stub.replace("<script>", `<script nonce="${nonce}">`)}\n${bridgeShim(nonce)}\n<script type="module"`,
         );
-      res.writeHead(200, {
-        "content-type": "text/html; charset=utf-8",
-        // Enable SharedArrayBuffer for xlsx library
-        "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "require-corp",
-      });
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(html);
       return;
     }
@@ -1414,60 +1132,6 @@ export function startHarness(fixtures, port = 0) {
         }),
       );
       res.end(readFileSync(fixtures.docx));
-      return;
-    }
-
-    // What the size guard's "Open anyway" loads: small enough that the grid proves the
-    // retry happened, real enough that the CSV parser runs.
-    if (path === "/edit.csv") {
-      res.writeHead(200, addCrossOriginHeaders({ "content-type": "text/csv; charset=utf-8" }));
-      res.end("id,name\n1,alpha\n2,beta\n");
-      return;
-    }
-
-    if (path === "/edit.xls") {
-      res.writeHead(200, addCrossOriginHeaders({ "content-type": "application/vnd.ms-excel" }));
-      res.end(EDIT_XLS);
-      return;
-    }
-
-    if (path === "/huge.csv") {
-      res.writeHead(200, addCrossOriginHeaders({ "content-type": "text/csv; charset=utf-8" }));
-      res.end("a,b,c\n1,2,3\n4,5,6\n");
-      return;
-    }
-
-    if (path === "/window.xls") {
-      res.writeHead(200, addCrossOriginHeaders({ "content-type": "application/vnd.ms-excel" }));
-      res.end(WINDOW_XLS);
-      return;
-    }
-
-    if (path === "/window.xlsx") {
-      const rows = Number(url.searchParams.get("rows") ?? 0) || 0;
-      res.writeHead(
-        200,
-        addCrossOriginHeaders({
-          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        }),
-      );
-      res.end(rows > 200 ? largeXlsx(rows) : WINDOW_XLSX);
-      return;
-    }
-
-    // The windowed view's document: 5000 rows, so "only the viewport is in the DOM" and
-    // "scrolling reaches the last row" are both observable.
-    if (path === "/window.csv") {
-      const rows = Math.min(
-        Math.max(Number(url.searchParams.get("rows") ?? 5000) || 5000, 1),
-        2_000_000,
-      );
-      const lines = ["id,a,b,c,d,e,f,g"];
-      for (let row = 0; row < rows; row++) {
-        lines.push(`r${row},1,2,3,4,5,6,7`);
-      }
-      res.writeHead(200, addCrossOriginHeaders({ "content-type": "text/csv; charset=utf-8" }));
-      res.end(lines.join("\n"));
       return;
     }
 

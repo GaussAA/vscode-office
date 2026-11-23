@@ -75,13 +75,10 @@ async function loadCspBuilder() {
  * table has a real cell and the pager is on screen, two frames later. Measuring inside the
  * page keeps DevTools round-trip time out of the number.
  */
-function harnessPage(openPayload, mode = "parquet") {
-  // What "the first data is on screen" means differs per route: a parquet table paints a cell
-  // and its pager, the windowed spreadsheet paints a row.
+function harnessPage(openPayload) {
+  // "The first data is on screen" for this viewer: a cell painted and the pager on screen.
   const painted =
-    mode === "sheet"
-      ? "document.querySelector('.windowed-sheet__row')"
-      : "document.querySelector('.parquet-viewer__cell')?.textContent && document.querySelector('.parquet-viewer__pager-info')";
+    "document.querySelector('.parquet-viewer__cell')?.textContent && document.querySelector('.parquet-viewer__pager-info')";
   return `<script>
 (function () {
   window.__bench = { t0: 0, ready: 0, open: ${JSON.stringify(openPayload)} };
@@ -128,7 +125,6 @@ export async function startPerfHarness(fixtures, port = 0) {
   const files = new Map([
     ["/f/flat.parquet", fixtures.flat],
     ["/f/wide.parquet", fixtures.wide],
-    ["/f/sheet.csv", fixtures.flatCsv],
   ]);
 
   function serveFile(req, res, file) {
@@ -180,28 +176,13 @@ export async function startPerfHarness(fixtures, port = 0) {
       res.end(JSON.stringify({ ok: true }));
       return;
     }
-    if (path === "/harness" || path === "/sheet") {
-      const sheet = path === "/sheet";
+    if (path === "/harness") {
       const file = url.searchParams.get("file") ?? "flat";
       const origin = `http://${req.headers.host}`;
       const nonce = randomBytes(16).toString("base64");
-      const target = sheet
-        ? "/f/sheet.csv"
-        : file === "wide"
-          ? "/f/wide.parquet"
-          : "/f/flat.parquet";
+      const target = file === "wide" ? "/f/wide.parquet" : "/f/flat.parquet";
       const name = target.split("/").pop();
-      const openPayload = sheet
-        ? {
-            ext: ".csv",
-            path: target,
-            fileName: name,
-            scheme: "file",
-            size: fixtures.flatCsvBytes,
-            readOnly: true,
-            documentCacheId: `perf:${name}`,
-          }
-        : { path: target, fileName: name, documentCacheId: `perf:${name}` };
+      const openPayload = { path: target, fileName: name, documentCacheId: `perf:${name}` };
       const csp = buildWebviewCsp(origin).replace(
         `script-src ${origin} `,
         `script-src ${origin} 'nonce-${nonce}' `,
@@ -210,12 +191,12 @@ export async function startPerfHarness(fixtures, port = 0) {
         .replace(/<base\s+href\s*=\s*(["'])[^"']*\1\s*\/?>/i, `<base href="${origin}/" />`)
         .replace(
           /<meta id="office-configs"[^>]*>/,
-          `<meta id="office-configs" data-config="${JSON.stringify({ route: sheet ? "excel" : "parquet", language: "en" }).replace(/"/g, "&quot;")}" />`,
+          `<meta id="office-configs" data-config="${JSON.stringify({ route: "parquet", language: "en" }).replace(/"/g, "&quot;")}" />`,
         )
         .replace("{{csp}}", csp)
         .replace(
           '<script type="module"',
-          `<style>${DARK}</style>\n${harnessPage(openPayload, sheet ? "sheet" : "parquet").replace("<script>", `<script nonce="${nonce}">`)}\n<script type="module"`,
+          `<style>${DARK}</style>\n${harnessPage(openPayload).replace("<script>", `<script nonce="${nonce}">`)}\n<script type="module"`,
         );
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(html);

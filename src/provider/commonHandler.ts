@@ -1,77 +1,37 @@
 import * as vscode from "vscode";
-import { basename, join, parse } from "path";
 import { Handler } from "@/common/handler";
 import { normalizeExternalUrl } from "@/common/externalLink";
-import { isUriReadOnly } from "@/common/fileReadOnly";
-import { Uri, workspace } from "vscode";
+import { Uri } from "vscode";
 import {
   emitFileOfficeOpen,
   emitVirtualOfficeOpen,
   isVirtualUri,
 } from "@/provider/handlers/officeContent";
-import { createSaveHandlers, type SaveAsPayload, type SaveTracker } from "./saveHandlers";
-
-function setDirty(handler: Handler, uri: Uri, dirty: boolean) {
-  const panel = handler.panel;
-  const fileName = basename(uri.fsPath);
-  panel.title = dirty ? `${fileName}*` : fileName;
-  if (dirty) {
-    void vscode.commands.executeCommand("workbench.action.keepEditor");
-  }
-}
 
 /**
- * @param saves who wrote what and when. The provider owns it and shares one instance between
- * its panels; the save rules themselves are in `saveHandlers`.
+ * The messages every viewer answers the same way: lifecycle, the escape hatches, and the
+ * external-link filter.
+ *
+ * @param clearCache set by Clear cache when it ran with no panel of this viewer open; the
+ * first open carries the one-shot flag so the webview can drop stale stored state.
  */
 export function handleCommonEvent(
   uri: Uri,
   handler: Handler,
-  saves: SaveTracker,
-  options: { clearCache?: boolean; hostWorkbook?: boolean; hostCsv?: boolean } = {},
+  options: { clearCache?: boolean } = {},
 ) {
-  let readOnly = false;
   // One-shot: the first successful open may clear; a later fileChange must not clear again.
   let clearCache = options.clearCache === true;
 
   const send = async () => {
-    if (saves.shouldSkip(uri.toString())) {
-      return;
-    }
-    readOnly = await isUriReadOnly(uri);
-    // The webview is about to replace its document, dropping unsaved edits.
-    saveHandlers.opened();
     const sendClear = clearCache;
     clearCache = false;
     if (isVirtualUri(uri)) {
       void emitVirtualOfficeOpen(handler, uri, { clearCache: sendClear });
       return;
     }
-    await emitFileOfficeOpen(handler, uri, handler.panel.webview, {
-      clearCache: sendClear,
-      hostWorkbook: options.hostWorkbook,
-      hostCsv: options.hostCsv,
-    });
+    await emitFileOfficeOpen(handler, uri, handler.panel.webview, { clearCache: sendClear });
   };
-  const saveHandlers = createSaveHandlers<Uri>({
-    document: uri,
-    baseName: parse(uri.fsPath).name,
-    saves,
-    keyOf: (target) => target.toString(),
-    isReadOnly: () => readOnly,
-    writeFile: (target, bytes) => workspace.fs.writeFile(target, bytes),
-    pickTarget: ({ defaultFileName, filters }) => {
-      const defaultUri =
-        uri.scheme === "file"
-          ? Uri.file(join(parse(uri.fsPath).dir, defaultFileName))
-          : Uri.joinPath(uri, "..", defaultFileName);
-      return vscode.window.showSaveDialog({ defaultUri, filters });
-    },
-    setDirty: (dirty) => setDirty(handler, uri, dirty),
-    openTarget: (target) =>
-      vscode.commands.executeCommand("vscode.openWith", target, "GaussAA.officeViewer"),
-    emit: (type, payload) => handler.emit(type, payload),
-  });
   const events = handler.on("editInVSCode", (full: boolean) => {
     const side = full ? vscode.ViewColumn.Active : vscode.ViewColumn.Beside;
     vscode.commands.executeCommand("vscode.openWith", uri, "default", side);
@@ -83,9 +43,6 @@ export function handleCommonEvent(
     .on("fileChange", () => {
       void send();
     })
-    .on("change", () => {
-      saveHandlers.edited();
-    })
     .on("openForce", async () => {
       // The webview's size guard said "open anyway". A `file:` document is fetched by the
       // webview itself, so only a virtual one needs the host to read it again — this time
@@ -94,8 +51,6 @@ export function handleCommonEvent(
         await emitVirtualOfficeOpen(handler, uri, { force: true });
       }
     })
-    .on("save", (content) => saveHandlers.save(content))
-    .on("saveAs", (payload: SaveAsPayload) => saveHandlers.saveAs(payload))
     .on("developerTool", () => vscode.commands.executeCommand("workbench.action.toggleDevTools"))
     .on("revealFile", async () => {
       // The one exit a broken file actually has. A virtual document has nothing to reveal, and
@@ -115,7 +70,8 @@ export function handleCommonEvent(
         void vscode.env.openExternal(vscode.Uri.parse(safe));
       }
     })
-    .on("dispose", () => {
-      saves.forget(uri.toString());
-    });
+    // The file watcher and the message channel belong to `Handler.bind`, which closes them when
+    // the panel is disposed. Nothing is kept per document here, so this only keeps the event
+    // name documented for anyone adding per-document state later.
+    .on("dispose", () => {});
 }

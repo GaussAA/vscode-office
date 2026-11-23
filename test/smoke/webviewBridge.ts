@@ -2,29 +2,17 @@
  * A test-side bridge to one custom-editor webview, built only from what VS Code itself
  * exposes: the Chromium remote-debugging port (see `.vscode-test.mjs`).
  *
- * Why this exists: the extension API cannot post a message *from* a webview, and the host
- * save rules in `commonHandler` / `saveHandlers` only run when the webview sends `change`,
- * `save` or `saveAs`. Through the debugging port the test evaluates script inside the
- * webview's outer frame and calls the same `__vscode_post_message__('onmessage', ...)` that
- * `acquireVsCodeApi().postMessage` ends in, so the message travels VS Code's real
- * webview -> extension-host channel and reaches `panel.webview.onDidReceiveMessage`.
- * In the other direction, a `message` listener in the inner frame records everything the
- * host `postMessage`s (`open`, `saveDone`, `saveFailed`).
+ * Why this exists: the extension API can see that a custom editor tab exists, but not what is
+ * inside it. Through the debugging port the test evaluates script in the webview and reads the
+ * DOM and the viewer's own `performance` entries — which is how the host-cache suite tells a
+ * cache hit from a rebuild.
  *
- * Nothing here touches `src/`. What it does NOT do is drive the Excel UI: an edit is the
- * `change` message the UI would send, not a cell being typed into the canvas.
+ * Nothing here touches `src/`.
  */
 import * as http from "node:http";
 
 /** Must match `--remote-debugging-port` in `.vscode-test.mjs`. */
 export const DEBUG_PORT = 9339;
-
-export interface HostMessage {
-  type: string;
-  /** Only the fields tests assert on; `open` payloads are not copied (they can be large). */
-  reason?: string;
-  message?: string;
-}
 
 interface DebugTarget {
   id: string;
@@ -132,47 +120,22 @@ class CdpSession {
     this.socket.close();
   }
 }
-// Runs in the outer webview frame. The inner frame is same-origin, so its window is reachable.
-// Do not require a canvas here: the windowed spreadsheet and the JSON preview have none. The
-// existing Excel grid tests ask for the canvas separately.
-const INSTALL_RECORDER = `(() => {
-  const inner = document.querySelector('iframe');
-  const win = inner && inner.contentWindow;
-  if (!win || !inner.contentDocument) return false;
-  if (!win.__hostLog) {
-    win.__hostLog = [];
-    win.addEventListener('message', (event) => {
-      const data = event.data;
-      if (!data || typeof data.type !== 'string') return;
-      const entry = { type: data.type };
-      if (data.content && typeof data.content === 'object') {
-        if (typeof data.content.reason === 'string') entry.reason = data.content.reason;
-        if (typeof data.content.message === 'string') entry.message = data.content.message;
-      }
-      win.__hostLog.push(entry);
-    });
-  }
-  return true;
-})()`;
 
-const CANVAS_READY = `(() => {
+/** Runs in the outer webview frame; the inner frame is same-origin, so its document is reachable. */
+const FRAME_READY = `(() => {
   const inner = document.querySelector('iframe');
-  const win = inner && inner.contentWindow;
-  return !!(win && inner.contentDocument && inner.contentDocument.querySelector('canvas'));
+  return !!(inner && inner.contentWindow && inner.contentDocument);
 })()`;
 
 export class WebviewBridge {
   private constructor(private readonly session: CdpSession) {}
 
   /**
-   * Attach to the webview that appeared after `knownIds` was taken, and wait until the Excel
-   * canvas is rendered. By then the host has answered `init` with `open`, so the host-side
-   * `send()` has finished and a later `change` cannot be overwritten by it.
+   * Attach to the webview that appeared after `knownIds` was taken, and wait until its frame is
+   * addressable. By then the host has answered `init` with `open`, so evaluating a cache measure
+   * reads a settled viewer.
    */
-  static async attachToNewWebview(
-    knownIds: ReadonlySet<string>,
-    options: { waitForCanvas?: boolean } = {},
-  ): Promise<WebviewBridge> {
+  static async attachToNewWebview(knownIds: ReadonlySet<string>): Promise<WebviewBridge> {
     const target = await waitFor(
       async () => (await listWebviewTargets()).find((candidate) => !knownIds.has(candidate.id)),
       () => "no new webview target appeared on the debugging port",
@@ -180,17 +143,10 @@ export class WebviewBridge {
     const session = await CdpSession.connect(target.webSocketDebuggerUrl);
     const bridge = new WebviewBridge(session);
     await waitFor(
-      () => session.evaluate<boolean>(INSTALL_RECORDER),
+      () => session.evaluate<boolean>(FRAME_READY),
       () => "the webview inner frame never became reachable",
       60000,
     );
-    if (options.waitForCanvas !== false) {
-      await waitFor(
-        () => session.evaluate<boolean>(CANVAS_READY),
-        () => "the Excel canvas never rendered inside the webview",
-        60000,
-      );
-    }
     return bridge;
   }
 
@@ -198,35 +154,9 @@ export class WebviewBridge {
     return new Set((await listWebviewTargets()).map((target) => target.id));
   }
 
-  /** Post a message the way the viewer's `handler.emit(type, content)` does. */
-  async post(type: string, content?: unknown): Promise<void> {
-    const message = JSON.stringify({ type, content });
-    await this.session.evaluate<boolean>(
-      `(window.__vscode_post_message__('onmessage', { message: ${message} }), true)`,
-    );
-  }
-
-  /** Run a script in the outer webview frame. Used when several messages must leave the
-   * webview back to back (no round trip to the test in between) or when a payload is better
-   * generated there than serialised through the debugging port. */
-  async run(expression: string): Promise<void> {
-    await this.session.evaluate<unknown>(expression);
-  }
-
-  /** Evaluate in the outer frame and return the value; windowed tests poll DOM/perf here. */
+  /** Evaluate in the outer frame and return the value; the cache-hit tests poll DOM/perf here. */
   async evaluate<T>(expression: string): Promise<T> {
     return this.session.evaluate<T>(expression);
-  }
-
-  /** Everything the host has posted to this webview since the recorder was installed. */
-  async received(): Promise<HostMessage[]> {
-    return this.session.evaluate<HostMessage[]>(
-      `(() => { const w = document.querySelector('iframe').contentWindow; return w.__hostLog || []; })()`,
-    );
-  }
-
-  async count(type: string): Promise<number> {
-    return (await this.received()).filter((entry) => entry.type === type).length;
   }
 
   close(): void {

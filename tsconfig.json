@@ -17,6 +17,7 @@
     "checkJs": false,
     "noEmit": true,
     "strict": true,
+    "types": ["node", "mocha"],
     "experimentalDecorators": true,
     "useDefineForClassFields": true
   },

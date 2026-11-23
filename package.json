@@ -1,7 +1,7 @@
 {
   "name": "office-viewer-plus",
-  "displayName": "Data File Viewer (Parquet, JSONL, Excel)",
-  "description": "Fork of Office Viewer narrowed to what its maintainer actually opens: spreadsheets (xls/xlsx/xlsm/csv/tsv/ods), parquet with ZSTD support, and a JSONL tree viewer.",
+  "displayName": "Data File Viewer (Parquet, JSONL)",
+  "description": "Fork of Office Viewer narrowed to what its maintainer actually opens: parquet with ZSTD support, and a JSONL tree viewer with a large-JSON array inspector.",
   "version": "6.18.0",
   "publisher": "GaussAA",
   "license": "MIT",
@@ -10,16 +10,10 @@
     "vscode": "^1.125.0"
   },
   "keywords": [
-    "excel",
-    "xlsx",
-    "xls",
-    "csv",
-    "tsv",
-    "ods",
     "parquet",
     "jsonl",
     "ndjson",
-    "spreadsheet"
+    "json"
   ],
   "categories": [
     "Visualization",
@@ -51,11 +45,6 @@
     ],
     "commands": [
       {
-        "command": "GaussAA.office.csv.switch",
-        "title": "Switch CSV editor",
-        "icon": "$(edit)"
-      },
-      {
         "command": "GaussAA.office.previewJson",
         "title": "Preview JSON",
         "category": "Data File Viewer"
@@ -74,11 +63,6 @@
     "menus": {
       "editor/title": [
         {
-          "command": "GaussAA.office.csv.switch",
-          "when": "resourceExtname == '.csv' || resourceExtname == '.tsv'",
-          "group": "navigation@-2"
-        },
-        {
           "command": "GaussAA.office.previewJson",
           "group": "navigation",
           "when": "resourceExtname == '.json'"
@@ -94,36 +78,6 @@
       ]
     },
     "customEditors": [
-      {
-        "viewType": "GaussAA.officeViewer",
-        "displayName": "Office Viewer",
-        "selector": [
-          {
-            "filenamePattern": "*.xls"
-          },
-          {
-            "filenamePattern": "*.xlsx"
-          },
-          {
-            "filenamePattern": "*.xlsm"
-          },
-          {
-            "filenamePattern": "file:/**/*.csv"
-          },
-          {
-            "filenamePattern": "vscode-vfs:/**/*.csv"
-          },
-          {
-            "filenamePattern": "vscode-remote:/**/*.csv"
-          },
-          {
-            "filenamePattern": "*.tsv"
-          },
-          {
-            "filenamePattern": "*.ods"
-          }
-        ]
-      },
       {
         "viewType": "GaussAA.parquetViewer",
         "displayName": "Parquet Viewer",
@@ -175,8 +129,6 @@
   },
   "devDependencies": {
     "@puppeteer/browsers": "^3.2.6",
-    "@types/dompurify": "^3.2.0",
-    "@types/jsdom": "^30.0.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.19.2",
     "@types/react": "^19.2.17",
@@ -190,7 +142,6 @@
     "esbuild": "^0.28.1",
     "husky": "^9.1.7",
     "hyparquet-writer": "^0.15.7",
-    "jsdom": "^31.0.1",
     "less": "^4.2.0",
     "ovsx": "^1.3.0",
     "oxfmt": "^0.76.0",
@@ -208,15 +159,10 @@
     "@ant-design/icons": "^6.3.4",
     "@vscode/codicons": "^0.0.45",
     "antd": "^6.7.0",
-    "buffer": "^6.0.3",
-    "dompurify": "^3.4.17",
     "hyparquet": "^1.26.1",
     "hyparquet-compressors": "^1.1.2",
-    "iconv-lite": "^0.7.3",
-    "jszip": "^3.10.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "xml-formatter": "^3.7.0",
     "yaml": "^2.9.0"
   },

@@ -5,7 +5,6 @@
  * 用法：
  *   node scripts/generate-test-fixtures.mjs
  *   node scripts/generate-test-fixtures.mjs --category=parquet
- *   node scripts/generate-test-fixtures.mjs --category=spreadsheet
  *   node scripts/generate-test-fixtures.mjs --category=jsonl
  */
 import { writeFileSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
@@ -362,124 +361,6 @@ function generateParquetFixtures() {
 }
 
 // ============================================================================
-// 表格文件生成
-// ============================================================================
-
-function generateSpreadsheetFixtures() {
-  const spreadsheetDir = join(fixturesRoot, "spreadsheet");
-  mkdirSync(spreadsheetDir, { recursive: true });
-
-  console.log("\n📊 生成表格 fixtures...");
-
-  // 1. 移动现有的 sample.csv
-  const oldCsvPath = join(fixturesRoot, "workspace", "sample.csv");
-  const newCsvPath = join(spreadsheetDir, "sample.csv");
-  if (existsSync(oldCsvPath) && !existsSync(newCsvPath)) {
-    copyFileSync(oldCsvPath, newCsvPath);
-    console.log(`   ✅ sample.csv (从 workspace/ 复制)`);
-  } else if (existsSync(newCsvPath)) {
-    console.log(`   ⏭️  sample.csv 已存在`);
-  }
-
-  // 2. TSV 文件
-  const tsvPath = join(spreadsheetDir, "sample.tsv");
-  if (!existsSync(tsvPath)) {
-    const content = `id\tname\tscore\tnote
-1\talpha\t95.5\tfirst entry
-2\tbeta\t87.3\tsecond entry
-3\tgamma\t92.1\tthird entry
-`;
-    writeFileSync(tsvPath, content, "utf8");
-    console.log(`   ✅ sample.tsv (4 行, Tab 分隔)`);
-  } else {
-    console.log(`   ⏭️  sample.tsv 已存在`);
-  }
-
-  // 3. UTF-8 with BOM
-  const bomPath = join(spreadsheetDir, "utf8-bom.csv");
-  if (!existsSync(bomPath)) {
-    const bom = "\uFEFF";
-    const content = `${bom}name,value,note
-测试,100,中文内容
-test,200,English content
-テスト,300,日本語
-`;
-    writeFileSync(bomPath, content, "utf8");
-    console.log(`   ✅ utf8-bom.csv (UTF-8 BOM, 多语言)`);
-  } else {
-    console.log(`   ⏭️  utf8-bom.csv 已存在`);
-  }
-
-  // 4. 无表头 CSV
-  const noHeaderPath = join(spreadsheetDir, "no-header.csv");
-  if (!existsSync(noHeaderPath)) {
-    const content = `1,apple,10.5
-2,banana,5.3
-3,orange,7.8
-`;
-    writeFileSync(noHeaderPath, content, "utf8");
-    console.log(`   ✅ no-header.csv (无表头)`);
-  } else {
-    console.log(`   ⏭️  no-header.csv 已存在`);
-  }
-
-  // 5. 空 CSV
-  const emptyCsvPath = join(spreadsheetDir, "empty.csv");
-  if (!existsSync(emptyCsvPath)) {
-    writeFileSync(emptyCsvPath, "", "utf8");
-    console.log(`   ✅ empty.csv (0 字节)`);
-  } else {
-    console.log(`   ⏭️  empty.csv 已存在`);
-  }
-
-  // 6. 只有表头
-  const headerOnlyPath = join(spreadsheetDir, "header-only.csv");
-  if (!existsSync(headerOnlyPath)) {
-    writeFileSync(headerOnlyPath, "id,name,score\n", "utf8");
-    console.log(`   ✅ header-only.csv (只有表头)`);
-  } else {
-    console.log(`   ⏭️  header-only.csv 已存在`);
-  }
-
-  // 7. 包含引号和换行的 CSV
-  const quotesPath = join(spreadsheetDir, "quotes-newlines.csv");
-  if (!existsSync(quotesPath)) {
-    const content = `id,text,note
-1,"Simple text",normal
-2,"Text with ""nested quotes""",quoted
-3,"Multi-line
-text here",newline
-4,"Comma, in text",comma
-`;
-    writeFileSync(quotesPath, content, "utf8");
-    console.log(`   ✅ quotes-newlines.csv (引号和换行)`);
-  } else {
-    console.log(`   ⏭️  quotes-newlines.csv 已存在`);
-  }
-
-  // 8. 混合类型列
-  const mixedTypesPath = join(spreadsheetDir, "mixed-types.csv");
-  if (!existsSync(mixedTypesPath)) {
-    const content = `id,mixed_column,note
-1,100,number
-2,text,string
-3,2024-01-01,date
-4,true,boolean
-5,,empty
-`;
-    writeFileSync(mixedTypesPath, content, "utf8");
-    console.log(`   ✅ mixed-types.csv (混合类型)`);
-  } else {
-    console.log(`   ⏭️  mixed-types.csv 已存在`);
-  }
-
-  console.log(
-    "\n   ⚠️  注意：Excel 文件（.xlsx, .xls, .xlsm, .ods）需要手动创建或使用 Python/LibreOffice",
-  );
-  console.log("   建议：用 Excel/LibreOffice 打开 sample.csv 并另存为各种格式");
-}
-
-// ============================================================================
 // JSONL 文件生成
 // ============================================================================
 
@@ -657,14 +538,13 @@ function updateReadme() {
   const readmePath = join(fixturesRoot, "README.md");
   const content = `# Test Fixtures
 
-测试样例数据文件，覆盖三种支持的格式：Parquet、表格（CSV/TSV/Excel）、JSONL。
+测试样例数据文件，覆盖两种支持的格式：Parquet 与 JSONL。
 
 ## 目录结构
 
 \`\`\`
 test/fixtures/
 ├── parquet/          # Parquet 格式样例
-├── spreadsheet/      # 表格格式样例（CSV, TSV, Excel）
 ├── jsonl/            # JSONL 格式样例
 └── workspace/        # 遗留文件（用于向后兼容）
 \`\`\`
@@ -683,21 +563,6 @@ test/fixtures/
 | \`single-row.parquet\` | 1 | 2 | - | 单行边界测试 |
 | \`single-column.parquet\` | 5 | 1 | - | 单列边界测试 |
 | \`corrupted.parquet\` | - | - | - | 损坏文件错误处理 |
-
-## 表格文件
-
-| 文件 | 行数 | 格式 | 用途 |
-|------|------|------|------|
-| \`sample.csv\` | 3 | CSV | 基本 CSV 测试 |
-| \`sample.tsv\` | 4 | TSV | Tab 分隔测试 |
-| \`utf8-bom.csv\` | 4 | CSV (UTF-8 BOM) | BOM 头 + 多语言 |
-| \`no-header.csv\` | 3 | CSV | 无表头 |
-| \`empty.csv\` | 0 | CSV | 空文件 |
-| \`header-only.csv\` | 1 | CSV | 只有表头 |
-| \`quotes-newlines.csv\` | 4 | CSV | 引号转义 + 换行 |
-| \`mixed-types.csv\` | 5 | CSV | 混合类型列 |
-
-**注意**：Excel 文件（.xlsx, .xls, .xlsm, .ods）需要手动创建。建议用 Excel/LibreOffice 打开 \`sample.csv\` 并另存为各种格式。
 
 ## JSONL 文件
 
@@ -719,7 +584,6 @@ test/fixtures/
 \`\`\`bash
 node scripts/generate-test-fixtures.mjs              # 生成全部
 node scripts/generate-test-fixtures.mjs --category=parquet
-node scripts/generate-test-fixtures.mjs --category=spreadsheet
 node scripts/generate-test-fixtures.mjs --category=jsonl
 \`\`\`
 
@@ -745,10 +609,6 @@ try {
     generateParquetFixtures();
   }
 
-  if (targetCategory === "all" || targetCategory === "spreadsheet") {
-    generateSpreadsheetFixtures();
-  }
-
   if (targetCategory === "all" || targetCategory === "jsonl") {
     generateJsonlFixtures();
   }
@@ -760,9 +620,8 @@ try {
   console.log("\n✅ 全部完成！");
   console.log("\n下一步：");
   console.log("  1. 检查生成的文件: ls -lh test/fixtures/*/");
-  console.log("  2. 手动创建 Excel 文件（.xlsx, .xls, .ods）");
-  console.log("  3. 运行测试验证: pnpm test");
-  console.log("  4. UI 验证: pnpm verify:ui");
+  console.log("  2. 运行测试验证: pnpm test");
+  console.log("  3. UI 验证: pnpm verify:ui");
 } catch (error) {
   console.error("\n❌ 错误:", error.message);
   process.exit(1);

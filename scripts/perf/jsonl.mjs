@@ -3,7 +3,7 @@
  *
  * The browser harness cannot see the extension host, where line indexing, window parsing and
  * the whole-file scan run. esbuild bundles those services into a temp directory and Node
- * measures them directly; the browser still runs for the parquet and spreadsheet scenarios.
+ * measures them directly; the browser still runs for the parquet scenarios.
  *
  * The window check asserts the **returned row count**, not only time: 40 x 2 MB lines must
  * return one row under the 4 MB budget, never the 40 an unbudgeted 500-line request parses.
