@@ -13,6 +13,7 @@ scripts/ui-verify/
 ├── harness.mjs   HTTP server: built HTML from out/webview + fake VS Code bridge + parquet bytes
 ├── browser.mjs   Puppeteer driver (puppeteer-core + @puppeteer/browsers) + a CDP session for CSP logs
 ├── fixtures.mjs  generates mixed/big parquet with hyparquet-writer, uses committed zstd sample
+├── frames.mjs    interaction-frame sampling shared by the parquet/JSONL/JSON smoothness scenarios
 ├── scenarios/    scenario definitions split across modules (json, jsonl, parquet-*, compare, etc.)
 └── fixtures/zstd.parquet
 ```
@@ -103,16 +104,16 @@ Rules that keep this suite useful:
 
 ## Route smoke vs. real scenarios
 
-`remaining-routes-smoke` walked the **React** routes without a behavioural scenario of their
-own — `excel` since the Git History panel was removed in 6.8.0 — with a minimal `open` payload
-and asserted that something mounted and nothing threw. Its job was to catch fork-wide breakage
-(entry, provider, shared utilities), **not** rendering correctness.
+`remaining-routes-smoke` used to walk the **React** routes without a behavioural scenario of
+their own — `excel` since the Git History panel was removed in 6.8.0 — with a minimal `open`
+payload and assert that something mounted and nothing threw. Its job was to catch fork-wide
+breakage (entry, provider, shared utilities), **not** rendering correctness.
 
-The spreadsheet viewer was removed in 7.0.0 ([ADR-0029](../adr/0029-narrow-to-two-viewers.md)), so
-`parquet` (`parquet-*`), `jsonl` (`jsonl-*`) and `json` (`json-*`) are the only routes left and
-each has its own scenarios; the route-smoke scenario goes with the route. `viewer-registry.test.ts`
-asserts that every route in `main.tsx` is covered one way or the other, so adding a route without
-coverage fails the build instead of silently shrinking the suite.
+It was deleted with the spreadsheet viewer in 7.0.0 ([ADR-0029](../adr/0029-narrow-to-two-viewers.md)):
+`parquet` (`parquet-*`), `jsonl` (`jsonl-*`) and `json` (`json-*`) are the only routes left, and
+each has behavioural scenarios. `viewer-registry.test.ts` replaces the scrape with a two-way pin:
+every route in `main.tsx` has a named scenario and every mapped route exists, so adding a route
+without coverage fails the build instead of silently shrinking the suite.
 
 No viewer is served outside the React route table anymore: the HTML preview panel and the PDF
 viewer were the last two, and both were removed in 6.0.0.
