@@ -32,16 +32,23 @@ docs/**
 .ui-verify/**
 .perf/**
 .agents/**
+.impeccable/**
 AGENTS.md
 CLAUDE.md
 GLOSSARY.md
+DESIGN.md
+PRODUCT.md
 *.vsix
+
+# Build reports: the visualizer writes a 1.7 MB HTML file that no code path loads.
+stats/**
 
 # Dev scaffolding: formatter/linter config, the smoke runner's config, the Vite dev page.
 .husky/**
 .oxlintrc.json
 .oxfmtrc.json
 .vscode-test.mjs
+.nvmrc
 index.html
 .git-blame-ignore-revs
 .review-tmp/**

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The vsix no longer ships build reports or internal notes.** `stats/bundle-analysis.html`
+  (the visualizer's 1.7 MB report), `.impeccable/design.json`, `DESIGN.md`, `PRODUCT.md` and
+  `.nvmrc` are excluded, and the two dead `image/git-history-*.svg` assets are deleted. 7.0.0's
+  package was 59 files / 944 KB; the next one is 52 files / 754 KB.
+
 ## [7.0.0] - 2026-11-23
 
 ### Removed
