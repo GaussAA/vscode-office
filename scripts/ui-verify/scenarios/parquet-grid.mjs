@@ -285,7 +285,6 @@ export default [
   },
   {
     name: "parquet-restore-page",
-    docs: "parquet-restore-page.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
       const size = await pageSize(page);
@@ -316,7 +315,6 @@ export default [
   },
   {
     name: "parquet-large-jump",
-    docs: "parquet-large-file.png",
     async run({ page, base }) {
       await openParquet(page, base, "?big=1");
       const size = await pageSize(page);
@@ -537,7 +535,6 @@ export default [
   },
   {
     name: "parquet-inspector",
-    docs: "parquet-inspector.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
       const hint = await page.evaluate(
@@ -703,7 +700,6 @@ export default [
   },
   {
     name: "parquet-value-panel",
-    docs: "parquet-value-panel.png",
     async run({ page, base }) {
       // Issue #46: the only way to read a value used to be a native tooltip — unselectable,
       // unwrappable, uncopyable — and DESIGN.md forbids a tooltip as the only channel.
@@ -1038,7 +1034,6 @@ export default [
   },
   {
     name: "parquet-search",
-    docs: "parquet-search.png",
     async run({ page, base }) {
       await openParquet(page, base, "?mixed=1");
       const size = await pageSize(page);

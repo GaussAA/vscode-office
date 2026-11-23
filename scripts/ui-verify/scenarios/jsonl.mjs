@@ -87,7 +87,6 @@ export default [
   },
   {
     name: "jsonl-search",
-    docs: "jsonl-search.png",
     async run({ page, base }) {
       await openJsonl(page, base);
       await page.evaluate(`(() => {
