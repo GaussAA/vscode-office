@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Empty arrays and objects no longer offer an expand arrow.** `[]` and `{}` were treated as
+  expandable because the adapter checked only "composite"; they are plain leaves now
+  (`isEmptyComposite`), so no click lands on an empty branch.
+- **Search marks hits inside an already-expanded lazy subtree.** Children loaded before the query
+  kept their pre-search summaries; while a search is active the adapter recomputes each visible
+  summary from the value, so the hit is marked and centred.
+- **Truncation never splits an emoji (or any surrogate pair).** The 120-character summaries, the
+  Raw header, the value panel's 4,000,000-character cut, the panel chunks and the host's
+  label/text caps all move the cut to a code-point boundary.
 - **Expanding a JSONL/JSON subtree could show an open arrow over an empty branch.** rc-tree hands
   `loadData` a copy of the node, so the children were attached to an object nothing rendered; and
   a node that was auto-expanded on mount was never asked to load at all. Lazy children now live

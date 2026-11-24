@@ -64,7 +64,17 @@ export function utf8ByteSize(text: string): number {
 
 /** Truncate text for preview: keep the first `max` characters, append "…" if cut. */
 export function truncate(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max)}…`;
+  return text.length <= max ? text : `${clipText(text, max)}…`;
+}
+
+/** A prefix of `text` that never ends between the two halves of a surrogate pair. */
+export function clipText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  let end = max;
+  const high = text.charCodeAt(end - 1);
+  const low = text.charCodeAt(end);
+  if (high >= 0xd800 && high <= 0xdbff && low >= 0xdc00 && low <= 0xdfff) end -= 1;
+  return text.slice(0, end);
 }
 
 /**

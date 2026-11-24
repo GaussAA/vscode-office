@@ -44,6 +44,19 @@ export function isComposite(value: unknown): value is Record<PathSeg, unknown> |
   return typeof value === "object" && value !== null;
 }
 
+/**
+ * A composite with nothing to expand. Arrays answer by length; objects stop at the first own
+ * key instead of allocating `Object.keys()` for a large one.
+ */
+export function isEmptyComposite(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length === 0;
+  if (!isObject(value)) return false;
+  for (const key in value) {
+    if (Object.prototype.hasOwnProperty.call(value, key)) return false;
+  }
+  return true;
+}
+
 export function typeLabel(value: unknown): string {
   if (value === null) return "null";
   if (Array.isArray(value)) return `array[${value.length}]`;
@@ -59,9 +72,38 @@ export function typeClass(value: unknown): string {
   return typeof value;
 }
 
-/** JSON-escaped body of the first `limit` characters; quotes are added by the caller. */
-function escapedBody(text: string, limit: number): string {
-  const quoted = JSON.stringify(text.slice(0, limit));
+/** A high surrogate must be followed by a low one; cutting between them paints a broken glyph. */
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff;
+}
+
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff;
+}
+
+/** Move a window edge outward so it does not separate a surrogate pair. */
+function safeWindowEnd(text: string, start: number, end: number): number {
+  return start < end &&
+    end < text.length &&
+    isHighSurrogate(text.charCodeAt(end - 1)) &&
+    isLowSurrogate(text.charCodeAt(end))
+    ? end + 1
+    : end;
+}
+
+/** Move a window start back so it begins at a code point, not at a low surrogate. */
+function safeWindowStart(text: string, start: number): number {
+  return start > 0 &&
+    start < text.length &&
+    isLowSurrogate(text.charCodeAt(start)) &&
+    isHighSurrogate(text.charCodeAt(start - 1))
+    ? start - 1
+    : start;
+}
+
+/** JSON-escaped body of an already-windowed string; quotes are added by the caller. */
+function escapeJsonBody(text: string): string {
+  const quoted = JSON.stringify(text);
   return quoted.length >= 2 ? quoted.slice(1, -1) : "";
 }
 
@@ -80,11 +122,12 @@ export function stringSummary(text: string, highlight?: string): string {
   let start = 0;
   if (highlight) {
     const hit = text.toLowerCase().indexOf(highlight.toLowerCase());
-    if (hit > 0) start = Math.max(0, hit - Math.floor(limit / 3));
+    if (hit > 0) start = safeWindowStart(text, Math.max(0, hit - Math.floor(limit / 3)));
   }
-  const body = escapedBody(text.slice(start, start + limit), limit);
+  const end = safeWindowEnd(text, start, start + limit);
+  const body = escapeJsonBody(text.slice(start, end));
   const lead = start > 0 ? "…" : "";
-  const tail = start + limit < text.length ? "…" : "";
+  const tail = end < text.length ? "…" : "";
   return `"${lead}${body}${tail}"${count}`;
 }
 
@@ -96,9 +139,8 @@ export function summaryHead(
   text: string,
   limit = SUMMARY_CHARS,
 ): { text: string; truncated: boolean } {
-  return text.length > limit
-    ? { text: text.slice(0, limit), truncated: true }
-    : { text, truncated: false };
+  if (text.length <= limit) return { text, truncated: false };
+  return { text: text.slice(0, safeWindowEnd(text, 0, limit)), truncated: true };
 }
 
 /**
@@ -125,8 +167,11 @@ export function chunkText(text: string, maxChars = 4_000): string[] {
   for (const line of text.split("\n")) {
     if (line.length > maxChars) {
       flush();
-      for (let at = 0; at < line.length; at += maxChars) {
-        chunks.push(line.slice(at, at + maxChars));
+      let at = 0;
+      while (at < line.length) {
+        const end = safeWindowEnd(line, at, Math.min(line.length, at + maxChars));
+        chunks.push(line.slice(at, end));
+        at = end;
       }
       continue;
     }
@@ -340,7 +385,15 @@ export function jsonTextBounded(value: unknown, limit: number): ValueText {
       truncated = true;
       return;
     }
-    const fit = Math.min(chunk.length, limit - text.length);
+    const fitRaw = Math.min(chunk.length, limit - text.length);
+    // Keep the cut on a code-point boundary; a lone surrogate paints as a broken glyph.
+    const fit =
+      fitRaw > 0 &&
+      fitRaw < chunk.length &&
+      isHighSurrogate(chunk.charCodeAt(fitRaw - 1)) &&
+      isLowSurrogate(chunk.charCodeAt(fitRaw))
+        ? fitRaw - 1
+        : fitRaw;
     text += chunk.slice(0, fit);
     if (fit < chunk.length) truncated = true;
   };
@@ -415,7 +468,7 @@ export function jsonTextBounded(value: unknown, limit: number): ValueText {
     emit(value, "");
   } catch {
     const fallback = String(value);
-    text = fallback.slice(0, limit);
+    text = fallback.slice(0, safeWindowEnd(fallback, 0, limit));
     chars = fallback.length;
     truncated = fallback.length > limit;
   }
@@ -425,7 +478,11 @@ export function jsonTextBounded(value: unknown, limit: number): ValueText {
 export function fullValueText(value: unknown, limit: number): ValueText {
   if (typeof value === "string") {
     if (value.length <= limit) return { text: value, chars: value.length, truncated: false };
-    return { text: value.slice(0, limit), chars: value.length, truncated: true };
+    return {
+      text: value.slice(0, safeWindowEnd(value, 0, limit)),
+      chars: value.length,
+      truncated: true,
+    };
   }
   try {
     return jsonTextBounded(value, limit);

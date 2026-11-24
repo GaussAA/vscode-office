@@ -1,9 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classifyEntry, utf8ByteSize } from "../../src/service/entryClassifier";
+import { classifyEntry, clipText, truncate, utf8ByteSize } from "../../src/service/entryClassifier";
 
 test("utf8ByteSize: calculates byte size for ASCII text", () => {
   assert.equal(utf8ByteSize("hello"), 5);
+});
+
+test("truncate/clipText: never cut a surrogate pair in half", () => {
+  const text = `${"a".repeat(39)}😀tail`;
+  const cut = truncate(text, 40);
+  assert.ok(cut.endsWith("…"));
+  assert.ok(!/[\ud800-\udbff]$/.test(cut.slice(0, -1)), "preview ends with a lone high surrogate");
+  assert.ok(!/[\ud800-\udbff]$/.test(clipText(text, 40)), "clip ends with a lone high surrogate");
+  assert.equal(clipText("short", 40), "short");
 });
 
 test("utf8ByteSize: calculates byte size for UTF-8 text", () => {

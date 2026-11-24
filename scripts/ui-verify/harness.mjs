@@ -254,6 +254,34 @@ function nestedFixtures() {
   ];
 }
 
+/** `?edge=1`: shapes the expansion invariant has to survive — wide, empty, deep arrays/objects. */
+function edgeFixtures() {
+  const values = [
+    {
+      meta: {
+        items: Array.from({ length: 260 }, (_, index) => ({ index, label: `row ${index}` })),
+      },
+    },
+    { a: { b: { emptyArray: [], emptyObject: {} } } },
+    { deep: { l1: { l2: { l3: { l4: "bottom" } } } } },
+    { outer: { mid: { deep: { long: `${"a".repeat(180)}-needle-marker` } } } },
+  ];
+  return values.map((value, index) => {
+    const text = JSON.stringify(value);
+    return {
+      index,
+      kind: "value",
+      raw: text.length <= 120 ? text : `${text.slice(0, 120)}…`,
+      text,
+      size: text.length,
+      textChars: text.length,
+      textTruncated: false,
+      label: `edge-${index}`,
+      value,
+    };
+  });
+}
+
 /** `?many=N`: N identical-shaped directory rows, for scroll/reachability scenarios. */
 function manyFixtures(count) {
   return Array.from({ length: count }, (_, index) => {
@@ -1068,7 +1096,9 @@ export function startHarness(fixtures, port = 0) {
           ? manyFixtures(many)
           : url.searchParams.get("nested") === "1"
             ? nestedFixtures()
-            : entries;
+            : url.searchParams.get("edge") === "1"
+              ? edgeFixtures()
+              : entries;
       const stub =
         path === "/harness-json"
           ? jsonStub(

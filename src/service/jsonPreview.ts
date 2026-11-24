@@ -20,7 +20,12 @@ import {
   type JsonSearchBatch,
   type JsonSyntaxErrorInfo,
 } from "@/common/jsonPreviewTypes";
-import { classifyEntry, truncate, type EntryClassification } from "@/service/entryClassifier";
+import {
+  classifyEntry,
+  clipText,
+  truncate,
+  type EntryClassification,
+} from "@/service/entryClassifier";
 import { jsonArrayAdapter, type JsonArrayAdapter } from "@/service/jsonArrayAdapter";
 import { createCancelToken } from "@/service/recordAddressableDocument";
 
@@ -206,7 +211,7 @@ function detailFrom(index: number, classification: EntryClassification): JsonlEn
     classification.kind === "value"
       ? ""
       : textTruncated
-        ? classification.text.slice(0, JSON_MAX_TEXT_CHARS)
+        ? clipText(classification.text, JSON_MAX_TEXT_CHARS)
         : classification.text;
   const base = {
     index,

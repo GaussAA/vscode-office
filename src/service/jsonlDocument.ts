@@ -11,7 +11,7 @@ import {
   type JsonlEntryDetail,
   type JsonlEntrySummary,
 } from "@/common/jsonlTypes";
-import { classifyEntry, truncate } from "@/service/entryClassifier";
+import { classifyEntry, clipText, truncate } from "@/service/entryClassifier";
 import {
   findCaseInsensitive,
   foldNeedle,
@@ -267,7 +267,7 @@ export function buildJsonlEntry(
   const textChars = classification.text.length;
   const textTruncated = textChars > JSONL_MAX_TEXT_CHARS;
   const fullText = textTruncated
-    ? classification.text.slice(0, JSONL_MAX_TEXT_CHARS)
+    ? clipText(classification.text, JSONL_MAX_TEXT_CHARS)
     : classification.text;
   // The tree needs the parsed value, not the line: shipping both doubles every detail message
   // (ADR-0030). Raw shows the same 120-character summary as every other surface (`raw` below),

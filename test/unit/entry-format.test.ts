@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   isComposite,
+  isEmptyComposite,
   typeLabel,
   typeClass,
   preview,
@@ -14,6 +15,9 @@ import {
   jsonText,
   jsonTextBounded,
   fullValueText,
+  chunkText,
+  summaryHead,
+  stringSummary,
 } from "../../src/react/view/entry/entryFormat.ts";
 
 // ===== Type Checking =====
@@ -310,4 +314,35 @@ test("buildEntryModel: includes all keys", () => {
   const obj = { a: { b: 1 }, c: 2 };
   const model = buildEntryModel(obj);
   assert(model.keys.length >= 3); // a, a.b, c
+});
+
+test("isEmptyComposite: empty containers only", () => {
+  assert.equal(isEmptyComposite([]), true);
+  assert.equal(isEmptyComposite({}), true);
+  assert.equal(isEmptyComposite([0]), false);
+  assert.equal(isEmptyComposite({ a: undefined }), false);
+  assert.equal(isEmptyComposite(null), false);
+  assert.equal(isEmptyComposite(""), false);
+  assert.equal(isEmptyComposite(0), false);
+});
+
+test("text boundaries never split a surrogate pair", () => {
+  const emoji = "😀";
+  const chunks = chunkText(`${"a".repeat(3_999)}${emoji}${"b".repeat(5)}`);
+  assert.equal(chunks.join(""), `${"a".repeat(3_999)}${emoji}${"b".repeat(5)}`);
+  for (const chunk of chunks) {
+    assert.ok(!/[\ud800-\udbff]$/.test(chunk), "a chunk ends with a lone high surrogate");
+    assert.ok(!/^[\udc00-\udfff]/.test(chunk), "a chunk starts with a lone low surrogate");
+  }
+
+  const head = summaryHead(`${"a".repeat(119)}${emoji}tail`);
+  assert.equal(head.truncated, true);
+  assert.ok(!/[\ud800-\udbff]$/.test(head.text), "the raw summary ends mid-pair");
+
+  const summary = stringSummary(`${"a".repeat(119)}${emoji}${"tail".repeat(3)}`);
+  assert.ok(summary.includes(emoji), `the summary escaped a lone surrogate: ${summary}`);
+
+  const panel = fullValueText(`${"a".repeat(3_999)}${emoji}b`, 4_000);
+  assert.equal(panel.truncated, true);
+  assert.ok(!/[\ud800-\udbff]$/.test(panel.text), "the panel cut ends mid-pair");
 });

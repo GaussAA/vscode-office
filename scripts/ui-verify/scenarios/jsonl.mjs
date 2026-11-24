@@ -1,4 +1,12 @@
-import { expect, json, jumpJsonl, openEmptyJsonl, openJsonl, unexpected } from "../helpers.mjs";
+import {
+  expect,
+  json,
+  jumpJsonl,
+  openEmptyJsonl,
+  openJsonl,
+  setInput,
+  unexpected,
+} from "../helpers.mjs";
 import { describeFrames, framesOf, summarizeFrames } from "../frames.mjs";
 
 /** 19 scenario(s); the runner concatenates these lists. */
@@ -686,6 +694,150 @@ export default [
       );
       expect(loaded, "the clicked lazy node rendered no children");
       return "a clicked lazy node loads its children";
+    },
+  },
+  {
+    name: "jsonl-expansion-invariants",
+    async run({ page, base }) {
+      const probe = `(() => {
+                const rows = [...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')];
+                const read = (row) => ({
+                    level: row.querySelectorAll('.ant-tree-indent-unit').length + 1,
+                    key: row.querySelector('.jsonl-key')?.textContent?.trim() ?? '?',
+                    open: !!row.querySelector('.ant-tree-switcher_open'),
+                    loading: !!row.querySelector('.ant-tree-switcher-loading-icon'),
+                    switcher: row.querySelector('.ant-tree-switcher')?.className ?? '',
+                    type: row.querySelector('.jsonl-type')?.textContent ?? '',
+                });
+                const info = rows.map(read);
+                const violations = [];
+                for (let i = 0; i < info.length - 1; i++) {
+                    const node = info[i];
+                    if (!node.open || node.loading) continue;
+                    if (info[i + 1].level <= node.level) violations.push(node.key + '@' + node.level);
+                }
+                // Under a screenful there is no virtual-list cut, so even the last row must not
+                // be an open branch that ends the list.
+                const last = info[info.length - 1];
+                if (info.length < 20 && last && last.open && !last.loading &&
+                    !/array\\[0\\]|object\\{0\\}/.test(last.type)) {
+                    violations.push(last.key + '@' + last.level + ':last');
+                }
+                return JSON.stringify({
+                    rows: info.length,
+                    keys: info.map((node) => node.key),
+                    violations,
+                    emptyOpen: info.filter((node) =>
+                        node.open && /array\\[0\\]|object\\{0\\}/.test(node.type)).length,
+                    emptySwitchers: info.filter((node) =>
+                        /^(emptyArray|emptyObject)$/.test(node.key) && !node.switcher.includes('noop')).length,
+                });
+            })()`;
+      const reports = [];
+      await openJsonl(page, base, "dark", "&edge=1");
+      for (let index = 0; index < 3; index++) {
+        if (index > 0) await jumpJsonl(page, index + 1);
+        const ready = await page.waitFor(`!!document.querySelector('.jsonl-detail__tree')`);
+        expect(ready, `edge entry ${index} never rendered`);
+        await page.sleep(900);
+        const report = json(await page.evaluate(probe));
+        expect(
+          report.violations.length === 0,
+          `edge entry ${index}: open rows with no child rows: ${JSON.stringify(report.violations)} (keys: ${report.keys.join(", ")})`,
+        );
+        expect(
+          report.emptyOpen === 0,
+          `edge entry ${index}: empty composites offered an expand arrow (${report.emptyOpen})`,
+        );
+        if (index === 1) {
+          expect(report.emptySwitchers === 0, "empty composites still rendered an expand switcher");
+        }
+        reports.push(`edge-${index}: ${report.rows} rows [${report.keys.join(", ")}]`);
+      }
+      // Same invariant on the everyday fixtures, not only the synthetic edge shapes.
+      await openJsonl(page, base);
+      const dense = await page.waitFor(
+        `document.querySelector('.jsonl-detail__index')?.innerText === 'L1' && !!document.querySelector('.jsonl-detail__tree')`,
+      );
+      expect(dense, "the default fixture never rendered");
+      await page.sleep(700);
+      const everyday = json(await page.evaluate(probe));
+      expect(
+        everyday.violations.length === 0,
+        `default entry: open rows with no child rows: ${JSON.stringify(everyday.violations)}`,
+      );
+      await jumpJsonl(page, 16);
+      await page.waitFor(`document.querySelector('.jsonl-detail__index')?.innerText === 'L16'`);
+      await page.sleep(900);
+      const heavy = json(await page.evaluate(probe));
+      expect(
+        heavy.violations.length === 0,
+        `dense entry: open rows with no child rows: ${JSON.stringify(heavy.violations)} (keys: ${heavy.keys.join(", ")})`,
+      );
+      reports.push(`default: ${everyday.rows} rows`, `dense: ${heavy.rows} rows`);
+
+      // The 200-child cap: the overflow row has to exist and stay a leaf.
+      await openJsonl(page, base, "dark", "&edge=1");
+      await page.evaluate(`(async () => {
+                const holder = document.querySelector('.jsonl-detail__tree .ant-tree-list-holder');
+                if (!holder) return;
+                for (let i = 0; i < 6; i++) {
+                    holder.scrollTop = holder.scrollHeight;
+                    await new Promise((resolve) => setTimeout(resolve, 150));
+                }
+            })()`);
+      const more = await page.evaluate(
+        `document.querySelector('.jsonl-detail__tree .jsonl-more')?.innerText ?? null`,
+      );
+      expect(/60 more keys/.test(more ?? ""), `wide array overflow row is ${more}`);
+
+      // A fourth-level lazy node loads like the others when clicked.
+      await jumpJsonl(page, 3);
+      await page.waitFor(`document.querySelector('.jsonl-detail__index')?.innerText === 'L3'`);
+      const deepClick = await page.evaluate(`(() => {
+                const row = [...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')]
+                    .find((node) => node.querySelector('.jsonl-key')?.textContent?.trim() === 'l3'
+                        && node.querySelector('.ant-tree-switcher_close'));
+                row?.querySelector('.ant-tree-switcher_close')
+                    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return !!row;
+            })()`);
+      expect(deepClick, "the fourth-level lazy row was not collapsed");
+      const bottom = await page.waitFor(
+        `[...document.querySelectorAll('.jsonl-detail__tree .jsonl-key')]
+                    .some((node) => node.textContent.trim() === 'l4')`,
+      );
+      expect(bottom, "the fourth-level lazy node rendered no child");
+      reports.push("wide overflow + fourth-level lazy node ok");
+      return reports.join(" · ");
+    },
+  },
+  {
+    name: "jsonl-search-marks-loaded-lazy-values",
+    async run({ page, base }) {
+      await openJsonl(page, base, "dark", "&edge=1");
+      await jumpJsonl(page, 4);
+      const ready = await page.waitFor(
+        `document.querySelector('.jsonl-detail__index')?.innerText === 'L4' && !!document.querySelector('.jsonl-detail__tree')`,
+      );
+      expect(ready, "the long-string entry never rendered");
+      // deep (depth 3) is lazy; its child long arrives before there is any search term.
+      const loaded = await page.waitFor(
+        `[...document.querySelectorAll('.jsonl-detail__tree .jsonl-key')]
+                    .some((node) => node.textContent.trim() === 'long')`,
+      );
+      expect(loaded, "the lazy node never loaded its long-string child");
+      const before = await page.evaluate(
+        `document.querySelector('.jsonl-detail__tree')?.innerText.includes('needle-marker') ?? false`,
+      );
+      expect(!before, "the 120-character summary unexpectedly includes the tail marker");
+      await page.evaluate(setInput(".jsonl-search input", "needle-marker"));
+      const marked = await page.waitFor(
+        `[...document.querySelectorAll('.jsonl-detail__tree mark.jsonl-hit')]
+                    .some((mark) => (mark.textContent ?? '').includes('needle-marker'))`,
+      );
+      expect(marked, "searching a value inside an already-loaded lazy node rendered no hit");
+      return "a value loaded before the search is re-marked and re-centred";
     },
   },
   {
