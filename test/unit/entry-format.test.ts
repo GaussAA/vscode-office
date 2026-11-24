@@ -310,10 +310,24 @@ test("buildEntryModel: marks truncation at max nodes", () => {
   assert.strictEqual(model.count, 3);
 });
 
-test("buildEntryModel: includes all keys", () => {
-  const obj = { a: { b: 1 }, c: 2 };
-  const model = buildEntryModel(obj);
-  assert(model.keys.length >= 3); // a, a.b, c
+test("buildEntryModel: pathPrefix keeps lazy child keys rooted at the entry", () => {
+  const root = { messages: [{ content: [{ type: "text", text: "hello" }] }] };
+  const model = buildEntryModel(root.messages[0].content[0], {
+    pathPrefix: ["messages", 0, "content", 0],
+    lazyDepth: 1,
+  });
+  const text = model.nodes.find((node) => node.label === "text");
+  assert.ok(text);
+  assert.deepEqual(text.path, ["messages", 0, "content", 0, "text"]);
+  assert.equal(text.key, makePathKey(["messages", 0, "content", 0, "text"]));
+  assert.equal(valueAtPath(root, text.path), "hello");
+});
+
+test("buildEntryModel: pathPrefix does not change relative lazy depth", () => {
+  const model = buildEntryModel({ a: { b: 1 } }, { pathPrefix: ["x", "y"], lazyDepth: 1 });
+  const a = model.nodes.find((node) => node.label === "a");
+  assert.ok(a);
+  assert.equal(a.lazy, true, "the direct child is still one level below the prefix");
 });
 
 test("isEmptyComposite: empty containers only", () => {

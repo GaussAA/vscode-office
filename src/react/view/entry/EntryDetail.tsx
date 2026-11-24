@@ -216,6 +216,7 @@ export default function EntryDetail({
       await Promise.resolve();
       const built = buildEntryModel(source.value, {
         lazyDepth: 1,
+        pathPrefix: source.path,
         ...(highlight ? { highlight } : {}),
       });
       // rc-tree passes a copy of the DataNode to `loadData`, and its entities are converted

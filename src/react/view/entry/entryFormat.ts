@@ -253,8 +253,13 @@ export interface EntryModelOptions {
   maxDepth?: number;
   maxNodes?: number;
   defaultExpandDepth?: number;
-  /** Build children only to this depth; deeper composites are marked lazy. */
+  /** Build children only to this depth (relative to `pathPrefix`); deeper composites are lazy. */
   lazyDepth?: number;
+  /**
+   * Absolute path of the value being built. A lazy node loads its subtree with this set to the
+   * node's own path, so child keys stay rooted at the entry and `valueAtPath` still resolves them.
+   */
+  pathPrefix?: PathSeg[];
   /** Search term; long-string summaries are centred on its first occurrence. */
   highlight?: string;
 }
@@ -269,6 +274,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
   const maxNodes = options.maxNodes ?? MAX_TREE_NODES;
   const defaultExpandDepth = options.defaultExpandDepth ?? DEFAULT_EXPAND_DEPTH;
   const lazyDepth = options.lazyDepth ?? Number.POSITIVE_INFINITY;
+  const basePath = options.pathPrefix ?? [];
   const highlight = options.highlight;
 
   const keys: string[] = [];
@@ -292,7 +298,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
       const key = makePathKey(childPath);
       count++;
       keys.push(key);
-      if (childPath.length <= defaultExpandDepth) shallowKeys.push(key);
+      if (childPath.length - basePath.length <= defaultExpandDepth) shallowKeys.push(key);
       const childComposite = isComposite(child);
       // At the cap the node keeps its type badge but must not advertise an expand arrow that
       // opens nothing. Its hidden key count is the honest "… N more keys" suffix.
@@ -305,7 +311,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
               : 0
           : 0;
       const capped = hiddenKeys > 0;
-      const lazy = childComposite && !capped && childPath.length >= lazyDepth;
+      const lazy = childComposite && !capped && childPath.length - basePath.length >= lazyDepth;
       nodes.push({
         key,
         path: childPath,
@@ -339,7 +345,7 @@ export function buildEntryModel(value: unknown, options: EntryModelOptions = {})
     return nodes;
   };
 
-  const nodes = walk(value, []);
+  const nodes = walk(value, basePath);
   return { nodes, keys, shallowKeys, count, truncated, limit: maxNodes };
 }
 

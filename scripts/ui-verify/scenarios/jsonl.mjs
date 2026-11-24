@@ -841,6 +841,73 @@ export default [
     },
   },
   {
+    name: "jsonl-select-loaded-child",
+    async run({ page, base }) {
+      await openJsonl(page, base, "dark", "&nested=1");
+      await page.waitFor(`!!document.querySelector('.jsonl-detail__tree')`);
+      // content[1] is a lazy child object; open it so its `text` leaf is selectable.
+      const opened = await page.evaluate(`(() => {
+                const rows = [...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')];
+                const contentAt = rows.findIndex((node) =>
+                    node.querySelector('.jsonl-key')?.textContent?.trim() === 'content');
+                const row = rows.slice(contentAt + 1).find((node) =>
+                    node.querySelector('.jsonl-key')?.textContent?.trim() === '[1]'
+                        && node.querySelector('.ant-tree-switcher_close'));
+                row?.querySelector('.ant-tree-switcher_close')
+                    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return !!row;
+            })()`);
+      expect(opened, "content[1] was not rendered as a collapsed child");
+      const textRow = await page.waitFor(
+        `!![...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')]
+                    .find((node) => node.querySelector('.jsonl-key')?.textContent?.trim() === 'text')`,
+      );
+      expect(textRow, "content[1] never loaded its text leaf");
+      const selected = await page.evaluate(`(() => {
+                const row = [...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')]
+                    .find((node) => node.querySelector('.jsonl-key')?.textContent?.trim() === 'text');
+                row?.querySelector('.ant-tree-node-content-wrapper')
+                    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return !!row;
+            })()`);
+      expect(selected, "the text leaf under content[1] was not selectable");
+      const bar = await page.waitFor(`!!document.querySelector('.jsonl-valuebar__toggle')`);
+      expect(bar, "selecting the loaded leaf did not open the value bar");
+      const collapsed = json(
+        await page.evaluate(`JSON.stringify({
+                    path: document.querySelector('.jsonl-valuebar__path')?.innerText ?? null,
+                    preview: document.querySelector('.jsonl-valuebar__preview')?.innerText ?? null,
+                    count: document.querySelector('.jsonl-valuebar__count')?.innerText ?? null,
+                })`),
+      );
+      expect(
+        /Which object is closer/.test(collapsed.preview ?? ""),
+        `the loaded leaf's value is not in the bar: ${JSON.stringify(collapsed)}`,
+      );
+      expect(
+        /string/.test(collapsed.count ?? "") && !/undefined/.test(collapsed.count ?? ""),
+        `the bar calls the value undefined: ${JSON.stringify(collapsed)}`,
+      );
+      await page.evaluate(
+        `document.querySelector('.jsonl-valuebar__toggle')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const openedPanel = await page.waitFor(`!!document.querySelector('.jsonl-valuebar__scroll')`);
+      expect(openedPanel, "the value panel did not open");
+      const panel = json(
+        await page.evaluate(`JSON.stringify({
+                    body: document.querySelector('.jsonl-valuebar__scroll')?.innerText ?? null,
+                    meta: document.querySelector('.jsonl-valuebar__meta')?.innerText ?? null,
+                })`),
+      );
+      expect(
+        /closer to the camera/.test(panel.body ?? ""),
+        `the panel did not render the full value: ${JSON.stringify(panel)}`,
+      );
+      expect(!/undefined/.test(panel.meta ?? ""), `the panel meta is undefined: ${panel.meta}`);
+      return `loaded leaf selected with its value (${collapsed.count})`;
+    },
+  },
+  {
     name: "jsonl-frames-select",
     async run({ page, base }) {
       await openJsonl(page, base, "dark", "&many=300");
