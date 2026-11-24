@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.0.1] - 2026-11-24
+
 ### Fixed
 
 - **Empty arrays and objects no longer offer an expand arrow.** `[]` and `{}` were treated as
@@ -26,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The vsix no longer ships build reports or internal notes.** `stats/bundle-analysis.html`
   (the visualizer's 1.7 MB report), `.impeccable/design.json`, `DESIGN.md`, `PRODUCT.md` and
   `.nvmrc` are excluded, and the two dead `image/git-history-*.svg` assets are deleted. 7.0.0's
-  package was 59 files / 944 KB; the next one is 52 files / 754 KB.
+  package was 59 files / 944 KB; this one is 52 files / 755 KB.
 
 ## [7.0.0] - 2026-11-23
 
