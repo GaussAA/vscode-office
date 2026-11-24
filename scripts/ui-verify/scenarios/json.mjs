@@ -190,6 +190,44 @@ export default [
     },
   },
   {
+    name: "json-preview-lazy-array",
+    async run({ page, base }) {
+      await openJson(page, base, "array", "&nested=1");
+      const ready = await page.waitFor(`!!document.querySelector('.jsonl-detail__tree')`);
+      expect(ready, "the nested record never rendered");
+      const before = json(
+        await page.evaluate(`JSON.stringify({
+                    keys: [...document.querySelectorAll('.jsonl-detail__tree .jsonl-key')]
+                        .map((node) => node.textContent.trim()),
+                })`),
+      );
+      const zeros = before.keys.filter((key) => key === "[0]").length;
+      const ones = before.keys.filter((key) => key === "[1]").length;
+      expect(
+        zeros >= 2 && ones >= 2,
+        `the expanded content array rendered no children: ${before.keys.join(", ")}`,
+      );
+      const clicked = await page.evaluate(`(() => {
+                const rows = [...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')];
+                const contentAt = rows.findIndex((node) =>
+                    node.querySelector('.jsonl-key')?.textContent?.trim() === 'content');
+                const row = rows.slice(contentAt + 1).find((node) =>
+                    node.querySelector('.jsonl-key')?.textContent?.trim() === '[0]'
+                        && node.querySelector('.ant-tree-switcher_close'));
+                row?.querySelector('.ant-tree-switcher_close')
+                    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return !!row;
+            })()`);
+      expect(clicked, "content[0] was not rendered as a collapsed child");
+      const fields = await page.waitFor(
+        `[...document.querySelectorAll('.jsonl-detail__tree .jsonl-key')]
+                    .some((node) => node.textContent.trim() === 'image_url')`,
+      );
+      expect(fields, "expanding content[0] in the JSON preview rendered no fields");
+      return "JSON preview: lazy content array and its child object render";
+    },
+  },
+  {
     name: "json-preview-frames-record",
     async run({ page, base }) {
       await openJson(page, base, "array", "&records=200");

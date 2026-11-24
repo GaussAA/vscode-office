@@ -249,6 +249,7 @@ function nestedFixtures() {
       textChars: text.length,
       textTruncated: false,
       label: "nested",
+      key: "nested",
       value,
     },
   ];
@@ -460,8 +461,8 @@ function jsonPreviewFixtures(count = 5) {
  * JSON preview stub. `mode` selects array / object / invalid / too-large / empty; the array
  * mode speaks the same five messages as the real panel, including a two-batch search.
  */
-function jsonStub(mode = "array", count = 5, fromBuffer = false) {
-  const fixtures = jsonPreviewFixtures(count);
+function jsonStub(mode = "array", count = 5, fromBuffer = false, nested = false) {
+  const fixtures = nested ? nestedFixtures() : jsonPreviewFixtures(count);
   const summaries = fixtures.map((entry) => ({
     index: entry.index,
     kind: entry.kind,
@@ -1105,6 +1106,7 @@ export function startHarness(fixtures, port = 0) {
               url.searchParams.get("mode") ?? "array",
               Math.min(Math.max(Number(url.searchParams.get("records") ?? 5) || 5, 1), 5000),
               url.searchParams.get("buffer") === "1",
+              url.searchParams.get("nested") === "1",
             )
           : route === "compare"
             ? compareStub(url.searchParams.get("case") ?? "same")
