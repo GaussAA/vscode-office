@@ -891,8 +891,12 @@ export default [
       await page.evaluate(
         `document.querySelector('.jsonl-valuebar__toggle')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
       );
-      const openedPanel = await page.waitFor(`!!document.querySelector('.jsonl-valuebar__scroll')`);
-      expect(openedPanel, "the value panel did not open");
+      // The body is built on open; wait for the text, not just the container, or a slow CI
+      // paint reads an empty scroll area.
+      const openedPanel = await page.waitFor(
+        `(document.querySelector('.jsonl-valuebar__scroll')?.innerText ?? '').includes('closer to the camera')`,
+      );
+      expect(openedPanel, "the value panel did not render the full value");
       const panel = json(
         await page.evaluate(`JSON.stringify({
                     body: document.querySelector('.jsonl-valuebar__scroll')?.innerText ?? null,
