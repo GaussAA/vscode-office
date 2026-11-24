@@ -215,6 +215,45 @@ function jsonlFixtures() {
   });
 }
 
+/** `?nested=1`: the transcript shape that exposed the lazy-array bug — depth 3 array of objects. */
+function nestedFixtures() {
+  const value = {
+    id: "nested",
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: {
+              url: "media://sat_vqa_lt_7p5k.tar/00159978.0.jpg",
+              width: 512,
+              height: 512,
+            },
+          },
+          { type: "text", text: "Which object is closer to the camera?" },
+        ],
+        group_mask_flag: true,
+      },
+      { role: "assistant", content: "soft fleecelined dog bed", group_mask_flag: false },
+    ],
+  };
+  const text = JSON.stringify(value);
+  return [
+    {
+      index: 0,
+      kind: "value",
+      raw: text.length <= 120 ? text : `${text.slice(0, 120)}…`,
+      text,
+      size: text.length,
+      textChars: text.length,
+      textTruncated: false,
+      label: "nested",
+      value,
+    },
+  ];
+}
+
 /** `?many=N`: N identical-shaped directory rows, for scroll/reachability scenarios. */
 function manyFixtures(count) {
   return Array.from({ length: count }, (_, index) => {
@@ -1024,7 +1063,12 @@ export function startHarness(fixtures, port = 0) {
       const theme = url.searchParams.get("theme") === "light" ? LIGHT : DARK;
       const many = Math.min(Math.max(Number(url.searchParams.get("many") ?? 0) || 0, 0), 5000);
       const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 0) || 0, 0), 500);
-      const jsonl = many > 0 ? manyFixtures(many) : entries;
+      const jsonl =
+        many > 0
+          ? manyFixtures(many)
+          : url.searchParams.get("nested") === "1"
+            ? nestedFixtures()
+            : entries;
       const stub =
         path === "/harness-json"
           ? jsonStub(

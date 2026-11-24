@@ -44,7 +44,11 @@ function renderHighlighted(text: string, highlight?: string): React.ReactNode {
   );
 }
 
-export function toAntdNodes(nodes: NodeModel[], highlight?: string): DataNode[] {
+export function toAntdNodes(
+  nodes: NodeModel[],
+  highlight?: string,
+  loaded?: Map<string, NodeModel[]>,
+): DataNode[] {
   return nodes.map((node) => {
     if (node.overflow !== undefined) {
       return {
@@ -54,10 +58,15 @@ export function toAntdNodes(nodes: NodeModel[], highlight?: string): DataNode[] 
         title: <span className="jsonl-more">{$t("jsonl.moreKeys", { count: node.overflow })}</span>,
       };
     }
+    // A lazy node gets its children from the loaded map once `loadData` has built them; the
+    // DataNode itself is re-created on that state change, because rc-tree keeps entities
+    // converted from the old treeData and would not notice an in-place mutation.
+    const childModels = node.lazy ? loaded?.get(String(node.key)) : node.children;
     return {
       key: node.key,
       isLeaf: !node.composite,
-      children: node.composite && !node.lazy ? toAntdNodes(node.children, highlight) : undefined,
+      children:
+        node.composite && childModels ? toAntdNodes(childModels, highlight, loaded) : undefined,
       ...(node.lazy ? { dataRef: node } : {}),
       title: (
         <span className="jsonl-kv">

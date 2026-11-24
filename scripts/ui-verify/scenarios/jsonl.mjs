@@ -598,6 +598,97 @@ export default [
     },
   },
   {
+    name: "jsonl-expand-lazy-array",
+    async run({ page, base }) {
+      await openJsonl(page, base, "dark", "&nested=1");
+      const ready = await page.waitFor(`!!document.querySelector('.jsonl-detail__tree')`);
+      expect(ready, "the nested transcript never rendered");
+      const before = json(
+        await page.evaluate(`JSON.stringify({
+                    keys: [...document.querySelectorAll('.jsonl-detail__tree .jsonl-key')]
+                        .map(node => node.textContent.trim()),
+                    contentSwitcher: ([...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')]
+                        .find(node => node.querySelector('.jsonl-key')?.textContent?.trim() === 'content')
+                        ?.querySelector('.ant-tree-switcher')?.className) ?? null,
+                })`),
+      );
+      // The record is small enough to auto-expand every key, so a depth-3 array must have its
+      // children rendered — an expanded arrow over an empty subtree is the bug. `[0]`/`[1]`
+      // appear twice: once under `messages`, once under `content`.
+      const zeros = before.keys.filter((key) => key === "[0]").length;
+      const ones = before.keys.filter((key) => key === "[1]").length;
+      expect(
+        zeros >= 2 && ones >= 2,
+        `the expanded content array rendered no children: ${before.keys.join(", ")}`,
+      );
+      expect(
+        (before.contentSwitcher ?? "").includes("switcher_open"),
+        `content did not start expanded: ${before.contentSwitcher}`,
+      );
+      // Expand one child object; the second lazy level must load through the same path.
+      const clicked = await page.evaluate(`(() => {
+                const rows = [...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')];
+                const contentAt = rows.findIndex(node =>
+                    node.querySelector('.jsonl-key')?.textContent?.trim() === 'content');
+                const row = rows.slice(contentAt + 1).find(node =>
+                    node.querySelector('.jsonl-key')?.textContent?.trim() === '[0]'
+                        && node.querySelector('.ant-tree-switcher_close'));
+                row?.querySelector('.ant-tree-switcher_close')
+                    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return !!row;
+            })()`);
+      expect(clicked, "content[0] was not rendered as a collapsed child");
+      const fields = await page.waitFor(
+        `[...document.querySelectorAll('.jsonl-detail__tree .jsonl-key')]
+                    .some(node => node.textContent.trim() === 'image_url')`,
+      );
+      expect(fields, "expanding content[0] rendered no fields");
+      const toggled = await page.evaluate(`(async () => {
+                const row = [...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')]
+                    .find(node => node.querySelector('.jsonl-key')?.textContent?.trim() === 'content');
+                row?.querySelector('.ant-tree-switcher')
+                    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                await new Promise(resolve => setTimeout(resolve, 120));
+                row?.querySelector('.ant-tree-switcher')
+                    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return true;
+            })()`);
+      expect(toggled, "content could not be collapsed and expanded again");
+      const again = await page.waitFor(
+        `[...document.querySelectorAll('.jsonl-detail__tree .jsonl-key')]
+                    .filter(node => node.textContent.trim() === '[0]').length >= 2`,
+      );
+      expect(again, "re-expanding content did not restore its children");
+      return `expanded content shows its two children; content[0] exposes image_url`;
+    },
+  },
+  {
+    name: "jsonl-expand-lazy-node",
+    async run({ page, base }) {
+      await openJsonl(page, base);
+      await jumpJsonl(page, 16);
+      const ready = await page.waitFor(
+        `document.querySelector('.jsonl-detail__index')?.innerText === 'L16' && !!document.querySelector('.jsonl-detail__tree')`,
+      );
+      expect(ready, "the dense entry never rendered");
+      const clicked = await page.evaluate(`(() => {
+                const row = [...document.querySelectorAll('.jsonl-detail__tree .ant-tree-treenode')]
+                    .find(node => node.querySelector('.jsonl-key')?.textContent?.trim() === 'parameters'
+                        && node.querySelector('.ant-tree-switcher_close'));
+                const switcher = row?.querySelector('.ant-tree-switcher_close');
+                switcher?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                return !!switcher;
+            })()`);
+      expect(clicked, "no collapsed lazy node named parameters was rendered");
+      const loaded = await page.waitFor(
+        `[...document.querySelectorAll('.jsonl-detail__tree .jsonl-key')]
+                    .some(node => node.textContent.trim() === 'properties')`,
+      );
+      expect(loaded, "the clicked lazy node rendered no children");
+      return "a clicked lazy node loads its children";
+    },
+  },
+  {
     name: "jsonl-frames-select",
     async run({ page, base }) {
       await openJsonl(page, base, "dark", "&many=300");

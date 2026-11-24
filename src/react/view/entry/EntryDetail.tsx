@@ -189,9 +189,10 @@ export default function EntryDetail({
   }, [entry, panelText, selection]);
 
   /** One adapter build per entry/expansion change; it used to run on every render. */
+  const [loadedChildren, setLoadedChildren] = useState<Map<string, NodeModel[]>>(() => new Map());
   const treeData = useMemo<DataNode[]>(() => {
     if (!model) return [];
-    const nodes = toAntdNodes(model.nodes, highlight);
+    const nodes = toAntdNodes(model.nodes, highlight, loadedChildren);
     if (model.truncated) {
       nodes.push({
         key: "__truncated__",
@@ -205,7 +206,7 @@ export default function EntryDetail({
       });
     }
     return nodes;
-  }, [model, highlight]);
+  }, [model, highlight, loadedChildren]);
 
   const loadData = useCallback(
     async (node: DataNode) => {
@@ -217,7 +218,13 @@ export default function EntryDetail({
         lazyDepth: 1,
         ...(highlight ? { highlight } : {}),
       });
-      node.children = toAntdNodes(built.nodes, highlight);
+      // rc-tree passes a copy of the DataNode to `loadData`, and its entities are converted
+      // from the old treeData; a new map makes the adapter rebuild a node that has children.
+      setLoadedChildren((previous) => {
+        const next = new Map(previous);
+        next.set(String(node.key), built.nodes);
+        return next;
+      });
     },
     [highlight],
   );

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Expanding a JSONL/JSON subtree could show an open arrow over an empty branch.** rc-tree hands
+  `loadData` a copy of the node, so the children were attached to an object nothing rendered; and
+  a node that was auto-expanded on mount was never asked to load at all. Lazy children now live
+  in the detail's state and the adapter rebuilds that node, covered by `jsonl-expand-lazy-array`
+  and `jsonl-expand-lazy-node`.
 - **The vsix no longer ships build reports or internal notes.** `stats/bundle-analysis.html`
   (the visualizer's 1.7 MB report), `.impeccable/design.json`, `DESIGN.md`, `PRODUCT.md` and
   `.nvmrc` are excluded, and the two dead `image/git-history-*.svg` assets are deleted. 7.0.0's
