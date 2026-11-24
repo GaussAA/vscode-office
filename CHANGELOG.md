@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.0.2] - 2026-11-24
+
+### Fixed
+
+- **Selecting a value inside a lazy subtree called it `undefined`.** Lazy children were built with
+  keys relative to the subtree, so the value bar's `valueAtPath` lookup resolved nothing and two
+  sibling subtrees could produce the same key. `buildEntryModel` now takes the node's absolute
+  path (`pathPrefix`), so keys stay rooted at the entry; covered by `jsonl-select-loaded-child`.
+
 ## [7.0.1] - 2026-11-24
 
 ### Fixed
