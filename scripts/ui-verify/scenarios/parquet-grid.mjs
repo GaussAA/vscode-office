@@ -1336,6 +1336,27 @@ export default [
       expect(start.header, "the header did not pin with the body");
       expect(start.bodyFixed >= 1, "no body cell carries antd's fix-start class");
 
+      // Alternating-row stripes must not repaint the selected column. Measure with the
+      // pointer outside the grid so the hover layer is not part of the comparison.
+      await page.moveMouse(10, 10);
+      await page.sleep(180);
+      const tint = json(
+        await page.evaluate(`(() => {
+          const cells = [...document.querySelectorAll(
+            '.ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--pinned.parquet-viewer__column--active'
+          )];
+          return JSON.stringify(cells.map((cell) => ({
+            row: cell.parentElement?.className ?? '',
+            bg: getComputedStyle(cell).backgroundColor,
+          })));
+        })()`),
+      );
+      const backgrounds = [...new Set(tint.map((cell) => cell.bg))];
+      expect(
+        backgrounds.length === 1,
+        `the pinned highlight is covered by row stripes: ${JSON.stringify(tint.slice(0, 6))}`,
+      );
+
       // Coming back far enough releases the pin and returns the column to its normal slot.
       await page.wheel(-2600, 0, box.x, box.y);
       const released = await page.waitFor(
@@ -1584,6 +1605,25 @@ export default [
       expect(
         state.scope === "all",
         `the scope selector did not start on all columns (${state.scope})`,
+      );
+
+      await page.moveMouse(10, 10);
+      await page.sleep(180);
+      const tints = json(
+        await page.evaluate(`(() => {
+          const cells = [...document.querySelectorAll(
+            '.ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--hit'
+          )].filter((cell) => {
+            const row = cell.closest('.ant-table-row');
+            return row && !row.classList.contains('parquet-viewer__row--match')
+              && !row.classList.contains('parquet-viewer__row--target');
+          });
+          return JSON.stringify([...new Set(cells.map((cell) => getComputedStyle(cell).backgroundColor))]);
+        })()`),
+      );
+      expect(
+        tints.length === 1,
+        `the matched-column tint is repainted by alternating rows: ${JSON.stringify(tints)}`,
       );
       return `mark ${state.markBackground} on ${state.markColor}, column header/body and row accent all present`;
     },

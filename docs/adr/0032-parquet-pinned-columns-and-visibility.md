@@ -76,3 +76,7 @@ autofilter）作为下一轮，不混进这次提交。
 - 测试：`scripts/ui-verify/scenarios/parquet-grid.mjs` 的 `parquet-pinned-column`、
   `parquet-column-visibility`、`parquet-search-scope`、`parquet-search-highlight`；
   `scripts/ui-verify/browser.mjs` 增加真实 wheel 手势（合成 WheelEvent 不会驱动 rc-virtual-list）。
+- 7.1.1 补齐背景层的优先级：`row--alt` 的普通/固定列规则排除 active/hit 列，pinned 中性底
+  排除 match/target 行，hover 有独立的 pinned 规则；`parquet-pinned-column` 与
+  `parquet-search-highlight` 现在按 `getComputedStyle(backgroundColor)` 断言同一列在所有
+  非 match 行上颜色一致，防止条纹再次盖住高亮。

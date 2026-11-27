@@ -162,6 +162,8 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
       await page.mouse.move(x, y);
       await page.mouse.wheel({ deltaX, deltaY });
     },
+    /** Park the pointer outside the grid so CSS `:hover` stops layering over a measurement. */
+    moveMouse: (x, y) => page.mouse.move(x, y),
     /** Long frames (rAF gaps ≥ 50 ms) and long animation frames since the page started. */
     frames: () =>
       page.evaluate(

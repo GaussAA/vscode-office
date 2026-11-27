@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.1.1] - 2026-11-27
+
+### Fixed
+
+- **Column highlights are no longer repainted by alternating-row stripes.** The new pinned/hit
+  backgrounds were more specific than the selected-column tint, so an active pinned column (and
+  a matched column) showed the `row--alt` stripe over its tint. The alt/fixed layers now exclude
+  active/hit columns, and the pinned neutral base excludes match/target rows so the row signal
+  still wins. Added computed-background assertions for the pinned selected column and the hit
+  column.
+- **A pinned column no longer swallows hover or hit/match surfaces.** A pointer over a pinned
+  cell shows the hover tint, and match/target rows keep their stronger wash; header active/hit
+  tints are not replaced by the opaque pinned base either.
+
 ## [7.1.0] - 2026-11-27
 
 ### Added

@@ -2,7 +2,7 @@
   "name": "office-viewer-plus",
   "displayName": "Data File Viewer (Parquet, JSONL)",
   "description": "Fork of Office Viewer narrowed to what its maintainer actually opens: parquet with ZSTD support, and a JSONL tree viewer with a large-JSON array inspector.",
-  "version": "7.1.0",
+  "version": "7.1.1",
   "publisher": "GaussAA",
   "license": "MIT",
   "icon": "image/logo.png",
