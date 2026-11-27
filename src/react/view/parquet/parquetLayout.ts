@@ -10,8 +10,6 @@
 /** A page below this is not a screenful; above it, paging stops being useful. */
 export const MIN_ROWS_PER_PAGE = 8;
 export const PARQUET_MAX_PAGE_SIZE = 200;
-/** Cap on matched rows kept in memory (highlight + navigation). */
-export const SEARCH_MAX_ROWS = 5_000;
 /** Schema sidebar bounds; the drag handle and keyboard use the same range. */
 export const SIDER_MIN = 208;
 export const SIDER_MAX = 420;

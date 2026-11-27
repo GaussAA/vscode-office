@@ -24,6 +24,12 @@ export interface ParquetUiState {
   columnWidths?: Record<string, number>;
   row?: number;
   fieldFilter?: string;
+  /** Which columns the next search walks; `active` needs a selected field. */
+  searchScope?: "all" | "active" | "visible";
+  /** Absolute column positions checked in the schema rail. */
+  selectedColumns?: number[];
+  /** Whether the table shows only `selectedColumns`. */
+  showOnlySelected?: boolean;
 }
 
 export type ParquetUiPatch = ParquetUiState;
@@ -87,6 +93,26 @@ export function loadParquetUi(key: string | undefined): ParquetUiState | null {
       state.row = Math.floor(parsed.row);
     }
     if (typeof parsed.fieldFilter === "string") state.fieldFilter = parsed.fieldFilter;
+    if (
+      parsed.searchScope === "all" ||
+      parsed.searchScope === "active" ||
+      parsed.searchScope === "visible"
+    ) {
+      state.searchScope = parsed.searchScope;
+    }
+    if (Array.isArray(parsed.selectedColumns)) {
+      state.selectedColumns = [
+        ...new Set(
+          parsed.selectedColumns.filter(
+            (position): position is number =>
+              typeof position === "number" && Number.isInteger(position) && position >= 0,
+          ),
+        ),
+      ].sort((left, right) => left - right);
+    }
+    if (typeof parsed.showOnlySelected === "boolean") {
+      state.showOnlySelected = parsed.showOnlySelected;
+    }
     return state;
   } catch {
     // A corrupt blob cannot describe a layout; remove it so the next open starts clean.
@@ -112,6 +138,9 @@ export function saveParquetUi(key: string | undefined, patch: ParquetUiPatch): v
     next.row = Math.floor(patch.row);
   }
   if (patch.fieldFilter !== undefined) next.fieldFilter = patch.fieldFilter;
+  if (patch.searchScope !== undefined) next.searchScope = patch.searchScope;
+  if (patch.selectedColumns !== undefined) next.selectedColumns = patch.selectedColumns;
+  if (patch.showOnlySelected !== undefined) next.showOnlySelected = patch.showOnlySelected;
   savePersistedState(PARQUET_UI_PREFIX, key, { v: UI_VERSION, ...next });
 }
 

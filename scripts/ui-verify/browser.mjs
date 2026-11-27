@@ -153,6 +153,15 @@ export async function launchBrowser({ headless = true, width = 1500, height = 85
      * synthetic events would pass while a real user is stuck, which is the worst kind of green.
      */
     press: (key) => page.keyboard.press(key),
+    /**
+     * A real wheel gesture. Synthetic `WheelEvent`s do not move rc-virtual-list: its handler
+     * reads the browser's trusted event stream, so horizontal-scroll scenarios need the
+     * compositor's wheel path.
+     */
+    wheel: async (deltaX, deltaY, x, y) => {
+      await page.mouse.move(x, y);
+      await page.mouse.wheel({ deltaX, deltaY });
+    },
     /** Long frames (rAF gaps ≥ 50 ms) and long animation frames since the page started. */
     frames: () =>
       page.evaluate(

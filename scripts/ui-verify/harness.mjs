@@ -45,6 +45,23 @@ const { applyWebviewBase } = await import(
 );
 await rmSync(shellHelpers, { recursive: true, force: true });
 
+// The parquet search now runs in the host; the fake host answers it from the same service.
+const searchHostDir = mkdtempSync(join(tmpdir(), "ovp-search-host-"));
+await build({
+  entryPoints: [join(repoRoot, "scripts", "ui-verify", "parquet-search-host.ts")],
+  outdir: searchHostDir,
+  outExtension: { ".js": ".mjs" },
+  bundle: true,
+  format: "esm",
+  platform: "node",
+  tsconfig: join(repoRoot, "tsconfig.json"),
+  logLevel: "silent",
+});
+const { searchFixture } = await import(
+  pathToFileURL(join(searchHostDir, "parquet-search-host.mjs")).href
+);
+await rmSync(searchHostDir, { recursive: true, force: true });
+
 const MIME = {
   ".js": "text/javascript",
   ".mjs": "text/javascript",
@@ -654,6 +671,7 @@ function parquetStub(fixtures) {
   return `<script>
 (function () {
   window.__openExternalCalls = [];
+  const searches = new Map();
   const api = {
     postMessage(msg) {
       if (!msg) return;
@@ -662,6 +680,52 @@ function parquetStub(fixtures) {
         return;
       }
       const params = new URLSearchParams(location.search);
+      const currentFile = params.get('big') === '1' ? '/big.parquet'
+        : params.get('mixed') === '1' ? '/mixed.parquet'
+        : params.get('nested') === '1' ? '/nested.parquet'
+        : params.get('empty') === '1' ? '/empty.parquet'
+        : params.get('types') === '1' ? '/types.parquet'
+        : params.get('preview') === '1' ? '/preview.parquet'
+        : params.get('wide') === '1' ? '/wide.parquet'
+        : params.get('bad') === '1' ? '/bad.parquet'
+        : '/sample.parquet';
+      if (msg.type === 'parquetSearch') {
+        const requestId = msg.content && msg.content.requestId;
+        const controller = new AbortController();
+        searches.set(requestId, controller);
+        fetch('/host/parquet-search', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            path: currentFile,
+            query: String(msg.content && msg.content.query),
+            columns: msg.content && msg.content.columns,
+          }),
+          signal: controller.signal,
+        })
+          .then(function (reply) { return reply.json(); })
+          .then(function (data) {
+            if (!searches.has(requestId)) return;
+            searches.delete(requestId);
+            window.postMessage({ type: 'parquetSearchData', content: Object.assign({ requestId: requestId }, data) }, '*');
+          })
+          .catch(function (error) {
+            if (!searches.has(requestId)) return;
+            searches.delete(requestId);
+            if (String(error && error.name) === 'AbortError') return;
+            window.postMessage({ type: 'parquetSearchData', content: { requestId: requestId, rows: null, columns: [], error: String(error) } }, '*');
+          });
+        return;
+      }
+      if (msg.type === 'parquetSearchCancel') {
+        const requestId = msg.content && msg.content.requestId;
+        const controller = searches.get(requestId);
+        if (controller) {
+          controller.abort();
+          searches.delete(requestId);
+        }
+        return;
+      }
       if (msg.type === 'parquetEmptyShareScan') {
         if (params.get('profile') !== '1') return;
         const requestId = msg.content && msg.content.requestId;
@@ -1055,6 +1119,17 @@ export function startHarness(fixtures, port = 0) {
   const indexHtml = readFileSync(join(WEBVIEW_ROOT, "index.html"), "utf8");
   const entries = jsonlFixtures();
   const stats = { ranged: 0, full: 0 };
+  const fixtureByUrl = new Map([
+    ["/sample.parquet", fixtures.sample],
+    ["/mixed.parquet", fixtures.mixed],
+    ["/nested.parquet", fixtures.nested],
+    ["/empty.parquet", fixtures.empty],
+    ["/types.parquet", fixtures.types],
+    ["/preview.parquet", fixtures.preview],
+    ["/wide.parquet", fixtures.wide],
+    ["/bad.parquet", fixtures.bad],
+    ["/big.parquet", fixtures.big],
+  ]);
 
   /**
    * `Cross-Origin-Resource-Policy` on every fixture response: the webview fetches parquet
@@ -1072,6 +1147,35 @@ export function startHarness(fixtures, port = 0) {
     if (path === "/stats") {
       res.writeHead(200, addCrossOriginHeaders({ "content-type": "application/json" }));
       res.end(JSON.stringify(stats));
+      return;
+    }
+
+    // Fake host for the parquet search: the webview posts the same request it posts to the
+    // extension, and the bundled service scans the fixture bytes.
+    if (path === "/host/parquet-search" && req.method === "POST") {
+      let raw = "";
+      req.on("data", (chunk) => {
+        raw += chunk;
+        if (raw.length > 10_000) req.destroy();
+      });
+      req.on("end", async () => {
+        try {
+          const body = JSON.parse(raw);
+          const file = fixtureByUrl.get(String(body.path ?? "").split("?")[0]);
+          res.writeHead(200, addCrossOriginHeaders({ "content-type": "application/json" }));
+          if (!file) {
+            res.end(JSON.stringify({ rows: null, columns: [], error: "unknown fixture" }));
+            return;
+          }
+          const columns = Array.isArray(body.columns)
+            ? body.columns.filter((position) => Number.isInteger(position))
+            : undefined;
+          res.end(JSON.stringify(await searchFixture(file, String(body.query ?? ""), columns)));
+        } catch (error) {
+          res.writeHead(500, addCrossOriginHeaders({ "content-type": "application/json" }));
+          res.end(JSON.stringify({ rows: null, columns: [], error: String(error) }));
+        }
+      });
       return;
     }
 

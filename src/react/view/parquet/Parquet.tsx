@@ -19,6 +19,7 @@ import type {
   ParquetProfile,
   ParquetProfilePayload,
 } from "@/common/parquetProfileTypes";
+import type { ParquetSearchData, ParquetSearchProgress } from "@/common/parquetSearchTypes";
 import { emptyShareOf } from "@/common/parquetProfileTypes";
 import { ParquetSession, type PagingSnapshot } from "./parquetSession.ts";
 import { describeParquetFailure } from "./parquetError.ts";
@@ -31,6 +32,7 @@ import {
 } from "@/common/parquetReader";
 import { parquetAntdTheme } from "./parquetAntdTheme.ts";
 import {
+  INDEX_COLUMN_WIDTH,
   MIN_ROWS_PER_PAGE,
   ROW_HEIGHT,
   SIDER_DEFAULT,
@@ -62,7 +64,7 @@ import { useParquetColumnFocus } from "./useParquetColumnFocus.ts";
 
 /** Bound one batch request; a schema with hundreds of structured columns scans in clicks. */
 const STRUCTURED_SCAN_BATCH = 32;
-import { useParquetSearch } from "./useParquetSearch.ts";
+import { useParquetSearch, type ParquetSearchScope } from "./useParquetSearch.ts";
 import ParquetTable from "./ParquetTable.tsx";
 import { buildParquetColumns } from "./parquetColumns.tsx";
 import { resolveParquetKey } from "./parquetKeymap.ts";
@@ -198,13 +200,31 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   /** Stable per-document UI key. The row/width/filter restore is keyed by this, not the path. */
   const [documentKey, setDocumentKey] = useState<string | undefined>(undefined);
   const [fieldFilter, setFieldFilter] = useState("");
+  const [searchScope, setSearchScope] = useState<ParquetSearchScope>("all");
+  /** Positions checked in the schema rail; the "only these" switch uses this set. */
+  const [selectedColumns, setSelectedColumns] = useState<number[]>([]);
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
   /** Bumped by Clear cache so the width hook drops edits made before the clear. */
   const [cacheEpoch, setCacheEpoch] = useState(0);
+
+  const visibleColumns = useMemo(() => {
+    const all = fileInfo ? fileInfo.columns.map((_column, position) => position) : [];
+    if (!showOnlySelected || selectedColumns.length === 0) return all;
+    const selected = new Set(selectedColumns);
+    return all.filter((position) => selected.has(position));
+  }, [fileInfo, selectedColumns, showOnlySelected]);
+
   const {
     layout: columnLayout,
     setColumnWidth,
     resetColumnWidth,
-  } = useParquetColumnLayout(fileInfo?.columns ?? [], tableBodyWidth, documentKey, cacheEpoch);
+  } = useParquetColumnLayout(
+    fileInfo?.columns ?? [],
+    tableBodyWidth,
+    documentKey,
+    cacheEpoch,
+    visibleColumns,
+  );
 
   const changeFieldFilter = useCallback(
     (value: string) => {
@@ -212,6 +232,43 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       if (documentKey) saveParquetUi(documentKey, { fieldFilter: value });
     },
     [documentKey],
+  );
+
+  const changeSearchScope = useCallback(
+    (value: ParquetSearchScope) => {
+      setSearchScope(value);
+      if (documentKey) saveParquetUi(documentKey, { searchScope: value });
+    },
+    [documentKey],
+  );
+
+  const changeSelectedColumns = useCallback(
+    (next: number[]) => {
+      const valid = [...new Set(next)]
+        .filter(
+          (position) =>
+            Number.isInteger(position) &&
+            position >= 0 &&
+            position < (fileInfo?.columns.length ?? 0),
+        )
+        .sort((left, right) => left - right);
+      setSelectedColumns(valid);
+      if (valid.length === 0 && showOnlySelected) {
+        setShowOnlySelected(false);
+        if (documentKey) saveParquetUi(documentKey, { showOnlySelected: false });
+      }
+      if (documentKey) saveParquetUi(documentKey, { selectedColumns: valid });
+    },
+    [documentKey, fileInfo, showOnlySelected],
+  );
+
+  const changeShowOnlySelected = useCallback(
+    (next: boolean) => {
+      if (next && selectedColumns.length === 0) return;
+      setShowOnlySelected(next);
+      if (documentKey) saveParquetUi(documentKey, { showOnlySelected: next });
+    },
+    [documentKey, selectedColumns.length],
   );
 
   /** The virtual table owns scrolling; cursor moves and row jumps go through its ref. */
@@ -228,10 +285,56 @@ function ParquetViewer({ dark }: { dark: boolean }) {
   const [targetRow, setTargetRow] = useState<number | null>(null);
   const fileInfoRef = useRef<ParquetFileInfo | null>(null);
 
-  const { activeColumn, setActiveColumn, focusColumn } = useParquetColumnFocus({
-    tableRef,
-    tableWrapRef,
-  });
+  const { activeColumn, setActiveColumn, focusColumn, pinnedColumn, pinSide, clearPin } =
+    useParquetColumnFocus({
+      tableRef,
+      tableWrapRef,
+      columnWidths: columnLayout.widths,
+      visibleColumns,
+      indexWidth: INDEX_COLUMN_WIDTH,
+    });
+
+  // A column that leaves the rendered set cannot stay the search scope or the pin.
+  useEffect(() => {
+    if (activeColumn !== null && !visibleColumns.includes(activeColumn)) {
+      setActiveColumn(null);
+      clearPin();
+    }
+  }, [activeColumn, clearPin, setActiveColumn, visibleColumns]);
+
+  const selectionAnchor = useRef<number | null>(null);
+
+  /**
+   * A schema click: plain activates and (when the view is filtered) brings the column back;
+   * Ctrl/Cmd toggles the selection; Shift extends it from the last plain click. Selection
+   * only controls visibility, so it deliberately does not replace the active column.
+   */
+  const onSchemaColumnClick = useCallback(
+    (position: number, event?: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => {
+      if (event?.shiftKey) {
+        const anchor = selectionAnchor.current ?? position;
+        const start = Math.min(anchor, position);
+        const end = Math.max(anchor, position);
+        const range: number[] = [];
+        for (let next = start; next <= end; next++) range.push(next);
+        changeSelectedColumns([...selectedColumns, ...range]);
+        return;
+      }
+      if (event && (event.ctrlKey || event.metaKey)) {
+        const selected = new Set(selectedColumns);
+        if (selected.has(position)) selected.delete(position);
+        else selected.add(position);
+        changeSelectedColumns([...selected]);
+        return;
+      }
+      selectionAnchor.current = position;
+      if (showOnlySelected && !selectedColumns.includes(position)) {
+        changeSelectedColumns([...selectedColumns, position]);
+      }
+      focusColumn(position);
+    },
+    [changeSelectedColumns, focusColumn, selectedColumns, showOnlySelected],
+  );
 
   // Keep the cursor in a ref as well as state: several keydowns can arrive before React
   // re-renders, and each one must move from the position the previous one reached.
@@ -280,6 +383,17 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     [selectCell],
   );
 
+  const requestSearch = useCallback(
+    (request: { requestId: number; query: string; columns?: number[] }) => {
+      handler.emit("parquetSearch", request);
+    },
+    [],
+  );
+
+  const cancelHostSearch = useCallback((requestId: number) => {
+    handler.emit("parquetSearchCancel", { requestId });
+  }, []);
+
   const search = useParquetSearch({
     onSearched: announceSearch,
     fileInfoRef,
@@ -288,8 +402,55 @@ function ParquetViewer({ dark }: { dark: boolean }) {
     goToPage,
     focusColumn,
     onError: setError,
+    scope: searchScope,
+    activeColumn,
+    visibleColumns,
+    requestSearch,
+    cancelHostSearch,
   });
-  const { query, matchRows, resetSearch } = search;
+  const { query, matchRows, matchedColumns, resetSearch } = search;
+
+  const hiddenMatchedColumns = useMemo(() => {
+    const visible = new Set(visibleColumns);
+    return [...matchedColumns].filter((position) => !visible.has(position));
+  }, [matchedColumns, visibleColumns]);
+
+  // A scope is a search parameter: switching it invalidates the visible hits rather than
+  // leaving a result set that claims a scope it was not produced with.
+  const previousScope = useRef(searchScope);
+  useEffect(() => {
+    if (previousScope.current === searchScope) return;
+    previousScope.current = searchScope;
+    resetSearch();
+  }, [resetSearch, searchScope]);
+
+  const previousActive = useRef(activeColumn);
+  useEffect(() => {
+    if (searchScope === "active" && previousActive.current !== activeColumn) {
+      resetSearch();
+    }
+    previousActive.current = activeColumn;
+  }, [activeColumn, resetSearch, searchScope]);
+
+  const searchHandlers = useRef<{
+    progress: (payload: ParquetSearchProgress) => void;
+    data: (payload: ParquetSearchData) => void;
+  } | null>(null);
+  useEffect(() => {
+    searchHandlers.current = {
+      progress: search.handleSearchProgress,
+      data: search.handleSearchData,
+    };
+  });
+
+  useEffect(() => {
+    handler.on("parquetSearchProgress", (payload: ParquetSearchProgress | undefined) => {
+      if (payload) searchHandlers.current?.progress(payload);
+    });
+    handler.on("parquetSearchData", (payload: ParquetSearchData | undefined) => {
+      if (payload) searchHandlers.current?.data(payload);
+    });
+  }, []);
 
   const onPageLoadedRef = useRef<((start: number, loaded: number) => void) | undefined>(
     announcePage,
@@ -368,6 +529,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setInspected(null);
       selectCell(null);
       setActiveColumn(null);
+      clearPin();
       setTargetRow(null);
       resetSearch(true);
       // Clear the UI scope before resetting the page, otherwise the reset would be persisted
@@ -392,6 +554,14 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         setDocumentKey(cacheId);
         const ui = loadParquetUi(cacheId);
         setFieldFilter(ui?.fieldFilter ?? "");
+        const restoredSelection = (ui?.selectedColumns ?? []).filter(
+          (position) => position < info.columns.length,
+        );
+        setSelectedColumns(restoredSelection);
+        setShowOnlySelected((ui?.showOnlySelected ?? false) && restoredSelection.length > 0);
+        // "Current column" needs an active column, and selection is not persisted; opening a
+        // document always starts from the all-columns scope.
+        setSearchScope(ui?.searchScope === "visible" ? "visible" : "all");
         // Only load the cached shares once the document has opened: the fingerprint describes
         // this file. Inline bytes have no stable identity, so they never get a cache scope.
         const shareScope =
@@ -439,7 +609,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         setLoading(false);
       }
     },
-    [resetPage, resetSearch, selectCell, setActiveColumn, setSiderWidth],
+    [clearPin, resetPage, resetSearch, selectCell, setActiveColumn, setSiderWidth],
   );
 
   // Resize observer: measure the table body and update page size
@@ -600,7 +770,11 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setScanError(null);
       setScanLoading(false);
       setFieldFilter("");
+      setSearchScope("all");
+      setSelectedColumns([]);
+      setShowOnlySelected(false);
       setActiveColumn(null);
+      clearPin();
       setInspected(null);
       selectCell(null);
       setTargetRow(null);
@@ -613,7 +787,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       setSiderWidth(SIDER_DEFAULT);
       setCacheEpoch((value) => value + 1);
     });
-  }, [resetPage, resetSearch, selectCell, setActiveColumn, setSiderWidth]);
+  }, [clearPin, resetPage, resetSearch, selectCell, setActiveColumn, setSiderWidth]);
 
   /**
    * Esc closes the panel and puts focus back on the field row that opened it.
@@ -909,6 +1083,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
         loadedStart,
         query,
         activeColumn,
+        matchedColumns,
+        pinnedColumn,
+        pinSide,
+        visibleColumns,
         columnLayout,
         onSelectCell: (cell) => selectCell(cell),
         onActivateColumn: (position) => setActiveColumn(position),
@@ -922,6 +1100,10 @@ function ParquetViewer({ dark }: { dark: boolean }) {
       query,
       selectCell,
       activeColumn,
+      matchedColumns,
+      pinnedColumn,
+      pinSide,
+      visibleColumns,
       columnLayout,
       setActiveColumn,
       setInspected,
@@ -1027,6 +1209,16 @@ function ParquetViewer({ dark }: { dark: boolean }) {
             searchInputRef={searchInputRef}
             fileInfo={fileInfo}
             codecs={codecs}
+            scope={searchScope}
+            onScopeChange={changeSearchScope}
+            activeColumnName={
+              activeColumn !== null ? fileInfo.columns[activeColumn]?.name : undefined
+            }
+            visibleColumnCount={visibleColumns.length}
+            hiddenHitCount={hiddenMatchedColumns.length}
+            onRevealHiddenHits={() =>
+              changeSelectedColumns([...selectedColumns, ...hiddenMatchedColumns])
+            }
           />
           <div className="parquet-viewer__body">
             <ParquetSchema
@@ -1039,8 +1231,12 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               structuredScan={structuredScan}
               fieldFilter={fieldFilter}
               onFieldFilterChange={changeFieldFilter}
+              selectedColumns={new Set(selectedColumns)}
+              showOnlySelected={showOnlySelected}
+              onShowOnlySelected={changeShowOnlySelected}
+              onClearSelection={() => changeSelectedColumns([])}
               onScanStructured={scanStructured}
-              onFocusColumn={focusColumn}
+              onFocusColumn={onSchemaColumnClick}
               onInspectColumn={openProfilePanel}
             />
             <div
@@ -1085,6 +1281,7 @@ function ParquetViewer({ dark }: { dark: boolean }) {
               tableColumns={tableColumns}
               matchRows={matchRows}
               targetRow={targetRow}
+              visibleColumnCount={visibleColumns.length}
               columnLayout={columnLayout}
               onKeyDown={handleTableKeyDown}
             />

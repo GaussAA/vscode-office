@@ -58,6 +58,12 @@ const SEARCH_BUDGET_FLAT_MS = 12_000;
 /** Milliseconds for a full scan of the 200k-row x 60-column file. Measured: ~1.2-2.4 s; the batched version takes ~40 s. */
 const SEARCH_BUDGET_WIDE_MS = 12_000;
 /**
+ * One string column of the wide file: 200k cells, no other column decoded. A scoped search
+ * must be near-instant compared with the 60-column scan; the scope selector is the user's
+ * main lever on a file with megabytes of text.
+ */
+const SEARCH_BUDGET_SCOPED_MS = 2_500;
+/**
  * Milliseconds for one page turn on the 60-column file, measured after the prefetch has settled.
  * Measured on an idle machine: ~210 ms warm and ~520 ms cold (one decoded data page per column).
  * A loaded machine inflates both by 2-4x, so the budgets are deliberately loose: this gate exists
@@ -141,7 +147,10 @@ const search = (page, needle) =>
     .evaluate(`(async () => {
       const deadline = performance.now() + 120000;
       const count = () => document.querySelector('.parquet-viewer__find-count')?.innerText ?? '';
-      const spinner = () => !!document.querySelector('.parquet-viewer__find-btn .codicon-loading');
+      // The host scan reports "N% · matches" while running; a finished search never contains
+      // a percent sign. The old "stop spinner" test missed the stop-circle icon and settled
+      // after a fixed 300 ms, which measured host latency instead of the scan.
+      const running = () => /%/.test(count());
       const input = document.querySelector('.parquet-viewer__find-input');
       const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
       setter.call(input, ${JSON.stringify(needle)});
@@ -149,15 +158,12 @@ const search = (page, needle) =>
       const started = performance.now();
       document.querySelector('.parquet-viewer__find-btn')
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      // A query with matches ends on "N rows"; one without matches ends with no count at
-      // all, so "no spinner after the first frame" is the settlement signal.
       let settledAt = 0;
       while (performance.now() < deadline) {
         await new Promise(resolve => setTimeout(resolve, 25));
         const text = count();
-        if (spinner()) continue;
-        if (text && /row/.test(text)) { settledAt = performance.now(); break; }
-        if (performance.now() - started > 300) { settledAt = performance.now(); break; }
+        // "0 matches" is a valid finish; an empty hint means the result has not arrived yet.
+        if (!running() && text) { settledAt = performance.now(); break; }
       }
       return JSON.stringify({
         ms: settledAt ? Math.round(settledAt - started) : null,
@@ -330,6 +336,43 @@ const scenarios = [
       );
       const timing = await readTiming(page);
       return `${result.ms} ms, ${result.count}, heap ${timing.heapMB} MB`;
+    },
+  },
+  {
+    name: "parquet-search-scoped-column",
+    async run({ page, base, fixtures }) {
+      await page.navigate(`${base}/harness?file=wide`);
+      const ready = await page.waitFor(`(window.__bench?.ready ?? 0) > 0`, 60000);
+      expect(ready, "the wide viewer never painted");
+      const selected = await page.evaluate(`(() => {
+        const item = [...document.querySelectorAll('.parquet-viewer__list-item')]
+          .find((button) => button.dataset.column === 's29');
+        item?.click();
+        return !!item;
+      })()`);
+      expect(selected, "the matching string column is missing from the schema");
+      await page.waitFor(
+        `document.querySelector('.parquet-viewer__list-item--active[data-column="s29"]') !== null`,
+      );
+      await page.sleep(600);
+      await page.evaluate(`(() => {
+        const select = document.querySelector('.parquet-viewer__scope-select');
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+        setter.call(select, 'active');
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      const result = await search(page, fixtures.wideNeedle);
+      expect(!result.timedOut, "the scoped search never settled");
+      expect(
+        result.ms <= SEARCH_BUDGET_SCOPED_MS,
+        `one column x ${fixtures.wideRows.toLocaleString()} rows took ${result.ms} ms ` +
+          `(budget ${SEARCH_BUDGET_SCOPED_MS} ms); the host must scan only the requested column`,
+      );
+      expect(
+        typeof result.count === "string" && !/^0 /.test(result.count),
+        `unexpected scoped match count: ${result.count}`,
+      );
+      return `${result.ms} ms for one column of ${fixtures.wideRows.toLocaleString()} rows → ${result.count}`;
     },
   },
   ...jsonlScenarios,

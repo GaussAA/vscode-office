@@ -243,11 +243,17 @@ JSON 预览不是 viewer，它是同一机身上的检查探头：命令打开�
 
 **The 420 Rule.** 数据单元格的 `max-width` 是 420px。要在单元格里放下更多信息，办法是点开看全文，不是让它换行把整张表撑高。
 
+**The Pinned Edge Rule.** schema 点击的列在即将划出视口时贴住那一侧（`fixed: start/end` + sticky），首次贴边后保持，滚回可见区自动释放。冻结是位置状态，不是第二种选中态：沿用 active 蓝 tint，另加 1px 琥珀边线 + 朝内的轻投影 + 列头图钉。投影只说明「这一列挡住了后面的列」，不构成层级。一次只能钉一列；单元格点击不冻结。
+
+**The Two Signal Colors Rule.** 选中列用 Signal Blue（active），搜索命中用 find-match 琥珀（hit）：命中文本是主题化 `<mark>` 色块，命中行加左侧 3px 强调条与更重的行底，命中列在列头显示圆点并把整列铺成淡琥珀。两种信号可以同时存在（选中列恰好命中），此时蓝色 header tint 与琥珀 hit 底叠加，但 body 永远只吃一层行底/列底，避免把数据洗灰。
+
+**The Hidden Hit Rule.** 「只看选中」隐藏的列仍参与默认的全量搜索；命中落在隐藏列时行/文本照常高亮，顶部出现「N 列已隐藏」按钮，点一下把命中列加回可见。不要为了搜索偷偷改用户的列视图。
+
 ## Elevation & Depth
 
 **没有阴影语义。** 层次完全由色调分层表达：同一块底色混入不同比例的前景（见 The Thin Mix Rule），相邻区域之间的边界是「亮度变化 + 8–16px 内距」，没有 1px 分割线。
 
-本仓库自己的样式不再声明浮层阴影。唯一保留的 `box-shadow` 是 antd 自带的弹层/下拉菜单；表格铺满视口后底部那条 1px 内阴影（`inset 0 -1px 0`）只是收边，不是层级。输入类控件的「描边」用 `inset 0 0 0 1px` 模拟，不是阴影。
+本仓库自己的样式不再声明浮层阴影。唯一保留的 `box-shadow` 是 antd 自带的弹层/下拉菜单；表格铺满视口后底部那条 1px 内阴影（`inset 0 -1px 0`）只是收边，不是层级。冻结列贴边时有一条朝内的轻投影，它是 sticky 的边界提示（说明前面还有被挡住的列），不是 elevation。输入类控件的「描边」用 `inset 0 0 0 1px` 模拟，不是阴影。
 
 ### Surface levels (signature)
 
@@ -365,7 +371,7 @@ Tab 的顺序是：命令栏 → 侧栏（过滤框、字段、侧栏拖拽把�
 
 ### Inputs / Fields
 
-- **Search field**: 32px 高、8px 圆角、底色 `--vscode-input-background`，内部是图标 + 无边框 `<input>` + 清除键。
+- **Search field**: 32px 高、8px 圆角、底色 `--vscode-input-background`，内部是范围下拉 + 搜索图标 + 无边框 `<input>` + 清除键。范围下拉（全部/当前列/可见列）放在输入框左侧，因为它改变的是同一个 Enter 的语义；当前列未选中时该选项禁用，不做静默回退。搜索命中在表内是三层：文本 mark、整行、命中列（见 The Two Signal Colors Rule）。
 - **Focus**: `:focus-within` 时加 `inset 0 0 0 1px var(--focus)`，**不加外发光**。
 - **Row-jump field**: 92px 宽、28px 高、6px 圆角、11px 等宽数字，聚焦同样用 inset ring。
 - **Placeholder**: muted 前景；**没有**错误态红色描边——错误用文字与 10% 底色的条，不用输入框变色。
@@ -378,6 +384,7 @@ Tab 的顺序是：命令栏 → 侧栏（过滤框、字段、侧栏拖拽把�
 - **Contents:** 类型图标（14px，按类型取色）+ 字段名（12px/500，单行省略）+ 空值率徽标（有统计时）+ 类型徽标（右对齐）。
 - **Null / empty share:** `null 12%` 来自 row-group statistics：精确、只数 null。结构列没有行级统计时显示 `null ?`；打开画像扫描后变成 `empty 12%`（`~` 前缀表示只扫描了前 20 万行），它把 null、空字符串、空 list、空二进制与空 map 都算作「没有数据」。两者都是 9.5px 等宽、muted、无底色、`tabular-nums`；整句走字段行的 `aria-label`（"Jump to column name — 12% of rows are null" / "… — 12% of the scanned rows are null or empty"），低于 1% 且非零显示 `<1%`，不四舍五入成 0。
 - **States:** hover 用 `list-hoverBackground`；激活行用 Signal Blue 16% 混入底色（浅色主题 14%）、字段名转 Signal Blue；再次点击当前行取消高亮；`focus-visible` 用 `outline-offset: -1px`（贴内边，避免与相邻行粘连）。
+- **Multi-select / only-selected:** Ctrl/Cmd 点击增减选择，Shift 点击选范围；选中的行右侧出现蓝色对勾，工具条「只看选中（N）」开启后未选中的行变淡但仍在列表中（点击即加回可见）。选择集与开关按文件持久化；这是「列工作区」，不是第二个导航列表。
 
 ### Type badges
 

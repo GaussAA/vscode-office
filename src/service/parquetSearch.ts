@@ -20,8 +20,9 @@
 import { parquetRead, parquetReadObjects, type FileMetaData } from "hyparquet";
 import { compressors } from "hyparquet-compressors";
 import type { AsyncBuffer } from "hyparquet";
-import { formatCellValue } from "@/common/parquetCellFormat";
+import { formatCellValue, isBinaryType } from "@/common/parquetCellFormat";
 import type { ParquetColumnInfo, ParquetFileInfo } from "@/common/parquetReader";
+import { PARQUET_SEARCH_MAX_ROWS } from "@/common/parquetSearchTypes";
 
 /** Rows per assembled read for a nested column. */
 const NESTED_CHUNK_ROWS = 20_000;
@@ -32,6 +33,8 @@ const PROGRESS_INTERVAL_MS = 100;
 export interface ParquetSearchOptions {
   /** Rows kept in the result; earlier rows win. Defaults to 5,000. */
   maxRows?: number;
+  /** Absolute top-level column positions to scan; omitted means every column. */
+  columns?: number[];
   isCancelled?: () => boolean;
   onProgress?: (scanned: number, matches: number) => void;
 }
@@ -59,7 +62,16 @@ class SearchCancelled extends Error {
   }
 }
 
-const DEFAULT_MAX_ROWS = 5_000;
+const DEFAULT_MAX_ROWS = PARQUET_SEARCH_MAX_ROWS;
+
+/**
+ * A plain text STRING is already its display text, so the formatter only adds a call and, for
+ * a multi-megabyte readme, nothing else. A BYTE_ARRAY that hyparquet decoded as a string is
+ * the one case where the formatter changes the text (to a hex preview), so keep the call there.
+ */
+function cellSearchText(value: unknown, type: string): string {
+  return typeof value === "string" && !isBinaryType(type) ? value : formatCellValue(value, type);
+}
 
 /**
  * Search every column for `query`, case-insensitively, as display text.
@@ -90,14 +102,20 @@ export async function searchParquetValues(
     matches++;
   };
 
-  const columnCount = Math.max(1, info.columns.length);
+  const targets = options.columns
+    ? [...new Set(options.columns)]
+        .filter((index) => Number.isInteger(index) && index >= 0 && index < info.columns.length)
+        .map((index) => ({ index, column: info.columns[index] }))
+    : info.columns.map((column, index) => ({ index, column }));
+
+  const columnCount = Math.max(1, targets.length);
   let lastProgress = 0;
-  const report = (columnIndex: number, withinColumn: number, force = false) => {
+  const report = (scannedColumn: number, withinColumn: number, force = false) => {
     if (!options.onProgress) return;
     const now = Date.now();
     if (!force && now - lastProgress < PROGRESS_INTERVAL_MS) return;
     lastProgress = now;
-    const fraction = (columnIndex + Math.min(1, Math.max(0, withinColumn))) / columnCount;
+    const fraction = (scannedColumn + Math.min(1, Math.max(0, withinColumn))) / columnCount;
     options.onProgress(Math.round(fraction * rowCount), matches);
   };
 
@@ -108,24 +126,24 @@ export async function searchParquetValues(
 
   let stopped = false;
   try {
-    for (let index = 0; index < info.columns.length; index++) {
+    for (let order = 0; order < targets.length; order++) {
       checkCancelled();
-      const column = info.columns[index];
+      const { index, column } = targets[order];
       const columnMark = (row: number) => mark(row, index);
       if (column.nested) {
         await scanNestedColumn(info.file, info.metadata, column, needle, columnMark, {
           rowCount,
           checkCancelled,
-          onRow: (row) => report(index, row / Math.max(1, rowCount)),
+          onRow: (row) => report(order, row / Math.max(1, rowCount)),
         });
       } else {
         await scanFlatColumn(info.file, info.metadata, column, needle, columnMark, {
           rowCount,
           checkCancelled,
-          onRow: (row) => report(index, row / Math.max(1, rowCount)),
+          onRow: (row) => report(order, row / Math.max(1, rowCount)),
         });
       }
-      report(index + 1, 0, true);
+      report(order + 1, 0, true);
     }
   } catch (error) {
     if (error instanceof SearchCancelled) stopped = true;
@@ -180,7 +198,7 @@ async function scanFlatColumn(
     onPage: ({ columnData, rowStart }) => {
       hooks.checkCancelled();
       for (let offset = 0; offset < columnData.length; offset++) {
-        if (formatCellValue(columnData[offset], column.type).toLowerCase().includes(needle)) {
+        if (cellSearchText(columnData[offset], column.type).toLowerCase().includes(needle)) {
           mark(rowStart + offset);
         }
       }
@@ -217,7 +235,7 @@ async function scanNestedColumn(
       compressors,
     });
     for (let offset = 0; offset < rows.length; offset++) {
-      if (formatCellValue(rows[offset][column.name], column.type).toLowerCase().includes(needle)) {
+      if (cellSearchText(rows[offset][column.name], column.type).toLowerCase().includes(needle)) {
         mark(start + offset);
       }
     }

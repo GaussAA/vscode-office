@@ -1,4 +1,5 @@
 import type { ColumnsType } from "antd/es/table";
+import { $t } from "../../i18n/i18nConfig.ts";
 import { DATA_COLUMN_WIDTH, INDEX_COLUMN_WIDTH } from "./parquetLayout";
 import type { ParquetColumnLayout } from "./parquetColumnLayout";
 import { ParquetCell, type TableRow } from "./parquetCell";
@@ -9,6 +10,13 @@ export interface ParquetColumnsOptions {
   loadedStart: number;
   query: string;
   activeColumn: number | null;
+  /** Columns with at least one hit in the current search; tinted while the search stands. */
+  matchedColumns: ReadonlySet<number>;
+  /** The schema-pinned column and the edge it sticks to, if it has left the viewport. */
+  pinnedColumn: number | null;
+  pinSide: "start" | "end" | null;
+  /** Absolute positions rendered, in table order; hidden columns are simply absent. */
+  visibleColumns: number[];
   columnLayout: ParquetColumnLayout;
   onSelectCell: (cell: { row: number; col: number }) => void;
   onActivateColumn: (position: number) => void;
@@ -27,6 +35,10 @@ export function buildParquetColumns({
   loadedStart,
   query,
   activeColumn,
+  matchedColumns,
+  pinnedColumn,
+  pinSide,
+  visibleColumns,
   columnLayout,
   onSelectCell,
   onActivateColumn,
@@ -50,27 +62,63 @@ export function buildParquetColumns({
       render: (_value, _row, index) => loadedStart + index + 1,
     },
   ];
-  fileInfo.columns.forEach((column, position) => {
+  visibleColumns.forEach((position, order) => {
+    const column = fileInfo.columns[position];
+    if (!column) return;
     const active = activeColumn === position;
+    const hit = matchedColumns.has(position);
+    const pinned = pinnedColumn === position && pinSide !== null;
+    const classes = [
+      active ? "parquet-viewer__column--active" : "",
+      hit ? "parquet-viewer__column--hit" : "",
+      pinned ? "parquet-viewer__column--pinned" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
     columns.push({
-      title: column.name,
+      title: (
+        <span className="parquet-viewer__column-title">
+          {hit ? (
+            <span className="parquet-viewer__hit-title">
+              {column.name}
+              <span className="parquet-viewer__hit-dot" aria-hidden="true" />
+            </span>
+          ) : (
+            column.name
+          )}
+          {pinned && (
+            <span
+              className="codicon codicon-pin parquet-viewer__pin-indicator"
+              title={$t("parquet.pinnedColumn")}
+              aria-label={$t("parquet.pinnedColumn")}
+            />
+          )}
+        </span>
+      ),
       dataIndex: column.name,
       key: column.name,
       ellipsis: true,
       width: columnLayout.widths[position] ?? DATA_COLUMN_WIDTH,
       align: column.category === "numeric" ? "right" : "left",
-      className: active ? "parquet-viewer__column--active" : undefined,
+      fixed: pinned ? pinSide : undefined,
+      className: classes || undefined,
       // A grid whose header and body are separate scroll surfaces has to state the column
       // ordinal on both sides: assistive tech maps a cell to its header by `aria-colindex`,
       // and the header itself needs the matching number.
       onHeaderCell: () => ({
         role: "columnheader",
-        "aria-colindex": position + 2,
+        "aria-colindex": order + 2,
+        "data-col-position": position,
+        title: column.name,
         columnKey: column.name,
         onResizeColumn: (width: number) => onResizeColumn(column.name, width),
         onResetColumn: () => onResetColumn(column.name),
       }),
-      onCell: () => ({ role: "gridcell", "aria-colindex": position + 2 }),
+      onCell: () => ({
+        role: "gridcell",
+        "aria-colindex": order + 2,
+        "data-col-position": position,
+      }),
       render: (value: unknown, _row, index) => {
         const rowIndex = loadedStart + index;
         return (

@@ -18,8 +18,16 @@ interface ParquetSchemaProps {
   /** Controlled by the viewer so the filter can be part of the per-file UI state. */
   fieldFilter: string;
   onFieldFilterChange: (value: string) => void;
+  /** Schema rows checked for "only these columns". */
+  selectedColumns: ReadonlySet<number>;
+  showOnlySelected: boolean;
+  onShowOnlySelected: (next: boolean) => void;
+  onClearSelection: () => void;
   onScanStructured: () => void;
-  onFocusColumn: (position: number) => void;
+  onFocusColumn: (
+    position: number,
+    event?: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean },
+  ) => void;
   /** Open the profile panel for this column (mouse on the badge, or `i` on the focused row). */
   onInspectColumn: (column: ParquetColumnInfo) => void;
 }
@@ -37,6 +45,10 @@ export default function ParquetSchema({
   structuredScan,
   fieldFilter,
   onFieldFilterChange,
+  selectedColumns,
+  showOnlySelected,
+  onShowOnlySelected,
+  onClearSelection,
   onScanStructured,
   onFocusColumn,
   onInspectColumn,
@@ -113,6 +125,30 @@ export default function ParquetSchema({
           </button>
         )}
       </div>
+      <div className="parquet-viewer__sider-actions">
+        <button
+          type="button"
+          className={`parquet-viewer__only-selected${showOnlySelected ? " parquet-viewer__only-selected--on" : ""}`}
+          aria-pressed={showOnlySelected}
+          disabled={selectedColumns.size === 0}
+          onClick={() => onShowOnlySelected(!showOnlySelected)}
+          title={$t("parquet.showOnlySelectedHint")}
+        >
+          <span className="codicon codicon-eye" aria-hidden="true" />
+          {$t("parquet.showOnlySelected", { count: selectedColumns.size })}
+        </button>
+        {selectedColumns.size > 0 && (
+          <button
+            type="button"
+            className="parquet-viewer__clear-selection"
+            onClick={onClearSelection}
+            title={$t("parquet.clearSelection")}
+            aria-label={$t("parquet.clearSelection")}
+          >
+            <span className="codicon codicon-close" />
+          </button>
+        )}
+      </div>
       {showStructuredScan && (
         <button
           type="button"
@@ -179,6 +215,8 @@ export default function ParquetSchema({
           const icon = COLUMN_ICONS[column.category];
           const kind = column.category;
           const active = activeColumn === position;
+          const picked = selectedColumns.has(position);
+          const dimmed = showOnlySelected && !picked;
           const stats = statsByName.get(column.name);
           const share = shares.get(column.name);
           // The badge is visual only; the row's accessible name carries the same sentence, so
@@ -220,14 +258,15 @@ export default function ParquetSchema({
               key={column.name}
               type="button"
               role="option"
-              className={`parquet-viewer__list-item${active ? " parquet-viewer__list-item--active" : ""}`}
+              className={`parquet-viewer__list-item${active ? " parquet-viewer__list-item--active" : ""}${picked ? " parquet-viewer__list-item--picked" : ""}${dimmed ? " parquet-viewer__list-item--dimmed" : ""}`}
               aria-selected={active}
               aria-label={summary ? `${label} — ${summary}` : label}
-              title={`${column.name} · ${column.type}`}
+              title={`${column.name} · ${column.type} · ${$t("parquet.selectColumnsHint")}`}
               data-column={column.name}
+              data-selected={picked ? "true" : undefined}
               tabIndex={index === fieldCursor ? 0 : -1}
               onFocus={() => setFieldCursor(index)}
-              onClick={() => onFocusColumn(position)}
+              onClick={(event) => onFocusColumn(position, event)}
             >
               <span
                 className={`codicon parquet-viewer__list-icon parquet-viewer__list-icon--${kind} ${icon}`}
@@ -235,6 +274,12 @@ export default function ParquetSchema({
               <span className="parquet-viewer__list-name" title={column.name}>
                 {column.name}
               </span>
+              {picked && (
+                <span
+                  className="codicon codicon-check parquet-viewer__list-check"
+                  aria-hidden="true"
+                />
+              )}
               {badge && (
                 <span
                   className="parquet-viewer__list-null"

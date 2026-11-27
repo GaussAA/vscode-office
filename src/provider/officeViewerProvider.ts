@@ -22,6 +22,8 @@ import { registerDataViewerCacheClearer } from "../service/dataViewerCacheClear"
 export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider {
   /** Open parquet panels, for the Clear cache broadcast. */
   private readonly parquetHandlers = new Set<Handler>();
+  /** Host-side search memos, one per panel; Clear cache has to drop them too. */
+  private readonly parquetSearchClearers = new Set<() => void>();
   /** Set by Clear cache when it ran with no parquet panel to clear; consumed by the next open. */
   private parquetClearPending = false;
 
@@ -35,6 +37,7 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
    */
   public async clearDataViewerCaches(): Promise<void> {
     parquetScanCache.clear();
+    for (const clear of this.parquetSearchClearers) clear();
     const parquetActive = [...this.parquetHandlers].filter((handler) => !handler.disposed);
     for (const handler of parquetActive) handler.emit("clearParquetCache");
     if (parquetActive.length === 0) this.parquetClearPending = true;
@@ -95,14 +98,22 @@ export class OfficeViewerProvider implements vscode.CustomReadonlyEditorProvider
       },
     });
     this.parquetHandlers.add(handler);
+    const clearSearch = () => parquet.clearSearchCache();
+    this.parquetSearchClearers.add(clearSearch);
     handler
       .on("parquetProfile", (request) => parquet.profile(request))
       .on("parquetColumnScan", (request) => parquet.columnScan(request))
-      .on("parquetEmptyShareScan", (request) => parquet.emptyShareScan(request));
+      .on("parquetEmptyShareScan", (request) => parquet.emptyShareScan(request))
+      .on("parquetSearch", (request) => parquet.search(request))
+      .on("parquetSearchCancel", (request) => parquet.cancelSearch(request))
+      // The memo describes bytes. A write to the file invalidates every answer even if the
+      // webview has not reloaded the panel yet.
+      .on("fileChange", () => parquet.clearSearchCache());
     // A batch scan can run for seconds on a wide nested schema; closing the tab aborts it
     // instead of letting the host decode to the row cap for nobody.
     webviewPanel.onDidDispose(() => {
       this.parquetHandlers.delete(handler);
+      this.parquetSearchClearers.delete(clearSearch);
       parquet.dispose();
     });
 

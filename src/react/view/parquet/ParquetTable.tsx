@@ -20,6 +20,8 @@ interface ParquetTableProps {
   tableColumns: ColumnsType<TableRow>;
   matchRows: Set<number>;
   targetRow: number | null;
+  /** Columns rendered, without the ordinal (#) column. */
+  visibleColumnCount: number;
   columnLayout: ParquetColumnLayout;
   onKeyDown: KeyboardEventHandler<HTMLDivElement>;
 }
@@ -41,6 +43,7 @@ export default function ParquetTable({
   tableColumns,
   matchRows,
   targetRow,
+  visibleColumnCount,
   columnLayout,
   onKeyDown,
 }: ParquetTableProps) {
@@ -63,7 +66,7 @@ export default function ParquetTable({
           role="grid"
           aria-label={fileName || undefined}
           aria-rowcount={fileInfo.rowCount}
-          aria-colcount={fileInfo.columns.length + 1}
+          aria-colcount={visibleColumnCount + 1}
           // A page is one screenful, so its size is a runtime fact. Exposed for the UI
           // assertions (and it documents the model in the DOM).
           data-page-size={pageSize}

@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.1.0] - 2026-11-27
+
+### Added
+
+- **Pin the selected parquet column.** A schema click selects and scrolls a column into view;
+  when it would leave the viewport it sticks to that edge (`start`/`end`), shows a pin marker,
+  divider and shadow, and releases when scrolled back. One column at a time; cell clicks tint
+  but never pin ([ADR-0032](docs/adr/0032-parquet-pinned-columns-and-visibility.md)).
+- **Column selection and “only selected”.** Ctrl/Cmd-click toggles columns, Shift-click selects
+  a range, and the sidebar switch narrows the table to them. Hidden fields stay listed and a
+  click brings one back; the set persists per file. Hidden columns keep participating in search,
+  and a hit in one is reported with a one-click reveal.
+- **Search scope.** The find bar offers all columns, the active column, or the visible columns;
+  the choice is remembered per file. Scoped hits run in the host and keep the UI responsive; on
+  a 139 MB / 269k-row file with a 122 MB text column, one column takes ~0.4 s instead of 12–17 s
+  for all of them.
+
+### Changed
+
+- **Whole-file search moved to the extension host** ([ADR-0031](docs/adr/0031-parquet-search-host-and-scope.md)).
+  The webview no longer decodes or holds 1.1–1.2 GB of temporary strings; progress, cancel and a
+  three-entry query memo now live next to the file. Matching semantics are unchanged (including
+  the Unicode edge cases); plain strings skip the display formatter.
+
+### Fixed
+
+- **Search hits are visible at a glance.** Matching text uses a themed high-contrast mark, the
+  matched row gets a left accent plus a stronger wash, and the matched column is tinted with a
+  header dot. A search jump no longer leaves a stale schema tint.
+- **Pinned columns paint correctly in antd 6.** The old `-fix-left/right` selectors never matched;
+  the pinned column now uses `-fix-start/end`, an opaque active-body tint (header tint stays on
+  the header) and the correct alt-row background.
+- **Long schema headers keep their full name** now that the title is a node (an explicit `title`
+  attribute is emitted), so the edge-types check and the tooltip both work.
+
 ## [7.0.2] - 2026-11-24
 
 ### Fixed

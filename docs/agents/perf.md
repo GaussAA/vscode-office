@@ -1,13 +1,14 @@
 # Performance gate
 
 `pnpm verify:perf` runs the built viewers in headless Chrome **and the JSONL / JSON / parquet
-profile host services in Node** and asserts nine numbers that used to be catastrophic and
+profile host services in Node** and asserts thirteen numbers that used to be catastrophic and
 invisible:
 
 | invariant                                       | budget                                    | why it exists                                                                                                                                                                                                                               |
 | ----------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | first paint reads at most 1.25x the file        | measured ~1.04x (1M rows), ~1.10x (small) | the viewer issues the visible page and its prefetch back to back; without in-flight deduplication in the range cache that is 2.04x the file                                                                                                 |
-| a whole-file search is one pass                 | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60                                                                                                                      |
+| a whole-file search is one pass                 | 1M rows < 12 s, 200k x 60 cols < 12 s     | the old per-5000-row-batch loop re-decoded the data page containing each batch: ~28 s for 1M rows, ~40 s for 200k x 60. The scan now runs in the host (ADR-0031); the page only waits for the reply                                         |
+| a scoped search reads only its columns          | one column x 200k rows < 2.5 s            | scanning all 60 columns just because the user narrowed the scope would hide the regression behind a still-fast file. Measured 368–578 ms for `s29` of the wide fixture; full scan is ~3.8 s                                                 |
 | a page turn on 60 columns stays usable          | best of 3: warm < 2 s, cold < 5 s         | idle: 210 ms warm (render of 3,000 cells), 520 ms cold (one decoded data page per column). Loose on purpose — load inflates samples 2-4x, and the regression this catches is 5-10x                                                          |
 | a JSONL directory window stays in budget        | 80 MB / 40 lines: ≤ 3 rows, < 1.5 s       | a 500-line request without the 4 MB byte budget parses all 40 × 2 MB lines before the first row; measured 15 ms / 1 row                                                                                                                     |
 | a whole-file JSONL search is one pass           | 200k lines < 5 s, `scanned == total`      | the line window per turn must stay byte-bounded; a per-batch re-read or an unbounded window shows up as an order-of-magnitude jump. Measured 0.3–0.5 s                                                                                      |
@@ -79,9 +80,13 @@ The message names the usual cause, because both budgets fail for exactly one rea
 - **first paint over budget** → duplicate in-flight range requests. Check that
   `rangeBackedBuffer`'s `inFlight` map is still consulted before `fetch`, and that the viewer
   still opens one source per document rather than two.
-- **search over budget** → something is reading per batch again. `parquetSearch.ts` must walk
-  each column once via `parquetRead`'s `onPage`; a `parquetReadObjects` call inside a row loop
-  is the regression.
+- **search over budget** → something is reading per batch again. `src/service/parquetSearch.ts`
+  must walk each column once via `parquetRead`'s `onPage`; a `parquetReadObjects` call inside a
+  row loop is the regression. A scoped search must also filter `info.columns` to the requested
+  positions, never scan the rest.
+- **scoped search over budget** → the `columns` option stopped being passed through. Check
+  `src/provider/parquetHandlers.ts` (`columns: requested`) and the UI's scope mapping; one
+  selected column must not expand to every column.
 - **JSONL window over rows** → the byte budget stopped being applied. Check
   `JsonlSession.readRange`'s `advance(from, lines, bytes)` call and `JsonlFile.advance`: a
   request for 500 lines must still return only what fits in 4 MB (one line here).

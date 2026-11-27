@@ -15,7 +15,7 @@ import {
   unexpected,
 } from "../helpers.mjs";
 
-/** 14 scenario(s); the runner concatenates these lists. */
+/** 18 scenario(s); the runner concatenates these lists. */
 export default [
   {
     name: "parquet-grid-semantics",
@@ -1259,6 +1259,333 @@ export default [
       );
       expect(again, "re-running the first query did not restore its hit");
       return `${state.count} at ${state.range}, ${geometry.height}px rows, Enter steps past ${before}, empty scan says 0`;
+    },
+  },
+  {
+    name: "parquet-pinned-column",
+    async run({ page, base }) {
+      await openParquet(page, base, "?wide=1");
+      const clickField = (name) =>
+        page.evaluate(`(() => {
+          [...document.querySelectorAll('.parquet-viewer__list-item')]
+            .find((item) => item.dataset.column === ${JSON.stringify(name)})?.click();
+        })()`);
+      await clickField("field_20");
+      await page.waitFor(`document.querySelectorAll('.parquet-viewer__column--active').length > 0`);
+      const initial = json(
+        await page.evaluate(`JSON.stringify({
+          pinned: document.querySelectorAll('.parquet-viewer__column--pinned').length,
+          pinIcon: document.querySelectorAll('.parquet-viewer__pin-indicator').length,
+        })`),
+      );
+      expect(initial.pinned === 0, "selecting a column pinned it before it left the viewport");
+      expect(initial.pinIcon === 0, "the pin icon appeared before the column was pinned");
+
+      // A cell click changes the tint/inspection, never the pin.
+      await page.evaluate(`(() => {
+        const cell = document.querySelector('.ant-table-tbody-virtual .ant-table-cell[data-col-position="5"] .parquet-viewer__cell');
+        cell?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      })()`);
+      const afterCell = await page.evaluate(
+        `document.querySelectorAll('.parquet-viewer__column--pinned').length`,
+      );
+      expect(afterCell === 0, `a cell click pinned ${afterCell} column(s)`);
+
+      await clickField("field_20");
+      await page.waitFor(
+        `document.querySelector('.parquet-viewer__list-item--active[data-column="field_20"]') !== null`,
+      );
+      await page.sleep(900);
+      const box = json(
+        await page.evaluate(`(() => {
+          const wrap = document.querySelector('.parquet-viewer__table-wrap');
+          const rect = wrap?.getBoundingClientRect();
+          const view = wrap?.querySelector('.ant-table-tbody-virtual')?.getBoundingClientRect();
+          return JSON.stringify({ x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2), left: view?.left, right: view?.right });
+        })()`),
+      );
+      await page.wheel(3000, 0, box.x, box.y);
+      const pinnedStart = await page.waitFor(
+        `!!document.querySelector('.ant-table-tbody-virtual .parquet-viewer__column--pinned.ant-table-cell-fix-start')`,
+        6000,
+      );
+      expect(pinnedStart, "scrolling right did not pin the selected column to the left edge");
+      const start = json(
+        await page.evaluate(`(() => {
+          const cell = document.querySelector('.ant-table-tbody-virtual .parquet-viewer__column--pinned.ant-table-cell-fix-start');
+          const header = document.querySelector('.ant-table-header .parquet-viewer__column--pinned.ant-table-cell-fix-start');
+          const view = document.querySelector('.ant-table-tbody-virtual')?.getBoundingClientRect();
+          const rect = cell?.getBoundingClientRect();
+          return JSON.stringify({
+            body: rect ? { left: Math.round(rect.left), right: Math.round(rect.right) } : null,
+            header: !!header,
+            viewLeft: view ? Math.round(view.left) : null,
+            viewRight: view ? Math.round(view.right) : null,
+            icon: document.querySelectorAll('.parquet-viewer__pin-indicator').length,
+            bodyFixed: document.querySelectorAll('.ant-table-tbody-virtual .ant-table-cell-fix-start').length,
+          });
+        })()`),
+      );
+      expect(start.icon >= 1, "the pinned header has no pin indicator");
+      expect(
+        start.body &&
+          start.body.left <= start.viewLeft + 72 &&
+          start.body.left >= start.viewLeft - 2,
+        `pinned-left column is at ${JSON.stringify(start.body)} inside ${start.viewLeft}..${start.viewRight}`,
+      );
+      expect(start.header, "the header did not pin with the body");
+      expect(start.bodyFixed >= 1, "no body cell carries antd's fix-start class");
+
+      // Coming back far enough releases the pin and returns the column to its normal slot.
+      await page.wheel(-2600, 0, box.x, box.y);
+      const released = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__column--pinned').length === 0`,
+        4000,
+      );
+      const releaseDiag = await page.evaluate(`(() => {
+        const wrap = document.querySelector('.parquet-viewer__table-wrap');
+        const inner = wrap?.querySelector('.ant-table-tbody-virtual-holder-inner');
+        const cell = document.querySelector('.ant-table-tbody-virtual .parquet-viewer__column--active');
+        const view = document.querySelector('.ant-table-tbody-virtual')?.getBoundingClientRect();
+        return JSON.stringify({
+          offset: inner ? Math.round(wrap.getBoundingClientRect().left - inner.getBoundingClientRect().left) : null,
+          cls: cell?.className ?? null,
+          cell: cell ? (({ left, right }) => ({ left: Math.round(left), right: Math.round(right) }))(cell.getBoundingClientRect()) : null,
+          view: view ? { left: Math.round(view.left), right: Math.round(view.right) } : null,
+        });
+      })()`);
+      expect(
+        released,
+        `scrolling the column back into view did not release the pin: ${releaseDiag}`,
+      );
+      const visible = await page.evaluate(`(() => {
+        const cell = document.querySelector('.ant-table-tbody-virtual .parquet-viewer__column--active');
+        const view = document.querySelector('.ant-table-tbody-virtual')?.getBoundingClientRect();
+        const rect = cell?.getBoundingClientRect();
+        return !!rect && !!view && rect.left > view.left && rect.right < view.right;
+      })()`);
+      expect(visible, "the released column is not fully inside the viewport");
+
+      await page.wheel(-5000, 0, box.x, box.y);
+      const pinnedEnd = await page.waitFor(
+        `!!document.querySelector('.ant-table-tbody-virtual .parquet-viewer__column--pinned.ant-table-cell-fix-end')`,
+        6000,
+      );
+      expect(pinnedEnd, "scrolling back past the column did not pin it to the right edge");
+      const end = json(
+        await page.evaluate(`(() => {
+          const cell = document.querySelector('.ant-table-tbody-virtual .parquet-viewer__column--pinned.ant-table-cell-fix-end');
+          const view = document.querySelector('.ant-table-tbody-virtual')?.getBoundingClientRect();
+          const rect = cell?.getBoundingClientRect();
+          return JSON.stringify({ right: rect ? Math.round(rect.right) : null, viewRight: view ? Math.round(view.right) : null });
+        })()`),
+      );
+      expect(
+        end.right !== null && end.right <= end.viewRight + 2 && end.right >= end.viewRight - 72,
+        `pinned-right column is at ${end.right}, viewport right is ${end.viewRight}`,
+      );
+
+      await clickField("field_20");
+      const unpinned = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__column--pinned').length === 0`,
+        3000,
+      );
+      expect(unpinned, "clicking the field again did not unpin the column");
+      // Leave the documentation screenshot in the state the scenario is about.
+      await clickField("field_20");
+      await page.waitFor(
+        `document.querySelector('.parquet-viewer__list-item--active[data-column="field_20"]') !== null`,
+      );
+      await page.sleep(700);
+      await page.wheel(3000, 0, box.x, box.y);
+      await page.waitFor(
+        `!!document.querySelector('.ant-table-tbody-virtual .parquet-viewer__column--pinned.ant-table-cell-fix-start')`,
+        6000,
+      );
+      return `pinned left at ${start.body.left}px and right at ${end.right}px; cell clicks never pin`;
+    },
+  },
+  {
+    name: "parquet-column-visibility",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      const ctrlClick = (name) =>
+        page.evaluate(`(() => {
+          const item = [...document.querySelectorAll('.parquet-viewer__list-item')]
+            .find((button) => button.dataset.column === ${JSON.stringify(name)});
+          item?.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+        })()`);
+      await ctrlClick("name");
+      await ctrlClick("score");
+      const picked = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__list-item[data-selected="true"]').length === 2`,
+      );
+      expect(picked, "Ctrl-click did not select two schema fields");
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__only-selected')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const filtered = await page.waitFor(`(() => {
+        const headers = document.querySelectorAll('.ant-table-header th[aria-colindex]').length;
+        const grid = document.querySelector('.parquet-viewer__table-wrap')?.getAttribute('aria-colcount');
+        return headers === 3 && grid === '3';
+      })()`);
+      expect(filtered, "only-selected did not reduce the table to the two checked columns");
+      const dimmed = await page.evaluate(
+        `document.querySelectorAll('.parquet-viewer__list-item--dimmed').length`,
+      );
+      expect(dimmed === 2, `expected 2 dimmed fields, got ${dimmed}`);
+
+      // Clicking a hidden field brings it back: the user asked for that column, not for a
+      // selected-only dead end.
+      await page.evaluate(`(() => {
+        [...document.querySelectorAll('.parquet-viewer__list-item')]
+          .find((item) => item.dataset.column === 'id')?.click();
+      })()`);
+      const restored = await page.waitFor(
+        `document.querySelectorAll('.ant-table-header th[aria-colindex]').length === 4`,
+        3000,
+      );
+      expect(restored, "clicking a hidden field did not add it back to the table");
+
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__clear-selection')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const all = await page.waitFor(
+        `document.querySelectorAll('.ant-table-header th[aria-colindex]').length === 5`,
+        3000,
+      );
+      expect(all, "clearing the selection did not restore every column");
+
+      // Per-file persistence is deliberate: re-open the same document and the view returns.
+      await ctrlClick("name");
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__only-selected')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      await page.waitFor(
+        `document.querySelectorAll('.ant-table-header th[aria-colindex]').length === 2`,
+      );
+      await page.navigate(`${base}/harness-parquet?mixed=1`);
+      const persisted = await page.waitFor(
+        `document.querySelectorAll('.ant-table-header th[aria-colindex]').length === 2`,
+        5000,
+      );
+      expect(persisted, "the checked column view was not restored for this document");
+      return "Ctrl-select, only-selected, hidden-column click and per-document restore";
+    },
+  },
+  {
+    name: "parquet-search-scope",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      // Hide `name`, where the query matches, behind the id-only view.
+      await page.evaluate(`(() => {
+        [...document.querySelectorAll('.parquet-viewer__list-item')]
+          .find((item) => item.dataset.column === 'id')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+      })()`);
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__only-selected')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      await page.waitFor(
+        `document.querySelectorAll('.ant-table-header th[aria-colindex]').length === 2`,
+      );
+
+      const search = async (scope, needle) => {
+        await page.evaluate(`(() => {
+          const select = document.querySelector('.parquet-viewer__scope-select');
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+          setter.call(select, ${JSON.stringify(scope)});
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          const input = document.querySelector('.parquet-viewer__find-input');
+          const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+          setValue.call(input, ${JSON.stringify(needle)});
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          document.querySelector('.parquet-viewer__find-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        })()`);
+      };
+      await search("all", "service-a");
+      const hidden = await page.waitFor(
+        `!!document.querySelector('.parquet-viewer__hidden-hit') && /\\d+ hidden/.test(document.querySelector('.parquet-viewer__hidden-hit')?.innerText ?? '')`,
+        8000,
+      );
+      expect(hidden, "a hit in the hidden `name` column was not reported");
+      const allCount = await page.evaluate(
+        `document.querySelector('.parquet-viewer__find-count')?.innerText ?? ''`,
+      );
+      expect(!/^0 /.test(allCount), `all-columns search missed the hidden hit (${allCount})`);
+
+      await search("visible", "service-a");
+      const visibleEmpty = await page.waitFor(
+        `(document.querySelector('.parquet-viewer__find-count')?.innerText ?? '') === '0 matches'`,
+        8000,
+      );
+      expect(visibleEmpty, "visible-columns search still reported hits from the hidden column");
+      const gone = await page.evaluate(
+        `document.querySelectorAll('.parquet-viewer__hidden-hit').length`,
+      );
+      expect(gone === 0, "hidden-hit notice survived a visible-only search");
+
+      await search("all", "service-a");
+      await page.waitFor(`!!document.querySelector('.parquet-viewer__hidden-hit')`, 8000);
+      await page.evaluate(
+        `document.querySelector('.parquet-viewer__hidden-hit')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`,
+      );
+      const revealed = await page.waitFor(
+        `document.querySelectorAll('.ant-table-header th[aria-colindex]').length === 3`,
+        3000,
+      );
+      expect(revealed, "the hidden-hit action did not reveal the matched column");
+      return `all-columns counted ${allCount}, visible-only found 0, reveal restored name`;
+    },
+  },
+  {
+    name: "parquet-search-highlight",
+    async run({ page, base }) {
+      await openParquet(page, base, "?mixed=1");
+      await page.evaluate(`(() => {
+        const input = document.querySelector('.parquet-viewer__find-input');
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(input, 'service-c-54');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        document.querySelector('.parquet-viewer__find-btn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      })()`);
+      const highlighted = await page.waitFor(
+        `document.querySelectorAll('.parquet-viewer__hit').length > 0`,
+        15000,
+      );
+      expect(highlighted, "the hit text was not marked");
+      const state = json(
+        await page.evaluate(`(() => {
+          const mark = document.querySelector('.parquet-viewer__hit');
+          const hitHeader = document.querySelector('.ant-table-header th.parquet-viewer__column--hit');
+          const hitCell = document.querySelector('.ant-table-tbody-virtual .parquet-viewer__column--hit');
+          const matchRow = document.querySelector('.ant-table-tbody-virtual .parquet-viewer__row--match');
+          const indexCell = matchRow?.querySelector('.parquet-viewer__index-cell');
+          const style = mark ? getComputedStyle(mark) : null;
+          return JSON.stringify({
+            markBackground: style?.backgroundColor ?? null,
+            markColor: style?.color ?? null,
+            hitDot: document.querySelectorAll('.parquet-viewer__hit-dot').length,
+            headerHit: !!hitHeader,
+            bodyHit: !!hitCell,
+            rowMatch: !!matchRow,
+            rowAccent: indexCell ? getComputedStyle(indexCell).boxShadow : null,
+            scope: document.querySelector('.parquet-viewer__scope-select')?.value ?? null,
+          });
+        })()`),
+      );
+      expect(state.markBackground !== "rgba(0, 0, 0, 0)", "the hit mark is transparent");
+      expect(state.markBackground !== null, "the hit mark has no background");
+      expect(state.headerHit, "the matched column header was not highlighted");
+      expect(state.bodyHit, "the matched column body was not highlighted");
+      expect(state.rowMatch, "the matched row lost its row highlight");
+      expect(state.rowAccent !== "none", "the matched row has no left accent");
+      expect(state.hitDot >= 1, "the matched column header has no hit dot");
+      expect(
+        state.scope === "all",
+        `the scope selector did not start on all columns (${state.scope})`,
+      );
+      return `mark ${state.markBackground} on ${state.markColor}, column header/body and row accent all present`;
     },
   },
 ];

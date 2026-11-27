@@ -6,7 +6,16 @@ import { MOTION_SLOW_MS, motionEnabled } from "../../util/motion";
 interface UseParquetColumnFocusArgs {
   tableRef: RefObject<TableRef | null>;
   tableWrapRef: RefObject<HTMLDivElement | null>;
+  /** Rendered widths by original column position; hidden columns simply never reach the loop. */
+  columnWidths: number[];
+  /** Absolute positions currently rendered, in table order. */
+  visibleColumns: number[];
+  /** Width of the always-fixed ordinal column. */
+  indexWidth: number;
 }
+
+/** Which edge a pinned column sticks to; antd's fixed names. */
+export type ParquetPinSide = "start" | "end";
 
 /** A frame may land a pixel off; more than this means something else owns the scroll. */
 const INTERRUPT_TOLERANCE = 2;
@@ -43,11 +52,28 @@ interface HorizontalTableRef {
  * grid currently is. The duration comes from the motion tokens (ADR-0022); reduced motion
  * places the column directly.
  */
-export function useParquetColumnFocus({ tableRef, tableWrapRef }: UseParquetColumnFocusArgs) {
+export function useParquetColumnFocus({
+  tableRef,
+  tableWrapRef,
+  columnWidths,
+  visibleColumns,
+  indexWidth,
+}: UseParquetColumnFocusArgs) {
   /** Field whose column the schema click last brought into view; tints it while browsing. */
   const [activeColumn, setActiveColumn] = useState<number | null>(null);
+  /** The column the schema click pinned. Cell clicks move the tint but never the pin. */
+  const [pinnedColumn, setPinnedColumn] = useState<number | null>(null);
+  const [pinSide, setPinSide] = useState<ParquetPinSide | null>(null);
+  const pinHover = useRef<{ offset: number }>({ offset: 0 });
   /** The one pending frame: measurement or glide step. The newest click owns it. */
   const frame = useRef(0);
+  const pinFrame = useRef(0);
+  /**
+   * A schema click scrolls the column into view; that programmatic glide must not count as the
+   * user pushing it off an edge. Pinning starts with the first wheel/pointer gesture after the
+   * click, and stops again while the next selection is being brought into view.
+   */
+  const pinArmed = useRef(false);
 
   /**
    * How far the grid is scrolled horizontally, read from the layout rather than tracked: the
@@ -102,7 +128,7 @@ export function useParquetColumnFocus({ tableRef, tableWrapRef }: UseParquetColu
       const header = wrap.querySelector<HTMLElement>(".ant-table-header");
       const viewport = wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual");
       const inner = wrap.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner");
-      const headCell = header?.querySelector<HTMLElement>(`th[aria-colindex="${position + 2}"]`);
+      const headCell = header?.querySelector<HTMLElement>(`th[data-col-position="${position}"]`);
       if (!header || !headCell || !viewport || !inner) return null;
       const viewportWidth = viewport.clientWidth;
       // A holder that has not been measured yet has no usable centre; a jump computed from it
@@ -164,17 +190,26 @@ export function useParquetColumnFocus({ tableRef, tableWrapRef }: UseParquetColu
   );
 
   const focusColumn = useCallback(
-    (position: number, mark = true) => {
+    (position: number, mark = true, preserveActive = false) => {
       if (!mark) {
-        // A search jump must not leave (or inherit) a "you picked this field" tint.
-        setActiveColumn(null);
+        // A search jump must not leave (or inherit) a "you picked this field" tint. The
+        // exception is a search scoped to the active column: clearing it would leave the
+        // scope selector without the column whose results are on screen.
+        pinArmed.current = false;
+        if (!preserveActive) setActiveColumn(null);
       } else if (activeColumn === position) {
         // The field is already highlighted: the second click dismisses it. That is a
         // selection toggle, not another navigation, so the grid stays where the reader is.
         setActiveColumn(null);
+        setPinnedColumn(null);
+        setPinSide(null);
         return;
       } else {
         setActiveColumn(position);
+        setPinnedColumn(position);
+        setPinSide(null);
+        pinArmed.current = false;
+        pinHover.current.offset = bodyOffset();
       }
       // Measure after the click has committed: on a cold start the holder's width can still be
       // zero, and an offset computed from half-measured columns would land somewhere else.
@@ -190,8 +225,102 @@ export function useParquetColumnFocus({ tableRef, tableWrapRef }: UseParquetColu
         glideTo(target.offset);
       });
     },
-    [activeColumn, apply, glideTo, stopGlide, targetFor],
+    [activeColumn, apply, bodyOffset, glideTo, stopGlide, targetFor],
   );
+
+  /**
+   * Choose and release the pinned edge from the column's natural position.
+   *
+   * The virtual body is moved by `margin-left`, which makes a fixed column's `sticky` offset
+   * work without a scroll port; this loop only decides *which* edge and when the column has
+   * come back far enough to release. Once a side is chosen it is kept until the column is
+   * fully inside the viewport again, so reversing direction cannot teleport it across.
+   */
+  const updatePinSide = useCallback(() => {
+    if (!pinArmed.current) return;
+    if (pinnedColumn === null) {
+      setPinSide((side) => (side === null ? side : null));
+      return;
+    }
+    const visibleIndex = visibleColumns.indexOf(pinnedColumn);
+    if (visibleIndex < 0) {
+      setPinnedColumn(null);
+      setPinSide(null);
+      return;
+    }
+    const wrap = tableWrapRef.current;
+    const viewport = wrap?.querySelector<HTMLElement>(".ant-table-tbody-virtual");
+    if (!wrap || !viewport) return;
+    let columnLeft = indexWidth;
+    for (let order = 0; order < visibleIndex; order++) {
+      columnLeft += columnWidths[visibleColumns[order]] ?? 0;
+    }
+    const width = columnWidths[pinnedColumn] ?? 0;
+    const offset = bodyOffset();
+    const naturalLeft = columnLeft - offset;
+    const naturalRight = naturalLeft + width;
+    const viewportWidth = viewport.clientWidth;
+    const previous = pinHover.current.offset;
+    pinHover.current.offset = offset;
+    const direction = offset > previous + 0.5 ? 1 : offset < previous - 0.5 ? -1 : 0;
+
+    setPinSide((current) => {
+      if (current === "start") {
+        // The column has come back far enough that its natural slot is visible again. A single
+        // large wheel can cross the whole viewport, so consider the other edge in the same
+        // pass instead of waiting for a mutation that may never come.
+        if (naturalLeft >= indexWidth + 6) {
+          return naturalRight > viewportWidth + 1 ? "end" : null;
+        }
+        return current;
+      }
+      if (current === "end") {
+        if (naturalRight <= viewportWidth - 6) {
+          return naturalLeft < indexWidth - 1 ? "start" : null;
+        }
+        return current;
+      }
+      const outLeft = naturalLeft < indexWidth - 1;
+      const outRight = naturalRight > viewportWidth + 1;
+      if (outLeft && outRight) return direction >= 0 ? "start" : "end";
+      if (outLeft) return "start";
+      if (outRight) return "end";
+      return null;
+    });
+  }, [bodyOffset, columnWidths, indexWidth, pinnedColumn, tableWrapRef, visibleColumns]);
+
+  useEffect(() => {
+    if (pinnedColumn === null) return;
+    const wrap = tableWrapRef.current;
+    const inner = wrap?.querySelector<HTMLElement>(".ant-table-tbody-virtual-holder-inner");
+    if (!wrap || !inner) return;
+    const schedule = () => {
+      if (pinFrame.current) return;
+      pinFrame.current = requestAnimationFrame(() => {
+        pinFrame.current = 0;
+        updatePinSide();
+      });
+    };
+    pinHover.current.offset = bodyOffset();
+    schedule();
+    // The body offset is an inline `margin-left`; a programmatic scroll and a scrollbar drag
+    // both rewrite it, so one observer covers every way the grid moves horizontally.
+    const observer = new MutationObserver(schedule);
+    observer.observe(inner, { attributes: true, attributeFilter: ["style"] });
+    const resize = new ResizeObserver(schedule);
+    resize.observe(wrap);
+    return () => {
+      observer.disconnect();
+      resize.disconnect();
+      cancelAnimationFrame(pinFrame.current);
+      pinFrame.current = 0;
+    };
+  }, [bodyOffset, pinnedColumn, tableWrapRef, updatePinSide]);
+
+  const clearPin = useCallback(() => {
+    setPinnedColumn(null);
+    setPinSide(null);
+  }, []);
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
@@ -203,6 +332,8 @@ export function useParquetColumnFocus({ tableRef, tableWrapRef }: UseParquetColu
       const wrap = tableWrapRef.current;
       const target = event.target;
       if (!wrap || !(target instanceof Node) || !wrap.contains(target)) return;
+      // A real gesture is what arms edge pinning; the click's own glide never does.
+      pinArmed.current = true;
       stopGlide();
     };
     window.addEventListener("wheel", cancel, { passive: true });
@@ -213,5 +344,5 @@ export function useParquetColumnFocus({ tableRef, tableWrapRef }: UseParquetColu
     };
   }, [stopGlide, tableWrapRef]);
 
-  return { activeColumn, setActiveColumn, focusColumn };
+  return { activeColumn, setActiveColumn, focusColumn, pinnedColumn, pinSide, clearPin };
 }

@@ -34,10 +34,26 @@ body:has(.parquet-app) {
      is that same amber, flattened. */
   --pv-row-match: color-mix(
     in srgb,
-    var(--vscode-editor-findMatchBackground, #ea5c00) 22%,
+    var(--vscode-editor-findMatchBackground, #ea5c00) 26%,
     var(--pv-canvas)
   );
   --pv-row-target: color-mix(in srgb, var(--pv-accent) 18%, var(--pv-canvas));
+  /* Search-hit identity is amber; the selected column stays blue. The column wash is the
+     weakest layer because it covers data, while the header edge and the text mark carry the
+     "here" signal. */
+  --pv-hit-column: color-mix(
+    in srgb,
+    var(--vscode-editor-findMatchBackground, #ea5c00) 13%,
+    var(--pv-canvas)
+  );
+  --pv-hit-column-header: color-mix(
+    in srgb,
+    var(--vscode-editor-findMatchBackground, #ea5c00) 24%,
+    var(--pv-canvas)
+  );
+  --pv-hit-edge: var(--vscode-editor-findMatchBackground, #ea5c00);
+  --pv-hit-mark-bg: var(--vscode-editor-findMatchBackground, #f2cc0c);
+  --pv-hit-mark-fg: #1b1b1b;
   --pv-scroll-thumb: color-mix(in srgb, var(--pv-fg) 22%, transparent);
   --pv-scroll-thumb-hover: color-mix(in srgb, var(--pv-fg) 38%, transparent);
   --pv-type-bg: color-mix(in srgb, var(--pv-fg) 8%, transparent);
@@ -213,6 +229,68 @@ body:has(.parquet-app) {
   flex-shrink: 0;
   font-size: 14px;
   color: var(--pv-muted);
+}
+
+/* The scope lives inside the find box: it changes what the same Enter searches, so it has to
+   be visible before the query, not hidden behind a menu. */
+.parquet-viewer__hidden-hit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
+  color: var(--pv-hit-mark-fg, #1b1b1b);
+  background: var(--pv-hit-edge);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    filter: brightness(1.08);
+  }
+}
+
+.parquet-viewer__scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  max-width: 156px;
+  height: 26px;
+  padding: 0 4px 0 6px;
+  border-radius: var(--pv-radius-sm);
+  background: var(--pv-control);
+}
+
+.parquet-viewer__scope-icon {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--pv-muted);
+}
+
+.parquet-viewer__scope-select {
+  max-width: 132px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  color: var(--pv-fg);
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 1px solid var(--pv-focus);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    color: var(--pv-muted);
+  }
 }
 
 .parquet-viewer__find-input {
@@ -503,6 +581,85 @@ body:has(.parquet-app) {
   overscroll-behavior: contain;
 }
 
+.parquet-viewer__sider-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 10px 6px;
+}
+
+.parquet-viewer__only-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
+  color: var(--pv-muted);
+  background: var(--pv-control);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    color: var(--pv-fg);
+    background: var(--pv-control-hover);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  &--on {
+    color: var(--pv-fg);
+    background: color-mix(in srgb, var(--pv-link) 18%, var(--pv-surface));
+  }
+}
+
+.parquet-viewer__clear-selection {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pv-radius-sm);
+  color: var(--pv-muted);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--pv-fg);
+    background: var(--pv-hover);
+  }
+}
+
+.parquet-viewer__list-item.parquet-viewer__list-item--picked {
+  background: color-mix(in srgb, var(--pv-link) 10%, transparent);
+
+  &:hover {
+    background: color-mix(in srgb, var(--pv-link) 16%, transparent);
+  }
+}
+
+.parquet-viewer__list-item.parquet-viewer__list-item--dimmed {
+  opacity: 0.45;
+}
+
+.parquet-viewer__list-check {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--pv-link);
+}
+
 .parquet-viewer__list-item {
   display: flex;
   align-items: center;
@@ -745,6 +902,14 @@ body:has(.parquet-app) {
     background: var(--pv-row-match) !important;
   }
 
+  /* A row accent survives the cell backgrounds and makes a hit findable while skimming. */
+  .ant-table-tbody > tr.parquet-viewer__row--match > td:first-child,
+  .ant-table-tbody-virtual .ant-table-row.parquet-viewer__row--match .ant-table-cell:first-child,
+  .ant-table-tbody > tr.parquet-viewer__row--target > td:first-child,
+  .ant-table-tbody-virtual .ant-table-row.parquet-viewer__row--target .ant-table-cell:first-child {
+    box-shadow: inset 3px 0 0 var(--pv-hit-edge);
+  }
+
   .ant-table-tbody > tr.parquet-viewer__row--target > td,
   .ant-table-tbody-virtual .ant-table-row.parquet-viewer__row--target .ant-table-cell {
     background: var(--pv-row-target) !important;
@@ -779,13 +944,126 @@ body:has(.parquet-app) {
     ) !important;
   }
 
-  .ant-table-cell-fix-left,
-  .ant-table-cell-fix-right {
+  .ant-table-thead > tr > th.parquet-viewer__column--hit {
+    color: var(--pv-fg) !important;
+    background: var(--pv-hit-column-header) !important;
+    box-shadow: inset 0 -2px 0 var(--pv-hit-edge);
+  }
+
+  .ant-table-thead > tr > th.parquet-viewer__column--active.parquet-viewer__column--hit {
+    background: color-mix(
+      in srgb,
+      var(--pv-hit-edge) 22%,
+      color-mix(in srgb, var(--pv-link) var(--pv-column-tint-header), var(--pv-surface))
+    ) !important;
+  }
+
+  /* Keep the row tint dominant: the column wash is only for rows that are not already a
+     stronger match/target surface. */
+  .ant-table-tbody-virtual
+    .ant-table-row:not(.parquet-viewer__row--match):not(.parquet-viewer__row--target)
+    .ant-table-cell.parquet-viewer__column--hit,
+  .ant-table-tbody
+    > tr:not(.parquet-viewer__row--match):not(.parquet-viewer__row--target)
+    > td.parquet-viewer__column--hit {
+    background: var(--pv-hit-column) !important;
+  }
+
+  .parquet-viewer__hit-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+  }
+
+  .parquet-viewer__column-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .parquet-viewer__pin-indicator {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--pv-hit-edge);
+  }
+
+  .parquet-viewer__hit-dot {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 50%;
+    background: var(--pv-hit-edge);
+    box-shadow: 0 0 0 1px var(--pv-canvas);
+  }
+
+  .parquet-viewer__hit {
+    padding: 0 1px;
+    border-radius: 2px;
+    color: var(--pv-hit-mark-fg);
+    background: var(--pv-hit-mark-bg);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--pv-hit-edge) 70%, transparent);
+  }
+
+  /* A pinned column has to be opaque: sticky paints it over the column it just covered. */
+  .ant-table-thead > tr > th.parquet-viewer__column--pinned.ant-table-cell-fix-start,
+  .ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--pinned.ant-table-cell-fix-start,
+  .ant-table-tbody > tr > td.parquet-viewer__column--pinned.ant-table-cell-fix-start {
+    background: var(--pv-surface) !important;
+    box-shadow:
+      inset -1px 0 0 var(--pv-hit-edge),
+      8px 0 10px -10px rgb(0 0 0 / 55%);
+  }
+
+  .ant-table-thead > tr > th.parquet-viewer__column--pinned.ant-table-cell-fix-end,
+  .ant-table-tbody-virtual .ant-table-cell.parquet-viewer__column--pinned.ant-table-cell-fix-end,
+  .ant-table-tbody > tr > td.parquet-viewer__column--pinned.ant-table-cell-fix-end {
+    background: var(--pv-surface) !important;
+    box-shadow:
+      inset 1px 0 0 var(--pv-hit-edge),
+      -8px 0 10px -10px rgb(0 0 0 / 55%);
+  }
+
+  .ant-table-thead > tr > th.parquet-viewer__column--pinned.parquet-viewer__column--active {
+    background: color-mix(
+      in srgb,
+      var(--pv-link) var(--pv-column-tint-header),
+      var(--pv-surface)
+    ) !important;
+  }
+
+  .ant-table-tbody-virtual
+    .ant-table-cell.parquet-viewer__column--pinned.parquet-viewer__column--active,
+  .ant-table-tbody > tr > td.parquet-viewer__column--pinned.parquet-viewer__column--active {
+    background: color-mix(
+      in srgb,
+      var(--pv-link) var(--pv-column-tint),
+      var(--pv-canvas)
+    ) !important;
+  }
+
+  .ant-table-tbody > tr.parquet-viewer__row--alt > td.parquet-viewer__column--pinned,
+  .ant-table-tbody-virtual
+    .ant-table-row.parquet-viewer__row--alt
+    .ant-table-cell.parquet-viewer__column--pinned {
+    background: var(--pv-row-alt) !important;
+  }
+
+  .ant-table-cell-fix-start,
+  .ant-table-cell-fix-end {
     background: var(--pv-canvas) !important;
   }
 
-  .ant-table-tbody > tr.parquet-viewer__row--alt > td.ant-table-cell-fix-left,
-  .ant-table-tbody > tr.parquet-viewer__row--alt > td.ant-table-cell-fix-right {
+  .ant-table-tbody > tr.parquet-viewer__row--alt > td.ant-table-cell-fix-start,
+  .ant-table-tbody > tr.parquet-viewer__row--alt > td.ant-table-cell-fix-end,
+  .ant-table-tbody-virtual
+    .ant-table-row.parquet-viewer__row--alt
+    .ant-table-cell.ant-table-cell-fix-start,
+  .ant-table-tbody-virtual
+    .ant-table-row.parquet-viewer__row--alt
+    .ant-table-cell.ant-table-cell-fix-end {
     background: var(--pv-row-alt) !important;
   }
 

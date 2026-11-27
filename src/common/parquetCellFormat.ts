@@ -21,7 +21,7 @@ function formatBinary(bytes: Uint8Array): string {
   return `0x${preview}${bytes.byteLength > BINARY_PREVIEW_BYTES ? ` … (${bytes.byteLength} B)` : ""}`;
 }
 
-function isBinaryType(type: string): boolean {
+export function isBinaryType(type: string): boolean {
   const upper = type.toUpperCase();
   return (
     upper === "BYTE_ARRAY" ||

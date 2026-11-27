@@ -72,6 +72,20 @@ test("ui state: fields round-trip and merge independently", () => {
   });
 });
 
+test("ui state: search scope and column selection round-trip", () => {
+  storage.clear();
+  saveParquetUi(docKey, {
+    searchScope: "visible",
+    selectedColumns: [3, 1, 3, -2, 1.5 as number],
+    showOnlySelected: true,
+  });
+  assert.deepEqual(loadParquetUi(docKey), {
+    searchScope: "visible",
+    selectedColumns: [1, 3],
+    showOnlySelected: true,
+  });
+});
+
 test("ui state: entries are per document and a missing key is a no-op", () => {
   storage.clear();
   saveParquetUi("file:///a.parquet", { row: 10 });

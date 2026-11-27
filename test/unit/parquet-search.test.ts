@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { parquetWriteBuffer } from "hyparquet-writer";
 import { openParquetFile } from "@/common/parquetReader";
-import { searchParquetValues } from "@/react/view/parquet/parquetSearch";
+import { searchParquetValues } from "@/service/parquetSearch";
 
 /**
  * The search used to read the file in 5000-row batches, and without an offset index every
@@ -56,6 +56,39 @@ test("search: reports which column matched for every row it keeps", async () => 
   assert.deepEqual(numeric.columns, [0]);
 });
 
+test("search: a column scope only scans the requested columns and keeps absolute positions", async () => {
+  const info = await generated();
+
+  const note = await searchParquetValues(info, "needle", { columns: [2] });
+  assert.deepEqual(note.rows, [1, 4]);
+  assert.deepEqual(note.columns, [2, 2], "the reply uses the schema position, not the subset");
+
+  const name = await searchParquetValues(info, "needle", { columns: [1] });
+  assert.deepEqual(name.rows, [], "name has no needle");
+  assert.equal(name.scanned, info.rowCount);
+
+  const none = await searchParquetValues(info, "needle", { columns: [99] });
+  assert.deepEqual(none.rows, [], "an out-of-range scope must not scan the whole file");
+});
+
+test("search: binary-looking strings are still matched as their formatted value", async () => {
+  const buffer = parquetWriteBuffer({
+    columnData: [
+      {
+        name: "raw",
+        // A STRING column whose physical type is BYTE_ARRAY: the formatter renders hex,
+        // and the cell shows that hex, so a search for the bytes must find the hex text.
+        data: ["abc"],
+        type: "BYTE_ARRAY",
+      },
+    ],
+  });
+  const info = await openParquetFile(buffer);
+  const hex = await searchParquetValues(info, "61 62 63");
+  assert.deepEqual(hex.rows, [0]);
+  const plain = await searchParquetValues(info, "abc");
+  assert.deepEqual(plain.rows, []);
+});
 test("search: numeric columns are matched as their display text", async () => {
   const info = await generated();
 

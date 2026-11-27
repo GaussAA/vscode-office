@@ -6,10 +6,10 @@ English | [简体中文](README-CN.md) | [繁體中文](README-TW.md)
 
 This extension previews **two things** in VS Code:
 
-| Format                              | What you get                                                                 |
-| ----------------------------------- | ---------------------------------------------------------------------------- |
-| Parquet: `.parquet`                 | ZSTD/GZIP/BROTLI/LZ4 columns, lazy paging, whole-file search, read-only      |
-| JSONL / NDJSON: `.jsonl`, `.ndjson` | A directory of entries on the left, the selected entry as a tree or raw text |
+| Format                              | What you get                                                                                                    |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Parquet: `.parquet`                 | ZSTD/GZIP/BROTLI/LZ4 columns, lazy paging, host-side scoped search, pinned/just-the-selected columns, read-only |
+| JSONL / NDJSON: `.jsonl`, `.ndjson` | A directory of entries on the left, the selected entry as a tree or raw text                                    |
 
 That is the whole list. Everything else this fork inherited — Word, PowerPoint, PDF, ePub, fonts,
 images, PSD, ICNS, XMind, HTML, Java `.class`, archives — was removed in **6.0.0**: VS Code
@@ -55,7 +55,12 @@ Reading is lazy and stays usable on big files:
 - **URLs are links.** A cell whose whole value is `http(s)` opens in the browser through the
   extension host; other schemes and URLs with credentials are never opened.
 - **Click a schema field to jump to its column.** The table scrolls horizontally to that
-  column and leaves a quiet tint behind, without changing rows or filters.
+  column and leaves a quiet tint behind, without changing rows or filters. When the column is
+  about to scroll out of view it pins to that edge, with a pin marker and a shadow; scroll it
+  back and it returns to the flow. Cell clicks tint but never pin.
+- **Select columns, then show only those.** Ctrl/Cmd-click adds columns, Shift-click selects a
+  range, and the sidebar's “only selected” switch narrows the table without touching column
+  widths. Clicking a hidden field brings it back. The checked set persists per file.
 - **A column profile in the sidebar.** Each field reports its share of null rows, read from the
   file's row-group statistics — footer metadata, never a column decode. A file written without
   statistics says so instead of showing `0%`, a partial answer is labelled partial, and a nested
@@ -65,8 +70,11 @@ Reading is lazy and stays usable on big files:
 
 ![Parquet types](docs/screenshots/parquet-types.png)
 
-**Find in file** scans each column once with progress, marks matching rows, highlights the
-matching text inside cells, and jumps to the first hit. A 1M-row file scans in about 1.3 s.
+**Find in file** runs in the extension host, so a large file keeps the UI responsive. Choose
+**all columns**, the **current column**, or the **visible columns** next to the search box; a
+139 MB / 269k-row file with a 122 MB text column takes about 0.4 s for one column instead of
+12–17 s for all of them. Hits get three layers — highlighted text, a marked row, and the matched
+column — and a hit in a column hidden by “only selected” is reported with a one-click reveal.
 
 The viewer follows the VS Code theme — including the antd widgets, which used to stay light
 under a dark view. There is no separate light/dark switch.

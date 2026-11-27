@@ -25,6 +25,7 @@ export function useParquetColumnLayout(
   tableBodyWidth: number,
   documentKey: string | undefined,
   resetToken = 0,
+  visibleColumns?: number[],
 ) {
   /** The latest edit for one document; null until the user actually resizes something. */
   const [edited, setEdited] = useState<EditedWidths | null>(null);
@@ -53,8 +54,22 @@ export function useParquetColumnLayout(
 
   const layout = useMemo(() => {
     const widths = columns.map((column) => columnWidths[column.name] ?? DATA_COLUMN_WIDTH);
-    return computeParquetColumnLayout(widths, tableBodyWidth);
-  }, [columnWidths, columns, tableBodyWidth]);
+    const positions =
+      visibleColumns && visibleColumns.length < columns.length
+        ? visibleColumns
+        : columns.map((_column, position) => position);
+    // Only the rendered columns share the leftover width and the filler; hidden columns keep
+    // their base width for the moment they are shown again.
+    const visible = computeParquetColumnLayout(
+      positions.map((position) => widths[position] ?? DATA_COLUMN_WIDTH),
+      tableBodyWidth,
+    );
+    const merged = [...widths];
+    positions.forEach((position, order) => {
+      merged[position] = visible.widths[order] ?? widths[position];
+    });
+    return { widths: merged, filler: visible.filler, extent: visible.extent };
+  }, [columnWidths, columns, tableBodyWidth, visibleColumns]);
 
   const setColumnWidth = useCallback(
     (name: string, width: number) => {

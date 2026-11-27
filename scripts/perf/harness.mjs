@@ -82,9 +82,48 @@ function harnessPage(openPayload) {
   return `<script>
 (function () {
   window.__bench = { t0: 0, ready: 0, open: ${JSON.stringify(openPayload)} };
+  const searches = new Map();
   const api = {
     postMessage(message) {
-      if (!message || message.type !== 'init') return;
+      if (!message) return;
+      if (message.type === 'parquetSearch') {
+        const requestId = message.content && message.content.requestId;
+        const controller = new AbortController();
+        searches.set(requestId, controller);
+        fetch('/host/parquet-search', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            path: window.__bench.open.path,
+            query: String(message.content && message.content.query),
+            columns: message.content && message.content.columns,
+          }),
+          signal: controller.signal,
+        })
+          .then(function (reply) { return reply.json(); })
+          .then(function (data) {
+            if (!searches.has(requestId)) return;
+            searches.delete(requestId);
+            window.postMessage({ type: 'parquetSearchData', content: Object.assign({ requestId: requestId }, data) }, '*');
+          })
+          .catch(function (error) {
+            if (!searches.has(requestId)) return;
+            searches.delete(requestId);
+            if (String(error && error.name) === 'AbortError') return;
+            window.postMessage({ type: 'parquetSearchData', content: { requestId: requestId, rows: null, columns: [], error: String(error) } }, '*');
+          });
+        return;
+      }
+      if (message.type === 'parquetSearchCancel') {
+        const requestId = message.content && message.content.requestId;
+        const controller = searches.get(requestId);
+        if (controller) {
+          controller.abort();
+          searches.delete(requestId);
+        }
+        return;
+      }
+      if (message.type !== 'init') return;
       setTimeout(function () {
         window.__bench.t0 = performance.now();
         window.postMessage({ type: 'open', content: window.__bench.open }, '*');
@@ -116,6 +155,23 @@ export async function startPerfHarness(fixtures, port = 0) {
   const indexHtml = readFileSync(join(WEBVIEW_ROOT, "index.html"), "utf8");
   const buildWebviewCsp = await loadCspBuilder();
 
+  // The search is host-side now; bundle the same service for the fake host.
+  const searchHostDir = mkdtempSync(join(tmpdir(), "ovp-perf-search-"));
+  await build({
+    entryPoints: [join(repoRoot, "scripts", "ui-verify", "parquet-search-host.ts")],
+    outdir: searchHostDir,
+    outExtension: { ".js": ".mjs" },
+    bundle: true,
+    format: "esm",
+    platform: "node",
+    tsconfig: join(repoRoot, "tsconfig.json"),
+    logLevel: "silent",
+  });
+  const { searchFixture } = await import(
+    pathToFileURL(join(searchHostDir, "parquet-search-host.mjs")).href
+  );
+  rmSync(searchHostDir, { recursive: true, force: true });
+
   let stats = { requests: 0, ranged: 0, full: 0, bytes: 0 };
   const reset = () => {
     stats = { requests: 0, ranged: 0, full: 0, bytes: 0 };
@@ -126,6 +182,7 @@ export async function startPerfHarness(fixtures, port = 0) {
     ["/f/flat.parquet", fixtures.flat],
     ["/f/wide.parquet", fixtures.wide],
   ]);
+  const fileForPath = (path) => (path.includes("wide") ? fixtures.wide : fixtures.flat);
 
   function serveFile(req, res, file) {
     if (!existsSync(file)) {
@@ -174,6 +231,35 @@ export async function startPerfHarness(fixtures, port = 0) {
       reset();
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (path === "/host/parquet-search" && req.method === "POST") {
+      let raw = "";
+      req.on("data", (chunk) => {
+        raw += chunk;
+        if (raw.length > 10_000) req.destroy();
+      });
+      req.on("end", async () => {
+        try {
+          const body = JSON.parse(raw);
+          const columns = Array.isArray(body.columns)
+            ? body.columns.filter((position) => Number.isInteger(position))
+            : undefined;
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(
+            JSON.stringify(
+              await searchFixture(
+                fileForPath(String(body.path ?? "")),
+                String(body.query ?? ""),
+                columns,
+              ),
+            ),
+          );
+        } catch (error) {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ rows: null, columns: [], error: String(error) }));
+        }
+      });
       return;
     }
     if (path === "/harness") {
